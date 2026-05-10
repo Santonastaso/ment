@@ -1,0 +1,19 @@
+// See https://containers.dev/implementors/json_reference/ for configuration reference
+{
+	"name": "MENT — Micro-Mentoring Platform",
+	"build": {
+		"dockerfile": "Dockerfile"
+	},
+	"remoteUser": "node",
+	"forwardPorts": [3000, 3001],
+	"portsAttributes": {
+		"3000": {
+			"label": "MENT Frontend",
+			"onAutoForward": "openBrowser"
+		},
+		"3001": {
+			"label": "MENT API",
+			"onAutoForward": "silent"
+		}
+	}
+}
