@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import SkillTagInput from '../components/SkillTagInput.jsx';
 import TeachSkillsEditor from '../components/TeachSkillsEditor.jsx';
+import MonthYearPicker from '../components/MonthYearPicker.jsx';
 import api from '../api/index.js';
 
 const DEPARTMENTS = ['Engineering', 'Finance', 'Marketing', 'Operations', 'HR', 'Legal', 'Product', 'Design', 'Sales', 'Other'];
@@ -20,7 +21,8 @@ export default function Onboarding() {
   const [currentRole, setCurrentRole] = useState(user?.current_role || '');
   const [location, setLocation] = useState(user?.location || '');
   const [bio, setBio] = useState(user?.bio || '');
-  const [career, setCareer] = useState([{ role: '', department: '', company: '', start_year: '', end_year: '' }]);
+  // start_date / end_date are "YYYY-MM" strings (native <input type="month"> format)
+  const [career, setCareer] = useState([{ role: '', department: '', company: '', start_date: '', end_date: '' }]);
 
   // Step 2 — Can teach: array of { skill, example_project }
   const [canTeach, setCanTeach] = useState([]);
@@ -30,7 +32,18 @@ export default function Onboarding() {
   const [shadowResponse, setShadowResponse] = useState(user?.shadow_role_response || '');
 
   function addCareerRow() {
-    setCareer([...career, { role: '', department: '', company: '', start_year: '', end_year: '' }]);
+    setCareer([...career, { role: '', department: '', company: '', start_date: '', end_date: '' }]);
+  }
+
+  function splitDate(s) {
+    if (!s) return { year: null, month: null };
+    const [y, m] = s.split('-');
+    const year = parseInt(y);
+    const month = parseInt(m);
+    return {
+      year: Number.isFinite(year) ? year : null,
+      month: Number.isFinite(month) && month >= 1 && month <= 12 ? month : null,
+    };
   }
 
   function updateCareer(idx, field, value) {
@@ -45,7 +58,21 @@ export default function Onboarding() {
     setSaving(true);
     setError('');
     try {
-      const validCareer = career.filter(c => c.role.trim() && c.department.trim());
+      const validCareer = career
+        .filter(c => c.role.trim() && c.department.trim())
+        .map(c => {
+          const s = splitDate(c.start_date);
+          const e = splitDate(c.end_date);
+          return {
+            role: c.role,
+            department: c.department,
+            company: c.company,
+            start_year: s.year,
+            start_month: s.month,
+            end_year: e.year,
+            end_month: e.month,
+          };
+        });
       const res = await api.post('/users/me/onboarding', {
         name, department, current_role: currentRole, location, bio,
         shadow_role_response: shadowResponse,
@@ -142,9 +169,15 @@ export default function Onboarding() {
                           {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
                         </select>
                         <input className="input text-sm" placeholder="Company (optional)" value={c.company} onChange={e => updateCareer(i, 'company', e.target.value)} />
-                        <div className="flex gap-2">
-                          <input className="input text-sm" type="number" placeholder="From" min="1990" max="2030" value={c.start_year} onChange={e => updateCareer(i, 'start_year', e.target.value)} />
-                          <input className="input text-sm" type="number" placeholder="To" min="1990" max="2030" value={c.end_year} onChange={e => updateCareer(i, 'end_year', e.target.value)} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[10px] text-ink-tertiary mb-1">From</label>
+                          <MonthYearPicker value={c.start_date} onChange={(v) => updateCareer(i, 'start_date', v)} />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] text-ink-tertiary mb-1">To <span className="text-ink-tertiary/70">(empty = present)</span></label>
+                          <MonthYearPicker value={c.end_date} onChange={(v) => updateCareer(i, 'end_date', v)} />
                         </div>
                       </div>
                       {career.length > 1 && (

@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import IcsDownloadButton from './IcsDownloadButton.jsx';
+import RatingPicker from './RatingPicker.jsx';
 import api from '../api/index.js';
 
+// Softer status badges — slate borders, subtle backgrounds. Trust-palette
+// rather than the saturated yellow/blue/green of the previous version.
 const statusColors = {
-  pending:   'bg-yellow-50 text-yellow-700 border-yellow-200',
-  scheduled: 'bg-blue-50 text-blue-700 border-blue-200',
-  completed: 'bg-green-50 text-green-700 border-green-200',
-  cancelled: 'bg-gray-100 text-gray-500 border-gray-200',
+  pending:   'bg-gold-soft text-amber-800 border-amber-200',
+  scheduled: 'bg-blue-50 text-navy border-navy-light/30',
+  completed: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  cancelled: 'bg-surface-subtle text-ink-tertiary border-surface-border',
 };
 
 const statusLabels = {
@@ -34,6 +37,7 @@ function isoToLocalInput(iso) {
 
 export default function SessionCard({ session, currentUserId, onUpdate }) {
   const [reflection, setReflection] = useState('');
+  const [rating, setRating] = useState(null);
   const [showReflection, setShowReflection] = useState(false);
   const [editingDate, setEditingDate] = useState(false);
   const [draftDate, setDraftDate] = useState(isoToLocalInput(session.scheduled_at));
@@ -75,11 +79,15 @@ export default function SessionCard({ session, currentUserId, onUpdate }) {
   async function handleComplete() {
     if (showReflection) {
       setSubmitting(true);
-      // Send the reflection to the right field based on the viewer's role
+      // Send the reflection + rating to the right fields based on viewer's role
       const body = { status: 'completed' };
       if (reflection.trim()) {
         if (isMentor) body.mentor_reflection = reflection.trim();
         else body.reflection = reflection.trim();
+      }
+      if (rating !== null) {
+        if (isMentor) body.mentor_rating = rating;
+        else body.mentee_rating = rating;
       }
       const updated = await api.put(`/sessions/${session.id}`, body);
       onUpdate?.(updated.data);
@@ -110,31 +118,31 @@ export default function SessionCard({ session, currentUserId, onUpdate }) {
   }
 
   return (
-    <div className="card p-5">
+    <div className="card p-5 transition-colors hover:border-navy/15">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-semibold flex-shrink-0">
+          <div className="w-10 h-10 rounded-full bg-surface-subtle flex items-center justify-center text-ink-secondary font-semibold flex-shrink-0">
             {other?.name?.charAt(0) || '?'}
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <Link to={`/profile/${other?.id}`} className="font-semibold text-navy hover:underline text-sm">
+              <Link to={`/profile/${other?.id}`} className="font-semibold text-ink hover:text-navy text-sm transition-colors">
                 {other?.name}
               </Link>
-              <span className="text-xs text-gray-400">{otherRole}</span>
+              <span className="text-xs text-ink-tertiary">{otherRole}</span>
             </div>
-            <p className="text-sm font-medium text-gray-700 mt-0.5">{session.title}</p>
+            <p className="text-sm font-medium text-ink-secondary mt-0.5">{session.title}</p>
             {session.scheduled_at ? (
-              <p className="text-xs text-gray-500 mt-0.5">
+              <p className="text-xs text-ink-tertiary mt-0.5">
                 {new Date(session.scheduled_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
               </p>
             ) : isUndated ? (
-              <p className="text-xs text-gray-500 italic mt-0.5">No date set yet</p>
+              <p className="text-xs text-ink-tertiary italic mt-0.5">No date set yet</p>
             ) : null}
             {session.topics?.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-1.5">
                 {session.topics.map((t, i) => (
-                  <span key={i} className="bg-blue-50 text-navy-light border border-blue-200 rounded-full px-2 py-0.5 text-[11px] font-medium">
+                  <span key={i} className="bg-blue-50 text-navy border border-navy-light/20 rounded-full px-2 py-0.5 text-[11px] font-medium">
                     {t}
                   </span>
                 ))}
@@ -142,15 +150,15 @@ export default function SessionCard({ session, currentUserId, onUpdate }) {
             )}
           </div>
         </div>
-        <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${statusColors[session.status] || statusColors.pending}`}>
+        <span className={`text-[10px] font-semibold uppercase tracking-label px-2 py-1 rounded-full border ${statusColors[session.status] || statusColors.pending}`}>
           {statusLabels[session.status] || session.status}
         </span>
       </div>
 
       {/* Pre-session question */}
       {session.pre_session_question && (
-        <div className="mt-3 bg-gray-50 rounded-lg p-3 text-sm text-gray-600 border border-gray-100">
-          <span className="font-medium text-gray-700">Focus question: </span>
+        <div className="mt-4 bg-surface-muted rounded-lg p-3 text-sm text-ink-secondary border border-surface-border">
+          <span className="font-medium text-ink">Focus question: </span>
           <span className="italic">"{session.pre_session_question}"</span>
         </div>
       )}
@@ -159,31 +167,37 @@ export default function SessionCard({ session, currentUserId, onUpdate }) {
       {session.status === 'completed' && (
         (isMentee && session.reflection) || (isMentor && session.mentor_reflection)
       ) && (
-        <div className="mt-3 bg-green-50 rounded-lg p-3 text-sm text-gray-600 border border-green-100">
-          <span className="font-medium text-green-700">Your reflection: </span>
+        <div className="mt-3 bg-emerald-50 rounded-lg p-3 text-sm text-ink-secondary border border-emerald-100">
+          <span className="font-medium text-emerald-700">Your reflection: </span>
           <span className="italic">"{isMentor ? session.mentor_reflection : session.reflection}"</span>
         </div>
       )}
 
       {/* Reflection input — shown when the user clicks Mark as completed */}
       {showReflection && session.status !== 'completed' && (
-        <div className="mt-3 space-y-2">
-          <label className="label text-sm">{reflectionPrompt}</label>
-          <textarea
-            className="input resize-none text-sm"
-            rows={3}
-            value={reflection}
-            onChange={e => setReflection(e.target.value)}
-            placeholder="Write your reflection here (optional but encouraged)…"
-            autoFocus
-          />
+        <div className="mt-3 space-y-3">
+          <div>
+            <label className="label text-sm">{reflectionPrompt}</label>
+            <textarea
+              className="input resize-none text-sm"
+              rows={3}
+              value={reflection}
+              onChange={e => setReflection(e.target.value)}
+              placeholder="Write your reflection here (optional but encouraged)…"
+              autoFocus
+            />
+          </div>
+          <div>
+            <label className="label text-sm">How useful was this session for you?</label>
+            <RatingPicker value={rating} onChange={setRating} />
+          </div>
         </div>
       )}
 
       {/* Reschedule input — inline datetime picker */}
       {editingDate && (
-        <div className="mt-3 bg-gray-50 rounded-lg p-3 border border-gray-100 space-y-2">
-          <label className="label text-sm">{session.scheduled_at ? 'Pick a new date and time' : 'Set a date and time'}</label>
+        <div className="mt-4 bg-surface-muted rounded-lg p-3 border border-surface-border space-y-2">
+          <label className="label">{session.scheduled_at ? 'Pick a new date and time' : 'Set a date and time'}</label>
           <input
             type="datetime-local"
             className="input text-sm"

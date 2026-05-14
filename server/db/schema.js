@@ -29,7 +29,9 @@ function runSchema() {
       company TEXT DEFAULT '',
       description TEXT DEFAULT '',
       start_year INTEGER,
-      end_year INTEGER
+      start_month INTEGER,
+      end_year INTEGER,
+      end_month INTEGER
     );
 
     CREATE TABLE IF NOT EXISTS skills (
@@ -61,6 +63,8 @@ function runSchema() {
       pre_session_question TEXT DEFAULT '',
       reflection TEXT DEFAULT '',
       mentor_reflection TEXT DEFAULT '',
+      mentee_rating INTEGER,
+      mentor_rating INTEGER,
       topics TEXT DEFAULT '[]',
       created_at TEXT DEFAULT (datetime('now'))
     );
@@ -113,6 +117,10 @@ function runSchema() {
     "ALTER TABLE users ADD COLUMN manager_id INTEGER",
     "ALTER TABLE sessions ADD COLUMN topics TEXT DEFAULT '[]'",
     "ALTER TABLE sessions ADD COLUMN mentor_reflection TEXT DEFAULT ''",
+    "ALTER TABLE sessions ADD COLUMN mentee_rating INTEGER",
+    "ALTER TABLE sessions ADD COLUMN mentor_rating INTEGER",
+    "ALTER TABLE career_history ADD COLUMN start_month INTEGER",
+    "ALTER TABLE career_history ADD COLUMN end_month INTEGER",
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch (e) {

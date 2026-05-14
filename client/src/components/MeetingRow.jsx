@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import RatingPicker from './RatingPicker.jsx';
 import api from '../api/index.js';
 
 // Shared collapsed/expandable row used by both Past and Upcoming meetings.
@@ -17,6 +18,7 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
   const [expanded, setExpanded] = useState(false);
   const [editingReflection, setEditingReflection] = useState(false);
   const [reflectionDraft, setReflectionDraft] = useState('');
+  const [ratingDraft, setRatingDraft] = useState(null);
   const [savingReflection, setSavingReflection] = useState(false);
 
   const isMentor = session.mentor?.id === currentUserId;
@@ -142,10 +144,12 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
             </div>
           )}
           {mode === 'past' && (() => {
-            // Each side has their own private reflection. Show only your own,
-            // and let the user add or edit it ex-post (after the session is over).
+            // Each side has their own private reflection AND their own private rating.
+            // Show only your own, and let the user add or edit ex-post.
             const myReflection = isMentor ? session.mentor_reflection : session.reflection;
+            const myRating = isMentor ? session.mentor_rating : session.mentee_rating;
             const reflectionField = isMentor ? 'mentor_reflection' : 'reflection';
+            const ratingField = isMentor ? 'mentor_rating' : 'mentee_rating';
             const reflectionPrompt = isMentor
               ? 'What did you take away from supporting them?'
               : 'What is one thing you will do differently based on this conversation?';
@@ -154,9 +158,9 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
             async function saveReflection() {
               setSavingReflection(true);
               try {
-                await api.put(`/sessions/${session.id}`, {
-                  [reflectionField]: reflectionDraft.trim(),
-                });
+                const body = { [reflectionField]: reflectionDraft.trim() };
+                if (ratingDraft !== null) body[ratingField] = ratingDraft;
+                await api.put(`/sessions/${session.id}`, body);
                 setEditingReflection(false);
                 onUpdate?.();
               } finally {
@@ -166,27 +170,33 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
 
             if (editingReflection) {
               return (
-                <div className="space-y-2">
-                  <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium">Your reflection (private)</p>
-                  <p className="text-xs text-gray-600 mb-1">{reflectionPrompt}</p>
-                  <textarea
-                    className="input resize-none text-sm"
-                    rows={3}
-                    value={reflectionDraft}
-                    onChange={e => setReflectionDraft(e.target.value)}
-                    placeholder="Take a moment to put words to what you took away…"
-                    autoFocus
-                  />
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-0.5">Your reflection (private)</p>
+                    <p className="text-xs text-gray-600 mb-1">{reflectionPrompt}</p>
+                    <textarea
+                      className="input resize-none text-sm"
+                      rows={3}
+                      value={reflectionDraft}
+                      onChange={e => setReflectionDraft(e.target.value)}
+                      placeholder="Take a moment to put words to what you took away…"
+                      autoFocus
+                    />
+                  </div>
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-0.5">Your rating (private)</p>
+                    <RatingPicker value={ratingDraft} onChange={setRatingDraft} />
+                  </div>
                   <div className="flex gap-2">
                     <button
                       onClick={saveReflection}
-                      disabled={savingReflection || !reflectionDraft.trim()}
+                      disabled={savingReflection || (!reflectionDraft.trim() && ratingDraft === null)}
                       className="btn-primary text-sm"
                     >
-                      {savingReflection ? 'Saving…' : 'Save reflection'}
+                      {savingReflection ? 'Saving…' : 'Save'}
                     </button>
                     <button
-                      onClick={() => { setEditingReflection(false); setReflectionDraft(''); }}
+                      onClick={() => { setEditingReflection(false); setReflectionDraft(''); setRatingDraft(null); }}
                       className="btn-ghost text-sm"
                     >
                       Cancel
@@ -196,19 +206,24 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
               );
             }
 
-            if (myReflection) {
+            if (myReflection || myRating) {
               return (
-                <div>
+                <div className="space-y-2">
                   <div className="flex items-baseline justify-between gap-2 mb-0.5">
                     <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium">Your reflection (private)</p>
                     <button
-                      onClick={() => { setReflectionDraft(myReflection); setEditingReflection(true); }}
+                      onClick={() => { setReflectionDraft(myReflection || ''); setRatingDraft(myRating ?? null); setEditingReflection(true); }}
                       className="text-xs text-navy-light hover:text-navy font-medium"
                     >
                       Edit
                     </button>
                   </div>
-                  <p className="text-gray-700 whitespace-pre-wrap">{myReflection}</p>
+                  {myReflection && <p className="text-gray-700 whitespace-pre-wrap">{myReflection}</p>}
+                  {myRating && (
+                    <div className="text-xs text-gray-500">
+                      Your rating: <RatingPicker value={myRating} onChange={() => {}} disabled showHint={false} />
+                    </div>
+                  )}
                 </div>
               );
             }
@@ -216,10 +231,10 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
             return (
               <div>
                 <p className="text-gray-400 text-xs italic mb-2">
-                  You haven't written a reflection for this one. {partnerName}'s reflection (if any) is private to them.
+                  You haven't written a reflection for this one. {partnerName}'s reflection and rating (if any) are private to them.
                 </p>
                 <button
-                  onClick={() => { setReflectionDraft(''); setEditingReflection(true); }}
+                  onClick={() => { setReflectionDraft(''); setRatingDraft(null); setEditingReflection(true); }}
                   className="btn-secondary text-xs"
                 >
                   + Add a reflection

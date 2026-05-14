@@ -4,7 +4,12 @@
 
 @layer base {
   body {
-    @apply text-gray-800 antialiased;
+    @apply text-ink antialiased bg-surface-muted;
+    font-feature-settings: 'cv11', 'ss01';   /* Inter variant glyphs for cleaner letterforms */
+  }
+  h1, h2, h3, h4 {
+    @apply text-ink;
+    letter-spacing: -0.01em;
   }
 }
 
@@ -33,25 +38,45 @@
 }
 
 @layer components {
+  /* Buttons — calmer transitions, subtle shadow on primary for slight depth */
   .btn-primary {
-    @apply bg-navy text-white px-4 py-2 rounded-lg font-medium hover:bg-navy-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center bg-navy text-white px-4 py-2.5 rounded-lg font-medium
+           shadow-sm hover:bg-navy-dark hover:shadow transition-all
+           disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-navy disabled:hover:shadow-sm;
   }
   .btn-secondary {
-    @apply bg-white text-navy border border-navy px-4 py-2 rounded-lg font-medium hover:bg-gray-50 transition-colors disabled:opacity-50;
+    @apply inline-flex items-center justify-center bg-surface text-navy border border-surface-border px-4 py-2.5 rounded-lg font-medium
+           hover:bg-surface-subtle hover:border-navy/30 transition-all
+           disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .btn-ghost {
-    @apply text-gray-500 px-4 py-2 rounded-lg font-medium hover:bg-gray-100 transition-colors;
+    @apply inline-flex items-center justify-center text-ink-secondary px-4 py-2.5 rounded-lg font-medium
+           hover:bg-surface-subtle hover:text-ink transition-colors;
   }
+
+  /* Cards — softer slate border, no shadow by default (Linear-style) */
   .card {
-    @apply bg-white rounded-xl border border-gray-200 shadow-sm;
+    @apply bg-surface rounded-xl border border-surface-border;
   }
+
+  /* Form controls — refined focus ring and placeholder color */
   .input {
-    @apply w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy-light focus:border-transparent;
+    @apply w-full bg-surface border border-surface-border rounded-lg px-3 py-2.5 text-sm text-ink
+           placeholder:text-ink-placeholder
+           focus:outline-none focus:ring-2 focus:ring-navy-light/30 focus:border-navy-light
+           transition-colors;
   }
   .label {
-    @apply block text-sm font-medium text-gray-700 mb-1;
+    @apply block text-sm font-medium text-ink mb-1.5;
   }
+  /* Use .label-meta for tiny uppercase eyebrows above values (Stripe-style) */
+  .label-meta {
+    @apply block text-[11px] font-semibold text-ink-secondary uppercase tracking-label mb-1;
+  }
+
+  /* Section headings — bigger, tighter spacing below */
   .section-title {
-    @apply text-lg font-semibold text-navy mb-4;
+    @apply text-xl font-semibold text-ink mb-3;
+    letter-spacing: -0.01em;
   }
 }

@@ -7,10 +7,47 @@ import BadgeDisplay from '../components/BadgeDisplay.jsx';
 import SessionRequestModal from '../components/SessionRequestModal.jsx';
 import SkillLandscape from '../components/SkillLandscape.jsx';
 import PastMeetings from '../components/PastMeetings.jsx';
+import MonthYearPicker from '../components/MonthYearPicker.jsx';
 import ReflectionLog from '../components/ReflectionLog.jsx';
 import api from '../api/index.js';
 
 const DEPARTMENTS = ['Engineering', 'Finance', 'Marketing', 'Operations', 'HR', 'Legal', 'Product', 'Design', 'Sales', 'Other'];
+
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// Convert (year, month) to "YYYY-MM" string that <input type="month"> expects.
+function ymToInput(year, month) {
+  if (!year) return '';
+  const m = month && month >= 1 && month <= 12 ? String(month).padStart(2, '0') : '01';
+  return `${year}-${m}`;
+}
+
+// Parse "YYYY-MM" back into { year, month } pair (null-safe).
+function inputToYM(value) {
+  if (!value) return { year: null, month: null };
+  const [y, m] = value.split('-');
+  const year = parseInt(y);
+  const month = parseInt(m);
+  return {
+    year: Number.isFinite(year) ? year : null,
+    month: Number.isFinite(month) && month >= 1 && month <= 12 ? month : null,
+  };
+}
+
+// Render a "Jun 2018 – Jul 2022" / "2018 – present" period label, handling
+// year-only legacy data gracefully.
+function formatPeriod(startY, startM, endY, endM) {
+  const fmt = (y, m) => {
+    if (!y) return '';
+    if (m && m >= 1 && m <= 12) return `${MONTH_NAMES[m - 1]} ${y}`;
+    return String(y);
+  };
+  const start = fmt(startY, startM);
+  const end = endY ? fmt(endY, endM) : 'present';
+  if (!start && (!endY)) return '';
+  if (!start) return end;
+  return `${start} – ${end}`;
+}
 
 export default function Profile() {
   const { id } = useParams();
@@ -31,8 +68,12 @@ export default function Profile() {
   // Edit form state
   const [form, setForm] = useState({});
   const [wantsToLearn, setWantsToLearn] = useState([]);
-  const [newCareer, setNewCareer] = useState({ role: '', department: '', company: '', description: '', start_year: '', end_year: '' });
+  // Career form uses `start_date` / `end_date` as "YYYY-MM" strings (matching
+  // the native <input type="month"> value); we split into year + month on save.
+  const [newCareer, setNewCareer] = useState({ role: '', department: '', company: '', description: '', start_date: '', end_date: '' });
   const [showAddCareer, setShowAddCareer] = useState(false);
+  const [editingCareerId, setEditingCareerId] = useState(null);
+  const [editCareerDraft, setEditCareerDraft] = useState(null);
   const [editingShadow, setEditingShadow] = useState(false);
   const [shadowDraft, setShadowDraft] = useState('');
 
@@ -154,9 +195,21 @@ export default function Profile() {
 
   async function handleAddCareer() {
     if (!newCareer.role.trim() || !newCareer.department.trim()) return;
-    const res = await api.post('/users/me/career', newCareer);
+    const start = inputToYM(newCareer.start_date);
+    const end = inputToYM(newCareer.end_date);
+    const payload = {
+      role: newCareer.role,
+      department: newCareer.department,
+      company: newCareer.company,
+      description: newCareer.description,
+      start_year: start.year,
+      start_month: start.month,
+      end_year: end.year,
+      end_month: end.month,
+    };
+    const res = await api.post('/users/me/career', payload);
     setProfile(prev => ({ ...prev, career: [res.data, ...(prev.career || [])] }));
-    setNewCareer({ role: '', department: '', company: '', description: '', start_year: '', end_year: '' });
+    setNewCareer({ role: '', department: '', company: '', description: '', start_date: '', end_date: '' });
     setShowAddCareer(false);
     showToast('Career entry added');
   }
@@ -165,6 +218,47 @@ export default function Profile() {
     await api.delete(`/users/me/career/${id}`);
     setProfile(prev => ({ ...prev, career: prev.career.filter(c => c.id !== id) }));
     showToast('Entry removed');
+  }
+
+  function startEditCareer(entry) {
+    setEditingCareerId(entry.id);
+    setEditCareerDraft({
+      role: entry.role || '',
+      department: entry.department || '',
+      company: entry.company || '',
+      description: entry.description || '',
+      start_date: ymToInput(entry.start_year, entry.start_month),
+      end_date: ymToInput(entry.end_year, entry.end_month),
+    });
+  }
+
+  function cancelEditCareer() {
+    setEditingCareerId(null);
+    setEditCareerDraft(null);
+  }
+
+  async function handleSaveEditedCareer() {
+    if (!editingCareerId || !editCareerDraft) return;
+    if (!editCareerDraft.role.trim() || !editCareerDraft.department.trim()) return;
+    const start = inputToYM(editCareerDraft.start_date);
+    const end = inputToYM(editCareerDraft.end_date);
+    const payload = {
+      role: editCareerDraft.role,
+      department: editCareerDraft.department,
+      company: editCareerDraft.company,
+      description: editCareerDraft.description,
+      start_year: start.year,
+      start_month: start.month,
+      end_year: end.year,
+      end_month: end.month,
+    };
+    const res = await api.put(`/users/me/career/${editingCareerId}`, payload);
+    setProfile(prev => ({
+      ...prev,
+      career: prev.career.map(c => c.id === editingCareerId ? res.data : c),
+    }));
+    cancelEditCareer();
+    showToast('Entry updated');
   }
 
   if (loading) {
@@ -352,9 +446,19 @@ export default function Profile() {
                 {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
               <input className="input text-sm" placeholder="Company" value={newCareer.company} onChange={e => setNewCareer(c => ({...c, company: e.target.value}))} />
-              <div className="flex gap-2">
-                <input className="input text-sm" type="number" placeholder="From" value={newCareer.start_year} onChange={e => setNewCareer(c => ({...c, start_year: e.target.value}))} />
-                <input className="input text-sm" type="number" placeholder="To" value={newCareer.end_year} onChange={e => setNewCareer(c => ({...c, end_year: e.target.value}))} />
+              <div>
+                <label className="block text-[10px] text-ink-tertiary mb-1">From</label>
+                <MonthYearPicker
+                  value={newCareer.start_date}
+                  onChange={(v) => setNewCareer(c => ({...c, start_date: v}))}
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] text-ink-tertiary mb-1">To <span className="text-ink-tertiary/70">(leave empty if this is your current role)</span></label>
+                <MonthYearPicker
+                  value={newCareer.end_date}
+                  onChange={(v) => setNewCareer(c => ({...c, end_date: v}))}
+                />
               </div>
             </div>
             <textarea
@@ -371,24 +475,82 @@ export default function Profile() {
         {profile.career?.length > 0 ? (
           <div className="space-y-3">
             {profile.career.map(entry => (
-              <div key={entry.id} className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="font-medium text-sm text-navy">{entry.role}</p>
-                  <p className="text-xs text-gray-500">
-                    {entry.department}
-                    {entry.company && ` · ${entry.company}`}
-                    {(entry.start_year || entry.end_year) && ` · ${entry.start_year || ''}–${entry.end_year || 'present'}`}
-                  </p>
-                  {entry.description && (
-                    <p className="text-xs text-gray-600 mt-1">{entry.description}</p>
+              editingCareerId === entry.id ? (
+                <div key={entry.id} className="bg-gray-50 rounded-lg p-4 space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      className="input text-sm"
+                      placeholder="Role title *"
+                      value={editCareerDraft.role}
+                      onChange={e => setEditCareerDraft(d => ({...d, role: e.target.value}))}
+                    />
+                    <select
+                      className="input text-sm"
+                      value={editCareerDraft.department}
+                      onChange={e => setEditCareerDraft(d => ({...d, department: e.target.value}))}
+                    >
+                      <option value="">Department *</option>
+                      {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                    <input
+                      className="input text-sm"
+                      placeholder="Company"
+                      value={editCareerDraft.company}
+                      onChange={e => setEditCareerDraft(d => ({...d, company: e.target.value}))}
+                    />
+                    <div />
+                    <div>
+                      <label className="block text-[10px] text-ink-tertiary mb-1">From</label>
+                      <MonthYearPicker
+                        value={editCareerDraft.start_date}
+                        onChange={(v) => setEditCareerDraft(d => ({...d, start_date: v}))}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-ink-tertiary mb-1">To <span className="text-ink-tertiary/70">(leave empty if this is your current role)</span></label>
+                      <MonthYearPicker
+                        value={editCareerDraft.end_date}
+                        onChange={(v) => setEditCareerDraft(d => ({...d, end_date: v}))}
+                      />
+                    </div>
+                  </div>
+                  <textarea
+                    className="input text-sm resize-none"
+                    rows={2}
+                    placeholder="What did you do in this role? (optional)"
+                    value={editCareerDraft.description}
+                    onChange={e => setEditCareerDraft(d => ({...d, description: e.target.value}))}
+                  />
+                  <div className="flex gap-2">
+                    <button onClick={handleSaveEditedCareer} className="btn-primary text-sm">Save</button>
+                    <button onClick={cancelEditCareer} className="btn-ghost text-sm">Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <div key={entry.id} className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm text-navy">{entry.role}</p>
+                    <p className="text-xs text-gray-500">
+                      {entry.department}
+                      {entry.company && ` · ${entry.company}`}
+                      {(entry.start_year || entry.end_year) && ` · ${formatPeriod(entry.start_year, entry.start_month, entry.end_year, entry.end_month)}`}
+                    </p>
+                    {entry.description && (
+                      <p className="text-xs text-gray-600 mt-1">{entry.description}</p>
+                    )}
+                  </div>
+                  {isOwnProfile && (
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      <button onClick={() => startEditCareer(entry)} className="text-gray-400 hover:text-navy text-sm">
+                        Edit
+                      </button>
+                      <button onClick={() => handleDeleteCareer(entry.id)} className="text-gray-400 hover:text-red-500 text-sm">
+                        Remove
+                      </button>
+                    </div>
                   )}
                 </div>
-                {isOwnProfile && (
-                  <button onClick={() => handleDeleteCareer(entry.id)} className="text-gray-400 hover:text-red-500 text-sm flex-shrink-0">
-                    Remove
-                  </button>
-                )}
-              </div>
+              )
             ))}
           </div>
         ) : (

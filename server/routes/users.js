@@ -232,7 +232,7 @@ router.post('/me/onboarding', authMiddleware, (req, res) => {
   db.prepare('DELETE FROM career_history WHERE user_id = ?').run(req.user.id);
   if (Array.isArray(career)) {
     const insertCareer = db.prepare(
-      'INSERT INTO career_history (user_id, role, department, company, description, start_year, end_year) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      'INSERT INTO career_history (user_id, role, department, company, description, start_year, start_month, end_year, end_month) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
     );
     for (const entry of career) {
       if (entry.role && entry.department) {
@@ -243,7 +243,9 @@ router.post('/me/onboarding', authMiddleware, (req, res) => {
           entry.company || '',
           entry.description || '',
           entry.start_year || null,
-          entry.end_year || null
+          entry.start_month || null,
+          entry.end_year || null,
+          entry.end_month || null
         );
       }
     }
@@ -310,15 +312,81 @@ router.delete('/me/skills/:id', authMiddleware, (req, res) => {
 
 // POST /api/users/me/career
 router.post('/me/career', authMiddleware, (req, res) => {
-  const { role, department, company, description, start_year, end_year } = req.body;
+  const { role, department, company, description, start_year, start_month, end_year, end_month } = req.body;
   if (!role || !department) {
     return res.status(400).json({ error: 'role and department required' });
   }
+  // Validate month if provided — must be 1-12
+  const cleanMonth = (m) => {
+    if (m === undefined || m === null || m === '') return null;
+    const n = parseInt(m);
+    return (Number.isFinite(n) && n >= 1 && n <= 12) ? n : null;
+  };
   const result = db.prepare(
-    'INSERT INTO career_history (user_id, role, department, company, description, start_year, end_year) VALUES (?, ?, ?, ?, ?, ?, ?)'
-  ).run(req.user.id, role, department, company || '', description || '', start_year || null, end_year || null);
+    'INSERT INTO career_history (user_id, role, department, company, description, start_year, start_month, end_year, end_month) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(
+    req.user.id,
+    role,
+    department,
+    company || '',
+    description || '',
+    start_year || null,
+    cleanMonth(start_month),
+    end_year || null,
+    cleanMonth(end_month)
+  );
   computeMatchesForUser(req.user.id);
-  res.status(201).json({ id: result.lastInsertRowid, role, department, company, description, start_year, end_year });
+  const row = db.prepare('SELECT * FROM career_history WHERE id = ?').get(result.lastInsertRowid);
+  res.status(201).json(row);
+});
+
+// PUT /api/users/me/career/:id — update an existing career entry
+router.put('/me/career/:id', authMiddleware, (req, res) => {
+  const id = parseInt(req.params.id);
+  const existing = db.prepare('SELECT * FROM career_history WHERE id = ? AND user_id = ?').get(id, req.user.id);
+  if (!existing) return res.status(404).json({ error: 'Career entry not found' });
+
+  const { role, department, company, description, start_year, start_month, end_year, end_month } = req.body;
+  if (role !== undefined && !String(role).trim()) {
+    return res.status(400).json({ error: 'role cannot be empty' });
+  }
+  if (department !== undefined && !String(department).trim()) {
+    return res.status(400).json({ error: 'department cannot be empty' });
+  }
+
+  const cleanMonth = (m) => {
+    if (m === undefined || m === null || m === '') return null;
+    const n = parseInt(m);
+    return (Number.isFinite(n) && n >= 1 && n <= 12) ? n : null;
+  };
+  const cleanYear = (y) => {
+    if (y === undefined || y === null || y === '') return null;
+    const n = parseInt(y);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  // Build a partial UPDATE — only fields actually sent in the body are touched
+  const updates = {};
+  if (role !== undefined)         updates.role = role;
+  if (department !== undefined)   updates.department = department;
+  if (company !== undefined)      updates.company = company;
+  if (description !== undefined)  updates.description = description;
+  if (start_year !== undefined)   updates.start_year = cleanYear(start_year);
+  if (start_month !== undefined)  updates.start_month = cleanMonth(start_month);
+  if (end_year !== undefined)     updates.end_year = cleanYear(end_year);
+  if (end_month !== undefined)    updates.end_month = cleanMonth(end_month);
+
+  if (Object.keys(updates).length === 0) {
+    return res.status(400).json({ error: 'No valid fields to update' });
+  }
+
+  const setClauses = Object.keys(updates).map(k => `${k} = ?`).join(', ');
+  const values = [...Object.values(updates), id];
+  db.prepare(`UPDATE career_history SET ${setClauses} WHERE id = ?`).run(...values);
+
+  computeMatchesForUser(req.user.id);
+  const row = db.prepare('SELECT * FROM career_history WHERE id = ?').get(id);
+  res.json(row);
 });
 
 // DELETE /api/users/me/career/:id

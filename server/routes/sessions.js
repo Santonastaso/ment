@@ -54,6 +54,11 @@ function enrichSession(session, currentUserId) {
     // their own private write-up.
     reflection: isMentee ? session.reflection : undefined,
     mentor_reflection: isMentor ? session.mentor_reflection : undefined,
+    // Same privacy rule for ratings: only the rater sees their own rating.
+    // The other party never sees how they were rated — this preserves honesty
+    // and prevents performative 5-star scoring.
+    mentee_rating: isMentee ? session.mentee_rating : undefined,
+    mentor_rating: isMentor ? session.mentor_rating : undefined,
   };
 }
 
@@ -137,25 +142,46 @@ router.put('/:id', authMiddleware, (req, res) => {
     return res.status(403).json({ error: 'Forbidden' });
   }
 
-  const { status, scheduled_at, reflection, mentor_reflection } = req.body;
+  const { status, scheduled_at, reflection, mentor_reflection, mentee_rating, mentor_rating } = req.body;
 
   // Only mentor can accept (change pending -> scheduled)
   if (status === 'scheduled' && session.mentor_id !== req.user.id) {
     return res.status(403).json({ error: 'Only the mentor can accept a session request' });
   }
-  // Mentee writes the mentee reflection, mentor writes the mentor reflection
+  // Mentee writes the mentee reflection + rating; mentor writes the mentor's.
   if (reflection !== undefined && session.mentee_id !== req.user.id) {
     return res.status(403).json({ error: 'Only the mentee can add a mentee reflection' });
   }
   if (mentor_reflection !== undefined && session.mentor_id !== req.user.id) {
     return res.status(403).json({ error: 'Only the mentor can add a mentor reflection' });
   }
+  if (mentee_rating !== undefined && session.mentee_id !== req.user.id) {
+    return res.status(403).json({ error: 'Only the mentee can set the mentee rating' });
+  }
+  if (mentor_rating !== undefined && session.mentor_id !== req.user.id) {
+    return res.status(403).json({ error: 'Only the mentor can set the mentor rating' });
+  }
+  // Sanitize ratings to 1-5 integer, or null to clear
+  const cleanRating = (v) => {
+    if (v === null) return null;
+    const n = parseInt(v, 10);
+    if (!Number.isFinite(n) || n < 1 || n > 5) return undefined; // ignore garbage
+    return n;
+  };
 
   const updates = {};
   if (status) updates.status = status;
   if (scheduled_at !== undefined) updates.scheduled_at = scheduled_at;
   if (reflection !== undefined) updates.reflection = reflection;
   if (mentor_reflection !== undefined) updates.mentor_reflection = mentor_reflection;
+  if (mentee_rating !== undefined) {
+    const r = cleanRating(mentee_rating);
+    if (r !== undefined) updates.mentee_rating = r;
+  }
+  if (mentor_rating !== undefined) {
+    const r = cleanRating(mentor_rating);
+    if (r !== undefined) updates.mentor_rating = r;
+  }
 
   if (Object.keys(updates).length === 0) {
     return res.status(400).json({ error: 'No valid fields to update' });
@@ -184,6 +210,13 @@ router.put('/:id', authMiddleware, (req, res) => {
     // Retroactive reflection edit on an already-completed session
     auditLog(req, 'session.reflection_added', 'session', session.id, {
       role: reflection !== undefined ? 'mentee' : 'mentor',
+    });
+  }
+  if (mentee_rating !== undefined || mentor_rating !== undefined) {
+    // Ratings — auditable because they feed the matching algorithm
+    auditLog(req, 'session.rated', 'session', session.id, {
+      role: mentor_rating !== undefined ? 'mentor' : 'mentee',
+      rating: mentor_rating ?? mentee_rating ?? null,
     });
   }
 

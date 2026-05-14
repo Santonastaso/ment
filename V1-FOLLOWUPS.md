@@ -250,7 +250,16 @@ download for the underlying data.
 
 ---
 
-### 19. Reflection log fetches the last 50 entries with no pagination
+### 19. Seed-large can't re-run on an existing DB
+**Status today.** `npm run seed:large` does `DELETE FROM users` after deleting child rows, but `users.manager_id` is a self-reference with no `ON DELETE` clause, so the delete fails with `SQLITE_CONSTRAINT_FOREIGNKEY` if any manager rows exist. Workaround: `rm server/ment.db*` first.
+
+**Why it's OK for MVP.** Seeding from scratch is rare and the workaround is a one-liner.
+
+**V1 fix.** Either add `ON DELETE SET NULL` to the `manager_id` foreign key, or have the seed `UPDATE users SET manager_id = NULL` as the first DELETE step. Two-minute change.
+
+---
+
+### 20. Reflection log fetches the last 50 entries with no pagination
 **Status today.** `GET /api/reflections` returns up to 50 entries, hard cap.
 
 **Why it's OK for MVP.** A user logging twice a week takes 6 months to hit

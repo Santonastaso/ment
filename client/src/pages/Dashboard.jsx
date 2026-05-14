@@ -151,11 +151,11 @@ export default function Dashboard() {
   });
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-12">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-navy">Welcome back, {user?.name?.split(' ')[0]}</h1>
-        <p className="text-gray-500 mt-1">Here's who you should connect with today.</p>
+        <h1 className="text-3xl font-semibold text-ink tracking-tight">Welcome back, {user?.name?.split(' ')[0]}</h1>
+        <p className="text-ink-secondary mt-1.5">Here's who you should connect with today.</p>
       </div>
 
       {/* Weekly check-in nudge */}
@@ -206,10 +206,10 @@ export default function Dashboard() {
 
       {/* Section 1: Matches */}
       <section>
-        <div className="flex items-end justify-between mb-1 flex-wrap gap-2">
+        <div className="flex items-end justify-between mb-4 flex-wrap gap-2">
           <div>
             <h2 className="section-title mb-0">Mentors for you</h2>
-            <p className="text-xs text-gray-500 mt-1">Three colleagues who could mentor you on what you're trying to grow.</p>
+            <p className="text-sm text-ink-secondary mt-1">Three colleagues who could mentor you on what you're trying to grow.</p>
           </div>
           {totalMatches > matches.length && (
             <Link to="/explorer" className="text-sm text-navy-light hover:text-navy font-medium">
@@ -256,9 +256,9 @@ export default function Dashboard() {
 
       {/* Section 2: Your sessions — split into "needs action" and "upcoming" */}
       <section>
-        <div className="mb-3">
+        <div className="mb-4">
           <h2 className="section-title mb-0">Your sessions</h2>
-          <p className="text-xs text-gray-500 mt-1">Past meetings live on your <Link to="/profile" className="text-navy-light hover:underline">profile</Link>.</p>
+          <p className="text-sm text-ink-secondary mt-1">Past meetings live on your <Link to="/profile" className="text-navy-light hover:underline">profile</Link>.</p>
         </div>
 
         {loadingSessions ? (
@@ -273,10 +273,10 @@ export default function Dashboard() {
           <div className="space-y-6">
             {needsAction.length > 0 && (
               <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="w-2 h-2 rounded-full bg-amber-400" />
-                  <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Needs your attention</h3>
-                  <span className="text-xs text-gray-400">{needsAction.length}</span>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="w-1.5 h-1.5 rounded-full bg-gold" />
+                  <h3 className="label-meta mb-0 text-ink-secondary">Needs your attention</h3>
+                  <span className="text-xs text-ink-tertiary">{needsAction.length}</span>
                 </div>
                 <div className="space-y-3">
                   {needsAction.map(session => (
@@ -293,10 +293,10 @@ export default function Dashboard() {
 
             {upcoming.length > 0 && (
               <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="w-2 h-2 rounded-full bg-navy-light" />
-                  <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Upcoming</h3>
-                  <span className="text-xs text-gray-400">{upcoming.length}</span>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="w-1.5 h-1.5 rounded-full bg-navy-light" />
+                  <h3 className="label-meta mb-0 text-ink-secondary">Upcoming</h3>
+                  <span className="text-xs text-ink-tertiary">{upcoming.length}</span>
                 </div>
                 <div className="space-y-3">
                   {upcoming.map(session => (

@@ -201,9 +201,9 @@ function computeAllMatches() {
   insertMany();
 }
 
-// Aggregate the viewer's accept/decline history into a department-only bias
-// signal. Used by getMatchesForUser to personalize the order of stored match
-// scores without changing the underlying base score.
+// Aggregate the viewer's accept/decline + rating history into per-department
+// bias signals. Used by getMatchesForUser to personalize the order of stored
+// match scores without changing the underlying base score.
 function getViewerPreferences(userId) {
   const declined = db.prepare(`
     SELECT u.department FROM connections c
@@ -217,31 +217,89 @@ function getViewerPreferences(userId) {
     WHERE (s.mentor_id = ? OR s.mentee_id = ?) AND s.status IN ('scheduled', 'completed')
   `).all(userId, userId, userId);
 
+  // Pull every rating the viewer has given on completed sessions, with the
+  // other party's department alongside it. Used to compute per-dept average
+  // satisfaction.
+  const rated = db.prepare(`
+    SELECT
+      u.department AS department,
+      CASE WHEN s.mentor_id = ? THEN s.mentor_rating ELSE s.mentee_rating END AS rating
+    FROM sessions s
+    JOIN users u ON u.id = CASE WHEN s.mentor_id = ? THEN s.mentee_id ELSE s.mentor_id END
+    WHERE (s.mentor_id = ? OR s.mentee_id = ?)
+      AND s.status = 'completed'
+      AND (CASE WHEN s.mentor_id = ? THEN s.mentor_rating ELSE s.mentee_rating END) IS NOT NULL
+  `).all(userId, userId, userId, userId, userId);
+
   const tally = (rows, key) => rows.reduce((acc, r) => {
     const v = r[key];
     if (v) acc[v] = (acc[v] || 0) + 1;
     return acc;
   }, {});
 
+  // Build per-department rating buckets: { dept: { sum, count, avg } }
+  const ratingsByDept = {};
+  for (const r of rated) {
+    if (!r.department || r.rating == null) continue;
+    const bucket = ratingsByDept[r.department] ||= { sum: 0, count: 0 };
+    bucket.sum += r.rating;
+    bucket.count += 1;
+  }
+  for (const dept of Object.keys(ratingsByDept)) {
+    ratingsByDept[dept].avg = ratingsByDept[dept].sum / ratingsByDept[dept].count;
+  }
+
   return {
     declines: { dept: tally(declined, 'department') },
     accepts: { dept: tally(accepted, 'department') },
+    ratings: { dept: ratingsByDept },
   };
 }
 
 // Compute the per-match adjustment (positive or negative) and any extra
 // reasons to surface. Caps are tight so signal never dominates the base score.
+//
+// Three signals stack: accept-volume boost, decline-volume penalty, and rating
+// average per department. Ratings carry the most weight because they're the
+// most deliberate signal — accepting a match is one click, rating a 5/5 is a
+// considered judgment after the meeting actually happened.
 function viewerAdjustment(prefs, candidate) {
   const declinesDept = prefs.declines.dept[candidate.department] || 0;
   const acceptsDept  = prefs.accepts.dept[candidate.department]  || 0;
+  const ratingBucket = prefs.ratings.dept[candidate.department];
 
   // Each completed/scheduled session = +2 (cap +6); each decline = -1 (cap -8)
   const deptBoost   = Math.min(acceptsDept * 2, 6);
   const deptPenalty = -Math.min(declinesDept, 8);
 
-  const adjustment = deptBoost + deptPenalty;
+  // Rating adjustment kicks in once we have ≥2 rated sessions for the dept
+  // (avoids a single bad rating tanking an entire department). Capped ±5.
+  let ratingAdjust = 0;
+  let ratingReason = null;
+  if (ratingBucket && ratingBucket.count >= 2) {
+    const avg = ratingBucket.avg;
+    if (avg >= 4.5) {
+      ratingAdjust = 5;
+      ratingReason =
+        `Your past sessions with ${candidate.department} colleagues have been consistently excellent — strong extra weight.`;
+    } else if (avg >= 4.0) {
+      ratingAdjust = 3;
+      ratingReason =
+        `Your past ratings of ${candidate.department} sessions skew positive — extra weight added.`;
+    } else if (avg >= 3.5) {
+      ratingAdjust = 1;
+    } else if (avg < 2.5) {
+      ratingAdjust = -5; // silent
+    } else if (avg < 3.0) {
+      ratingAdjust = -3; // silent
+    }
+  }
+
+  const adjustment = deptBoost + deptPenalty + ratingAdjust;
   const reasons = [];
-  if (acceptsDept >= 1) {
+  if (ratingReason) {
+    reasons.push(ratingReason);
+  } else if (acceptsDept >= 1) {
     reasons.push(
       `Past mentoring with ${candidate.department} colleagues has gone well — extra weight added.`
     );
