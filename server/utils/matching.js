@@ -411,4 +411,13 @@ function countMatchesForUser(userId, { role = null } = {}) {
   return count;
 }
 
-module.exports = { computeMatchesForUser, computeAllMatches, getMatchesForUser, countMatchesForUser };
+module.exports = {
+  computeScore,
+  computeMatchesForUser,
+  computeAllMatches,
+  getMatchesForUser,
+  countMatchesForUser,
+  isMentorLeaning,
+  viewerAdjustment,
+  getViewerPreferences,
+};

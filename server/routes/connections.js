@@ -1,13 +1,12 @@
 const express = require('express');
 const db = require('../db/database');
-const { authMiddleware } = require('../middleware/auth');
 
 const router = express.Router();
 
 // POST /api/connections — upsert. If the connection already exists, update its
 // status; otherwise insert. Lets the client mark "not interested" in one call
 // instead of POST-then-PUT (which had a bug where the PUT used the wrong id).
-router.post('/', authMiddleware, (req, res) => {
+router.post('/', (req, res) => {
   const { addressee_id, status: requestedStatus } = req.body;
   if (!addressee_id) return res.status(400).json({ error: 'addressee_id required' });
   if (addressee_id === req.user.id) return res.status(400).json({ error: 'Cannot connect with yourself' });
@@ -31,7 +30,7 @@ router.post('/', authMiddleware, (req, res) => {
 });
 
 // PUT /api/connections/:id
-router.put('/:id', authMiddleware, (req, res) => {
+router.put('/:id', (req, res) => {
   const { status } = req.body;
   if (!['accepted', 'declined'].includes(status)) {
     return res.status(400).json({ error: 'status must be accepted or declined' });
@@ -50,7 +49,7 @@ router.put('/:id', authMiddleware, (req, res) => {
 });
 
 // GET /api/connections
-router.get('/', authMiddleware, (req, res) => {
+router.get('/', (req, res) => {
   const connections = db.prepare(`
     SELECT c.*,
       r.name as requester_name, r.department as requester_dept,

@@ -1,6 +1,5 @@
 const express = require('express');
 const db = require('../db/database');
-const { authMiddleware } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -13,7 +12,7 @@ const MIN_REPORTS_FOR_REPORT = 3;
 // Returns an anonymized ranking of the most common "wants_to_learn" skills
 // across the current user's direct reports — plus, for context, the most
 // common "can_teach" skills. No names, no ids, no per-employee breakdown.
-router.get('/skill-gaps', authMiddleware, (req, res) => {
+router.get('/skill-gaps', (req, res) => {
   const reports = db.prepare(
     'SELECT id FROM users WHERE manager_id = ? AND is_admin = 0'
   ).all(req.user.id);

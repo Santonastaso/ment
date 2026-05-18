@@ -1,5 +1,4 @@
 const express = require('express');
-const { authMiddleware } = require('../middleware/auth');
 const { getMatchesForUser, countMatchesForUser } = require('../utils/matching');
 
 const router = express.Router();
@@ -8,7 +7,7 @@ const router = express.Router();
 // No limit returns all stored matches (sorted by score desc, dismissed filtered out).
 // role=mentor restricts to candidates who lean toward being a mentor for the
 // viewer (they teach what you want to learn, or are senior to you, etc.).
-router.get('/', authMiddleware, (req, res) => {
+router.get('/', (req, res) => {
   const limit = req.query.limit ? Math.max(0, parseInt(req.query.limit)) : undefined;
   const offset = req.query.offset ? Math.max(0, parseInt(req.query.offset)) : 0;
   const role = req.query.role === 'mentor' ? 'mentor' : null;

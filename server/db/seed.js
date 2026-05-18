@@ -19,7 +19,9 @@ db.exec(`
   DELETE FROM users;
 `);
 
-const hash = bcrypt.hashSync('ment2026', 10);
+const { generateTempPassword } = require('../utils/password');
+const demoPassword = generateTempPassword();
+const hash = bcrypt.hashSync(demoPassword, 10);
 
 const insertUser = db.prepare(`
   INSERT INTO users (email, password_hash, name, department, seniority, current_role, tenure_years, location, bio, shadow_role_response, onboarding_complete, is_admin)
@@ -200,6 +202,6 @@ const matchCount = db.prepare('SELECT COUNT(*) as cnt FROM match_scores').get().
 console.log(`✓ Seeded ${users.length} users across 4 departments`);
 console.log(`✓ ${matchCount} match pairs computed`);
 console.log(`✓ 3 sample sessions created (pending, scheduled, completed)`);
-console.log(`\nTest credentials (all passwords: ment2026):`);
+console.log(`\nTest credentials (all passwords: ${demoPassword}):`);
 console.log(`  Admin:    alice.chen@ment.io`);
 console.log(`  Employee: bob.taylor@ment.io, frank.wu@ment.io, jack.wilson@ment.io, mia.white@ment.io`);

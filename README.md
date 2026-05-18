@@ -20,7 +20,7 @@ Then open **http://localhost:3000**.
 
 ## Test Credentials
 
-All accounts use the password: **`ment2026`**
+After `npm run seed`, the script prints a **one-time temporary password** for demo accounts. Each user must change it on first login.
 
 | Role     | Email                    | Notes                              |
 |----------|--------------------------|------------------------------------|
@@ -63,7 +63,7 @@ All accounts use the password: **`ment2026`**
 | `can_teach`     | No       | Comma-separated skills                 |
 | `wants_to_learn`| No       | Comma-separated skills                 |
 
-All imported users get the default password **`ment2026`** (shown to admin after upload).
+All imported users get a **random temporary password** (shown once to the admin after upload). Users must change it on first login.
 
 Download a pre-formatted template from the Admin Dashboard → Import section.
 
@@ -105,6 +105,35 @@ Only pairs scoring ≥ 30 are stored. Matching runs automatically after import, 
 ```
 
 In development, Vite proxies `/api` requests to Express on port 3001.
+
+---
+
+## Environment
+
+Copy `.env.example` to `server/.env` (or export variables before starting):
+
+```bash
+export JWT_SECRET=$(openssl rand -hex 32)   # required
+export ANTHROPIC_API_KEY=sk-...             # optional — profile import + reflection AI
+```
+
+---
+
+## Deploying a pilot instance
+
+```bash
+docker build -t ment:latest .
+docker run -d \
+  -p 3001:3001 \
+  -e JWT_SECRET="$(openssl rand -hex 32)" \
+  -e ANTHROPIC_API_KEY="your-key" \
+  -v ment-data:/data \
+  ment:latest
+```
+
+Open `http://localhost:3001`. SQLite lives in the `/data` volume (`DB_PATH=/data/ment.db`).
+
+One container per pilot customer — no multi-tenancy in the POC.
 
 ---
 

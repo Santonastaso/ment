@@ -1,6 +1,5 @@
 const express = require('express');
 const db = require('../db/database');
-const { authMiddleware } = require('../middleware/auth');
 const { classifyReflection } = require('../utils/reflectionClassifier');
 const { computeMatchesForUser } = require('../utils/matching');
 const { auditLog } = require('../utils/auditLog');
@@ -23,7 +22,7 @@ function format(row) {
 }
 
 // GET /api/reflections — own log, most recent first. Also includes "due" hint.
-router.get('/', authMiddleware, (req, res) => {
+router.get('/', (req, res) => {
   const rows = db.prepare(
     'SELECT * FROM reflection_logs WHERE user_id = ? ORDER BY created_at DESC LIMIT 50'
   ).all(req.user.id);
@@ -45,7 +44,7 @@ router.get('/', authMiddleware, (req, res) => {
 });
 
 // POST /api/reflections — submit a new check-in. Classifies inline.
-router.post('/', authMiddleware, async (req, res) => {
+router.post('/', async (req, res) => {
   const supportNeeded = (req.body?.support_needed || '').trim();
   const managedWell = (req.body?.managed_well || '').trim();
   if (!supportNeeded && !managedWell) {
@@ -89,7 +88,7 @@ router.post('/', authMiddleware, async (req, res) => {
 
 // POST /api/reflections/:id/apply — apply some/all extracted skills to the profile.
 // Body: { gaps?: string[], strengths?: string[] } — when omitted, applies all extracted.
-router.post('/:id/apply', authMiddleware, (req, res) => {
+router.post('/:id/apply', (req, res) => {
   const id = parseInt(req.params.id);
   const log = db.prepare('SELECT * FROM reflection_logs WHERE id = ? AND user_id = ?').get(id, req.user.id);
   if (!log) return res.status(404).json({ error: 'Reflection not found' });
@@ -139,7 +138,7 @@ router.post('/:id/apply', authMiddleware, (req, res) => {
 });
 
 // DELETE /api/reflections/:id
-router.delete('/:id', authMiddleware, (req, res) => {
+router.delete('/:id', (req, res) => {
   db.prepare('DELETE FROM reflection_logs WHERE id = ? AND user_id = ?')
     .run(parseInt(req.params.id), req.user.id);
   res.json({ ok: true });

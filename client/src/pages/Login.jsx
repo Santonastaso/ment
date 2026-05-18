@@ -18,7 +18,9 @@ export default function Login() {
     try {
       const res = await api.post('/auth/login', { email, password });
       login(res.data.token, res.data.user);
-      if (res.data.user.is_admin) {
+      if (res.data.user.must_change_password) {
+        navigate('/change-password');
+      } else if (res.data.user.is_admin) {
         navigate('/admin');
       } else if (!res.data.user.onboarding_complete) {
         navigate('/onboarding');
@@ -81,9 +83,8 @@ export default function Login() {
             </button>
           </form>
 
-          <div className="mt-6 pt-5 border-t border-gray-100 text-xs text-gray-400 text-center space-y-1">
-            <p>New to MENT? Your account was created by your HR admin.</p>
-            <p>Default password: <code className="bg-gray-100 px-1 rounded">ment2026</code></p>
+          <div className="mt-6 pt-5 border-t border-gray-100 text-xs text-gray-400 text-center">
+            <p>New to MENT? Your account was created by your HR admin — use the temporary password they sent you.</p>
           </div>
         </div>
       </div>

@@ -2,6 +2,7 @@ import React from 'react';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from './context/AuthContext.jsx';
 import Login from './pages/Login.jsx';
+import ForcePasswordChange from './pages/ForcePasswordChange.jsx';
 import Onboarding from './pages/Onboarding.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import Explorer from './pages/Explorer.jsx';
@@ -14,6 +15,7 @@ function ProtectedRoute() {
   const { user, loading } = useAuth();
   if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="text-navy font-medium">Loading…</div></div>;
   if (!user) return <Navigate to="/login" replace />;
+  if (user.must_change_password) return <Navigate to="/change-password" replace />;
   if (!user.onboarding_complete && !user.is_admin) return <Navigate to="/onboarding" replace />;
   return (
     <div className="min-h-screen bg-gray-50">
@@ -25,10 +27,23 @@ function ProtectedRoute() {
   );
 }
 
+function ChangePasswordRoute() {
+  const { user, loading } = useAuth();
+  if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="text-navy font-medium">Loading…</div></div>;
+  if (!user) return <Navigate to="/login" replace />;
+  if (!user.must_change_password) {
+    if (user.is_admin) return <Navigate to="/admin" replace />;
+    if (!user.onboarding_complete) return <Navigate to="/onboarding" replace />;
+    return <Navigate to="/" replace />;
+  }
+  return <ForcePasswordChange />;
+}
+
 function OnboardingRoute() {
   const { user, loading } = useAuth();
   if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="text-navy font-medium">Loading…</div></div>;
   if (!user) return <Navigate to="/login" replace />;
+  if (user.must_change_password) return <Navigate to="/change-password" replace />;
   if (user.onboarding_complete) return <Navigate to="/" replace />;
   return <Onboarding />;
 }
@@ -43,6 +58,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/change-password" element={<ChangePasswordRoute />} />
       <Route path="/onboarding" element={<OnboardingRoute />} />
       <Route element={<ProtectedRoute />}>
         <Route path="/" element={<Dashboard />} />

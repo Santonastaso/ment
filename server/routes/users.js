@@ -1,11 +1,21 @@
 const express = require('express');
 const db = require('../db/database');
-const { authMiddleware } = require('../middleware/auth');
 const { computeMatchesForUser } = require('../utils/matching');
 
 const router = express.Router();
 
-const SENIORITY_ORDER = ['junior', 'mid', 'senior', 'lead'];
+const SENIORITIES = ['junior', 'mid', 'senior', 'lead'];
+
+const cleanMonth = (m) => {
+  if (m === undefined || m === null || m === '') return null;
+  const n = parseInt(m, 10);
+  return (Number.isFinite(n) && n >= 1 && n <= 12) ? n : null;
+};
+const cleanYear = (y) => {
+  if (y === undefined || y === null || y === '') return null;
+  const n = parseInt(y, 10);
+  return Number.isFinite(n) ? n : null;
+};
 
 function computeBadges(userId) {
   const badges = [
@@ -76,9 +86,14 @@ function computeBadges(userId) {
 
 function getUserProfile(userId, viewerId) {
   const user = db.prepare(
-    'SELECT id, email, name, department, seniority, current_role, tenure_years, location, bio, shadow_role_response, onboarding_complete, is_admin, created_at FROM users WHERE id = ?'
+    `SELECT id, email, name, department, seniority, current_role, tenure_years, location, bio,
+      shadow_role_response, onboarding_complete, is_admin, must_change_password, deactivated_at, created_at
+     FROM users WHERE id = ?`
   ).get(userId);
   if (!user) return null;
+  // Redact deactivated users' identity when viewed by a peer; self-view (impossible
+  // since deactivated users can't authenticate) keeps the original name.
+  if (user.deactivated_at && viewerId !== userId) user.name = '[Former colleague]';
 
   const skills = db.prepare('SELECT id, user_id, skill, type, example_project FROM skills WHERE user_id = ?').all(userId);
   const career = db.prepare('SELECT * FROM career_history WHERE user_id = ? ORDER BY start_year DESC').all(userId);
@@ -142,7 +157,7 @@ function getUserProfile(userId, viewerId) {
     ).get(userId).cnt;
   }
 
-  return {
+  const payload = {
     ...user,
     skills: visibleSkills,
     career,
@@ -151,6 +166,11 @@ function getUserProfile(userId, viewerId) {
     skillProgress: visibleSkillProgress,
     direct_reports,
   };
+  if (!isSelf) {
+    delete payload.must_change_password;
+    delete payload.deactivated_at;
+  }
+  return payload;
 }
 
 // Normalize a can_teach/wants_to_learn input into [{skill, example_project}]
@@ -170,7 +190,7 @@ function normalizeSkillsInput(arr) {
 }
 
 // GET /api/users/me
-router.get('/me', authMiddleware, (req, res) => {
+router.get('/me', (req, res) => {
   const profile = getUserProfile(req.user.id, req.user.id);
   if (!profile) return res.status(404).json({ error: 'User not found' });
   res.json(profile);
@@ -178,27 +198,26 @@ router.get('/me', authMiddleware, (req, res) => {
 
 // PUT /api/users/me — all fields are partial-update safe: a field absent from
 // the request body is left untouched (no clobbering with empty strings).
-router.put('/me', authMiddleware, (req, res) => {
+router.put('/me', (req, res) => {
   const body = req.body || {};
   const has = k => Object.prototype.hasOwnProperty.call(body, k);
-
-  const validSeniority = ['junior','mid','senior','lead'];
+  const str = (v) => String(v || '').trim();
 
   // Build an UPDATE that only sets fields actually present in the body
   const sets = [];
   const params = [];
-  if (has('name'))                  { sets.push('name = ?');                  params.push(String(body.name || '').trim()); }
-  if (has('department'))            { sets.push('department = ?');            params.push(String(body.department || '').trim()); }
-  if (has('seniority'))             {
+  if (has('name'))                  { sets.push('name = ?');                  params.push(str(body.name)); }
+  if (has('department'))            { sets.push('department = ?');            params.push(str(body.department)); }
+  if (has('seniority')) {
     const s = String(body.seniority || '').toLowerCase().trim();
     sets.push('seniority = ?');
-    params.push(validSeniority.includes(s) ? s : 'junior');
+    params.push(SENIORITIES.includes(s) ? s : 'junior');
   }
-  if (has('current_role'))          { sets.push('current_role = ?');          params.push(String(body.current_role || '').trim()); }
-  if (has('bio'))                   { sets.push('bio = ?');                   params.push(String(body.bio || '').trim()); }
-  if (has('shadow_role_response')) { sets.push('shadow_role_response = ?');  params.push(String(body.shadow_role_response || '').trim()); }
+  if (has('current_role'))          { sets.push('current_role = ?');          params.push(str(body.current_role)); }
+  if (has('bio'))                   { sets.push('bio = ?');                   params.push(str(body.bio)); }
+  if (has('shadow_role_response'))  { sets.push('shadow_role_response = ?');  params.push(str(body.shadow_role_response)); }
   if (has('tenure_years'))          { sets.push('tenure_years = ?');          params.push(parseInt(body.tenure_years) || 0); }
-  if (has('location'))              { sets.push('location = ?');              params.push(String(body.location || '').trim()); }
+  if (has('location'))              { sets.push('location = ?');              params.push(str(body.location)); }
 
   if (sets.length > 0) {
     params.push(req.user.id);
@@ -209,7 +228,7 @@ router.put('/me', authMiddleware, (req, res) => {
 });
 
 // POST /api/users/me/onboarding
-router.post('/me/onboarding', authMiddleware, (req, res) => {
+router.post('/me/onboarding', (req, res) => {
   const { career, can_teach, wants_to_learn, name, department, seniority, current_role, bio, shadow_role_response, tenure_years, location } = req.body;
 
   db.prepare(`
@@ -273,14 +292,14 @@ router.post('/me/onboarding', authMiddleware, (req, res) => {
 });
 
 // GET /api/users/:id  (public profile)
-router.get('/:id', authMiddleware, (req, res) => {
+router.get('/:id', (req, res) => {
   const profile = getUserProfile(parseInt(req.params.id), req.user.id);
   if (!profile) return res.status(404).json({ error: 'User not found' });
   res.json(profile);
 });
 
 // POST /api/users/me/skills
-router.post('/me/skills', authMiddleware, (req, res) => {
+router.post('/me/skills', (req, res) => {
   const { skill, type, example_project } = req.body;
   if (!skill || !['can_teach', 'wants_to_learn'].includes(type)) {
     return res.status(400).json({ error: 'skill and type (can_teach|wants_to_learn) required' });
@@ -294,7 +313,7 @@ router.post('/me/skills', authMiddleware, (req, res) => {
 });
 
 // PUT /api/users/me/skills/:id  — update example_project for a can_teach skill
-router.put('/me/skills/:id', authMiddleware, (req, res) => {
+router.put('/me/skills/:id', (req, res) => {
   const id = parseInt(req.params.id);
   const existing = db.prepare('SELECT * FROM skills WHERE id = ? AND user_id = ?').get(id, req.user.id);
   if (!existing) return res.status(404).json({ error: 'Skill not found' });
@@ -304,24 +323,18 @@ router.put('/me/skills/:id', authMiddleware, (req, res) => {
 });
 
 // DELETE /api/users/me/skills/:id
-router.delete('/me/skills/:id', authMiddleware, (req, res) => {
+router.delete('/me/skills/:id', (req, res) => {
   db.prepare('DELETE FROM skills WHERE id = ? AND user_id = ?').run(parseInt(req.params.id), req.user.id);
   computeMatchesForUser(req.user.id);
   res.json({ ok: true });
 });
 
 // POST /api/users/me/career
-router.post('/me/career', authMiddleware, (req, res) => {
+router.post('/me/career', (req, res) => {
   const { role, department, company, description, start_year, start_month, end_year, end_month } = req.body;
   if (!role || !department) {
     return res.status(400).json({ error: 'role and department required' });
   }
-  // Validate month if provided — must be 1-12
-  const cleanMonth = (m) => {
-    if (m === undefined || m === null || m === '') return null;
-    const n = parseInt(m);
-    return (Number.isFinite(n) && n >= 1 && n <= 12) ? n : null;
-  };
   const result = db.prepare(
     'INSERT INTO career_history (user_id, role, department, company, description, start_year, start_month, end_year, end_month) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
   ).run(
@@ -330,9 +343,9 @@ router.post('/me/career', authMiddleware, (req, res) => {
     department,
     company || '',
     description || '',
-    start_year || null,
+    cleanYear(start_year),
     cleanMonth(start_month),
-    end_year || null,
+    cleanYear(end_year),
     cleanMonth(end_month)
   );
   computeMatchesForUser(req.user.id);
@@ -341,7 +354,7 @@ router.post('/me/career', authMiddleware, (req, res) => {
 });
 
 // PUT /api/users/me/career/:id — update an existing career entry
-router.put('/me/career/:id', authMiddleware, (req, res) => {
+router.put('/me/career/:id', (req, res) => {
   const id = parseInt(req.params.id);
   const existing = db.prepare('SELECT * FROM career_history WHERE id = ? AND user_id = ?').get(id, req.user.id);
   if (!existing) return res.status(404).json({ error: 'Career entry not found' });
@@ -353,17 +366,6 @@ router.put('/me/career/:id', authMiddleware, (req, res) => {
   if (department !== undefined && !String(department).trim()) {
     return res.status(400).json({ error: 'department cannot be empty' });
   }
-
-  const cleanMonth = (m) => {
-    if (m === undefined || m === null || m === '') return null;
-    const n = parseInt(m);
-    return (Number.isFinite(n) && n >= 1 && n <= 12) ? n : null;
-  };
-  const cleanYear = (y) => {
-    if (y === undefined || y === null || y === '') return null;
-    const n = parseInt(y);
-    return Number.isFinite(n) ? n : null;
-  };
 
   // Build a partial UPDATE — only fields actually sent in the body are touched
   const updates = {};
@@ -390,7 +392,7 @@ router.put('/me/career/:id', authMiddleware, (req, res) => {
 });
 
 // DELETE /api/users/me/career/:id
-router.delete('/me/career/:id', authMiddleware, (req, res) => {
+router.delete('/me/career/:id', (req, res) => {
   db.prepare('DELETE FROM career_history WHERE id = ? AND user_id = ?').run(parseInt(req.params.id), req.user.id);
   computeMatchesForUser(req.user.id);
   res.json({ ok: true });

@@ -15,6 +15,7 @@ db.exec(`
   DELETE FROM connections;
   DELETE FROM skills;
   DELETE FROM career_history;
+  UPDATE users SET manager_id = NULL;
   DELETE FROM users;
 `);
 

@@ -7,7 +7,8 @@
     "start": "concurrently --names \"server,client\" --prefix-colors \"blue,green\" \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
     "build": "npm run build --prefix client",
     "seed": "node server/db/seed.js",
-    "seed:large": "node server/db/seed-large.js"
+    "seed:large": "node server/db/seed-large.js",
+    "test": "npm test --prefix server"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

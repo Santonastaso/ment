@@ -15,10 +15,24 @@ function runSchema() {
       bio TEXT DEFAULT '',
       shadow_role_response TEXT DEFAULT '',
       pending_checkin INTEGER DEFAULT 0,
-      manager_id INTEGER REFERENCES users(id),
+      manager_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      must_change_password INTEGER DEFAULT 0,
+      deactivated_at TEXT,
       onboarding_complete INTEGER DEFAULT 0,
       is_admin INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS profile_drafts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      source TEXT NOT NULL,
+      raw_text TEXT,
+      proposed_json TEXT NOT NULL,
+      accepted_json TEXT,
+      classifier_source TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      accepted_at TEXT
     );
 
     CREATE TABLE IF NOT EXISTS career_history (
@@ -121,6 +135,10 @@ function runSchema() {
     "ALTER TABLE sessions ADD COLUMN mentor_rating INTEGER",
     "ALTER TABLE career_history ADD COLUMN start_month INTEGER",
     "ALTER TABLE career_history ADD COLUMN end_month INTEGER",
+    "ALTER TABLE users ADD COLUMN must_change_password INTEGER DEFAULT 0",
+    "ALTER TABLE users ADD COLUMN deactivated_at TEXT",
+    "ALTER TABLE sessions ADD COLUMN mentee_completed_at TEXT",
+    "ALTER TABLE sessions ADD COLUMN mentor_completed_at TEXT",
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch (e) {

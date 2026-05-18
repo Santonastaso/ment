@@ -11,7 +11,10 @@ export function AuthProvider({ children }) {
     const token = localStorage.getItem('ment_token');
     if (token) {
       api.get('/users/me')
-        .then(res => setUser(res.data))
+        .then(res => setUser({
+          ...res.data,
+          must_change_password: res.data.must_change_password || 0,
+        }))
         .catch(() => {
           localStorage.removeItem('ment_token');
         })
