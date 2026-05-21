@@ -2,15 +2,17 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import IcsDownloadButton from './IcsDownloadButton.jsx';
 import RatingPicker from './RatingPicker.jsx';
+import { Surface, SurfaceBody } from './Surface.jsx';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import api from '../api/index.js';
 
 // Softer status badges — slate borders, subtle backgrounds. Trust-palette
 // rather than the saturated yellow/blue/green of the previous version.
 const statusColors = {
-  pending:   'bg-gold-soft text-amber-800 border-amber-200',
-  scheduled: 'bg-blue-50 text-navy border-navy-light/30',
+  pending:   'bg-amber-50 text-amber-800 border-amber-200',
+  scheduled: 'bg-primary/10 text-primary border-primary/20',
   completed: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  cancelled: 'bg-surface-subtle text-ink-tertiary border-surface-border',
+  cancelled: 'bg-muted text-muted-foreground border-border',
 };
 
 const statusLabels = {
@@ -117,32 +119,35 @@ export default function SessionCard({ session, currentUserId, onUpdate }) {
     onUpdate?.(updated.data);
   }
 
+  const initials = (other?.name || '?').split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase();
+
   return (
-    <div className="card p-5 transition-colors hover:border-navy/15">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
+    <Surface className="transition-colors hover:border-primary/25">
+      <SurfaceBody>
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-surface-subtle flex items-center justify-center text-ink-secondary font-semibold flex-shrink-0">
-            {other?.name?.charAt(0) || '?'}
-          </div>
+          <Avatar className="size-10">
+            <AvatarFallback className="bg-primary/10 text-sm font-semibold text-primary">{initials}</AvatarFallback>
+          </Avatar>
           <div>
             <div className="flex items-center gap-2">
-              <Link to={`/profile/${other?.id}`} className="font-semibold text-ink hover:text-navy text-sm transition-colors">
+              <Link to={`/profile/${other?.id}`} className="font-semibold text-foreground hover:text-primary text-sm transition-colors">
                 {other?.name}
               </Link>
-              <span className="text-xs text-ink-tertiary">{otherRole}</span>
+              <span className="text-xs text-muted-foreground">{otherRole}</span>
             </div>
-            <p className="text-sm font-medium text-ink-secondary mt-0.5">{session.title}</p>
+            <p className="text-sm font-medium text-muted-foreground mt-0.5">{session.title}</p>
             {session.scheduled_at ? (
-              <p className="text-xs text-ink-tertiary mt-0.5">
+              <p className="text-xs text-muted-foreground mt-0.5">
                 {new Date(session.scheduled_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
               </p>
             ) : isUndated ? (
-              <p className="text-xs text-ink-tertiary italic mt-0.5">No date set yet</p>
+              <p className="text-xs text-muted-foreground italic mt-0.5">No date set yet</p>
             ) : null}
             {session.topics?.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-1.5">
                 {session.topics.map((t, i) => (
-                  <span key={i} className="bg-blue-50 text-navy border border-navy-light/20 rounded-full px-2 py-0.5 text-[11px] font-medium">
+                  <span key={i} className="bg-primary/10 text-primary border border-primary/20 rounded-full px-2 py-0.5 text-[11px] font-medium">
                     {t}
                   </span>
                 ))}
@@ -157,8 +162,8 @@ export default function SessionCard({ session, currentUserId, onUpdate }) {
 
       {/* Pre-session question */}
       {session.pre_session_question && (
-        <div className="mt-4 bg-surface-muted rounded-lg p-3 text-sm text-ink-secondary border border-surface-border">
-          <span className="font-medium text-ink">Focus question: </span>
+        <div className="mt-4 bg-muted rounded-lg p-3 text-sm text-muted-foreground border border-border">
+          <span className="font-medium text-foreground">Focus question: </span>
           <span className="italic">"{session.pre_session_question}"</span>
         </div>
       )}
@@ -167,7 +172,7 @@ export default function SessionCard({ session, currentUserId, onUpdate }) {
       {session.status === 'completed' && (
         (isMentee && session.reflection) || (isMentor && session.mentor_reflection)
       ) && (
-        <div className="mt-3 bg-emerald-50 rounded-lg p-3 text-sm text-ink-secondary border border-emerald-100">
+        <div className="mt-3 bg-emerald-50 rounded-lg p-3 text-sm text-muted-foreground border border-emerald-100">
           <span className="font-medium text-emerald-700">Your reflection: </span>
           <span className="italic">"{isMentor ? session.mentor_reflection : session.reflection}"</span>
         </div>
@@ -196,7 +201,7 @@ export default function SessionCard({ session, currentUserId, onUpdate }) {
 
       {/* Reschedule input — inline datetime picker */}
       {editingDate && (
-        <div className="mt-4 bg-surface-muted rounded-lg p-3 border border-surface-border space-y-2">
+        <div className="mt-4 bg-muted rounded-lg p-3 border border-border space-y-2">
           <label className="label">{session.scheduled_at ? 'Pick a new date and time' : 'Set a date and time'}</label>
           <input
             type="datetime-local"
@@ -262,6 +267,7 @@ export default function SessionCard({ session, currentUserId, onUpdate }) {
           </button>
         )}
       </div>
-    </div>
+      </SurfaceBody>
+    </Surface>
   );
 }

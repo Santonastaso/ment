@@ -3,7 +3,13 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import MatchCard from '../components/MatchCard.jsx';
 import SessionCard from '../components/SessionCard.jsx';
+import { PageShell, PageSection } from '../components/PageShell.jsx';
+import { Surface, SurfaceBody } from '../components/Surface.jsx';
 import api from '../api/index.js';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const POLL_INTERVAL_MS = 30000;
 
@@ -151,98 +157,69 @@ export default function Dashboard() {
   });
 
   return (
-    <div className="space-y-12">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-semibold text-ink tracking-tight">Welcome back, {user?.name?.split(' ')[0]}</h1>
-        <p className="text-ink-secondary mt-1.5">Here's who you should connect with today.</p>
-      </div>
+    <PageShell
+      title={`Welcome back, ${user?.name?.split(' ')[0]}`}
+      description="Mentor suggestions and sessions that need your attention."
+      className="gap-8"
+    >
 
-      {/* Weekly check-in nudge */}
       {checkinDue && (
-        <div className="bg-gradient-to-r from-blue-50 to-amber-50 border border-blue-200 rounded-xl p-4 flex items-start justify-between gap-4 flex-wrap">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-full bg-white border border-blue-200 flex items-center justify-center text-xl flex-shrink-0">✦</div>
-            <div>
-              <p className="text-navy font-semibold text-sm">
-                {pendingFromAdmin ? 'New weekly check-in from your admin' : 'Time for your weekly check-in'}
-              </p>
-              <p className="text-xs text-gray-600 mt-0.5">
-                {pendingFromAdmin
-                  ? 'Two short questions about your week. Helps refine your matches and surface skills you can mentor on.'
-                  : lastEntryDays === null
-                    ? 'Two short questions. Your answers feed your skill landscape over time.'
-                    : `It's been ${lastEntryDays} days. Two short questions, that's it.`}
-              </p>
-              {notifPermission === 'default' && (
-                <button
-                  onClick={handleEnableNotifications}
-                  className="text-xs text-navy-light hover:text-navy font-medium mt-1.5 underline-offset-2 hover:underline"
-                >
-                  Enable desktop notifications
-                </button>
-              )}
-              {notifPermission === 'denied' && (
-                <p className="text-[11px] text-gray-500 mt-1.5">
-                  Desktop notifications were blocked — re-enable in your browser settings to get OS-level toasts.
-                </p>
-              )}
-            </div>
-          </div>
-          <Link to="/profile#reflection-log" className="btn-primary text-sm whitespace-nowrap">
+        <Alert className="relative border-primary/20 bg-primary/5">
+          <AlertTitle>{pendingFromAdmin ? 'New weekly check-in from your admin' : 'Time for your weekly check-in'}</AlertTitle>
+          <AlertDescription className="space-y-2">
+            <p>
+              {pendingFromAdmin
+                ? 'Two short questions about your week. Helps refine your matches and surface skills you can mentor on.'
+                : lastEntryDays === null
+                  ? 'Two short questions. Your answers feed your skill landscape over time.'
+                  : `It's been ${lastEntryDays} days. Two short questions, that's it.`}
+            </p>
+            {notifPermission === 'default' && (
+              <button type="button" onClick={handleEnableNotifications} className="text-xs font-medium text-primary underline-offset-2 hover:underline">
+                Enable desktop notifications
+              </button>
+            )}
+          </AlertDescription>
+          <Link to="/profile#reflection-log" className={cn(buttonVariants(), 'mt-3 inline-flex sm:absolute sm:right-4 sm:top-4 sm:mt-0')}>
             Open check-in
           </Link>
-        </div>
+        </Alert>
       )}
 
-      {/* Out-of-banner enable nudge — only shown if we're not currently due AND permission still default */}
       {!checkinDue && notifPermission === 'default' && (
-        <div className="text-xs text-gray-500 -mt-6">
-          <button onClick={handleEnableNotifications} className="text-navy-light hover:text-navy font-medium hover:underline">
+        <p className="-mt-6 text-xs text-muted-foreground">
+          <button type="button" onClick={handleEnableNotifications} className="font-medium text-primary hover:underline">
             Enable desktop notifications
-          </button> to get OS-level toasts when your weekly check-in is ready.
-        </div>
+          </button>{' '}
+          for OS-level toasts when your weekly check-in is ready.
+        </p>
       )}
 
-      {/* Section 1: Matches */}
-      <section>
-        <div className="flex items-end justify-between mb-4 flex-wrap gap-2">
-          <div>
-            <h2 className="section-title mb-0">Mentors for you</h2>
-            <p className="text-sm text-ink-secondary mt-1">Three colleagues who could mentor you on what you're trying to grow.</p>
-          </div>
-          {totalMatches > matches.length && (
-            <Link to="/explorer" className="text-sm text-navy-light hover:text-navy font-medium">
+      <PageSection
+        title="Mentors for you"
+        description="Three colleagues who could mentor you on what you're trying to grow."
+        action={
+          totalMatches > matches.length ? (
+            <Link to="/explorer" className="text-sm font-medium text-primary hover:underline">
               Browse {totalMatches - matches.length} more in Explorer →
             </Link>
-          )}
-        </div>
+          ) : null
+        }
+      >
         {loadingMatches ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-3">
-            {[1,2,3].map(i => (
-              <div key={i} className="card p-5 animate-pulse">
-                <div className="flex gap-3 mb-4">
-                  <div className="w-11 h-11 rounded-full bg-gray-200" />
-                  <div className="space-y-2 flex-1">
-                    <div className="h-4 bg-gray-200 rounded w-3/4" />
-                    <div className="h-3 bg-gray-200 rounded w-1/2" />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="h-3 bg-gray-200 rounded" />
-                  <div className="h-3 bg-gray-200 rounded w-5/6" />
-                </div>
-              </div>
-            ))}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3].map(i => <Skeleton key={i} className="h-48 rounded-xl" />)}
           </div>
         ) : matches.length === 0 ? (
-          <div className="card p-8 text-center mt-3">
-            <div className="text-4xl mb-3">✦</div>
-            <p className="text-navy font-semibold mb-1">Your matches are being calculated</p>
-            <p className="text-gray-500 text-sm">Check back shortly — we're finding the right people for you based on your skills and goals.</p>
-          </div>
+          <Surface>
+            <SurfaceBody className="py-10 text-center">
+              <p className="font-medium mb-1">No matches yet</p>
+              <p className="text-sm text-muted-foreground mb-4">Complete your profile skills so we can find mentors for you.</p>
+              <Link to="/profile" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>Complete profile</Link>
+            </SurfaceBody>
+          </Surface>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             {matches.map(match => (
               <MatchCard
                 key={match.matchId || match.user.id}
@@ -252,31 +229,34 @@ export default function Dashboard() {
             ))}
           </div>
         )}
-      </section>
+      </PageSection>
 
-      {/* Section 2: Your sessions — split into "needs action" and "upcoming" */}
-      <section>
-        <div className="mb-4">
-          <h2 className="section-title mb-0">Your sessions</h2>
-          <p className="text-sm text-ink-secondary mt-1">Past meetings live on your <Link to="/profile" className="text-navy-light hover:underline">profile</Link>.</p>
-        </div>
-
+      <PageSection
+        title="Your sessions"
+        description={
+          <>
+            Past meetings live on your <Link to="/profile" className="text-primary hover:underline">profile</Link>.
+          </>
+        }
+      >
         {loadingSessions ? (
           <div className="space-y-3">
-            {[1,2].map(i => <div key={i} className="card p-5 h-24 animate-pulse bg-gray-100" />)}
+            {[1, 2].map(i => <Skeleton key={i} className="h-24 rounded-xl" />)}
           </div>
         ) : (needsAction.length === 0 && upcoming.length === 0) ? (
-          <div className="card p-6 text-center">
-            <p className="text-gray-500 text-sm">No active sessions yet. Request one from your mentor suggestions above.</p>
-          </div>
+          <Surface>
+            <SurfaceBody className="py-8 text-center text-sm text-muted-foreground">
+              No active sessions yet. Request one from your mentor suggestions above.
+            </SurfaceBody>
+          </Surface>
         ) : (
           <div className="space-y-6">
             {needsAction.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="w-1.5 h-1.5 rounded-full bg-gold" />
-                  <h3 className="label-meta mb-0 text-ink-secondary">Needs your attention</h3>
-                  <span className="text-xs text-ink-tertiary">{needsAction.length}</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-accent" />
+                  <h3 className="label-meta mb-0">Needs your attention</h3>
+                  <span className="text-xs text-muted-foreground">{needsAction.length}</span>
                 </div>
                 <div className="space-y-3">
                   {needsAction.map(session => (
@@ -294,9 +274,9 @@ export default function Dashboard() {
             {upcoming.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="w-1.5 h-1.5 rounded-full bg-navy-light" />
-                  <h3 className="label-meta mb-0 text-ink-secondary">Upcoming</h3>
-                  <span className="text-xs text-ink-tertiary">{upcoming.length}</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                  <h3 className="label-meta mb-0">Upcoming</h3>
+                  <span className="text-xs text-muted-foreground">{upcoming.length}</span>
                 </div>
                 <div className="space-y-3">
                   {upcoming.map(session => (
@@ -312,7 +292,7 @@ export default function Dashboard() {
             )}
           </div>
         )}
-      </section>
-    </div>
+      </PageSection>
+    </PageShell>
   );
 }

@@ -6,7 +6,7 @@ export default function ReflectionCard({ session }) {
     <div className="card p-5 border-l-4 border-green-400">
       <div className="flex items-start justify-between gap-2 mb-2">
         <div>
-          <p className="font-medium text-navy text-sm">{session.title}</p>
+          <p className="font-medium text-foreground text-sm">{session.title}</p>
           <p className="text-xs text-gray-500">with {mentor?.name} · {mentor?.department}</p>
         </div>
         {session.scheduled_at && (

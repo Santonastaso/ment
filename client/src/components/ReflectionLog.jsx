@@ -103,7 +103,7 @@ export default function ReflectionLog({ onSkillsApplied }) {
       {dueForCheckIn && !showForm && (
         <div className="bg-gradient-to-r from-blue-50 to-amber-50 border border-blue-200 rounded-xl p-4 flex items-start justify-between gap-4">
           <div>
-            <p className="text-navy font-semibold text-sm">Time for your weekly check-in</p>
+            <p className="text-foreground font-semibold text-sm">Time for your weekly check-in</p>
             <p className="text-xs text-gray-600 mt-0.5">
               {lastEntryDays === null
                 ? 'A short reflection helps us refine your matches and surface skills you might want to teach or learn.'
@@ -120,7 +120,7 @@ export default function ReflectionLog({ onSkillsApplied }) {
       {showForm && (
         <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-navy">Weekly check-in</h3>
+            <h3 className="text-sm font-semibold text-foreground">Weekly check-in</h3>
             <button onClick={() => { setShowForm(false); setError(''); }} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
           </div>
           {PROMPTS.map(p => (
@@ -147,7 +147,7 @@ export default function ReflectionLog({ onSkillsApplied }) {
 
       {/* Add manually if not due */}
       {!showForm && !dueForCheckIn && (
-        <button onClick={() => setShowForm(true)} className="text-sm text-navy-light hover:text-navy font-medium">
+        <button onClick={() => setShowForm(true)} className="text-sm text-primary hover:text-primary/80 font-medium">
           + Add a reflection now
         </button>
       )}
@@ -195,7 +195,7 @@ function ChipWithEsco({ skill, uri, tone, onDismiss }) {
           href={uri}
           target="_blank"
           rel="noreferrer"
-          className="ml-0.5 inline-flex items-center justify-center px-1.5 py-0.5 rounded-full bg-white/70 text-[9px] font-semibold tracking-wider text-gray-700 hover:text-navy"
+          className="ml-0.5 inline-flex items-center justify-center px-1.5 py-0.5 rounded-full bg-white/70 text-[9px] font-semibold tracking-wider text-gray-700 hover:text-foreground"
           title={`Open in ESCO taxonomy: ${uri}`}
           onClick={e => e.stopPropagation()}
         >
@@ -246,7 +246,7 @@ function Entry({ entry, onApply, onDelete, timeAgo }) {
     <div className="border border-gray-200 rounded-xl overflow-hidden">
       <div className="px-4 py-3 bg-gray-50 flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap text-xs">
-          <span className="font-medium text-navy">{timeAgo(entry.created_at)}</span>
+          <span className="font-medium text-foreground">{timeAgo(entry.created_at)}</span>
           <span className="text-gray-400">·</span>
           <span className="text-gray-500">
             classified via {classifierLabel(entry.classifier_source)}
@@ -277,14 +277,14 @@ function Entry({ entry, onApply, onDelete, timeAgo }) {
         {hasSuggestions && (
           <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-3 mt-2">
             <div className="flex items-baseline justify-between mb-2 gap-2 flex-wrap">
-              <p className="text-[11px] uppercase tracking-wide text-navy font-medium">
+              <p className="text-[11px] uppercase tracking-wide text-foreground font-medium">
                 Skill signals
                 <span className="text-gray-500 normal-case font-normal ml-1">— click × on any chip to drop it before applying</span>
               </p>
               {totalDismissed > 0 && !entry.applied && (
                 <button
                   onClick={restoreAll}
-                  className="text-[11px] text-navy-light hover:text-navy underline-offset-2 hover:underline"
+                  className="text-[11px] text-primary hover:text-primary/80 underline-offset-2 hover:underline"
                 >
                   Restore {totalDismissed} dismissed
                 </button>

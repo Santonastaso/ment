@@ -1,5 +1,5 @@
 import React from 'react';
-import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext.jsx';
 import Login from './pages/Login.jsx';
 import ForcePasswordChange from './pages/ForcePasswordChange.jsx';
@@ -9,27 +9,32 @@ import Explorer from './pages/Explorer.jsx';
 import Profile from './pages/Profile.jsx';
 import TeamSkills from './pages/TeamSkills.jsx';
 import AdminDashboard from './pages/AdminDashboard.jsx';
-import Navbar from './components/Navbar.jsx';
+import AppLayout from './components/AppLayout.jsx';
+import { Skeleton } from '@/components/ui/skeleton';
+
+function LoadingScreen() {
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background p-8">
+      <Skeleton className="h-8 w-32" />
+      <Skeleton className="h-4 w-48" />
+    </div>
+  );
+}
 
 function ProtectedRoute() {
   const { user, loading } = useAuth();
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="text-navy font-medium">Loading…</div></div>;
+  if (loading) return <LoadingScreen />;
   if (!user) return <Navigate to="/login" replace />;
   if (user.must_change_password) return <Navigate to="/change-password" replace />;
   if (!user.onboarding_complete && !user.is_admin) return <Navigate to="/onboarding" replace />;
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar />
-      <main className="max-w-6xl mx-auto px-4 py-8">
-        <Outlet />
-      </main>
-    </div>
+    <AppLayout />
   );
 }
 
 function ChangePasswordRoute() {
   const { user, loading } = useAuth();
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="text-navy font-medium">Loading…</div></div>;
+  if (loading) return <LoadingScreen />;
   if (!user) return <Navigate to="/login" replace />;
   if (!user.must_change_password) {
     if (user.is_admin) return <Navigate to="/admin" replace />;
@@ -41,11 +46,17 @@ function ChangePasswordRoute() {
 
 function OnboardingRoute() {
   const { user, loading } = useAuth();
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="text-navy font-medium">Loading…</div></div>;
+  if (loading) return <LoadingScreen />;
   if (!user) return <Navigate to="/login" replace />;
   if (user.must_change_password) return <Navigate to="/change-password" replace />;
   if (user.onboarding_complete) return <Navigate to="/" replace />;
-  return <Onboarding />;
+  return (
+    <div className="min-h-screen bg-background">
+      <main className="mx-auto max-w-2xl px-4 py-10">
+        <Onboarding />
+      </main>
+    </div>
+  );
 }
 
 function AdminRoute({ children }) {

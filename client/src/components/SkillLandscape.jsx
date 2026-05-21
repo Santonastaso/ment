@@ -25,26 +25,26 @@ function learnTier(n) {
 // Each preset returns { bubble: tailwind classes, dot: legend dot color, label }
 const teachPresets = {
   untapped: {
-    bubble: 'bg-blue-50 text-navy border border-blue-200 hover:bg-blue-100',
-    dot: 'bg-blue-200',
+    bubble: 'bg-muted text-foreground border border-border hover:bg-muted/80',
+    dot: 'bg-border',
     label: 'Untapped',
     extraClass: '',
   },
   active: {
-    bubble: 'bg-blue-100 text-navy border border-navy-light hover:bg-blue-200',
-    dot: 'bg-navy-light',
+    bubble: 'bg-secondary text-secondary-foreground border border-border hover:opacity-90',
+    dot: 'bg-muted-foreground/40',
     label: 'Active',
     extraClass: '',
   },
   trusted: {
-    bubble: 'bg-navy text-white border border-navy hover:bg-navy-dark',
-    dot: 'bg-navy',
+    bubble: 'bg-primary/90 text-primary-foreground border border-primary hover:bg-primary',
+    dot: 'bg-primary',
     label: 'Trusted',
     extraClass: '',
   },
   expert: {
-    bubble: 'bg-gradient-to-r from-amber-300 to-yellow-500 text-amber-950 border border-amber-500 font-semibold',
-    dot: 'bg-amber-400',
+    bubble: 'bg-primary text-primary-foreground border border-primary font-semibold ring-2 ring-accent',
+    dot: 'bg-accent',
     label: 'Deep expert',
     extraClass: 'skill-bubble-glow',
   },
@@ -104,7 +104,7 @@ function Bubble({ entry, kind, tier, preset, index, isOwnProfile, onDelete }) {
   const closeBtnTone = isExpert
     ? 'bg-amber-950/15 hover:bg-amber-950/30 text-amber-950'
     : kind === 'teach'
-      ? 'bg-white/60 hover:bg-white text-navy'
+      ? 'bg-white/60 hover:bg-white text-foreground'
       : 'bg-white/70 hover:bg-white text-gray-700 hover:text-rose-600';
 
   function handleDelete(e) {
@@ -151,8 +151,8 @@ function Bubble({ entry, kind, tier, preset, index, isOwnProfile, onDelete }) {
 
       {/* Hover popover */}
       {hover && (
-        <div className="absolute z-30 left-1/2 -translate-x-1/2 mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-xs text-gray-700 leading-relaxed pointer-events-none whitespace-pre-line">
-          <div className="font-semibold text-navy mb-1">{entry.skill}</div>
+        <div className="absolute z-30 left-1/2 -translate-x-1/2 mt-2 w-64 rounded-lg border border-border bg-card p-3 text-xs text-muted-foreground shadow-lg leading-relaxed pointer-events-none whitespace-pre-line">
+          <div className="font-semibold text-foreground mb-1">{entry.skill}</div>
           <div className="text-[10px] uppercase tracking-wide font-medium mb-1.5"
             style={{ color: kind === 'teach' && tier === 'expert' ? '#92400e' : kind === 'teach' ? '#1B3A5C' : tier === 'missing' ? '#be123c' : '#15803d' }}>
             {preset.label}
@@ -191,7 +191,7 @@ function Section({ title, subtitle, items, kind, tierFn, presets, order, firstNa
       <header className="mb-3">
         <div className="flex items-end justify-between gap-3 flex-wrap">
           <div>
-            <h3 className="text-base font-semibold text-navy">{title}</h3>
+            <h3 className="text-base font-semibold text-foreground">{title}</h3>
             {subtitle && <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>}
           </div>
           <Legend presets={presets} order={order} />
@@ -201,13 +201,15 @@ function Section({ title, subtitle, items, kind, tierFn, presets, order, firstNa
       <div className="flex flex-wrap gap-2.5">
         {sorted.map((entry, i) => {
           const tier = tierFn(entry.session_count || 0);
+          const preset = presets[tier] || presets[order[0]];
+          if (!preset) return null;
           return (
             <Bubble
-              key={entry.id}
+              key={entry.id ?? `${entry.skill}-${i}`}
               entry={entry}
               kind={kind}
               tier={tier}
-              preset={presets[tier]}
+              preset={preset}
               index={i}
               isOwnProfile={isOwnProfile}
               onDelete={onDelete}
@@ -243,21 +245,21 @@ export default function SkillLandscape({ skillProgress = [], isOwnProfile, first
       {(totalLearning > 0 || totalTeaching > 0) && (
         <div className="grid grid-cols-2 gap-3">
           {totalTeaching > 0 && (
-            <div className="bg-blue-50 rounded-xl px-4 py-3 border border-blue-200">
-              <div className="text-2xl font-bold text-navy leading-none">
-                {totalActiveTeaching}<span className="text-gray-400 text-lg font-medium">/{totalTeaching}</span>
+            <div className="rounded-lg border border-border bg-muted/50 px-4 py-3">
+              <div className="text-2xl font-bold text-foreground leading-none tabular-nums">
+                {totalActiveTeaching}<span className="text-muted-foreground text-lg font-medium">/{totalTeaching}</span>
               </div>
-              <div className="text-xs text-gray-600 mt-1">
+              <div className="text-xs text-muted-foreground mt-1">
                 {isOwnProfile ? 'skills you’re actively teaching' : `skills ${firstName} actively teaches`}
               </div>
             </div>
           )}
           {totalLearning > 0 && (
-            <div className={`rounded-xl px-4 py-3 border ${totalGrowing > 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'}`}>
-              <div className={`text-2xl font-bold leading-none ${totalGrowing > 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-                {totalGrowing}<span className="text-gray-400 text-lg font-medium">/{totalLearning}</span>
+            <div className={`rounded-lg border px-4 py-3 ${totalGrowing > 0 ? 'border-emerald-600/30 bg-emerald-600/5' : 'border-destructive/30 bg-destructive/5'}`}>
+              <div className={`text-2xl font-bold leading-none tabular-nums ${totalGrowing > 0 ? 'text-emerald-700' : 'text-destructive'}`}>
+                {totalGrowing}<span className="text-muted-foreground text-lg font-medium">/{totalLearning}</span>
               </div>
-              <div className="text-xs text-gray-600 mt-1">
+              <div className="text-xs text-muted-foreground mt-1">
                 {isOwnProfile ? 'learning goals you’ve started' : `learning goals ${firstName} has started`}
               </div>
             </div>

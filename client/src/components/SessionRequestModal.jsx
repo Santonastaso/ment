@@ -65,7 +65,7 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess }) {
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
         <div className="p-6 border-b border-gray-100 flex-shrink-0">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-navy">Request a session</h2>
+            <h2 className="text-lg font-semibold text-foreground">Request a session</h2>
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
           </div>
           <p className="text-sm text-gray-500 mt-1">with {mentor.name} · {mentor.department}</p>
@@ -75,7 +75,7 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess }) {
           {/* Step indicator */}
           <div className="flex gap-2 mb-2">
             {Array.from({ length: TOTAL_STEPS }, (_, i) => (
-              <div key={i} className={`h-1.5 flex-1 rounded-full ${(i + 1) <= step ? 'bg-navy-light' : 'bg-gray-200'}`} />
+              <div key={i} className={`h-1.5 flex-1 rounded-full ${(i + 1) <= step ? 'bg-primary' : 'bg-gray-200'}`} />
             ))}
           </div>
 
@@ -103,8 +103,8 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess }) {
                         onClick={() => toggleTopic(skill)}
                         className={`rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ${
                           active
-                            ? 'bg-navy text-white border-navy'
-                            : 'bg-white text-navy border-blue-200 hover:bg-blue-50'
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-card text-foreground border-border hover:bg-muted'
                         }`}
                       >
                         {active && <span className="mr-1.5">✓</span>}
@@ -140,10 +140,10 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess }) {
               <div className="text-right text-xs text-gray-400 mt-1">{question.length}/200</div>
               {selectedTopics.length > 0 && (
                 <div className="mt-3 bg-blue-50/60 border border-blue-100 rounded-lg p-3">
-                  <p className="text-[11px] uppercase tracking-wide text-navy font-medium mb-1">Topics you picked</p>
+                  <p className="text-[11px] uppercase tracking-wide text-foreground font-medium mb-1">Topics you picked</p>
                   <div className="flex flex-wrap gap-1.5">
                     {selectedTopics.map(t => (
-                      <span key={t} className="bg-white text-navy border border-blue-200 rounded-full px-2.5 py-0.5 text-xs">
+                      <span key={t} className="bg-white text-foreground border border-blue-200 rounded-full px-2.5 py-0.5 text-xs">
                         {t}
                       </span>
                     ))}
@@ -166,15 +166,15 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess }) {
               />
               <div className="mt-4 bg-gray-50 rounded-lg p-3 text-sm text-gray-600 space-y-2">
                 <div>
-                  <span className="font-medium text-navy">Your focus question:</span>
+                  <span className="font-medium text-foreground">Your focus question:</span>
                   <p className="mt-1 italic">"{question}"</p>
                 </div>
                 {selectedTopics.length > 0 && (
                   <div>
-                    <span className="font-medium text-navy">Topics:</span>
+                    <span className="font-medium text-foreground">Topics:</span>
                     <div className="flex flex-wrap gap-1.5 mt-1">
                       {selectedTopics.map(t => (
-                        <span key={t} className="bg-white text-navy border border-blue-200 rounded-full px-2.5 py-0.5 text-xs">{t}</span>
+                        <span key={t} className="bg-white text-foreground border border-blue-200 rounded-full px-2.5 py-0.5 text-xs">{t}</span>
                       ))}
                     </div>
                   </div>

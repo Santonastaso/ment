@@ -40,7 +40,7 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
       ? { label: 'Awaiting your acceptance', className: 'bg-amber-100 text-amber-800 border border-amber-300' }
       : { label: 'Awaiting their acceptance', className: 'bg-amber-50 text-amber-700 border border-amber-200' };
   } else if (session.status === 'scheduled' && !hasDate) {
-    statusBadge = { label: 'Confirmed — date to be set', className: 'bg-blue-50 text-navy-light border border-blue-200' };
+    statusBadge = { label: 'Confirmed — date to be set', className: 'bg-blue-50 text-primary border border-blue-200' };
   }
 
   const topics = session.topics || [];
@@ -48,7 +48,7 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
   const extraTopics = Math.max(0, topics.length - visibleTopics.length);
 
   const roleBadge = isMentor
-    ? { label: "You're the mentor", className: 'bg-navy text-white' }
+    ? { label: "You're the mentor", className: 'bg-primary text-primary-foreground' }
     : { label: "You're the mentee", className: 'bg-amber-100 text-amber-800 border border-amber-300' };
 
   return (
@@ -58,12 +58,12 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
         onClick={() => setExpanded(e => !e)}
         className="w-full text-left p-4 hover:bg-gray-50 transition-colors flex items-start gap-3"
       >
-        <div className="w-10 h-10 rounded-full bg-navy-light flex items-center justify-center text-white font-semibold flex-shrink-0">
+        <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-semibold flex-shrink-0">
           {counterpart?.name?.charAt(0)}
         </div>
         <div className="flex-1 min-w-0 space-y-1">
           <div className="flex items-baseline gap-2 flex-wrap">
-            <span className="font-medium text-navy">{session.title}</span>
+            <span className="font-medium text-foreground">{session.title}</span>
             {hasDate ? (
               <>
                 <span className="text-xs text-gray-400">·</span>
@@ -78,7 +78,7 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
               </>
             )}
             {relative && (
-              <span className="text-[10px] uppercase tracking-wide bg-blue-50 text-navy-light border border-blue-200 rounded-full px-2 py-0.5">
+              <span className="text-[10px] uppercase tracking-wide bg-blue-50 text-primary border border-blue-200 rounded-full px-2 py-0.5">
                 {relative}
               </span>
             )}
@@ -99,7 +99,7 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
             </span>
             <span className="text-xs text-gray-600">
               with{' '}
-              <Link to={`/profile/${counterpart?.id}`} className="text-navy-light hover:underline" onClick={e => e.stopPropagation()}>
+              <Link to={`/profile/${counterpart?.id}`} className="text-primary hover:underline" onClick={e => e.stopPropagation()}>
                 {counterpart?.name}
               </Link>
               <span className="text-gray-400"> · {counterpart?.department}</span>
@@ -108,7 +108,7 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
           {visibleTopics.length > 0 && (
             <div className="flex flex-wrap gap-1.5 pt-0.5">
               {visibleTopics.map((t, i) => (
-                <span key={i} className="bg-blue-50 text-navy-light border border-blue-200 rounded-full px-2 py-0.5 text-[11px] font-medium">
+                <span key={i} className="bg-blue-50 text-primary border border-blue-200 rounded-full px-2 py-0.5 text-[11px] font-medium">
                   {t}
                 </span>
               ))}
@@ -130,7 +130,7 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {topics.map((t, i) => (
-                  <span key={i} className="bg-blue-50 text-navy-light border border-blue-200 rounded-full px-2.5 py-0.5 text-xs font-medium">
+                  <span key={i} className="bg-blue-50 text-primary border border-blue-200 rounded-full px-2.5 py-0.5 text-xs font-medium">
                     {t}
                   </span>
                 ))}
@@ -213,7 +213,7 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
                     <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium">Your reflection (private)</p>
                     <button
                       onClick={() => { setReflectionDraft(myReflection || ''); setRatingDraft(myRating ?? null); setEditingReflection(true); }}
-                      className="text-xs text-navy-light hover:text-navy font-medium"
+                      className="text-xs text-primary hover:text-foreground font-medium"
                     >
                       Edit
                     </button>

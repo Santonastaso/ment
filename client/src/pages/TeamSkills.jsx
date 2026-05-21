@@ -1,18 +1,19 @@
 import React, { useEffect, useState } from 'react';
+import { Lock, Users } from 'lucide-react';
 import api from '../api/index.js';
+import { PageShell } from '../components/PageShell.jsx';
+import { Surface, SurfaceBody, SurfaceHeader } from '../components/Surface.jsx';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 
-// Anonymized team skill-gaps view for managers.
-// Two principles baked in:
-//   1) No individual attribution. The server returns aggregate counts only.
-//   2) Privacy gate. Below 3 direct reports the report is suppressed entirely
-//      to prevent trivial de-anonymization.
 export default function TeamSkills() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    async function load() {
+    (async () => {
       try {
         const res = await api.get('/team/skill-gaps');
         setData(res.data);
@@ -21,124 +22,130 @@ export default function TeamSkills() {
       } finally {
         setLoading(false);
       }
-    }
-    load();
+    })();
   }, []);
 
   if (loading) {
-    return <div className="card p-8 animate-pulse h-48 bg-gray-100" />;
+    return (
+      <PageShell title="Team skill landscape">
+        <Skeleton className="h-24 w-full rounded-xl" />
+        <Skeleton className="h-48 w-full rounded-xl" />
+      </PageShell>
+    );
   }
+
   if (error) {
     return (
-      <div className="card p-6">
-        <p className="text-rose-700">{error}</p>
-      </div>
+      <PageShell title="Team skill landscape">
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      </PageShell>
     );
   }
 
   const { reportCount, gated, gaps, strengths, message } = data || {};
 
   return (
-    <div className="space-y-6 max-w-3xl">
-      <div>
-        <h1 className="text-2xl font-bold text-navy">Team skill landscape</h1>
-        <p className="text-gray-500 mt-1">
-          An anonymized snapshot of where your direct reports are growing and
-          what they collectively bring. Designed to help you plan L&D, never to
-          identify individuals.
-        </p>
-      </div>
+    <PageShell
+      title="Team skill landscape"
+      description="Anonymized counts only — never individual names. Suppressed below 3 direct reports."
+    >
+      <Alert className="border-primary/20 bg-primary/5">
+        <AlertTitle>Privacy</AlertTitle>
+        <AlertDescription>
+          Aggregate counts help you plan L&D. With fewer than 3 reports, this view is hidden to prevent trivial de-anonymization.
+        </AlertDescription>
+      </Alert>
 
-      <div className="card p-4 bg-blue-50/40 border-l-4 border-l-navy-light">
-        <p className="text-sm text-navy">
-          <strong>How this report stays private:</strong> only aggregate
-          counts are shown, never names. Reports are suppressed entirely if you
-          manage fewer than 3 people, since one or two reports could be
-          trivially identified.
-        </p>
-      </div>
-
-      {/* Empty / gated states */}
       {reportCount === 0 && (
-        <div className="card p-8 text-center">
-          <div className="text-3xl mb-2">👥</div>
-          <p className="text-navy font-semibold">No direct reports linked</p>
-          <p className="text-gray-500 text-sm mt-1">{message}</p>
-        </div>
+        <Surface>
+          <SurfaceBody className="py-12 text-center">
+            <Users className="mx-auto size-10 text-muted-foreground mb-3" />
+            <p className="font-semibold">No direct reports linked</p>
+            <p className="text-sm text-muted-foreground mt-1">{message}</p>
+          </SurfaceBody>
+        </Surface>
       )}
 
       {gated && (
-        <div className="card p-8 text-center">
-          <div className="text-3xl mb-2">🔒</div>
-          <p className="text-navy font-semibold">Report suppressed for privacy</p>
-          <p className="text-gray-500 text-sm mt-1 max-w-md mx-auto">{message}</p>
-        </div>
+        <Surface>
+          <SurfaceBody className="py-12 text-center">
+            <Lock className="mx-auto size-10 text-muted-foreground mb-3" />
+            <p className="font-semibold">Report suppressed</p>
+            <p className="text-sm text-muted-foreground mt-1">{message}</p>
+          </SurfaceBody>
+        </Surface>
       )}
 
-      {/* Real report */}
       {!gated && reportCount > 0 && (
         <>
-          <div className="card p-5">
-            <p className="text-sm text-gray-500">Reporting on</p>
-            <p className="text-3xl font-bold text-navy mt-1">
-              {reportCount}<span className="text-lg text-gray-500 font-medium ml-2">direct reports</span>
-            </p>
-          </div>
+          <Surface>
+            <SurfaceBody>
+              <p className="text-sm text-muted-foreground">Reporting on</p>
+              <p className="mt-1 text-4xl font-bold tabular-nums tracking-tight">
+                {reportCount}
+                <span className="ml-2 text-lg font-medium text-muted-foreground">direct reports</span>
+              </p>
+            </SurfaceBody>
+          </Surface>
 
-          {/* Skill gaps */}
-          <div className="card p-6">
-            <h2 className="section-title mb-1">Top 5 gaps in your team</h2>
-            <p className="text-xs text-gray-500 mb-4">
-              The skills the highest share of your reports are looking to develop. Useful for prioritizing training, peer mentoring, or external workshops.
-            </p>
-            {gaps.length === 0 ? (
-              <p className="text-sm text-gray-400 italic">No skill-gap data yet — your reports may not have completed onboarding.</p>
-            ) : (
-              <ul className="space-y-2">
-                {gaps.map((g, i) => (
-                  <SkillRow key={g.skill} rank={i + 1} item={g} reportCount={reportCount} tone="gap" />
-                ))}
-              </ul>
-            )}
-          </div>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Surface>
+              <SurfaceHeader title="Top gaps" description="Skills your team most often wants to develop." />
+              <SurfaceBody className="pt-5">
+                {gaps.length === 0 ? (
+                  <p className="text-sm text-muted-foreground italic">No gap data yet.</p>
+                ) : (
+                  <ul className="space-y-4">
+                    {gaps.map((g, i) => (
+                      <SkillRow key={g.skill} rank={i + 1} item={g} reportCount={reportCount} variant="gap" />
+                    ))}
+                  </ul>
+                )}
+              </SurfaceBody>
+            </Surface>
 
-          {/* Skill strengths */}
-          <div className="card p-6">
-            <h2 className="section-title mb-1">Top 5 strengths in your team</h2>
-            <p className="text-xs text-gray-500 mb-4">
-              The skills the highest share of your team already shares — useful for spotting internal mentors before looking outside.
-            </p>
-            {strengths.length === 0 ? (
-              <p className="text-sm text-gray-400 italic">No can-teach data yet.</p>
-            ) : (
-              <ul className="space-y-2">
-                {strengths.map((s, i) => (
-                  <SkillRow key={s.skill} rank={i + 1} item={s} reportCount={reportCount} tone="strength" />
-                ))}
-              </ul>
-            )}
+            <Surface>
+              <SurfaceHeader title="Top strengths" description="Skills your team most often offers to teach." />
+              <SurfaceBody className="pt-5">
+                {strengths.length === 0 ? (
+                  <p className="text-sm text-muted-foreground italic">No strength data yet.</p>
+                ) : (
+                  <ul className="space-y-4">
+                    {strengths.map((s, i) => (
+                      <SkillRow key={s.skill} rank={i + 1} item={s} reportCount={reportCount} variant="strength" />
+                    ))}
+                  </ul>
+                )}
+              </SurfaceBody>
+            </Surface>
           </div>
         </>
       )}
-    </div>
+    </PageShell>
   );
 }
 
-function SkillRow({ rank, item, reportCount, tone }) {
-  const barColor = tone === 'gap' ? 'bg-rose-300' : 'bg-emerald-400';
-  const trackColor = 'bg-gray-100';
-  const barWidth = Math.min(100, Math.max(8, item.share));
+function SkillRow({ rank, item, reportCount, variant }) {
+  const isGap = variant === 'gap';
   return (
-    <li className="flex items-center gap-3">
-      <span className="w-6 text-right text-xs font-semibold text-gray-400">{rank}.</span>
-      <span className="flex-1 min-w-0">
-        <span className="text-sm font-medium text-navy">{item.skill}</span>
-      </span>
-      <div className={`flex-shrink-0 w-32 ${trackColor} rounded-full h-2 overflow-hidden`}>
-        <div className={`${barColor} h-full rounded-full transition-all`} style={{ width: barWidth + '%' }} />
+    <li className="grid grid-cols-[2rem_1fr_auto] items-center gap-3 sm:grid-cols-[2rem_1fr_8rem_5rem]">
+      <span className="text-right text-sm font-semibold tabular-nums text-muted-foreground">{rank}</span>
+      <div className="min-w-0">
+        <p className="truncate text-sm font-medium">{item.skill}</p>
+        <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
+          <div
+            className={`h-full rounded-full transition-all ${isGap ? 'bg-destructive/80' : 'bg-emerald-600'}`}
+            style={{ width: `${Math.min(100, item.share)}%` }}
+          />
+        </div>
       </div>
-      <span className="w-20 text-right text-xs text-gray-600 whitespace-nowrap">
-        {item.count} of {reportCount} <span className="text-gray-400">({item.share}%)</span>
+      <Badge variant={isGap ? 'destructive' : 'secondary'} className="justify-self-end sm:col-start-3">
+        {item.share}%
+      </Badge>
+      <span className="hidden text-right text-xs text-muted-foreground sm:block sm:col-start-4">
+        {item.count}/{reportCount}
       </span>
     </li>
   );

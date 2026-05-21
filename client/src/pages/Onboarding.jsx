@@ -159,28 +159,29 @@ export default function Onboarding() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-navy py-6">
-        <div className="max-w-2xl mx-auto px-4">
-          <h1 className="text-white font-bold text-2xl">MENT</h1>
-          <p className="text-blue-200 text-sm mt-1">Set up your profile to get matched</p>
+    <div className="space-y-8">
+      <div className="flex items-center gap-2">
+        <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">M</span>
+        <div>
+          <h1 className="text-xl font-semibold text-foreground">Set up your profile</h1>
+          <p className="text-sm text-muted-foreground">A few steps so we can match you with mentors.</p>
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto px-4 py-8">
+      <div>
         {/* Progress */}
         <div className="flex items-center gap-2 mb-8">
           {[0, 1, 2, 3].map(s => (
             <React.Fragment key={s}>
-              <div className={`flex items-center gap-1 shrink-0 ${step >= s ? 'text-navy' : 'text-gray-400'}`}>
-                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold border-2 ${step > s ? 'bg-navy border-navy text-white' : step === s ? 'border-navy text-navy' : 'border-gray-300 text-gray-400'}`}>
+              <div className={`flex items-center gap-1 shrink-0 ${step >= s ? 'text-foreground' : 'text-gray-400'}`}>
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold border-2 ${step > s ? 'bg-primary border-primary text-white' : step === s ? 'border-primary text-foreground' : 'border-gray-300 text-gray-400'}`}>
                   {step > s ? '✓' : s + 1}
                 </div>
                 <span className="text-xs font-medium hidden md:block">
                   {s === 0 ? 'Import' : s === 1 ? 'Background' : s === 2 ? 'Teach' : 'Learn'}
                 </span>
               </div>
-              {s < 3 && <div className={`flex-1 min-w-4 h-0.5 ${step > s ? 'bg-navy' : 'bg-gray-200'}`} />}
+              {s < 3 && <div className={`flex-1 min-w-4 h-0.5 ${step > s ? 'bg-primary' : 'bg-gray-200'}`} />}
             </React.Fragment>
           ))}
         </div>
@@ -189,12 +190,12 @@ export default function Onboarding() {
           {step === 0 && (
             <>
               <div>
-                <h2 className="text-xl font-semibold text-navy mb-1">Import your profile</h2>
+                <h2 className="text-xl font-semibold text-foreground mb-1">Import your profile</h2>
                 <p className="text-gray-500 text-sm">
                   Upload a performance review or CV (.docx or .pdf). We pre-fill your profile — edit anything before saving.
                 </p>
               </div>
-              <label className="block border-2 border-dashed border-gray-300 rounded-xl p-10 text-center cursor-pointer hover:border-navy-light hover:bg-gray-50">
+              <label className="block border-2 border-dashed border-gray-300 rounded-xl p-10 text-center cursor-pointer hover:border-primary-light hover:bg-gray-50">
                 <input
                   type="file"
                   accept=".docx,.pdf,.txt"
@@ -215,7 +216,7 @@ export default function Onboarding() {
           {step === 1 && (
             <>
               <div>
-                <h2 className="text-xl font-semibold text-navy mb-1">Your background</h2>
+                <h2 className="text-xl font-semibold text-foreground mb-1">Your background</h2>
                 <p className="text-gray-500 text-sm">Tell us about your current role and experience. This helps us find relevant matches.</p>
               </div>
 
@@ -251,7 +252,7 @@ export default function Onboarding() {
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <label className="label mb-0">Previous roles{suggested.has('career') && <SuggestedPill source={classifierSource} />} <span className="font-normal text-gray-400">(optional)</span></label>
-                  <button type="button" onClick={addCareerRow} className="text-sm text-navy-light hover:text-navy font-medium">+ Add role</button>
+                  <button type="button" onClick={addCareerRow} className="text-sm text-primary hover:text-foreground font-medium">+ Add role</button>
                 </div>
                 <div className="space-y-3">
                   {career.map((c, i) => (
@@ -288,7 +289,7 @@ export default function Onboarding() {
           {step === 2 && (
             <>
               <div>
-                <h2 className="text-xl font-semibold text-navy mb-1">What you can teach{suggested.has('can_teach') && <SuggestedPill source={classifierSource} />}</h2>
+                <h2 className="text-xl font-semibold text-foreground mb-1">What you can teach{suggested.has('can_teach') && <SuggestedPill source={classifierSource} />}</h2>
                 <p className="text-gray-500 text-sm">What topics could you help a colleague with based on your experience? For each skill, you can optionally add an example project that shows you've done it.</p>
               </div>
               <TeachSkillsEditor
@@ -306,7 +307,7 @@ export default function Onboarding() {
           {step === 3 && (
             <>
               <div>
-                <h2 className="text-xl font-semibold text-navy mb-1">What you want to learn{suggested.has('wants_to_learn') && <SuggestedPill source={classifierSource} />}</h2>
+                <h2 className="text-xl font-semibold text-foreground mb-1">What you want to learn{suggested.has('wants_to_learn') && <SuggestedPill source={classifierSource} />}</h2>
                 <p className="text-gray-500 text-sm">What skills or areas do you want to develop in the next 6–12 months? Type a skill and press Enter.</p>
               </div>
               <SkillTagInput

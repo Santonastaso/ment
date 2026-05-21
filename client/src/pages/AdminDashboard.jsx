@@ -1,13 +1,29 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../api/index.js';
+import { PageShell } from '../components/PageShell.jsx';
+import { Surface, SurfaceBody, SurfaceHeader, SurfacePanel } from '../components/Surface.jsx';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 function StatCard({ label, value, sub }) {
   return (
-    <div className="card p-5">
-      <p className="text-sm text-gray-500 mb-1">{label}</p>
-      <p className="text-3xl font-bold text-navy">{value}</p>
-      {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
-    </div>
+    <Surface>
+      <SurfaceBody className="py-4">
+        <p className="text-sm text-muted-foreground">{label}</p>
+        <p className="mt-1 text-3xl font-bold tabular-nums tracking-tight">{value}</p>
+        {sub && <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p>}
+      </SurfaceBody>
+    </Surface>
   );
 }
 
@@ -38,6 +54,11 @@ export default function AdminDashboard() {
   const [importMode, setImportMode] = useState('insert');
   const [users, setUsers] = useState([]);
   const [usersLoading, setUsersLoading] = useState(false);
+  const [notice, setNotice] = useState(null);
+  const [tempPasswordDialog, setTempPasswordDialog] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState(null);
+  const [managerDialog, setManagerDialog] = useState(null);
+  const [managerEmailDraft, setManagerEmailDraft] = useState('');
   const fileRef = useRef(null);
 
   async function loadStats() {
@@ -92,10 +113,17 @@ export default function AdminDashboard() {
 
   async function handleRematch() {
     setRematching(true);
+    setNotice(null);
     try {
       const res = await api.post('/admin/rematch');
       setStats(prev => prev ? { ...prev, totalMatches: res.data.matchesGenerated } : prev);
-      alert(res.data.message);
+      setNotice({ variant: 'default', title: 'Matching complete', message: res.data.message });
+    } catch (e) {
+      setNotice({
+        variant: 'destructive',
+        title: 'Matching failed',
+        message: e.response?.data?.error || 'Could not re-run matching.',
+      });
     } finally {
       setRematching(false);
     }
@@ -113,26 +141,68 @@ export default function AdminDashboard() {
     }
   }
 
-  async function handleResetPassword(userId) {
-    if (!confirm('Generate a new temporary password for this user?')) return;
-    const res = await api.post(`/admin/users/${userId}/reset-password`);
-    alert(`Temp password for ${res.data.email}:\n\n${res.data.tempPassword}\n\n(User must change it on next login.)`);
+  function openResetPasswordConfirm(user) {
+    setConfirmDialog({
+      title: 'Reset password?',
+      description: `Generate a new temporary password for ${user.name}. They must change it on next login.`,
+      confirmLabel: 'Generate password',
+      onConfirm: async () => {
+        const res = await api.post(`/admin/users/${user.id}/reset-password`);
+        setTempPasswordDialog({
+          email: res.data.email,
+          tempPassword: res.data.tempPassword,
+        });
+      },
+    });
   }
 
-  async function handleDeactivate(userId) {
-    if (!confirm('Deactivate this user? They will not be able to log in.')) return;
-    await api.put(`/admin/users/${userId}`, { deactivate: true });
-    loadUsers();
+  function openDeactivateConfirm(user) {
+    setConfirmDialog({
+      title: 'Deactivate user?',
+      description: `${user.name} will not be able to log in.`,
+      confirmLabel: 'Deactivate',
+      destructive: true,
+      onConfirm: async () => {
+        await api.put(`/admin/users/${user.id}`, { deactivate: true });
+        loadUsers();
+        setNotice({ variant: 'default', title: 'User deactivated', message: `${user.name} has been deactivated.` });
+      },
+    });
   }
 
-  async function handleSetManager(userId, currentManagerEmail) {
-    const email = prompt('Manager email (leave empty to clear):', currentManagerEmail || '');
-    if (email === null) return;
+  function openSetManager(user) {
+    setManagerEmailDraft(user.manager_email || '');
+    setManagerDialog({ userId: user.id, userName: user.name });
+  }
+
+  async function handleSaveManager() {
+    if (!managerDialog) return;
     try {
-      await api.put(`/admin/users/${userId}`, { manager_email: email.trim() });
+      await api.put(`/admin/users/${managerDialog.userId}`, { manager_email: managerEmailDraft.trim() });
+      setManagerDialog(null);
       loadUsers();
+      setNotice({ variant: 'default', title: 'Manager updated', message: 'Reporting line saved.' });
     } catch (e) {
-      alert(e.response?.data?.error || 'Could not update manager');
+      setNotice({
+        variant: 'destructive',
+        title: 'Could not update manager',
+        message: e.response?.data?.error || 'Try again.',
+      });
+    }
+  }
+
+  async function runConfirmDialog() {
+    if (!confirmDialog) return;
+    try {
+      await confirmDialog.onConfirm();
+      setConfirmDialog(null);
+    } catch (e) {
+      setConfirmDialog(null);
+      setNotice({
+        variant: 'destructive',
+        title: 'Action failed',
+        message: e.response?.data?.error || 'Something went wrong.',
+      });
     }
   }
 
@@ -140,51 +210,57 @@ export default function AdminDashboard() {
   const deptActivityMax = Math.max(...(stats?.deptActivity?.map(x => x.session_count || 0) ?? []), 1);
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-navy">Admin Dashboard</h1>
-          <p className="text-gray-500 mt-1">Platform overview and management</p>
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          <button type="button" onClick={() => setTab('overview')} className={tab === 'overview' ? 'btn-primary text-sm' : 'btn-secondary text-sm'}>Overview</button>
-          <button type="button" onClick={() => { setTab('users'); loadUsers(); }} className={tab === 'users' ? 'btn-primary text-sm' : 'btn-secondary text-sm'}>Users</button>
-          <button onClick={handleRematch} disabled={rematching} className="btn-secondary text-sm">
-            {rematching ? 'Computing…' : '↻ Re-run matching'}
-          </button>
-        </div>
+    <PageShell title="Admin" description="Usage, matching, imports, and weekly check-in broadcasts.">
+
+      {notice && (
+        <Alert variant={notice.variant} className="relative pr-20">
+          <AlertTitle>{notice.title}</AlertTitle>
+          <AlertDescription>{notice.message}</AlertDescription>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="absolute top-2 right-2"
+            onClick={() => setNotice(null)}
+          >
+            Dismiss
+          </Button>
+        </Alert>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" variant={tab === 'overview' ? 'default' : 'outline'} size="sm" onClick={() => setTab('overview')}>Overview</Button>
+        <Button type="button" variant={tab === 'users' ? 'default' : 'outline'} size="sm" onClick={() => { setTab('users'); loadUsers(); }}>Users</Button>
+        <Button type="button" variant="outline" size="sm" onClick={handleRematch} disabled={rematching}>
+          {rematching ? 'Computing…' : 'Re-run matching'}
+        </Button>
       </div>
 
       {tab === 'overview' && (
         <>
           {/* Weekly reflection broadcast — demo trigger */}
-          <div className="card p-5 border-l-4 border-l-navy-light">
-            <div className="flex items-start justify-between gap-4 flex-wrap">
-              <div className="min-w-0">
-                <h2 className="text-lg font-semibold text-navy mb-1">Weekly reflection check-in</h2>
-                <p className="text-sm text-gray-600">
-                  Sends every employee an in-app banner and (when they've granted permission) a desktop
-                  notification asking them to log this week's reflection. In production this fires
-                  automatically; trigger it manually here for demos.
-                </p>
-                {broadcastResult && (
-                  <p className="mt-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 inline-flex items-center gap-2">
-                    <span>✓</span>
-                    <span>{broadcastResult.message}</span>
-                    <span className="text-emerald-600">Employees with the app open will see it within 30 seconds.</span>
-                  </p>
-                )}
-              </div>
-              <button onClick={handleBroadcastCheckin} disabled={broadcasting} className="btn-primary text-sm whitespace-nowrap">
-                {broadcasting ? 'Sending…' : '📨 Send reflection notes'}
-              </button>
-            </div>
-          </div>
+          <SurfacePanel
+            title="Weekly reflection check-in"
+            description="Sends every employee an in-app banner and (when they've granted permission) a desktop notification asking them to log this week's reflection. In production this fires automatically; trigger it manually here for demos."
+            action={
+              <Button onClick={handleBroadcastCheckin} disabled={broadcasting} size="sm" className="shrink-0 whitespace-nowrap">
+                {broadcasting ? 'Sending…' : 'Send reflection notes'}
+              </Button>
+            }
+          >
+            {broadcastResult && (
+              <p className="inline-flex flex-wrap items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                <span>✓</span>
+                <span>{broadcastResult.message}</span>
+                <span className="text-emerald-600">Employees with the app open will see it within 30 seconds.</span>
+              </p>
+            )}
+          </SurfacePanel>
 
           {/* Key metrics */}
           {loading ? (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {[1, 2, 3, 4].map(i => <div key={i} className="card p-5 h-24 animate-pulse bg-gray-100" />)}
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+              {[1, 2, 3, 4].map(i => <div key={i} className="h-24 animate-pulse rounded-xl border border-[var(--border)] bg-muted" />)}
             </div>
           ) : stats && (
             <>
@@ -195,75 +271,82 @@ export default function AdminDashboard() {
                 <StatCard label="Match pairs" value={stats.totalMatches} />
               </div>
 
-              <div className="card p-6">
-                <h2 className="section-title">Sessions breakdown</h2>
-                <div className="grid grid-cols-3 gap-4">
-                  <SessionBox count={sessionsByStatus.pending || 0} label="Pending" tone="yellow" />
-                  <SessionBox count={sessionsByStatus.scheduled || 0} label="Scheduled" tone="blue" />
-                  <SessionBox count={sessionsByStatus.completed || 0} label="Completed" tone="green" />
-                </div>
-              </div>
+              <Surface>
+                <SurfaceHeader title="Sessions breakdown" />
+                <SurfaceBody className="pt-5">
+                  <div className="grid grid-cols-3 gap-3">
+                    <SessionBox count={sessionsByStatus.pending || 0} label="Pending" tone="yellow" />
+                    <SessionBox count={sessionsByStatus.scheduled || 0} label="Scheduled" tone="blue" />
+                    <SessionBox count={sessionsByStatus.completed || 0} label="Completed" tone="green" />
+                  </div>
+                </SurfaceBody>
+              </Surface>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="card p-6">
-                  <h2 className="section-title">Most active mentors</h2>
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <Surface>
+                  <SurfaceHeader title="Most active mentors" />
+                  <SurfaceBody className="pt-5">
                   {stats.topMentors?.length > 0 ? (
                     <div className="space-y-3">
                       {stats.topMentors.map((m, i) => (
                         <div key={m.id} className="flex items-center gap-3">
-                          <span className="text-sm font-bold text-gray-400 w-5">{i + 1}</span>
-                          <div className="w-8 h-8 rounded-full bg-navy-light flex items-center justify-center text-white text-sm font-semibold">
+                          <span className="w-5 text-sm font-bold tabular-nums text-muted-foreground">{i + 1}</span>
+                          <div className="flex size-8 items-center justify-center rounded-md bg-primary text-sm font-bold text-primary-foreground">
                             {m.name?.charAt(0)}
                           </div>
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-navy">{m.name}</p>
-                            <p className="text-xs text-gray-400">{m.department}</p>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium text-foreground">{m.name}</p>
+                            <p className="text-xs text-muted-foreground">{m.department}</p>
                           </div>
-                          <span className="text-sm font-semibold text-gray-600">{m.session_count} sessions</span>
+                          <span className="shrink-0 text-sm font-semibold tabular-nums text-muted-foreground">{m.session_count} sessions</span>
                         </div>
                       ))}
                     </div>
-                  ) : <p className="text-gray-400 text-sm">No completed sessions yet.</p>}
-                </div>
+                  ) : <p className="text-sm text-muted-foreground">No completed sessions yet.</p>}
+                  </SurfaceBody>
+                </Surface>
 
-                <div className="card p-6">
-                  <h2 className="section-title">Department activity</h2>
+                <Surface>
+                  <SurfaceHeader title="Department activity" />
+                  <SurfaceBody className="pt-5">
                   {stats.deptActivity?.length > 0 ? (
                     <div className="space-y-3">
                       {stats.deptActivity.map(d => (
                         <div key={d.department} className="flex items-center gap-3">
-                          <div className="flex-1">
-                            <div className="flex justify-between text-sm mb-1">
-                              <span className="font-medium text-navy">{d.department}</span>
-                              <span className="text-gray-500">{d.session_count} sessions</span>
+                          <div className="min-w-0 flex-1">
+                            <div className="mb-1 flex justify-between gap-2 text-sm">
+                              <span className="font-medium text-foreground">{d.department}</span>
+                              <span className="tabular-nums text-muted-foreground">{d.session_count} sessions</span>
                             </div>
-                            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                              <div className="h-full bg-navy-light rounded-full" style={{ width: `${Math.min(100, (d.session_count / deptActivityMax) * 100)}%` }} />
+                            <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                              <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, (d.session_count / deptActivityMax) * 100)}%` }} />
                             </div>
                           </div>
                           {d.session_count === 0 && (
-                            <span className="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full">Silo risk</span>
+                            <span className="shrink-0 rounded-full bg-orange-100 px-2 py-0.5 text-xs text-orange-700">Silo risk</span>
                           )}
                         </div>
                       ))}
                     </div>
-                  ) : <p className="text-gray-400 text-sm">No data yet.</p>}
-                </div>
+                  ) : <p className="text-sm text-muted-foreground">No data yet.</p>}
+                  </SurfaceBody>
+                </Surface>
               </div>
             </>
           )}
 
           {/* Import */}
-          <div className="card p-6">
-            <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-              <div>
-                <h2 className="section-title mb-0">Import employees</h2>
-                <p className="text-sm text-gray-500 mt-1">Upload a CSV or XLSX file to onboard employees in bulk.</p>
-              </div>
-              <button onClick={() => downloadBlob('/admin/template', 'ment-import-template.csv')} className="text-sm text-navy-light hover:text-navy font-medium">
-                Download template
-              </button>
-            </div>
+          <Surface>
+            <SurfaceHeader
+              title="Import employees"
+              description="Upload a CSV or XLSX file to onboard employees in bulk."
+              action={
+                <Button type="button" variant="link" size="sm" className="h-auto px-0" onClick={() => downloadBlob('/admin/template', 'ment-import-template.csv')}>
+                  Download template
+                </Button>
+              }
+            />
+            <SurfaceBody className="space-y-4 pt-5">
 
             <div className="bg-gray-50 rounded-lg p-3 mb-4 text-xs text-gray-500 font-mono">
               name, email, department, current_role, tenure_years, location, manager_email, can_teach, wants_to_learn
@@ -279,7 +362,7 @@ export default function AdminDashboard() {
             </div>
 
             <div
-              className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-colors ${dragOver ? 'border-navy-light bg-blue-50' : 'border-gray-300 hover:border-navy-light hover:bg-gray-50'}`}
+              className={`cursor-pointer rounded border-2 border-dashed p-10 text-center transition-colors ${dragOver ? 'border-[#1264a3] bg-[#f0f7fc]' : 'border-[#dddddd] hover:border-[#1264a3] hover:bg-[#f8f8f8]'}`}
               onClick={() => fileRef.current?.click()}
               onDragOver={e => { e.preventDefault(); setDragOver(true); }}
               onDragLeave={() => setDragOver(false)}
@@ -299,7 +382,7 @@ export default function AdminDashboard() {
               />
               {uploading ? (
                 <div className="space-y-2">
-                  <div className="w-8 h-8 border-2 border-navy-light border-t-transparent rounded-full animate-spin mx-auto" />
+                  <div className="mx-auto size-8 animate-spin rounded-full border-2 border-[#1264a3] border-t-transparent" />
                   <p className="text-sm text-gray-500">Processing file…</p>
                 </div>
               ) : (
@@ -324,35 +407,44 @@ export default function AdminDashboard() {
             )}
 
             {uploadError && (
-              <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700">{uploadError}</div>
+              <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{uploadError}</div>
             )}
-          </div>
+            </SurfaceBody>
+          </Surface>
 
-          {/* Audit log */}
-          <div className="card p-6">
-            <div className="flex items-center justify-between mb-1 flex-wrap gap-3">
-              <div>
-                <h2 className="section-title mb-0">Audit log</h2>
-                <p className="text-xs text-gray-500 mt-1">
+          <Surface>
+            <SurfaceHeader
+              title="Audit log"
+              description={
+                <>
                   Recent platform events. Sensitive content (reflection text, profile field values) is never recorded — only actions and counts.
-                  {auditTotal > 0 && <span className="text-gray-400 ml-1">{auditTotal} total events.</span>}
-                </p>
-              </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => { setAuditOpen(o => { if (!o) loadAudit(); return !o; }); }}
-                  className="text-sm text-navy-light hover:text-navy font-medium whitespace-nowrap"
-                >
-                  {auditOpen ? 'Hide log' : 'Show recent events'}
-                </button>
-                <button
-                  onClick={() => downloadBlob('/admin/audit/export', 'ment-audit-export.csv')}
-                  className="text-sm text-navy-light hover:text-navy font-medium whitespace-nowrap"
-                >
-                  Export CSV
-                </button>
-              </div>
-            </div>
+                  {auditTotal > 0 && <span className="ml-1 text-muted-foreground/80">{auditTotal} total events.</span>}
+                </>
+              }
+              action={
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="link"
+                    size="sm"
+                    className="h-auto px-0"
+                    onClick={() => { setAuditOpen(o => { if (!o) loadAudit(); return !o; }); }}
+                  >
+                    {auditOpen ? 'Hide log' : 'Show recent events'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="link"
+                    size="sm"
+                    className="h-auto px-0"
+                    onClick={() => downloadBlob('/admin/audit/export', 'ment-audit-export.csv')}
+                  >
+                    Export CSV
+                  </Button>
+                </div>
+              }
+            />
+            <SurfaceBody className="pt-5">
 
             {auditOpen && (
               <div className="mt-4 border border-gray-100 rounded-lg overflow-hidden">
@@ -365,15 +457,17 @@ export default function AdminDashboard() {
                 )}
               </div>
             )}
-          </div>
+            </SurfaceBody>
+          </Surface>
         </>
       )}
 
       {tab === 'users' && (
-        <div className="card p-6">
-          <h2 className="section-title">Users</h2>
-          {usersLoading ? <p className="text-sm text-gray-500 mt-4">Loading…</p> : (
-            <div className="overflow-x-auto mt-4">
+        <Surface>
+          <SurfaceHeader title="Users" />
+          <SurfaceBody className="pt-5">
+          {usersLoading ? <p className="text-sm text-muted-foreground">Loading…</p> : (
+            <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-gray-500 border-b">
@@ -394,9 +488,9 @@ export default function AdminDashboard() {
                       <td className="py-2 space-x-2 whitespace-nowrap">
                         {!u.deactivated_at && (
                           <>
-                            <button type="button" className="text-xs text-navy-light hover:underline" onClick={() => handleSetManager(u.id, u.manager_email)}>Set manager</button>
-                            <button type="button" className="text-xs text-navy-light hover:underline" onClick={() => handleResetPassword(u.id)}>Reset password</button>
-                            <button type="button" className="text-xs text-red-600 hover:underline" onClick={() => handleDeactivate(u.id)}>Deactivate</button>
+                            <Button type="button" variant="link" size="sm" className="h-auto px-0 text-xs" onClick={() => openSetManager(u)}>Set manager</Button>
+                            <Button type="button" variant="link" size="sm" className="h-auto px-0 text-xs" onClick={() => openResetPasswordConfirm(u)}>Reset password</Button>
+                            <Button type="button" variant="link" size="sm" className="h-auto px-0 text-xs text-destructive" onClick={() => openDeactivateConfirm(u)}>Deactivate</Button>
                           </>
                         )}
                       </td>
@@ -406,20 +500,87 @@ export default function AdminDashboard() {
               </table>
             </div>
           )}
-        </div>
+          </SurfaceBody>
+        </Surface>
       )}
-    </div>
+
+      <Dialog open={!!confirmDialog} onOpenChange={open => { if (!open) setConfirmDialog(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{confirmDialog?.title}</DialogTitle>
+            <DialogDescription>{confirmDialog?.description}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setConfirmDialog(null)}>Cancel</Button>
+            <Button
+              type="button"
+              variant={confirmDialog?.destructive ? 'destructive' : 'default'}
+              onClick={runConfirmDialog}
+            >
+              {confirmDialog?.confirmLabel || 'Confirm'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!tempPasswordDialog} onOpenChange={open => { if (!open) setTempPasswordDialog(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Temporary password</DialogTitle>
+            <DialogDescription>
+              Share this with {tempPasswordDialog?.email}. They must change it on next login.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-lg border bg-muted px-3 py-2 font-mono text-sm">{tempPasswordDialog?.tempPassword}</div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                navigator.clipboard?.writeText(tempPasswordDialog?.tempPassword || '');
+              }}
+            >
+              Copy password
+            </Button>
+            <Button type="button" onClick={() => setTempPasswordDialog(null)}>Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!managerDialog} onOpenChange={open => { if (!open) setManagerDialog(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Set manager</DialogTitle>
+            <DialogDescription>Reporting line for {managerDialog?.userName}. Leave empty to clear.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="manager-email">Manager email</Label>
+            <Input
+              id="manager-email"
+              type="email"
+              value={managerEmailDraft}
+              onChange={e => setManagerEmailDraft(e.target.value)}
+              placeholder="manager@company.com"
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setManagerDialog(null)}>Cancel</Button>
+            <Button type="button" onClick={handleSaveManager}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </PageShell>
   );
 }
 
 function SessionBox({ count, label, tone }) {
   const cls = {
-    yellow: 'bg-yellow-50 border-yellow-100 text-yellow-700',
-    blue:   'bg-blue-50 border-blue-100 text-blue-700',
-    green:  'bg-green-50 border-green-100 text-green-700',
+    yellow: 'bg-[#fcf4de] border-[#e8d99a] text-[#9b6b00]',
+    blue:   'bg-[#f0f7fc] border-[#c5d9eb] text-[#1264a3]',
+    green:  'bg-[#e8f5e9] border-[#a5d6a7] text-[#2e7d32]',
   }[tone];
   return (
-    <div className={`text-center p-4 rounded-xl border ${cls}`}>
+    <div className={`rounded border p-3 text-center ${cls}`}>
       <p className="text-2xl font-bold">{count}</p>
       <p className="text-sm mt-1 opacity-80">{label}</p>
     </div>

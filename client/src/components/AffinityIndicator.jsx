@@ -1,9 +1,5 @@
 import React from 'react';
 
-// Maps a viewer-adjusted match score (0-100) to a 1-5 affinity level.
-// The current matching algorithm's max practical score is ~85 (40 skill + 20
-// career + 25 diversity), so the bands are tuned to that range rather than
-// to a literal 0-100 scale.
 function scoreToDots(score) {
   if (score >= 70) return 5;
   if (score >= 55) return 4;
@@ -26,23 +22,15 @@ export default function AffinityIndicator({ score = 0, showLabel = true, size = 
 
   return (
     <div className="inline-flex items-center gap-2">
-      <div
-        className={`flex items-center ${gap}`}
-        aria-label={`Affinity: ${dots} of 5 — ${label}`}
-        title={`Affinity score: ${score}/100`}
-      >
+      <div className={`flex items-center ${gap}`} aria-label={`Affinity: ${dots} of 5 — ${label}`} title={`Affinity score: ${score}/100`}>
         {[1, 2, 3, 4, 5].map(i => (
           <span
             key={i}
-            className={`${dotSize} rounded-full transition-colors ${
-              i <= dots ? 'bg-navy' : 'bg-surface-border'
-            }`}
+            className={`${dotSize} rounded-full transition-colors ${i <= dots ? 'bg-primary' : 'bg-border'}`}
           />
         ))}
       </div>
-      {showLabel && (
-        <span className="text-xs font-medium text-ink-secondary">{label}</span>
-      )}
+      {showLabel && <span className="text-xs font-medium text-muted-foreground">{label}</span>}
     </div>
   );
 }

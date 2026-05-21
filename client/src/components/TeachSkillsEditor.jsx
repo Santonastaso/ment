@@ -32,7 +32,7 @@ export default function TeachSkillsEditor({ value = [], onChange, placeholder = 
 
   return (
     <div className="space-y-3">
-      <div className="border border-gray-300 rounded-lg px-3 py-2 focus-within:ring-2 focus-within:ring-navy-light focus-within:border-transparent bg-white min-h-[44px]">
+      <div className="border border-gray-300 rounded-lg px-3 py-2 focus-within:ring-2 focus-within:ring-primary/40 focus-within:border-transparent bg-white min-h-[44px]">
         <input
           type="text"
           value={skillInput}
@@ -48,7 +48,7 @@ export default function TeachSkillsEditor({ value = [], onChange, placeholder = 
         <div className="space-y-2">
           {value.map((entry, i) => (
             <div key={i} className="bg-gray-50 rounded-lg px-3 py-2.5 flex items-start gap-3">
-              <span className="bg-blue-50 text-navy-light border border-blue-200 rounded-full px-3 py-0.5 text-sm font-medium whitespace-nowrap mt-1">
+              <span className="bg-blue-50 text-primary border border-blue-200 rounded-full px-3 py-0.5 text-sm font-medium whitespace-nowrap mt-1">
                 {entry.skill}
               </span>
               <input
@@ -56,7 +56,7 @@ export default function TeachSkillsEditor({ value = [], onChange, placeholder = 
                 value={entry.example_project}
                 onChange={e => updateExample(i, e.target.value)}
                 placeholder="Example project (optional) — what shows you've done this?"
-                className="flex-1 min-w-0 outline-none text-sm bg-transparent border-b border-transparent focus:border-navy-light py-1"
+                className="flex-1 min-w-0 outline-none text-sm bg-transparent border-b border-transparent focus:border-primary py-1"
               />
               <button
                 type="button"

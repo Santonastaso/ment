@@ -2,6 +2,11 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import api from '../api/index.js';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -18,15 +23,10 @@ export default function Login() {
     try {
       const res = await api.post('/auth/login', { email, password });
       login(res.data.token, res.data.user);
-      if (res.data.user.must_change_password) {
-        navigate('/change-password');
-      } else if (res.data.user.is_admin) {
-        navigate('/admin');
-      } else if (!res.data.user.onboarding_complete) {
-        navigate('/onboarding');
-      } else {
-        navigate('/');
-      }
+      if (res.data.user.must_change_password) navigate('/change-password');
+      else if (res.data.user.is_admin) navigate('/admin');
+      else if (!res.data.user.onboarding_complete) navigate('/onboarding');
+      else navigate('/');
     } catch (e) {
       setError(e.response?.data?.error || 'Login failed. Please try again.');
     } finally {
@@ -35,59 +35,37 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-navy to-navy-light flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">MENT</h1>
-          <p className="text-blue-200">Internal micro-mentoring platform</p>
-        </div>
-
-        <div className="card p-8">
-          <h2 className="text-xl font-semibold text-navy mb-6">Sign in to your account</h2>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="label">Email address</label>
-              <input
-                type="email"
-                className="input"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="you@company.com"
-                autoComplete="email"
-                required
-                autoFocus
-              />
-            </div>
-            <div>
-              <label className="label">Password</label>
-              <input
-                type="password"
-                className="input"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="••••••••"
-                autoComplete="current-password"
-                required
-              />
-            </div>
-
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 rounded-lg">
-                {error}
-              </div>
-            )}
-
-            <button type="submit" disabled={loading} className="btn-primary w-full mt-2 py-2.5">
-              {loading ? 'Signing in…' : 'Sign in'}
-            </button>
-          </form>
-
-          <div className="mt-6 pt-5 border-t border-gray-100 text-xs text-gray-400 text-center">
-            <p>New to MENT? Your account was created by your HR admin — use the temporary password they sent you.</p>
-          </div>
-        </div>
+    <div className="flex min-h-screen flex-col items-center justify-center bg-background p-6">
+      <div className="mb-8 flex items-center gap-2">
+        <span className="flex size-10 items-center justify-center rounded-lg bg-primary text-base font-bold text-primary-foreground">M</span>
+        <span className="text-xl font-semibold">MENT</span>
       </div>
+      <Card className="w-full max-w-[400px] rounded-xl border-[var(--border)] shadow-none">
+        <CardHeader>
+          <CardTitle className="text-lg font-semibold">Sign in</CardTitle>
+          <CardDescription>Use the email and temporary password from your HR admin.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Work email</Label>
+              <Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" autoComplete="email" required autoFocus />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} autoComplete="current-password" required />
+            </div>
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? 'Signing in…' : 'Continue'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }
