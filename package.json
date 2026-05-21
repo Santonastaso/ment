@@ -2,6 +2,9 @@
   "name": "ment",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": ">=20 <23"
+  },
   "scripts": {
     "postinstall": "npm install --prefix server && npm install --prefix client",
     "start": "concurrently --names \"server,client\" --prefix-colors \"blue,green\" \"npm run dev --prefix server\" \"npm run dev --prefix client\"",

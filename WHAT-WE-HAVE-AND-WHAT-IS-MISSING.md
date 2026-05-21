@@ -1,7 +1,8 @@
 # What we have and what is missing
 
-A thorough snapshot of the MENT platform as of **2026-05-14**. Reads in two
-big parts:
+A thorough snapshot of the MENT platform as of **2026-05-21**. Security,
+tests, and seed sections below were refreshed against `main`; treat the
+codebase as source of truth if anything drifts. Reads in two big parts:
 
 1. **What we have** — every feature that's actually built, working, and
    shippable for the pilot.
@@ -21,7 +22,8 @@ the bird's-eye view; that one is the punch list.
 - **JWT-based session** issued on login; carried as a bearer token by the
   client on every API call.
 - **Self-registration** endpoint exists but the demo flow seeds users via
-  CSV import; the default password for seeded users is `ment2026`.
+  CSV import or `npm run seed`. Seeded/imported users get a one-time random
+  temp password and `must_change_password=1` until they rotate it on first login.
 - **Admin flag** on the user record gates the `/admin` routes and the
   Admin tab in the navbar.
 
@@ -123,8 +125,8 @@ the bird's-eye view; that one is the punch list.
 - **Topics on request** are stored on the session itself (snapshotted at
   request time when present; derived from current skill overlap when
   legacy/seeded sessions have none).
-- **Mark complete** — only shown when the session's scheduled time has
-  passed.
+- **Per-role completion** — `mentor_completed_at` and `mentee_completed_at`;
+  each side marks complete independently after the scheduled time has passed.
 - **Per-side reflection** — mentor_reflection and reflection (mentee)
   columns. Each side sees only their own.
 - **Per-side rating** — 5-star RatingPicker with hover hints. mentor_rating
@@ -151,9 +153,9 @@ the bird's-eye view; that one is the punch list.
 ### 1.11 Admin dashboard
 - **Stats** — counts of users, sessions, matches, reflections, audit
   events.
-- **CSV upload** — bulk-import users with email, name, department, role,
-  manager_email columns. Uses `INSERT OR IGNORE` (existing users skipped;
-  see V1 item 17).
+- **CSV/XLSX upload** — bulk-import users with email, name, department, role,
+  manager_email columns. Query param `?mode=insert|update|upsert` (default
+  `insert` skips existing; `update`/`upsert` refresh profile fields).
 - **Template download** — get the CSV header row as a starter file.
 - **Rematch all** — manual trigger to recompute every pair.
 - **Broadcast check-in** — sets `pending_checkin=1` on every user;
@@ -191,8 +193,10 @@ the bird's-eye view; that one is the punch list.
 - **Express + Node `--watch`** backend with auto-reload.
 - **Tailwind CSS** with a custom navy/slate/gold trust palette in
   [client/tailwind.config.js](client/tailwind.config.js).
-- **Seeding scripts** — `npm run seed:small` (~10 users) and
+- **Seeding scripts** — `npm run seed` (~15 users) and
   `npm run seed:large` (~300 users with realistic skill distributions).
+- **Jest tests** — matching, session privacy, reflection apply, auth gate,
+  profile ingest (`npm test` in `server/`).
 - **Single-process deployment** path: `vite build` → `client/dist/`,
   Express serves the static bundle when `NODE_ENV=production`.
 
@@ -222,11 +226,11 @@ or product question, not yet a build task.*
 
 ### 2.1 Security & production-readiness — BLOCKING for any non-demo exposure
 
-- **JWT_SECRET is a hardcoded fallback** (`ment_dev_secret_change_in_prod`
-  in [server/middleware/auth.js](server/middleware/auth.js)). Anyone who
-  reads the repo can forge tokens. **Must bind to an env var with no
-  fallback** before any non-localhost deployment.
-- **No rate limiting** on auth endpoints. Brute-force friendly.
+**Done (POC floor):** `JWT_SECRET` required at boot (no fallback), helmet,
+auth rate limiting (`/api/auth`), forced password rotation for imported/seeded
+users, configurable `CORS_ORIGINS`.
+
+**Still missing:**
 - **No HTTPS-enforcement** layer in the Express app (assumes reverse proxy
   handles TLS).
 - **No password complexity rules** beyond bcrypt hashing the input.
@@ -234,8 +238,7 @@ or product question, not yet a build task.*
   Workspace / Microsoft 365 would be a strong asset.
 - **CORS allowlist** is `localhost:3000` only (acceptable for dev; needs
   prod origins on deployment).
-- **No CSP, no HSTS headers**, no helmet middleware.
-- **Default password `ment2026`** for seeded users is documented openly.
+- **No CSP beyond helmet defaults, no explicit HSTS** (assumes reverse proxy).
 - **No email verification** on registration.
 - **No password reset flow** (no email infrastructure wired up at all).
 - **No session revocation** — JWTs are stateless and live until expiry; no
@@ -325,7 +328,7 @@ To support it, V1 needs:
 ### 2.10 Admin / HR
 - **No CSV export** of analytics (V1 item 18).
 - **No audit log export or retention policy** (V1 item 12).
-- **No "update mode" on CSV re-import** (V1 item 17).
+- **No diff preview on CSV re-import** — `?mode=update|upsert` exists; UI toggle still open (V1 item 17).
 - **No user offboarding flow** (V1 item 13) — must run SQL by hand.
 - **No org-wide settings page** — k-anonymity threshold, working-hours
   policy, notification cadence are all code constants.
@@ -360,16 +363,14 @@ To support it, V1 needs:
 - **No CDN for static assets**; Express serves the Vite bundle directly.
 
 ### 2.14 Data integrity / DX
-- **No automated tests committed to the repo** (small ad-hoc tests during
-  development weren't kept). A V1 needs at least integration tests for the
-  matching algorithm, privacy enforcement, and the reflection-apply path.
-- **No CI/CD pipeline** wired up on the GitHub repo.
+- **Jest suites exist** for matching, session privacy, reflection apply, auth
+  gate, and profile ingest — run via `npm test`.
+- **CI** — GitHub Actions workflow (`.github/workflows/test.yml`) runs tests
+  on push/PR to `main`.
 - **No environment-specific config**; `process.env.NODE_ENV` is the only
   switch, and most config is hardcoded.
 - **No structured logging** — `console.error` only.
 - **No error tracking** (Sentry, Bugsnag, etc.).
-- **Seed-large can't re-run on an existing DB** (V1 item 19) — must
-  `rm server/ment.db*` first.
 
 ### 2.15 Legal / compliance
 - **No Terms of Service or Privacy Policy** rendered in-app.
@@ -392,8 +393,7 @@ To support it, V1 needs:
 
 A rough "what to tackle first" stack, based on impact × risk:
 
-1. **JWT_SECRET hardening + basic security headers** (1 day).
-2. **Multi-tenancy schema migration** (1-2 weeks). Blocking everything
+1. **Multi-tenancy schema migration** (1-2 weeks). Blocking everything
    else in the cross-company direction.
 3. **Email infrastructure** + transactional templates (1 week). Unblocks
    notifications, password reset, invitations, the weekly nudge cadence.
@@ -401,16 +401,13 @@ A rough "what to tackle first" stack, based on impact × risk:
    view) (1 week).
 5. **Calendar OAuth** (Google first, Microsoft second) (1-2 weeks).
 6. **CSV export + audit retention** (2 days).
-7. **Test suite + CI** (1 week).
-8. **Internationalization + accessibility pass** (1 week).
-9. **Postgres migration** (when scale demands).
+7. **Internationalization + accessibility pass** (1 week).
+8. **Postgres migration** (when scale demands).
 
 Everything in [V1-FOLLOWUPS.md](V1-FOLLOWUPS.md) item 1-20 fits into the
-"V1 features and polish" tier, not the "before any non-demo deployment"
-tier — except for the JWT secret, which is item 0 in my head even though
-it isn't numbered there.
+"V1 features and polish" tier.
 
 ---
 
-*Document last updated: 2026-05-14. Maintain by hand or regenerate from
+*Document last updated: 2026-05-21. Maintain by hand or regenerate from
 this exact prompt as the codebase evolves.*

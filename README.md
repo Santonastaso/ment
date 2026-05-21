@@ -71,14 +71,15 @@ Download a pre-formatted template from the Admin Dashboard → Import section.
 
 ## Matching Algorithm
 
-Each employee pair receives a score from 0–100:
+Each employee pair receives a base score from 0–85 (seniority is intentionally not used):
 
 | Signal | Max pts | Logic |
 |--------|---------|-------|
 | Skill overlap | 40 | 10pts per skill where A teaches what B wants to learn (or vice versa) |
 | Career crossover | 20 | +20 if either person previously worked in the other's current department |
-| Seniority gap | 15 | +15 if 1 level apart, +10 if 2 levels apart |
 | Department diversity | 25 | +25 if different departments |
+
+Viewer-specific adjustments (accept/decline history and session ratings per department) are stacked on top of the base score — see `server/utils/matching.js`.
 
 Only pairs scoring ≥ 30 are stored. Matching runs automatically after import, onboarding completion, and via the admin "Re-run matching" button.
 
