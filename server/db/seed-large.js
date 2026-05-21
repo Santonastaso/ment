@@ -5,6 +5,7 @@ const db = require('./database');
 const { runSchema } = require('./schema');
 const bcrypt = require('bcryptjs');
 const { computeAllMatches } = require('../utils/matching');
+const { generateTempPassword } = require('../utils/password');
 
 runSchema();
 
@@ -146,11 +147,12 @@ const LOCATION_DIST = [
 
 // ---------- Generate users ----------
 const TARGET_USERS = 300;
-const passwordHash = bcrypt.hashSync('ment2026', 10);
+const demoPassword = generateTempPassword();
+const passwordHash = bcrypt.hashSync(demoPassword, 10);
 
 const insertUser = db.prepare(`
-  INSERT INTO users (email, password_hash, name, department, seniority, current_role, tenure_years, location, bio, shadow_role_response, onboarding_complete, is_admin)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+  INSERT INTO users (email, password_hash, name, department, seniority, current_role, tenure_years, location, bio, shadow_role_response, onboarding_complete, is_admin, must_change_password)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, 1)
 `);
 const insertCareer = db.prepare(`
   INSERT INTO career_history (user_id, role, department, company, description, start_year, end_year)
@@ -502,7 +504,7 @@ const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
 const matchCount = db.prepare('SELECT COUNT(*) as cnt FROM match_scores').get().cnt;
 console.log(`✓ ${matchCount} match pairs computed in ${elapsed}s`);
 
-console.log('\nDefault password for everyone: ment2026');
+console.log(`\nTemporary password for all seeded users (change on first login): ${demoPassword}`);
 console.log('Admin login:                   admin@ment.io');
 const samples = db.prepare(`
   SELECT email FROM users WHERE is_admin = 0 ORDER BY id LIMIT 5

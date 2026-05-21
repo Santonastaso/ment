@@ -229,14 +229,16 @@ behavior on mobile and desktop. No native app needed for V1.
 ## Data & ops
 
 ### 17. Bulk admin re-import skips existing users
-**Status today.** `INSERT OR IGNORE` on email — re-uploading a CSV doesn't
-update users who already exist.
+**Status today.** Upload supports `?mode=insert|update|upsert` on
+`POST /api/admin/upload`. Default `insert` skips existing emails; `update`
+and `upsert` refresh department, role, seniority, tenure, location, and
+skills for rows that already exist. No diff preview in the UI yet.
 
-**Why it's OK for MVP.** The default password is in plain sight; admins
-re-import only on first run.
+**Why it's OK for MVP.** Admins can re-import with `update` or `upsert` when
+needed.
 
-**V1 fix.** Add an "update mode" toggle on the upload card. Maybe a diff
-preview ("3 new users, 12 fields changed across 8 existing users").
+**V1 fix.** Add a mode toggle on the upload card and a diff preview
+("3 new users, 12 fields changed across 8 existing users").
 
 ---
 
@@ -247,15 +249,6 @@ download for the underlying data.
 **Why it's OK for MVP.** Stats fit on one screen.
 
 **V1 fix.** "Export anonymized analytics" button on the admin dashboard.
-
----
-
-### 19. Seed-large can't re-run on an existing DB
-**Status today.** `npm run seed:large` does `DELETE FROM users` after deleting child rows, but `users.manager_id` is a self-reference with no `ON DELETE` clause, so the delete fails with `SQLITE_CONSTRAINT_FOREIGNKEY` if any manager rows exist. Workaround: `rm server/ment.db*` first.
-
-**Why it's OK for MVP.** Seeding from scratch is rare and the workaround is a one-liner.
-
-**V1 fix.** Either add `ON DELETE SET NULL` to the `manager_id` foreign key, or have the seed `UPDATE users SET manager_id = NULL` as the first DELETE step. Two-minute change.
 
 ---
 
@@ -271,4 +264,7 @@ the cap.
 
 ## Closed (moved here when fixed)
 
-_— none yet —_
+### 19. Seed-large can't re-run on an existing DB
+**Fixed.** `seed-large.js` runs `UPDATE users SET manager_id = NULL` before
+`DELETE FROM users`, so re-seeding on an existing DB works without manually
+removing the SQLite file.
