@@ -15,5 +15,8 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.106.1"
+  },
+  "devDependencies": {
+    "better-sqlite3": "^9.6.0"
   }
 }

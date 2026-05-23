@@ -12,10 +12,13 @@ import { createRequire } from 'node:module';
 import { createClient } from '@supabase/supabase-js';
 
 const require = createRequire(import.meta.url);
-const Database = require('../server/node_modules/better-sqlite3');
+const Database = require('better-sqlite3');
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const SQLITE_PATH = path.resolve(__dirname, '..', 'server', 'ment.db');
+// Default to the legacy seed location; override with SQLITE_PATH env var.
+const SQLITE_PATH = process.env.SQLITE_PATH
+  ? path.resolve(process.cwd(), process.env.SQLITE_PATH)
+  : path.resolve(__dirname, '..', 'ment.db');
 const ID_MAP_PATH = path.resolve(__dirname, '..', 'migration-id-map.json');
 
 const URL = process.env.SUPABASE_URL;
