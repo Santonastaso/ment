@@ -21,6 +21,22 @@ function LoadingScreen() {
   );
 }
 
+// `/login` lives outside the protected tree. Once the user signs in we need an
+// explicit guard to push them to wherever the protected tree would have sent
+// them — change-password / onboarding / home / admin — instead of leaving them
+// on the form.
+function LoginRoute() {
+  const { user, loading } = useAuth();
+  if (loading) return <LoadingScreen />;
+  if (user) {
+    if (user.must_change_password) return <Navigate to="/change-password" replace />;
+    if (!user.onboarding_complete && !user.is_admin) return <Navigate to="/onboarding" replace />;
+    if (user.is_admin) return <Navigate to="/admin" replace />;
+    return <Navigate to="/" replace />;
+  }
+  return <Login />;
+}
+
 function ProtectedRoute() {
   const { user, loading } = useAuth();
   if (loading) return <LoadingScreen />;
@@ -68,7 +84,7 @@ function AdminRoute({ children }) {
 export default function App() {
   return (
     <Routes>
-      <Route path="/login" element={<Login />} />
+      <Route path="/login" element={<LoginRoute />} />
       <Route path="/change-password" element={<ChangePasswordRoute />} />
       <Route path="/onboarding" element={<OnboardingRoute />} />
       <Route element={<ProtectedRoute />}>
