@@ -47,29 +47,32 @@ export function AuthProvider({ children }) {
     let mounted = true;
     let lastUserId = null;
 
-    async function hydrate(s) {
+    async function hydrate(s, source) {
+      console.log('[MENT auth] hydrate', source, 'uid=', s?.user?.id);
       if (!mounted) return;
       setSession(s);
       const uid = s?.user?.id ?? null;
-      // De-dupe: skip a fresh profile fetch when the auth state event
-      // doesn't actually change the user (e.g. INITIAL_SESSION + SIGNED_IN
-      // firing back-to-back), which used to abort the in-flight count
-      // query and leave us stuck on the loading screen.
       if (uid === lastUserId && uid !== null) {
+        console.log('[MENT auth] dedupe, clearing loading');
         setLoading(false);
         return;
       }
       lastUserId = uid;
       try {
         const next = uid ? await loadProfile(uid) : null;
+        console.log('[MENT auth] loadProfile resolved, next=', next && 'profile');
         if (mounted) setProfile(next);
+      } catch (e) {
+        console.log('[MENT auth] loadProfile threw', e?.message);
       } finally {
         if (mounted) setLoading(false);
       }
     }
 
-    supabase.auth.getSession().then(({ data: { session: s } }) => hydrate(s));
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => hydrate(s));
+    supabase.auth.getSession().then(({ data: { session: s } }) => hydrate(s, 'getSession'));
+    const { data: sub } = supabase.auth.onAuthStateChange((event, s) =>
+      hydrate(s, 'onAuthStateChange:' + event)
+    );
 
     return () => {
       mounted = false;
