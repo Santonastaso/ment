@@ -9,21 +9,33 @@ const PROFILE_FIELDS =
   'deactivated_at, onboarding_complete, is_admin';
 
 async function loadProfile(userId) {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select(PROFILE_FIELDS)
-    .eq('id', userId)
-    .single();
-  if (error) return null;
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select(PROFILE_FIELDS)
+      .eq('id', userId)
+      .single();
+    if (error || !data) return null;
 
-  const { count } = await supabase
-    .from('profiles')
-    .select('id', { count: 'exact', head: true })
-    .eq('manager_id', userId)
-    .eq('is_admin', false);
+    // direct_reports drives Team-Skills nav visibility. Best-effort: a
+    // failure here must not block the whole AuthContext from finishing.
+    let directReports = 0;
+    try {
+      const { count } = await supabase
+        .from('profiles')
+        .select('id', { count: 'exact', head: true })
+        .eq('manager_id', userId)
+        .eq('is_admin', false);
+      directReports = count ?? 0;
+    } catch {
+      /* swallow */
+    }
 
-  // Alias job_title -> current_role for legacy components.
-  return { ...data, current_role: data.job_title, direct_reports: count ?? 0 };
+    // Alias job_title -> current_role for legacy components.
+    return { ...data, current_role: data.job_title, direct_reports: directReports };
+  } catch {
+    return null;
+  }
 }
 
 export function AuthProvider({ children }) {
@@ -33,19 +45,32 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     let mounted = true;
+    let lastUserId = null;
 
-    supabase.auth.getSession().then(async ({ data: { session: s } }) => {
+    async function hydrate(s) {
       if (!mounted) return;
       setSession(s);
-      setProfile(s ? await loadProfile(s.user.id) : null);
-      setLoading(false);
-    });
+      const uid = s?.user?.id ?? null;
+      // De-dupe: skip a fresh profile fetch when the auth state event
+      // doesn't actually change the user (e.g. INITIAL_SESSION + SIGNED_IN
+      // firing back-to-back), which used to abort the in-flight count
+      // query and leave us stuck on the loading screen.
+      if (uid === lastUserId && uid !== null) {
+        setLoading(false);
+        return;
+      }
+      lastUserId = uid;
+      try {
+        const next = uid ? await loadProfile(uid) : null;
+        if (mounted) setProfile(next);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
 
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, s) => {
-      if (!mounted) return;
-      setSession(s);
-      setProfile(s ? await loadProfile(s.user.id) : null);
-    });
+    supabase.auth.getSession().then(({ data: { session: s } }) => hydrate(s));
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => hydrate(s));
+
     return () => {
       mounted = false;
       sub.subscription.unsubscribe();
