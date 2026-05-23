@@ -46,33 +46,29 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let mounted = true;
     let lastUserId = null;
+    let initialized = false;
 
-    async function hydrate(s, source) {
-      console.log('[MENT auth] hydrate', source, 'uid=', s?.user?.id);
+    async function hydrate(s) {
       if (!mounted) return;
       setSession(s);
       const uid = s?.user?.id ?? null;
-      if (uid === lastUserId && uid !== null) {
-        console.log('[MENT auth] dedupe, clearing loading');
-        setLoading(false);
-        return;
-      }
+      // Same user as last call: nothing to refetch. The original call still
+      // owns the loading flag — never clear it from a dedupe path.
+      if (uid === lastUserId && initialized) return;
       lastUserId = uid;
       try {
         const next = uid ? await loadProfile(uid) : null;
-        console.log('[MENT auth] loadProfile resolved, next=', next && 'profile');
         if (mounted) setProfile(next);
-      } catch (e) {
-        console.log('[MENT auth] loadProfile threw', e?.message);
       } finally {
-        if (mounted) setLoading(false);
+        if (mounted && !initialized) {
+          initialized = true;
+          setLoading(false);
+        }
       }
     }
 
-    supabase.auth.getSession().then(({ data: { session: s } }) => hydrate(s, 'getSession'));
-    const { data: sub } = supabase.auth.onAuthStateChange((event, s) =>
-      hydrate(s, 'onAuthStateChange:' + event)
-    );
+    supabase.auth.getSession().then(({ data: { session: s } }) => hydrate(s));
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => hydrate(s));
 
     return () => {
       mounted = false;
