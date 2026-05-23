@@ -34,6 +34,8 @@ jobs:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
           # Hosted at https://<owner>.github.io/<repo>/, so vite's `base` is /<repo>/
+          # Pages serves the site at https://<owner>.github.io/<repo>/, so
+          # vite needs `base` set to /<repo>/ for asset URLs to resolve.
           BASE_PATH: /${{ github.event.repository.name }}/
         run: npm run build
 
