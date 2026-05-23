@@ -63,16 +63,26 @@ security definer
 set search_path = public
 as $$
 begin
+  -- service_role (Edge Functions, migration script, admin RPCs) bypasses the guard.
   if coalesce(auth.role(), '') = 'service_role' then
     return new;
   end if;
+  -- Updates fired from inside other triggers (e.g. an auth.users password
+  -- change cascading to profiles) are trusted.
+  if pg_trigger_depth() > 1 then
+    return new;
+  end if;
+  -- True org-level privileges that an authenticated user must never set on
+  -- themselves or anyone else.
   if new.is_admin is distinct from old.is_admin
      or new.manager_id is distinct from old.manager_id
-     or new.deactivated_at is distinct from old.deactivated_at
-     or new.must_change_password is distinct from old.must_change_password
-     or new.pending_checkin is distinct from old.pending_checkin then
-    raise exception 'protected_columns: only service_role can change is_admin, manager_id, deactivated_at, must_change_password, pending_checkin';
+     or new.deactivated_at is distinct from old.deactivated_at then
+    raise exception 'protected_columns: only service_role can change is_admin, manager_id, deactivated_at';
   end if;
+  -- `must_change_password` and `pending_checkin` are deliberately
+  -- user-flippable on the caller's own row (RLS scopes to id = auth.uid()):
+  -- the former is cleared after rotating the password, the latter when the
+  -- user acknowledges the weekly check-in nudge.
   return new;
 end;
 $$;
