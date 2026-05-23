@@ -1,87 +1,8 @@
 # MENT — Micro-Mentoring Platform
 
-An internal micro-mentoring platform for large organizations. Employees are matched with colleagues based on skill overlap, career history, and department diversity. Sessions are booked in-app and tracked from request through reflection.
+Internal micro-mentoring platform for large organizations. Employees are matched with colleagues based on skill overlap, career history, and department diversity. Sessions are booked in-app and tracked from request through reflection.
 
----
-
-## Quick Start
-
-```bash
-npm install        # installs server + client dependencies
-npm run seed       # seeds the database with 15 sample employees and 65 match pairs
-npm start          # starts server (:3001) and client dev server (:3000) concurrently
-```
-
-Then open **http://localhost:3000**.
-
-> The seed step only needs to run once. The database is stored in `server/ment.db`.
-
----
-
-## Test Credentials
-
-After `npm run seed`, the script prints a **one-time temporary password** for demo accounts. Each user must change it on first login.
-
-| Role     | Email                    | Notes                              |
-|----------|--------------------------|------------------------------------|
-| Admin    | alice.chen@ment.io       | Access to admin dashboard          |
-| Employee | bob.taylor@ment.io       | Has a pending session with David   |
-| Employee | frank.wu@ment.io         | Finance lead, ex-Engineering       |
-| Employee | jack.wilson@ment.io      | Has a completed session with Leo   |
-| Employee | mia.white@ment.io        | Operations lead, ex-Marketing      |
-| Employee | david.park@ment.io       | Junior engineer, lots of matches   |
-
----
-
-## Features
-
-### Employee experience
-- **Dashboard**: See top 5 matches with reasons, manage sessions, view private reflections
-- **Match cards**: Request a session or dismiss a suggestion (removes from list privately)
-- **Session flow**: Submit a focus question → propose a time → mentor accepts → download .ics
-- **Post-session reflection**: Mark complete and write what you'll do differently
-- **Profile**: Edit skills, career history, view earned badges
-- **Onboarding wizard**: 3-step setup on first login
-
-### Admin experience
-- **Stats dashboard**: Users, onboarding rate, sessions by status, top mentors, department silos
-- **Bulk import**: Upload CSV/XLSX to create employee accounts in bulk
-- **Re-run matching**: Recompute all match scores after profile changes
-
----
-
-## CSV/XLSX Import Format
-
-| Column          | Required | Notes                                  |
-|-----------------|----------|----------------------------------------|
-| `name`          | Yes      | Full name                              |
-| `email`         | Yes      | Used as login credential               |
-| `department`    | No       | Engineering, Finance, Marketing, etc.  |
-| `current_role`  | No       | Job title                              |
-| `seniority`     | No       | `junior`, `mid`, `senior`, or `lead`   |
-| `tenure_years`  | No       | Integer                                |
-| `can_teach`     | No       | Comma-separated skills                 |
-| `wants_to_learn`| No       | Comma-separated skills                 |
-
-All imported users get a **random temporary password** (shown once to the admin after upload). Users must change it on first login.
-
-Download a pre-formatted template from the Admin Dashboard → Import section.
-
----
-
-## Matching Algorithm
-
-Each employee pair receives a base score from 0–85 (seniority is intentionally not used):
-
-| Signal | Max pts | Logic |
-|--------|---------|-------|
-| Skill overlap | 40 | 10pts per skill where A teaches what B wants to learn (or vice versa) |
-| Career crossover | 20 | +20 if either person previously worked in the other's current department |
-| Department diversity | 25 | +25 if different departments |
-
-Viewer-specific adjustments (accept/decline history and session ratings per department) are stacked on top of the base score — see `server/utils/matching.js`.
-
-Only pairs scoring ≥ 30 are stored. Matching runs automatically after import, onboarding completion, and via the admin "Re-run matching" button.
+The app is **server-less**: a React client talks directly to **Supabase** (Auth + Postgres + RLS + Storage + Edge Functions + pg_cron).
 
 ---
 
@@ -89,62 +10,205 @@ Only pairs scoring ≥ 30 are stored. Matching runs automatically after import, 
 
 ```
 /
-├── package.json          root scripts + concurrently
-├── server/               Node.js + Express API
-│   ├── index.js          server entry point (port 3001)
-│   ├── ment.db           SQLite database (auto-created)
-│   ├── db/               schema, seed, database connection
-│   ├── middleware/        JWT auth + admin guard
-│   ├── routes/           auth, users, matches, connections, sessions, admin
-│   └── utils/            matching algorithm, ICS generator
-└── client/               React + Tailwind (Vite)
-    └── src/
-        ├── pages/         Login, Onboarding, Dashboard, Profile, AdminDashboard
-        ├── components/    MatchCard, SessionCard, SkillTagInput, BadgeDisplay, …
-        ├── context/       AuthContext (JWT storage + user state)
-        └── api/           Axios instance with JWT interceptor
+├── client/                       React + Vite (the only app process)
+│   └── src/
+│       ├── pages/                Login, Onboarding, Dashboard, Profile, …
+│       ├── components/           MatchCard, SessionCard, IcsDownloadButton, …
+│       ├── context/AuthContext   Wraps supabase.auth + profile fetch
+│       ├── api/index.js          Backwards-compatible shim that routes
+│       │                         legacy api.get/post/put/delete to supabase-js
+│       └── lib/
+│           ├── supabase.js       Browser supabase-js client (anon key)
+│           └── ics.js            In-browser .ics calendar generator
+├── supabase/
+│   ├── migrations/0001_init.sql       Tables, indexes
+│   ├── migrations/0002_functions.sql  Triggers, RPCs (matching, badges,
+│   │                                   skill progress, team gaps, session
+│   │                                   lifecycle, audit log)
+│   ├── migrations/0003_rls.sql        RLS policies + grants
+│   ├── migrations/0004_cron.sql       pg_cron: weekly check-in, nightly
+│   │                                   match recompute
+│   ├── migrations/0005_storage.sql    Buckets + storage RLS
+│   ├── functions/                     Deno Edge Functions:
+│   │   ├── admin-create-user/         CSV/XLSX bulk import
+│   │   ├── admin-reset-password/      Generates a fresh temp password
+│   │   ├── profile-ingest/            PDF/DOCX → Anthropic → profile draft
+│   │   └── reflection-classify/       Anthropic + ESCO skill extraction
+│   └── config.toml
+└── scripts/
+    ├── db-query.mjs              Runs a SQL file via the Management API
+    └── migrate-from-sqlite.mjs   One-shot SQLite → Supabase backfill
 ```
 
-In development, Vite proxies `/api` requests to Express on port 3001.
+No Express server. No JWT secret. No CORS. No bcrypt. No nightly cron jobs to babysit.
 
 ---
 
-## Environment
+## Quick start
 
-Copy `.env.example` to `server/.env` (or export variables before starting):
+### Prerequisites
+- Node.js 20+ (the build runs on Node 20; the migration script wants Node 22 for native WebSocket).
+- A Supabase project (free tier is enough). Create one with:
+
+  ```bash
+  curl -X POST -H "Authorization: Bearer $SUPABASE_PAT" \
+    -H "Content-Type: application/json" \
+    -d '{"name":"Ment","organization_id":"YOUR_ORG","region":"eu-central-1","db_pass":"<generated>"}' \
+    https://api.supabase.com/v1/projects
+  ```
+
+  Capture `ref`, anon key, and service role key. The Management API also exposes them at `/v1/projects/{ref}/api-keys`.
+
+### 1. Configure secrets
 
 ```bash
-export JWT_SECRET=$(openssl rand -hex 32)   # required
-export ANTHROPIC_API_KEY=sk-...             # optional — profile import + reflection AI
+cp .env.example .env
+# Fill in SUPABASE_PAT, SUPABASE_PROJECT_REF, SUPABASE_URL,
+# SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
 ```
 
----
+`client/.env.local` only needs the public bits:
 
-## Deploying a pilot instance
+```
+VITE_SUPABASE_URL=https://YOUR_REF.supabase.co
+VITE_SUPABASE_ANON_KEY=...
+```
+
+### 2. Apply the schema
 
 ```bash
-docker build -t ment:latest .
-docker run -d \
-  -p 3001:3001 \
-  -e JWT_SECRET="$(openssl rand -hex 32)" \
-  -e ANTHROPIC_API_KEY="your-key" \
-  -v ment-data:/data \
-  ment:latest
+source .env
+
+node scripts/db-query.mjs supabase/migrations/0001_init.sql
+node scripts/db-query.mjs supabase/migrations/0002_functions.sql
+node scripts/db-query.mjs supabase/migrations/0003_rls.sql
+node scripts/db-query.mjs supabase/migrations/0004_cron.sql
+node scripts/db-query.mjs supabase/migrations/0005_storage.sql
 ```
 
-Open `http://localhost:3001`. SQLite lives in the `/data` volume (`DB_PATH=/data/ment.db`).
+(Or `supabase db push --linked` if you have the CLI set up.)
 
-One container per pilot customer — no multi-tenancy in the POC.
+### 3. Deploy Edge Functions
+
+```bash
+supabase functions deploy admin-create-user admin-reset-password \
+  profile-ingest reflection-classify
+
+# Optional — enables Anthropic-powered profile/reflection classification
+supabase secrets set ANTHROPIC_API_KEY=sk-...
+```
+
+### 4. (Optional) backfill from an existing SQLite DB
+
+If you're upgrading from the legacy SQLite POC, place `server/ment.db` at the repo root and run:
+
+```bash
+nvm use 22
+npm run migrate:from-sqlite
+```
+
+The script prints a one-time temp password every migrated user must rotate on first login.
+
+### 5. Run the client
+
+```bash
+npm install
+npm run dev      # http://localhost:3000
+```
 
 ---
 
-## Recognition Badges
+## Test credentials
+
+After the legacy SQLite migration, seeded users keep the existing email addresses (`alice.chen@ment.io`, `bob.taylor@ment.io`, …). The temp password is printed once by the migration script.
+
+`alice.chen@ment.io` is the admin.
+
+---
+
+## Features
+
+### Employee experience
+- **Dashboard**: top mentor suggestions, active sessions split into "needs your attention" and "upcoming", weekly reflection check-in nudge.
+- **Profile**: edit skills, career history, view earned badges, expertise signature ("what colleagues seek you out for").
+- **Match cards**: request a session or dismiss with one click. Dismissals re-rank future matches.
+- **Session flow**: focus question → propose a time → mentor accepts → calendar `.ics` generated in-browser → mark complete with private reflection + 1–5 rating.
+- **Reflection log**: weekly two-question check-in. Anthropic + ESCO extract skills you can apply to your landscape.
+- **Onboarding wizard**: optional CV/perf-review upload (PDF/DOCX) prefills the form via Anthropic + ESCO.
+
+### Admin experience
+- **Stats**: users, onboarding rate, sessions by status, top mentors, department activity, silos.
+- **Bulk import**: CSV/XLSX → Edge Function → `auth.admin.createUser` per row → automatic match recompute.
+- **Manage users**: set manager, reset password, deactivate.
+- **Audit log**: every important state change is captured by Postgres triggers; downloadable CSV.
+- **Send reflection notes**: manual override of the weekly `pg_cron` broadcast.
+
+---
+
+## CSV/XLSX import format
+
+| Column           | Required | Notes                                |
+|------------------|----------|--------------------------------------|
+| `name`           | Yes      | Full name                            |
+| `email`          | Yes      | Becomes the auth.users login         |
+| `department`     | No       | Engineering, Finance, Marketing, …   |
+| `current_role`   | No       | Job title (stored as `job_title`)    |
+| `seniority`      | No       | `junior`, `mid`, `senior`, `lead`    |
+| `tenure_years`   | No       | Integer                              |
+| `location`       | No       | Free text                            |
+| `manager_email`  | No       | Email of an already-imported user    |
+| `can_teach`      | No       | Comma-separated skills               |
+| `wants_to_learn` | No       | Comma-separated skills               |
+
+All imported users land with `must_change_password = true` and a shared temp password (returned once to the admin who triggered the upload).
+
+---
+
+## Matching algorithm
+
+Stored as a Postgres function (`public.recompute_matches_for(uuid)`). Same scoring as before:
+
+| Signal                | Max pts | Logic                                                                  |
+|-----------------------|---------|------------------------------------------------------------------------|
+| Skill overlap         | 40      | 10 pts per distinct (lower-cased, trimmed) skill where A teaches B's wants-to-learn or vice versa |
+| Career crossover      | 20      | +20 if either user previously worked in the other's current department |
+| Department diversity  | 25      | +25 if departments differ                                              |
+
+Only pairs scoring ≥ 30 are stored. Viewer-specific adjustments (accept/decline volumes and rating averages per department) are layered on at read time inside `public.get_matches_for(...)`.
+
+Recompute fires:
+- On profile/skill/career changes (via the SQL function the client calls after writes).
+- Nightly at 03:15 UTC via `pg_cron` (`mt-nightly-rematch`).
+- On admin "Re-run matching".
+
+---
+
+## Schedules (pg_cron)
+
+| Job                  | Schedule        | What                                                |
+|----------------------|-----------------|-----------------------------------------------------|
+| `mt-weekly-checkin`  | `0 9 * * MON`   | Sets `pending_checkin = true` on all active users.  |
+| `mt-nightly-rematch` | `15 3 * * *`    | Calls `recompute_all_matches()` for the whole org.  |
+
+---
+
+## Recognition badges
 
 | Badge | Condition |
 |-------|-----------|
-| 🌱 First Step | Completed first session |
-| 🔗 Connector | Sessions with people from 3+ departments |
-| ⭐ Deep Expert | Requested as mentor 5+ times |
-| 🧭 Explorer | Completed session with someone from a different department |
+| First Step | Completed first session |
+| Connector | Sessions with people from 3+ departments |
+| Deep Expert | Requested as mentor 5+ times |
+| Explorer | Completed session with someone from a different department |
 
-Locked badges are shown in grey with the unlock condition.
+Computed on-demand by `public.badges_for(uuid)`.
+
+---
+
+## Operating notes
+
+- **Auth**: `auth.users` owns identities. `public.profiles.id = auth.users.id`. A trigger creates the profile on signup. `must_change_password` blocks the user at the route level (App.jsx) and is cleared by the `complete_password_change` RPC after `auth.updateUser({ password })`.
+- **Authorization**: RLS is enabled on every public table. Reads are broad enough for the directory; writes are scoped to `user_id = auth.uid()` or are gated through `security definer` RPCs (sessions, connections, admin actions, broadcast).
+- **Audit log**: written exclusively by triggers and the admin RPCs, never by app code. Sensitive content is never recorded — only actions and counts.
+- **Storage**: two private buckets (`profile-uploads`, `imports`) with RLS so users only see their own uploads and admins see imports.
+- **Edge Functions**: Deno; verify_jwt is on. The Anthropic key lives in `supabase secrets`, never in the client bundle.

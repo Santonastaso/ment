@@ -1,0 +1,13 @@
+project_id = "vqvjdtnpcamyrqkqsrfb"
+
+[functions.admin-create-user]
+verify_jwt = true
+
+[functions.admin-reset-password]
+verify_jwt = true
+
+[functions.profile-ingest]
+verify_jwt = true
+
+[functions.reflection-classify]
+verify_jwt = true

@@ -7,6 +7,20 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <script>
+      // Restore the SPA route preserved by 404.html (?p=/foo/bar) so React
+      // Router sees the original URL on first load.
+      (function () {
+        var u = new URL(window.location.href);
+        var p = u.searchParams.get('p');
+        if (p) {
+          u.searchParams.delete('p');
+          var rest = u.search.replace(/^\?/, '');
+          var base = u.pathname.replace(/\/$/, '');
+          window.history.replaceState(null, '', base + p + (rest ? '?' + rest : '') + u.hash);
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

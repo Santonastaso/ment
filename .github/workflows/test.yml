@@ -1,4 +1,4 @@
-name: Test
+name: Build
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 jobs:
-  test:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,9 +18,7 @@ jobs:
           cache: npm
 
       - run: npm ci
-
-      - run: npm rebuild better-sqlite3 --prefix server
-
-      - run: npm test
+      - run: npm run build
         env:
-          JWT_SECRET: test_jwt_secret_minimum_32_characters_long_for_ci
+          VITE_SUPABASE_URL: https://example.supabase.co
+          VITE_SUPABASE_ANON_KEY: build_only_placeholder

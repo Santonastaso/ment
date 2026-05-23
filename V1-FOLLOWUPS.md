@@ -1,5 +1,14 @@
 # V1 follow-ups
 
+> **2026-05-23 — Architecture note.** The platform now runs on Supabase
+> (Auth + Postgres + RLS + Storage + Edge Functions + pg_cron). Items
+> below that referenced server-side code paths (`server/utils/...`,
+> Express routes, JWT middleware) have been re-implemented in Postgres
+> functions or Deno Edge Functions. Item-level fixes still apply
+> conceptually; only the file paths change. Where the V1 fix is now
+> trivially solved by Supabase (e.g. password reset email infrastructure,
+> session revocation), treat the item as resolved.
+
 A running list of trade-offs and limitations that are acceptable for the MVP
 demo but should be addressed in a proper V1. Each entry notes *what's wrong*
 today, *why it's OK for now*, and a sketch of *what the V1 fix looks like*.

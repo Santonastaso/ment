@@ -1,5 +1,40 @@
 # What we have and what is missing
 
+> **2026-05-23 — Supabase migration.** The Express + SQLite stack
+> documented below has been replaced by a server-less Supabase
+> architecture. The features still exist; the substrate is different.
+> The headline shifts:
+>
+> - **Auth & sessions:** `auth.users` (Supabase Auth) replaces bcrypt + JWT.
+>   `must_change_password` is a flag on `public.profiles`, cleared via a
+>   security-definer RPC after `supabase.auth.updateUser({ password })`.
+> - **Authorization:** Row Level Security on every public table replaces
+>   the in-app `authMiddleware` / `adminOnly` guards. Reads are scoped at
+>   the database, not in route handlers.
+> - **Data access:** `supabase-js` from the browser. The legacy
+>   `client/src/api/index.js` is now a thin shim that translates the
+>   old REST verbs to `supabase.from / .rpc / .functions.invoke` calls.
+> - **Compute:** PDF/DOCX parsing, Anthropic calls, and CSV/XLSX import
+>   live in **Deno Edge Functions** (`supabase/functions/`). Matching
+>   logic, badges, team-skill aggregations, and session lifecycle are
+>   `security definer` Postgres functions called via `supabase.rpc(...)`.
+> - **Schedules:** `pg_cron` replaces the manual admin broadcast and
+>   nightly recompute scripts.
+> - **Audit log:** Postgres triggers, not application code.
+> - **Storage:** Supabase Storage private buckets for CSV imports and
+>   profile uploads; multer/in-memory upload paths removed.
+> - **No Express server.** The `server/` directory has been deleted in
+>   the migration commit; `Dockerfile` removed; `JWT_SECRET`,
+>   `CORS_ORIGINS`, `DB_PATH` no longer exist as env vars.
+>
+> The "Part 1 — What we have" entries below are still accurate at the
+> *behavioral* level — features that worked then work now. The "Part 2 —
+> What is missing" entries that were specific to the Express stack
+> (HTTPS-enforcement layer, CORS allowlist, missing password-reset
+> infrastructure, JWT session revocation) are now owned by Supabase. The
+> remaining gaps (multi-tenancy, email infrastructure, calendar OAuth,
+> SAML/SSO) carry over unchanged.
+
 A thorough snapshot of the MENT platform as of **2026-05-21**. Security,
 tests, and seed sections below were refreshed against `main`; treat the
 codebase as source of truth if anything drifts. Reads in two big parts:

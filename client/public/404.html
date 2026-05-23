@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>MENT</title>
+    <script>
+      // SPA fallback for GitHub Pages: rewrite a "/Project_1/foo/bar" URL into
+      // "/Project_1/?p=/foo/bar" so the bundled React app receives it as a
+      // client-side route. main.jsx restores the original path on boot.
+      (function () {
+        var l = window.location;
+        var segments = l.pathname.split('/').filter(Boolean);
+        // First segment is the repo name when hosted under /<repo>/
+        var base = segments.length ? '/' + segments[0] + '/' : '/';
+        var rest = l.pathname.slice(base.length - 1) || '/';
+        l.replace(base + '?p=' + encodeURIComponent(rest) + l.search.replace(/^\?/, '&') + l.hash);
+      })();
+    </script>
+  </head>
+  <body></body>
+</html>

@@ -6,7 +6,8 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 
 export default function UserMenu() {
-  const { user, logout } = useAuth();
+  const { user, session, logout } = useAuth();
+  const email = session?.user?.email || '';
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
@@ -36,9 +37,9 @@ export default function UserMenu() {
     };
   }, [open]);
 
-  function handleSignOut() {
+  async function handleSignOut() {
     setOpen(false);
-    logout();
+    await logout();
     navigate('/login');
   }
 
@@ -70,7 +71,7 @@ export default function UserMenu() {
         >
           <div className="border-b border-border px-2.5 py-2">
             <p className="text-sm font-medium">{user?.name}</p>
-            <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
+            <p className="truncate text-xs text-muted-foreground">{email}</p>
           </div>
           <button
             type="button"

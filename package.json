@@ -1,19 +1,19 @@
 {
   "name": "ment",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "engines": {
-    "node": ">=20 <23"
+    "node": ">=20"
   },
   "scripts": {
-    "postinstall": "npm install --prefix server && npm install --prefix client",
-    "start": "concurrently --names \"server,client\" --prefix-colors \"blue,green\" \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
+    "postinstall": "npm install --prefix client",
+    "dev": "npm run dev --prefix client",
     "build": "npm run build --prefix client",
-    "seed": "node server/db/seed.js",
-    "seed:large": "node server/db/seed-large.js",
-    "test": "npm test --prefix server"
+    "lint": "supabase db lint --linked",
+    "deploy:functions": "supabase functions deploy admin-create-user admin-reset-password profile-ingest reflection-classify",
+    "migrate:from-sqlite": "node scripts/migrate-from-sqlite.mjs"
   },
-  "devDependencies": {
-    "concurrently": "^8.2.2"
+  "dependencies": {
+    "@supabase/supabase-js": "^2.106.1"
   }
 }

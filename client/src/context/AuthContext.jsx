@@ -1,45 +1,107 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import api from '../api/index.js';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { supabase } from '../lib/supabase.js';
 
 const AuthContext = createContext(null);
 
+const PROFILE_FIELDS =
+  'id, name, department, seniority, job_title, tenure_years, location, bio, ' +
+  'shadow_role_response, pending_checkin, manager_id, must_change_password, ' +
+  'deactivated_at, onboarding_complete, is_admin';
+
+async function loadProfile(userId) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select(PROFILE_FIELDS)
+    .eq('id', userId)
+    .single();
+  if (error) return null;
+
+  const { count } = await supabase
+    .from('profiles')
+    .select('id', { count: 'exact', head: true })
+    .eq('manager_id', userId)
+    .eq('is_admin', false);
+
+  // Alias job_title -> current_role for legacy components.
+  return { ...data, current_role: data.job_title, direct_reports: count ?? 0 };
+}
+
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
+  const [session, setSession] = useState(null);
+  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('ment_token');
-    if (token) {
-      api.get('/users/me')
-        .then(res => setUser({
-          ...res.data,
-          must_change_password: res.data.must_change_password || 0,
-        }))
-        .catch(() => {
-          localStorage.removeItem('ment_token');
-        })
-        .finally(() => setLoading(false));
-    } else {
+    let mounted = true;
+
+    supabase.auth.getSession().then(async ({ data: { session: s } }) => {
+      if (!mounted) return;
+      setSession(s);
+      setProfile(s ? await loadProfile(s.user.id) : null);
       setLoading(false);
-    }
+    });
+
+    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, s) => {
+      if (!mounted) return;
+      setSession(s);
+      setProfile(s ? await loadProfile(s.user.id) : null);
+    });
+    return () => {
+      mounted = false;
+      sub.subscription.unsubscribe();
+    };
   }, []);
 
-  function login(token, userData) {
-    localStorage.setItem('ment_token', token);
-    setUser(userData);
+  // Realtime: keep `profile` fresh when must_change_password / pending_checkin
+  // change (e.g. weekly cron flips the flag).
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    const ch = supabase
+      .channel(`profile:${session.user.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${session.user.id}` },
+        (payload) => setProfile((p) => (p ? { ...p, ...payload.new } : p))
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [session?.user?.id]);
+
+  async function signIn(email, password) {
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password,
+    });
+    if (error) throw error;
   }
 
-  function logout() {
-    localStorage.removeItem('ment_token');
-    setUser(null);
+  async function signOut() {
+    await supabase.auth.signOut();
   }
 
-  function updateUser(partial) {
-    setUser(prev => ({ ...prev, ...partial }));
+  async function refreshProfile() {
+    if (!session?.user?.id) return;
+    setProfile(await loadProfile(session.user.id));
+  }
+
+  function updateProfileLocal(partial) {
+    setProfile((p) => (p ? { ...p, ...partial } : p));
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, updateUser }}>
+    <AuthContext.Provider
+      value={{
+        session,
+        user: profile, // app-level "user" = our profile row, mirrors legacy shape
+        loading,
+        signIn,
+        signOut,
+        // Keep legacy names so existing components don't all need renaming.
+        logout: signOut,
+        updateUser: updateProfileLocal,
+        refreshProfile,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
