@@ -116,23 +116,22 @@ npm install
 npm run dev      # http://localhost:3000
 ```
 
-### 6. Hosted build (GitHub Pages)
+### 6. Hosted build (Vercel)
 
-`.github/workflows/deploy.yml` builds `client/dist` and ships it to GitHub Pages on every push to `main`. To enable:
+Production hosting is **Vercel**. Build is driven by [`vercel.json`](./vercel.json): `npm install --prefix client && npm run build --prefix client`, output `client/dist`. SPA rewrites are handled by `vercel.json` (no `404.html` shim needed).
 
-1. Settings → Pages → Source = "GitHub Actions".
-2. Settings → Secrets and variables → Actions → **Variables**, set:
+1. Vercel → Project → Settings → Environment Variables:
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
-3. Add the deployed origin to Supabase Auth allow list:
+2. Add the deployed origin (e.g. `https://ment-steel.vercel.app`) to Supabase Auth allow list:
    ```bash
    curl -X PATCH -H "Authorization: Bearer $SUPABASE_PAT" \
      -H "Content-Type: application/json" \
-     -d '{"site_url":"https://<owner>.github.io/<repo>","uri_allow_list":"http://localhost:3000,https://<owner>.github.io/<repo>"}' \
+     -d '{"site_url":"https://ment-steel.vercel.app","uri_allow_list":"http://localhost:3000,https://ment-steel.vercel.app,https://*-asantonastaso.vercel.app"}' \
      https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/config/auth
    ```
 
-`client/public/404.html` covers SPA deep links. Vite's `base` is set to `/<repo>/` via the workflow's `BASE_PATH` env var, and `BrowserRouter` consumes the same value via `import.meta.env.BASE_URL`.
+Preview deployments are automatic on every PR.
 
 ---
 
