@@ -131,6 +131,8 @@ GitHub Actions expects these repository secrets for Supabase checks and function
 - `SUPABASE_PROJECT_REF`
 - `SUPABASE_DB_URL` (optional, used for DB lint without linking)
 
+CI also runs a full-history Gitleaks scan from the official CLI container with redacted output. Keep `actions/checkout` at `fetch-depth: 0` for that job so a secret committed and then removed still fails the PR.
+
 ---
 
 ## Test credentials
@@ -223,6 +225,20 @@ Client signup is intentionally deferred. Public `/request-access` submissions ar
 | Explorer | Completed session with someone from a different department |
 
 Computed on-demand by `public.badges_for(uuid)`.
+
+---
+
+## Current backlog notes
+
+These are the useful V1 notes that still apply after the Supabase migration:
+
+- **Notifications**: in-app prompts depend on the browser being open. Service Worker + Push API or email delivery are still future work.
+- **Calendar**: `.ics` download is the only calendar integration. Google/Microsoft OAuth, availability, and two-way sync are not implemented.
+- **AI classification**: Anthropic is opt-in and the default heuristic/ESCO path is the production-safe baseline. Prompt calibration, few-shot examples, and shorter display aliases for long ESCO labels remain V1 polish.
+- **Matching**: feedback is still coarse-grained around departments. Per-skill feedback and incremental match recompute would matter at larger scale.
+- **Privacy and admin ops**: audit export exists, but retention policy, GDPR export/delete workflows, org-level settings, 2FA/SSO, and legal consent screens are not built.
+- **Accessibility/i18n/PWA**: UI strings are English only, no PWA install/offline mode exists, and touch/keyboard accessibility should get a dedicated audit before broad rollout.
+- **Analytics**: owner/org CSV export exists, but deeper anonymized HR analytics and funnel/cohort reporting are not yet productized.
 
 ---
 

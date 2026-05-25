@@ -332,16 +332,6 @@ async function get(url) {
     return ok(await enrichSession(data, viewer.id));
   }
 
-  if (url === '/connections') {
-    const { data, error } = await supabase
-      .from('connections')
-      .select('*')
-      .or(`requester_id.eq.${viewer.id},addressee_id.eq.${viewer.id}`)
-      .order('created_at', { ascending: false });
-    if (error) throw new ApiError(error.message);
-    return ok(data || []);
-  }
-
   if (url === '/reflections') {
     const { data: rows, error } = await supabase
       .from('reflection_logs')
@@ -407,12 +397,6 @@ async function get(url) {
     const limit = Number(params.get('limit') || 100);
     const { data, error } = await supabase.rpc('platform_access_requests', { p_limit: limit });
     if (error) throw new ApiError(error.message);
-    return ok(data);
-  }
-  if (url.startsWith('/admin/users/')) {
-    const id = url.slice('/admin/users/'.length);
-    const { data, error } = await supabase.rpc('admin_user_detail', { p_user_id: id });
-    if (error) throw new ApiError(error.message, 404);
     return ok(data);
   }
   if (url.startsWith('/admin/users')) {
@@ -761,15 +745,6 @@ async function put(url, body = {}) {
       session = data;
     }
     return ok(await enrichSession(session, viewer.id));
-  }
-
-  if (/^\/connections\/\d+$/.test(url)) {
-    const id = Number(url.split('/')[2]);
-    const { data, error } = await supabase.rpc('update_connection_status', {
-      p_id: id, p_status: body.status,
-    });
-    if (error) throw new ApiError(error.message);
-    return ok(data);
   }
 
   if (/^\/admin\/access-requests\/\d+$/.test(url)) {
