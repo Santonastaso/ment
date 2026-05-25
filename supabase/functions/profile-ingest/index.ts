@@ -120,6 +120,7 @@ function heuristicExtract(rawText: string) {
 }
 
 async function claudeExtractProfile(rawText: string) {
+  if (Deno.env.get('AI_CLASSIFICATION_ENABLED') !== 'true') return null;
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
   if (!apiKey) return null;
 

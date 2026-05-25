@@ -19,7 +19,7 @@ import {
 
 const CURATED = [
   'leadership','mentoring','communication','presentation skills','time management','public speaking',
-  'data analysis','strategic thinking','negotiation','project management','program management',
+  'data analysis','strategic thinking','negotiation','project management','program management','Power BI',
   'React','TypeScript','JavaScript','Python','SQL','system design','code review','testing strategy',
   'API design','observability','DevOps','Docker','Kubernetes',
   'budgeting','forecasting','financial modeling','financial analysis','Excel','compliance','risk management',
@@ -33,27 +33,51 @@ const CURATED = [
   'customer health','renewal strategy','expansion','escalation management',
 ];
 
+const ALIASES: { phrase: string; canonical: string }[] = [
+  { phrase: 'project management', canonical: 'project management' },
+  { phrase: 'project manager', canonical: 'project management' },
+  { phrase: 'project planning', canonical: 'project management' },
+  { phrase: 'program management', canonical: 'program management' },
+  { phrase: 'stakeholder management', canonical: 'stakeholder management' },
+  { phrase: 'stakeholder communication', canonical: 'stakeholder management' },
+  { phrase: 'stakeholder comms', canonical: 'stakeholder management' },
+  { phrase: 'data analysis', canonical: 'data analysis' },
+  { phrase: 'data analytics', canonical: 'data analysis' },
+  { phrase: 'power bi', canonical: 'Power BI' },
+  { phrase: 'powerbi', canonical: 'Power BI' },
+  { phrase: 'communication', canonical: 'communication' },
+  { phrase: 'leadership', canonical: 'leadership' },
+  { phrase: 'financial modeling', canonical: 'financial modeling' },
+  { phrase: 'financial modelling', canonical: 'financial modeling' },
+  { phrase: 'change management', canonical: 'change management' },
+];
+
 function escapeRe(s: string) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function heuristicMatch(text: string): string[] {
   if (!text || !text.trim()) return [];
-  const sorted = [...CURATED].sort((a, b) => b.length - a.length);
+  const candidates = [
+    ...CURATED.map((skill) => ({ phrase: skill, canonical: skill })),
+    ...ALIASES,
+  ];
+  const sorted = candidates.sort((a, b) => b.phrase.length - a.phrase.length);
   const lc = text.toLowerCase();
   const consumed = Array.from(lc, () => false);
   const out: string[] = [];
   const seen = new Set<string>();
-  for (const skill of sorted) {
-    if (seen.has(skill.toLowerCase())) continue;
-    const re = new RegExp(`\\b${escapeRe(skill.toLowerCase())}\\b`, 'g');
+  for (const { phrase, canonical } of sorted) {
+    if (seen.has(canonical.toLowerCase())) continue;
+    const pattern = phrase.toLowerCase().split(/\s+/).map(escapeRe).join('\\s+');
+    const re = new RegExp(`\\b${pattern}\\b`, 'g');
     let m: RegExpExecArray | null;
     while ((m = re.exec(lc)) !== null) {
-      const overlaps = consumed.slice(m.index, m.index + skill.length).some(Boolean);
+      const overlaps = consumed.slice(m.index, m.index + m[0].length).some(Boolean);
       if (!overlaps) {
-        out.push(skill);
-        seen.add(skill.toLowerCase());
-        for (let i = m.index; i < m.index + skill.length; i++) consumed[i] = true;
+        out.push(canonical);
+        seen.add(canonical.toLowerCase());
+        for (let i = m.index; i < m.index + m[0].length; i++) consumed[i] = true;
         break;
       }
     }
@@ -62,6 +86,7 @@ function heuristicMatch(text: string): string[] {
 }
 
 async function claudeExtractCandidates(supportNeeded: string, managedWell: string) {
+  if (Deno.env.get('AI_CLASSIFICATION_ENABLED') !== 'true') return null;
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
   if (!apiKey) return null;
 
@@ -121,7 +146,6 @@ async function canonicalizeViaEsco(phrase: string, contextText: string) {
 }
 
 async function classifyOneText(text: string) {
-  if (!isSubstantive(text)) return { pairs: [] as { label: string; uri: string }[], usedEsco: false, usedHeuristic: false };
   const heuristicHits = heuristicMatch(text);
 
   if (heuristicHits.length > 0) {
@@ -136,6 +160,8 @@ async function classifyOneText(text: string) {
     );
     return { pairs: enriched.slice(0, 5), usedEsco: enriched.some((p) => p.uri), usedHeuristic: true };
   }
+
+  if (!isSubstantive(text)) return { pairs: [] as { label: string; uri: string }[], usedEsco: false, usedHeuristic: false };
 
   const escoHits = await escoExtract(text);
   if (Array.isArray(escoHits) && escoHits.length > 0) {

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import MatchCard from '../components/MatchCard.jsx';
 import SessionCard from '../components/SessionCard.jsx';
+import ReflectionLog from '../components/ReflectionLog.jsx';
 import { PageShell, PageSection } from '../components/PageShell.jsx';
 import { Surface, SurfaceBody } from '../components/Surface.jsx';
 import api from '../api/index.js';
@@ -30,7 +31,7 @@ function fireDesktopNotification({ adminTriggered }) {
     });
     n.onclick = () => {
       window.focus();
-      window.location.assign('/profile#reflection-log');
+      window.location.assign('/?checkin=1');
       n.close();
     };
   } catch { /* notification API can throw on some browsers; ignore */ }
@@ -46,12 +47,15 @@ export default function Dashboard() {
   const [checkinDue, setCheckinDue] = useState(false);
   const [pendingFromAdmin, setPendingFromAdmin] = useState(false);
   const [lastEntryDays, setLastEntryDays] = useState(null);
+  const [showDashboardCheckin, setShowDashboardCheckin] = useState(false);
+  const [checkinOpenToken, setCheckinOpenToken] = useState(0);
   const [notifPermission, setNotifPermission] = useState(
     notificationsSupported() ? Notification.permission : 'unsupported'
   );
   // Track previous state across polls so we only fire desktop notifications on edges
   const prevDueRef = useRef(false);
   const prevAdminRef = useRef(false);
+  const checkinSectionRef = useRef(null);
 
   const loadMatches = useCallback(async () => {
     setLoadingMatches(true);
@@ -66,32 +70,54 @@ export default function Dashboard() {
     }
   }, []);
 
+  const loadCheckinStatus = useCallback(async ({ notify = false } = {}) => {
+    const res = await api.get('/reflections');
+    const due = !!res.data.dueForCheckIn;
+    const fromAdmin = !!res.data.pendingFromAdmin;
+    setCheckinDue(due);
+    setPendingFromAdmin(fromAdmin);
+    setLastEntryDays(res.data.lastEntryDays);
+    if (notify) {
+      const becameAdmin = fromAdmin && !prevAdminRef.current;
+      const becameDue = due && !prevDueRef.current;
+      if (becameAdmin || becameDue) {
+        fireDesktopNotification({ adminTriggered: fromAdmin });
+      }
+    }
+    prevDueRef.current = due;
+    prevAdminRef.current = fromAdmin;
+  }, []);
+
+  const openCheckin = useCallback(() => {
+    setShowDashboardCheckin(true);
+    setCheckinOpenToken(t => t + 1);
+    requestAnimationFrame(() => {
+      checkinSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }, []);
+
   // Poll the reflections endpoint so an admin broadcast lands within ~30s
   useEffect(() => {
     let cancelled = false;
     async function tick() {
       try {
-        const res = await api.get('/reflections');
+        await loadCheckinStatus({ notify: true });
+      } catch {
         if (cancelled) return;
-        const due = !!res.data.dueForCheckIn;
-        const fromAdmin = !!res.data.pendingFromAdmin;
-        setCheckinDue(due);
-        setPendingFromAdmin(fromAdmin);
-        setLastEntryDays(res.data.lastEntryDays);
-        // Fire a desktop notification on the edge: admin just triggered, or it just became due
-        const becameAdmin = fromAdmin && !prevAdminRef.current;
-        const becameDue = due && !prevDueRef.current;
-        if (becameAdmin || becameDue) {
-          fireDesktopNotification({ adminTriggered: fromAdmin });
-        }
-        prevDueRef.current = due;
-        prevAdminRef.current = fromAdmin;
-      } catch { /* network blip — keep polling */ }
+      }
     }
     tick();
     const id = setInterval(tick, POLL_INTERVAL_MS);
     return () => { cancelled = true; clearInterval(id); };
-  }, []);
+  }, [loadCheckinStatus]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search || '');
+    if (params.get('checkin') === '1' || window.location.hash === '#checkin') {
+      openCheckin();
+      window.history.replaceState(null, '', '/');
+    }
+  }, [openCheckin]);
 
   async function handleEnableNotifications() {
     if (!notificationsSupported()) return;
@@ -180,10 +206,28 @@ export default function Dashboard() {
               </button>
             )}
           </AlertDescription>
-          <Link to="/profile#reflection-log" className={cn(buttonVariants(), 'mt-3 inline-flex sm:absolute sm:right-4 sm:top-4 sm:mt-0')}>
+          <Button type="button" onClick={openCheckin} className="mt-3 inline-flex sm:absolute sm:right-4 sm:top-4 sm:mt-0">
             Open check-in
-          </Link>
+          </Button>
         </Alert>
+      )}
+
+      {(showDashboardCheckin || checkinDue) && (
+        <div ref={checkinSectionRef} id="checkin" className="scroll-mt-8">
+          <Surface className="border-primary/30 bg-primary/5">
+            <SurfaceBody className="pt-5">
+              <div className="mb-4">
+                <p className="text-sm font-semibold text-foreground">Weekly check-in</p>
+                <p className="mt-1 text-sm text-muted-foreground">Two short answers help keep your mentoring matches current.</p>
+              </div>
+              <ReflectionLog
+                initialOpen={showDashboardCheckin || checkinDue}
+                autoOpenToken={checkinOpenToken}
+                onSubmitted={() => loadCheckinStatus()}
+              />
+            </SurfaceBody>
+          </Surface>
+        </div>
       )}
 
       {!checkinDue && notifPermission === 'default' && (

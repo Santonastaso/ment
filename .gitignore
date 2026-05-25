@@ -14,6 +14,9 @@ migration-id-map.*.json
 supabase/.temp/
 supabase/.branches/
 
+# Vercel local project metadata
+.vercel/
+
 # Environment variables — keep secrets out of git
 .env
 .env.local

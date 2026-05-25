@@ -137,6 +137,14 @@
   .input::placeholder { color: var(--muted-foreground); }
   .input:focus-visible { outline: 2px solid var(--ring); outline-offset: 0; }
   .input:disabled { cursor: not-allowed; opacity: 0.5; }
+  textarea.input {
+    display: block;
+    height: auto;
+    min-height: 6rem;
+    padding-top: 0.625rem;
+    padding-bottom: 0.625rem;
+    line-height: 1.45;
+  }
 
   .label {
     font-size: 0.875rem;

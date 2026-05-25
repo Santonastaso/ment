@@ -99,7 +99,7 @@ export default function TeamSkills() {
                 ) : (
                   <ul className="space-y-4">
                     {gaps.map((g, i) => (
-                      <SkillRow key={g.skill} rank={i + 1} item={g} reportCount={reportCount} variant="gap" />
+                      <SkillRow key={g.skill} rank={i + 1} item={g} variant="gap" />
                     ))}
                   </ul>
                 )}
@@ -114,7 +114,7 @@ export default function TeamSkills() {
                 ) : (
                   <ul className="space-y-4">
                     {strengths.map((s, i) => (
-                      <SkillRow key={s.skill} rank={i + 1} item={s} reportCount={reportCount} variant="strength" />
+                      <SkillRow key={s.skill} rank={i + 1} item={s} variant="strength" />
                     ))}
                   </ul>
                 )}
@@ -127,13 +127,13 @@ export default function TeamSkills() {
   );
 }
 
-function SkillRow({ rank, item, reportCount, variant }) {
+function SkillRow({ rank, item, variant }) {
   const isGap = variant === 'gap';
   return (
-    <li className="grid grid-cols-[2rem_1fr_auto] items-center gap-3 sm:grid-cols-[2rem_1fr_8rem_5rem]">
+    <li className="grid grid-cols-[2rem_1fr_auto] items-center gap-3">
       <span className="text-right text-sm font-semibold tabular-nums text-muted-foreground">{rank}</span>
       <div className="min-w-0">
-        <p className="truncate text-sm font-medium">{item.skill}</p>
+        <p className="text-sm font-medium leading-snug">{item.skill}</p>
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
           <div
             className={`h-full rounded-full transition-all ${isGap ? 'bg-destructive/80' : 'bg-emerald-600'}`}
@@ -144,9 +144,6 @@ function SkillRow({ rank, item, reportCount, variant }) {
       <Badge variant={isGap ? 'destructive' : 'secondary'} className="justify-self-end sm:col-start-3">
         {item.share}%
       </Badge>
-      <span className="hidden text-right text-xs text-muted-foreground sm:block sm:col-start-4">
-        {item.count}/{reportCount}
-      </span>
     </li>
   );
 }

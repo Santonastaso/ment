@@ -103,9 +103,9 @@ export default function SessionCard({ session, currentUserId, onUpdate }) {
     if (!draftDate) return;
     setSubmitting(true);
     try {
-      const updated = await api.put(`/sessions/${session.id}`, {
-        scheduled_at: new Date(draftDate).toISOString(),
-      });
+      const body = { scheduled_at: new Date(draftDate).toISOString() };
+      if (isMentor && session.status === 'pending') body.status = 'scheduled';
+      const updated = await api.put(`/sessions/${session.id}`, body);
       onUpdate?.(updated.data);
       setEditingDate(false);
     } finally {
@@ -202,7 +202,11 @@ export default function SessionCard({ session, currentUserId, onUpdate }) {
       {/* Reschedule input — inline datetime picker */}
       {editingDate && (
         <div className="mt-4 bg-muted rounded-lg p-3 border border-border space-y-2">
-          <label className="label">{session.scheduled_at ? 'Pick a new date and time' : 'Set a date and time'}</label>
+          <label className="label">
+            {isMentor && session.status === 'pending'
+              ? 'Choose a date and time to accept'
+              : session.scheduled_at ? 'Pick a new date and time' : 'Set a date and time'}
+          </label>
           <input
             type="datetime-local"
             className="input text-sm"
@@ -235,7 +239,9 @@ export default function SessionCard({ session, currentUserId, onUpdate }) {
             onClick={() => { setDraftDate(isoToLocalInput(session.scheduled_at)); setEditingDate(true); }}
             className="btn-secondary text-sm"
           >
-            {session.scheduled_at ? 'Reschedule' : 'Set a date'}
+            {isMentor && session.status === 'pending'
+              ? 'Accept & schedule'
+              : session.scheduled_at ? 'Reschedule' : 'Set a date'}
           </button>
         )}
         {editingDate && (

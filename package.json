@@ -10,13 +10,6 @@
     "dev": "npm run dev --prefix client",
     "build": "npm run build --prefix client",
     "lint": "supabase db lint --linked",
-    "deploy:functions": "supabase functions deploy admin-create-user admin-reset-password profile-ingest reflection-classify",
-    "migrate:from-sqlite": "node scripts/migrate-from-sqlite.mjs"
-  },
-  "dependencies": {
-    "@supabase/supabase-js": "^2.106.1"
-  },
-  "devDependencies": {
-    "better-sqlite3": "^9.6.0"
+    "deploy:functions": "supabase functions deploy admin-create-user admin-reset-password profile-ingest reflection-classify"
   }
 }

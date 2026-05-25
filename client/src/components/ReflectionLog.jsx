@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import api from '../api/index.js';
 
 // Reflection log: weekly two-question check-in. Answers are classified by an AI
@@ -10,10 +10,10 @@ const PROMPTS = [
   { key: 'managed_well',   label: 'What did you feel you managed well this week?' },
 ];
 
-export default function ReflectionLog({ onSkillsApplied }) {
+export default function ReflectionLog({ onSkillsApplied, onSubmitted, initialOpen = false, autoOpenToken = 0 }) {
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
+  const [showForm, setShowForm] = useState(initialOpen);
   const [supportNeeded, setSupportNeeded] = useState('');
   const [managedWell, setManagedWell] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -21,8 +21,20 @@ export default function ReflectionLog({ onSkillsApplied }) {
   const [lastEntryDays, setLastEntryDays] = useState(null);
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
+  const firstFieldRef = useRef(null);
 
   useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    if (!initialOpen && !autoOpenToken) return;
+    setShowForm(true);
+  }, [initialOpen, autoOpenToken]);
+
+  useEffect(() => {
+    if (!showForm) return;
+    const id = requestAnimationFrame(() => firstFieldRef.current?.focus());
+    return () => cancelAnimationFrame(id);
+  }, [showForm, autoOpenToken]);
   async function load() {
     setLoading(true);
     try {
@@ -48,6 +60,7 @@ export default function ReflectionLog({ onSkillsApplied }) {
       setManagedWell('');
       setShowForm(false);
       await load();
+      onSubmitted?.();
       setToast('Saved. We picked out some skill signals — review them below.');
       setTimeout(() => setToast(''), 4000);
     } catch (e) {
@@ -82,13 +95,18 @@ export default function ReflectionLog({ onSkillsApplied }) {
   }
 
   function timeAgo(iso) {
-    const ms = Date.now() - new Date(iso + 'Z').getTime();
+    const date = new Date(iso);
+    const normalized = Number.isNaN(date.getTime()) && typeof iso === 'string' && !/[zZ]|[+-]\d\d:?\d\d$/.test(iso)
+      ? new Date(`${iso}Z`)
+      : date;
+    if (Number.isNaN(normalized.getTime())) return 'recently';
+    const ms = Date.now() - normalized.getTime();
     const days = Math.floor(ms / (1000 * 60 * 60 * 24));
     if (days === 0) return 'today';
     if (days === 1) return 'yesterday';
     if (days < 7) return `${days} days ago`;
     if (days < 30) return `${Math.floor(days / 7)} week${Math.floor(days/7) === 1 ? '' : 's'} ago`;
-    return new Date(iso + 'Z').toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    return normalized.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
   }
 
   return (
@@ -127,6 +145,7 @@ export default function ReflectionLog({ onSkillsApplied }) {
             <div key={p.key}>
               <label className="label">{p.label}</label>
               <textarea
+                ref={p.key === 'support_needed' ? firstFieldRef : undefined}
                 rows={3}
                 className="input resize-none"
                 value={p.key === 'support_needed' ? supportNeeded : managedWell}

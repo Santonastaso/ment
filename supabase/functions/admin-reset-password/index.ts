@@ -18,10 +18,13 @@ Deno.serve(async (req) => {
 
   const { data: target } = await ctx.sb
     .from('profiles')
-    .select('id, is_admin')
+    .select('id, is_admin, admin_scope, organization_id')
     .eq('id', userId)
     .single();
-  if (!target || target.is_admin) return jsonError('user_not_found', 404);
+  if (!target || target.is_admin || target.admin_scope !== 'none') return jsonError('user_not_found', 404);
+  if (ctx.profile.admin_scope !== 'platform' && target.organization_id !== ctx.profile.organization_id) {
+    return jsonError('user_not_found', 404);
+  }
 
   const { data: authUser } = await ctx.sb.auth.admin.getUserById(userId);
   if (!authUser?.user?.email) return jsonError('user_not_found', 404);

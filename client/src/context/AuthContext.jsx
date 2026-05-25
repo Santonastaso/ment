@@ -6,7 +6,7 @@ const AuthContext = createContext(null);
 const PROFILE_FIELDS =
   'id, name, department, seniority, job_title, tenure_years, location, bio, ' +
   'shadow_role_response, pending_checkin, manager_id, must_change_password, ' +
-  'deactivated_at, onboarding_complete, is_admin';
+  'deactivated_at, onboarding_complete, is_admin, admin_scope, organization_id';
 
 async function loadProfile(userId) {
   try {
@@ -21,11 +21,7 @@ async function loadProfile(userId) {
     // failure here must not block the whole AuthContext from finishing.
     let directReports = 0;
     try {
-      const { count } = await supabase
-        .from('profiles')
-        .select('id', { count: 'exact', head: true })
-        .eq('manager_id', userId)
-        .eq('is_admin', false);
+      const { data: count } = await supabase.rpc('direct_report_count', { p_manager_id: userId });
       directReports = count ?? 0;
     } catch {
       /* swallow */

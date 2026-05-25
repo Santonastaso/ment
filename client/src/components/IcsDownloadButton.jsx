@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { supabase } from '../lib/supabase.js';
+import api from '../api/index.js';
 import { buildSessionIcs, downloadIcs } from '../lib/ics.js';
 
 export default function IcsDownloadButton({ sessionId, className = '' }) {
@@ -8,25 +8,14 @@ export default function IcsDownloadButton({ sessionId, className = '' }) {
   async function handleDownload() {
     setLoading(true);
     try {
-      const { data: session, error } = await supabase
-        .from('sessions')
-        .select('*')
-        .eq('id', sessionId)
-        .single();
-      if (error || !session) throw error || new Error('not_found');
+      const { data: session } = await api.get(`/sessions/${sessionId}`);
+      if (!session) throw new Error('not_found');
       if (!session.scheduled_at) throw new Error('no_scheduled_at');
-
-      const [{ data: mentor }, { data: mentee }] = await Promise.all([
-        supabase.from('profiles').select('id, name').eq('id', session.mentor_id).single(),
-        supabase.from('profiles').select('id, name').eq('id', session.mentee_id).single(),
-      ]);
-      const { data: viewer } = await supabase.auth.getUser();
-      const myEmail = viewer?.user?.email || '';
 
       const ics = buildSessionIcs(
         session,
-        { ...mentor, email: viewer?.user?.id === session.mentor_id ? myEmail : '' },
-        { ...mentee, email: viewer?.user?.id === session.mentee_id ? myEmail : '' }
+        session.mentor,
+        session.mentee
       );
       downloadIcs(`session-${sessionId}.ics`, ics);
     } catch (e) {

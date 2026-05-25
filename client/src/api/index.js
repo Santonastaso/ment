@@ -28,7 +28,7 @@ async function getViewer() {
   const id = await getViewerId();
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, name, department, seniority, job_title, is_admin')
+    .select('id, name, department, seniority, job_title, is_admin, admin_scope, organization_id')
     .eq('id', id)
     .single();
   if (error) throw new ApiError(error.message);
@@ -102,7 +102,7 @@ function renderReasons(structured, viewer, other, opts = {}) {
 const PROFILE_FIELDS =
   'id, name, department, seniority, job_title, tenure_years, location, bio, ' +
   'shadow_role_response, pending_checkin, manager_id, must_change_password, ' +
-  'deactivated_at, onboarding_complete, is_admin, created_at';
+  'deactivated_at, onboarding_complete, is_admin, admin_scope, organization_id, created_at';
 
 async function fetchAuthEmail(userId) {
   // We can't read auth.users directly from the client; cache email via supabase.auth.user() if it's the viewer.
@@ -112,6 +112,14 @@ async function fetchAuthEmail(userId) {
 }
 
 async function loadProfile(userId, viewerId) {
+  const isSelf = userId === viewerId;
+  if (!isSelf) {
+    const { data, error } = await supabase.rpc('peer_profile', { p_user_id: userId });
+    if (error) throw new ApiError(error.message, 404);
+    if (!data) throw new ApiError('User not found', 404);
+    return data;
+  }
+
   const { data: row, error } = await supabase
     .from('profiles')
     .select(PROFILE_FIELDS)
@@ -120,17 +128,13 @@ async function loadProfile(userId, viewerId) {
   if (error) throw new ApiError(error.message);
   if (!row) throw new ApiError('User not found', 404);
 
-  const isSelf = userId === viewerId;
-
   const [skillsRes, careerRes, progressRes, badgesRes, expertiseRes, reportsCountRes] = await Promise.all([
     supabase.from('skills').select('id, user_id, skill, type, example_project').eq('user_id', userId),
     supabase.from('career_history').select('*').eq('user_id', userId).order('start_year', { ascending: false }),
     supabase.rpc('skill_progress_for', { p_user_id: userId }),
     supabase.rpc('badges_for', { p_user_id: userId }),
     supabase.rpc('expertise_signature_for', { p_user_id: userId }),
-    isSelf
-      ? supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('manager_id', userId).eq('is_admin', false)
-      : Promise.resolve({ count: 0 }),
+    supabase.rpc('direct_report_count', { p_manager_id: userId }),
   ]);
 
   const allSkills = (skillsRes.data || []).map((s) => ({ ...s }));
@@ -141,7 +145,7 @@ async function loadProfile(userId, viewerId) {
   const career = shapeCareer(careerRes.data);
   const badges = badgesRes.data || [];
   const expertiseSignature = (expertiseRes.data || []).map((r) => r.skill);
-  const direct_reports = isSelf ? (reportsCountRes.count ?? 0) : 0;
+  const direct_reports = reportsCountRes.data ?? 0;
 
   const email = await fetchAuthEmail(userId);
 
@@ -173,7 +177,11 @@ async function loadProfile(userId, viewerId) {
 // Sessions
 // ============================================================
 
-async function fetchSessionUser(userId) {
+async function fetchSessionUser(userId, viewerId) {
+  if (userId !== viewerId) {
+    const { data } = await supabase.rpc('peer_profile', { p_user_id: userId });
+    return data ? shapeUser(data) : null;
+  }
   const { data } = await supabase
     .from('profiles')
     .select('id, name, department, seniority, job_title, deactivated_at')
@@ -188,8 +196,8 @@ async function enrichSession(session, viewerId) {
   const isMentor = session.mentor_id === viewerId;
   const isMentee = session.mentee_id === viewerId;
   const [mentor, mentee] = await Promise.all([
-    fetchSessionUser(session.mentor_id),
-    fetchSessionUser(session.mentee_id),
+    fetchSessionUser(session.mentor_id, viewerId),
+    fetchSessionUser(session.mentee_id, viewerId),
   ]);
   if (mentor?.deactivated_at) mentor.name = '[Former colleague]';
   if (mentee?.deactivated_at) mentee.name = '[Former colleague]';
@@ -235,13 +243,22 @@ async function enrichSession(session, viewerId) {
 // Match list (calls get_matches_for, renders reasons in JS)
 // ============================================================
 
-async function listMatches({ limit, role } = {}) {
+async function listMatches({ limit, role, includeDirectory = false } = {}) {
   const viewer = await getViewer();
-  const { data, error } = await supabase.rpc('get_matches_for', {
+  const rpcArgs = {
     p_role: role ?? null,
     p_limit: null, // we paginate after rendering reasons
     p_offset: 0,
-  });
+  };
+  if (includeDirectory) rpcArgs.p_include_directory = true;
+  let { data, error } = await supabase.rpc('get_matches_for', rpcArgs);
+  if (error && includeDirectory && /get_matches_for|function/i.test(error.message || '')) {
+    ({ data, error } = await supabase.rpc('get_matches_for', {
+      p_role: role ?? null,
+      p_limit: null,
+      p_offset: 0,
+    }));
+  }
   if (error) throw new ApiError(error.message);
 
   const all = (data?.matches || []).map((m) => {
@@ -293,22 +310,22 @@ async function get(url) {
 
   if (url.startsWith('/matches')) {
     const params = new URLSearchParams(url.split('?')[1] || '');
-    return ok(await listMatches({ limit: params.get('limit'), role: params.get('role') }));
+    return ok(await listMatches({
+      limit: params.get('limit'),
+      role: params.get('role'),
+      includeDirectory: params.get('includeDirectory') === '1',
+    }));
   }
 
   if (url === '/sessions') {
-    const { data, error } = await supabase
-      .from('sessions')
-      .select('*')
-      .or(`mentor_id.eq.${viewer.id},mentee_id.eq.${viewer.id}`)
-      .order('created_at', { ascending: false });
+    const { data, error } = await supabase.rpc('my_sessions');
     if (error) throw new ApiError(error.message);
     const enriched = await Promise.all((data || []).map((s) => enrichSession(s, viewer.id)));
     return ok(enriched);
   }
   if (url.startsWith('/sessions/') && !url.endsWith('/ics')) {
     const id = Number(url.slice('/sessions/'.length));
-    const { data, error } = await supabase.from('sessions').select('*').eq('id', id).single();
+    const { data, error } = await supabase.rpc('my_session', { p_session_id: id });
     if (error) throw new ApiError(error.message, 404);
     return ok(await enrichSession(data, viewer.id));
   }
@@ -373,15 +390,16 @@ async function get(url) {
     if (error) throw new ApiError(error.message);
     return ok(data);
   }
+  if (url === '/admin/owner-stats') {
+    const { data, error } = await supabase.rpc('platform_owner_stats');
+    if (error) throw new ApiError(error.message);
+    return ok(data);
+  }
   if (url.startsWith('/admin/users/')) {
     const id = url.slice('/admin/users/'.length);
-    const { data, error } = await supabase
-      .from('profiles')
-      .select(PROFILE_FIELDS + ', manager:manager_id(id, name)')
-      .eq('id', id)
-      .single();
+    const { data, error } = await supabase.rpc('admin_user_detail', { p_user_id: id });
     if (error) throw new ApiError(error.message, 404);
-    return ok({ user: { ...data, current_role: data.job_title } });
+    return ok(data);
   }
   if (url.startsWith('/admin/users')) {
     const params = new URLSearchParams(url.split('?')[1] || '');
@@ -576,10 +594,9 @@ async function post(url, body = {}, opts = {}) {
   }
 
   if (url === '/admin/rematch') {
-    const { error: rpcErr } = await supabase.rpc('recompute_all_matches');
-    if (rpcErr) throw new ApiError(rpcErr.message);
-    const { count } = await supabase.from('match_scores').select('*', { count: 'exact', head: true });
-    return ok({ matchesGenerated: count ?? 0, message: `Matching complete. ${count ?? 0} match pairs stored.` });
+    const { data, error } = await supabase.rpc('admin_recompute_matches');
+    if (error) throw new ApiError(error.message);
+    return ok({ matchesGenerated: data ?? 0, message: `Matching complete. ${data ?? 0} match pairs stored.` });
   }
 
   if (url === '/admin/broadcast-checkin') {
@@ -658,7 +675,7 @@ async function put(url, body = {}) {
       session = data;
     } else if (body.status === 'completed') {
       // Per-role completion: send the matching reflection/rating to the RPC
-      const role = (await supabase.from('sessions').select('mentor_id, mentee_id').eq('id', id).single()).data;
+      const role = (await supabase.rpc('my_session', { p_session_id: id })).data;
       const isMentor = role?.mentor_id === viewer.id;
       const refl = isMentor ? body.mentor_reflection : body.reflection;
       const rating = isMentor ? body.mentor_rating : body.mentee_rating;

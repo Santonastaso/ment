@@ -41,16 +41,16 @@ export async function requireAdmin(req: Request) {
   const ctx = await requireUser(req);
   const { data: profile } = await ctx.sb
     .from('profiles')
-    .select('is_admin')
+    .select('id, is_admin, admin_scope, organization_id')
     .eq('id', ctx.user.id)
     .single();
-  if (!profile?.is_admin) {
+  if (!profile?.is_admin && !['org', 'platform'].includes(profile?.admin_scope || '')) {
     throw new Response(JSON.stringify({ error: 'admin_only' }), {
       status: 403,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
-  return ctx;
+  return { ...ctx, profile };
 }
 
 export function jsonOk(payload: unknown, status = 200) {

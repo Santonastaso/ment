@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../api/index.js';
+import { useAuth } from '../context/AuthContext.jsx';
 import { PageShell } from '../components/PageShell.jsx';
 import { Surface, SurfaceBody, SurfaceHeader, SurfacePanel } from '../components/Surface.jsx';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -38,7 +39,10 @@ async function downloadBlob(apiPath, filename) {
 }
 
 export default function AdminDashboard() {
+  const { user } = useAuth();
   const [stats, setStats] = useState(null);
+  const [ownerStats, setOwnerStats] = useState(null);
+  const [ownerLoading, setOwnerLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [rematching, setRematching] = useState(false);
@@ -87,6 +91,16 @@ export default function AdminDashboard() {
       setAuditEntries(res.data.entries || []);
       setAuditTotal(res.data.total || 0);
     } catch { /* ignore */ }
+  }
+
+  async function loadOwnerStats() {
+    setOwnerLoading(true);
+    try {
+      const res = await api.get('/admin/owner-stats');
+      setOwnerStats(res.data);
+    } finally {
+      setOwnerLoading(false);
+    }
   }
 
   useEffect(() => { loadStats(); }, []);
@@ -208,6 +222,7 @@ export default function AdminDashboard() {
 
   const sessionsByStatus = stats?.sessionsByStatus?.reduce((acc, r) => { acc[r.status] = r.cnt; return acc; }, {}) || {};
   const deptActivityMax = Math.max(...(stats?.deptActivity?.map(x => x.session_count || 0) ?? []), 1);
+  const isPlatformAdmin = user?.admin_scope === 'platform';
 
   return (
     <PageShell title="Admin" description="Usage, matching, imports, and weekly check-in broadcasts.">
@@ -231,6 +246,9 @@ export default function AdminDashboard() {
       <div className="flex flex-wrap items-center gap-2">
         <Button type="button" variant={tab === 'overview' ? 'default' : 'outline'} size="sm" onClick={() => setTab('overview')}>Overview</Button>
         <Button type="button" variant={tab === 'users' ? 'default' : 'outline'} size="sm" onClick={() => { setTab('users'); loadUsers(); }}>Users</Button>
+        {isPlatformAdmin && (
+          <Button type="button" variant={tab === 'owner' ? 'default' : 'outline'} size="sm" onClick={() => { setTab('owner'); loadOwnerStats(); }}>Owner</Button>
+        )}
         <Button type="button" variant="outline" size="sm" onClick={handleRematch} disabled={rematching}>
           {rematching ? 'Computing…' : 'Re-run matching'}
         </Button>
@@ -500,6 +518,52 @@ export default function AdminDashboard() {
               </table>
             </div>
           )}
+          </SurfaceBody>
+        </Surface>
+      )}
+
+      {tab === 'owner' && isPlatformAdmin && (
+        <Surface>
+          <SurfaceHeader
+            title="Owner dashboard"
+            description="Cross-organization activity for platform reporting."
+          />
+          <SurfaceBody className="pt-5">
+            {ownerLoading ? (
+              <p className="text-sm text-muted-foreground">Loading…</p>
+            ) : ownerStats?.organizations?.length ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-gray-500">
+                      <th className="py-2 pr-4">Organization</th>
+                      <th className="py-2 pr-4">Users</th>
+                      <th className="py-2 pr-4">Onboarded</th>
+                      <th className="py-2 pr-4">Active 30d</th>
+                      <th className="py-2 pr-4">Sessions</th>
+                      <th className="py-2">Churned</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ownerStats.organizations.map(org => (
+                      <tr key={org.organizationId} className="border-b border-gray-100">
+                        <td className="py-2 pr-4">
+                          <p className="font-medium">{org.organizationName}</p>
+                          <p className="text-xs text-muted-foreground">{org.slug}</p>
+                        </td>
+                        <td className="py-2 pr-4 tabular-nums">{org.totalUsers}</td>
+                        <td className="py-2 pr-4 tabular-nums">{org.onboardingRate}% <span className="text-muted-foreground">({org.onboarded})</span></td>
+                        <td className="py-2 pr-4 tabular-nums">{org.activeMembers}</td>
+                        <td className="py-2 pr-4 tabular-nums">{org.sessions}</td>
+                        <td className="py-2 tabular-nums">{org.churned}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No organizations yet.</p>
+            )}
           </SurfaceBody>
         </Surface>
       )}

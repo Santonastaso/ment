@@ -21,7 +21,7 @@ export default function Explorer() {
     async function load() {
       setLoading(true);
       try {
-        const res = await api.get('/matches');
+        const res = await api.get('/matches?role=mentor&limit=100&includeDirectory=1');
         setMatches(res.data.matches || []);
       } finally {
         setLoading(false);
@@ -30,27 +30,25 @@ export default function Explorer() {
     load();
   }, []);
 
-  const beyondTopThree = useMemo(() => matches.slice(3), [matches]);
-
   const departments = useMemo(() => {
     const set = new Set();
-    for (const m of beyondTopThree) {
+    for (const m of matches) {
       if (m.user.department) set.add(m.user.department);
     }
     return [...set].sort();
-  }, [beyondTopThree]);
+  }, [matches]);
 
   const locations = useMemo(() => {
     const set = new Set();
-    for (const m of beyondTopThree) {
+    for (const m of matches) {
       if (m.user.location) set.add(m.user.location);
     }
     return [...set].sort();
-  }, [beyondTopThree]);
+  }, [matches]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return beyondTopThree.filter(m => {
+    return matches.filter(m => {
       if (departmentFilter && m.user.department !== departmentFilter) return false;
       if (locationFilter && m.user.location !== locationFilter) return false;
       if (!q) return true;
@@ -63,15 +61,15 @@ export default function Explorer() {
       ].join(' ').toLowerCase();
       return haystack.includes(q);
     });
-  }, [beyondTopThree, query, departmentFilter, locationFilter]);
+  }, [matches, query, departmentFilter, locationFilter]);
 
   const activeFilterCount = [departmentFilter, locationFilter].filter(Boolean).length;
 
   return (
-    <PageShell
-      title="Explorer"
-      description="Everyone beyond your top three on Home, sorted by match score."
-    >
+      <PageShell
+        title="Explorer"
+        description="Browse eligible colleagues in your organization, sorted by match strength."
+      >
 
       <Surface>
         <SurfaceBody className="space-y-3">
@@ -107,9 +105,9 @@ export default function Explorer() {
       </Surface>
 
       <div className="flex items-center justify-between text-sm text-muted-foreground">
-        <span>{loading ? 'Loading…' : `${filtered.length} of ${beyondTopThree.length} colleagues`}</span>
+        <span>{loading ? 'Loading…' : `${filtered.length} of ${matches.length} colleagues`}</span>
         {!loading && (
-          <span>Top 3 on <Link to="/" className="font-medium text-primary hover:underline">Home</Link></span>
+          <span>Top suggestions stay on <Link to="/" className="font-medium text-primary hover:underline">Home</Link></span>
         )}
       </div>
 
@@ -120,9 +118,9 @@ export default function Explorer() {
       ) : filtered.length === 0 ? (
         <Surface>
           <SurfaceBody className="py-12 text-center">
-            {beyondTopThree.length === 0 ? (
+            {matches.length === 0 ? (
               <>
-                <p className="font-semibold text-foreground">Your top matches are on Home</p>
+                <p className="font-semibold text-foreground">No eligible colleagues yet</p>
                 <p className="mt-1 text-sm text-muted-foreground">More colleagues appear here as they complete onboarding.</p>
               </>
             ) : (
@@ -133,7 +131,7 @@ export default function Explorer() {
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {filtered.map(m => (
-            <ExplorerCard key={m.matchId} match={m} onRequest={() => setRequestingMentor(m.user)} />
+            <ExplorerCard key={m.matchId || m.user.id} match={m} onRequest={() => setRequestingMentor(m.user)} />
           ))}
         </div>
       )}
@@ -142,7 +140,10 @@ export default function Explorer() {
         <SessionRequestModal
           mentor={requestingMentor}
           onClose={() => setRequestingMentor(null)}
-          onSuccess={() => setRequestingMentor(null)}
+          onSuccess={() => {
+            setMatches(prev => prev.filter(m => m.user.id !== requestingMentor.id));
+            setRequestingMentor(null);
+          }}
         />
       )}
     </PageShell>

@@ -61,9 +61,8 @@ export default function Profile() {
   const { user: currentUser, updateUser } = useAuth();
   const navigate = useNavigate();
 
-  const parsedId = id ? parseInt(id, 10) : null;
-  const isOwnProfile = !id || (currentUser?.id != null && parsedId === currentUser.id);
-  const targetId = isOwnProfile ? currentUser?.id : parsedId;
+  const isOwnProfile = !id || (currentUser?.id != null && id === currentUser.id);
+  const targetId = isOwnProfile ? currentUser?.id : id;
 
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -299,7 +298,7 @@ export default function Profile() {
   const skillTitle = isOwnProfile ? 'Your skill landscape' : `${profile.name?.split(' ')[0]}'s skill landscape`;
   const skillDescription = isOwnProfile
     ? 'A snapshot of what you share and where you’re growing. Sessions push the bars forward.'
-    : `An overview of where ${profile.name?.split(' ')[0]} can help and where they’re growing.`;
+    : `An overview of where ${profile.name?.split(' ')[0]} can help.`;
 
   return (
     <PageShell>

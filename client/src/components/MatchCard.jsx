@@ -74,7 +74,11 @@ export default function MatchCard({ match, onDismiss }) {
         <SessionRequestModal
           mentor={user}
           onClose={() => setShowModal(false)}
-          onSuccess={() => setShowModal(false)}
+          onSuccess={() => {
+            setShowModal(false);
+            setDismissed(true);
+            onDismiss?.(user.id);
+          }}
         />
       )}
     </>

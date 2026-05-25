@@ -56,6 +56,8 @@ Deno.serve(async (req) => {
   if (!rows.length) return jsonError('empty_file', 400);
 
   const tempPassword = generateTempPassword();
+  const adminOrgId = ctx.profile.organization_id;
+  const isPlatformAdmin = ctx.profile.admin_scope === 'platform';
   let imported = 0;
   let updated = 0;
   let skipped = 0;
@@ -81,6 +83,13 @@ Deno.serve(async (req) => {
 
     if (userId) {
       if (mode === 'insert') { skipped++; continue; }
+      const { data: existingProfile } = await ctx.sb
+        .from('profiles')
+        .select('organization_id, admin_scope')
+        .eq('id', userId)
+        .single();
+      if (!existingProfile || existingProfile.admin_scope !== 'none') { skipped++; continue; }
+      if (!isPlatformAdmin && existingProfile.organization_id !== adminOrgId) { skipped++; continue; }
       await ctx.sb.from('profiles').update({
         name, department, seniority, job_title, tenure_years, location,
       }).eq('id', userId);
@@ -93,7 +102,7 @@ Deno.serve(async (req) => {
         email_confirm: true,
         user_metadata: {
           name, department, seniority, job_title, tenure_years, location,
-          must_change_password: true, onboarding_complete: true,
+          must_change_password: true, onboarding_complete: true, organization_id: adminOrgId,
         },
       });
       if (error || !data.user) {
@@ -106,6 +115,7 @@ Deno.serve(async (req) => {
       await ctx.sb.from('profiles').update({
         name, department, seniority, job_title, tenure_years, location,
         onboarding_complete: true,
+        organization_id: adminOrgId,
       }).eq('id', userId);
       imported++;
     }
@@ -128,7 +138,14 @@ Deno.serve(async (req) => {
     const { data: page } = await ctx.sb.auth.admin.listUsers({ page: 1, perPage: 1, email: link.email });
     const mgr = page?.users?.find((u) => u.email?.toLowerCase() === link.email);
     if (mgr) {
-      await ctx.sb.from('profiles').update({ manager_id: mgr.id }).eq('id', link.userId);
+      const { data: mgrProfile } = await ctx.sb
+        .from('profiles')
+        .select('organization_id')
+        .eq('id', mgr.id)
+        .single();
+      if (mgrProfile?.organization_id === adminOrgId || isPlatformAdmin) {
+        await ctx.sb.from('profiles').update({ manager_id: mgr.id }).eq('id', link.userId);
+      }
     }
   }
 
@@ -139,7 +156,7 @@ Deno.serve(async (req) => {
     actor_id: ctx.user.id,
     action: 'admin.upload',
     target_type: 'csv',
-    metadata: { rows: rows.length, imported, updated, skipped, mode },
+    metadata: { rows: rows.length, imported, updated, skipped, mode, organization_id: adminOrgId },
   });
 
   return jsonOk({

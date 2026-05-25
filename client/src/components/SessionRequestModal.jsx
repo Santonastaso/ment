@@ -130,7 +130,7 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess }) {
               </label>
               <textarea
                 className="input resize-none"
-                rows={4}
+                rows={5}
                 maxLength={200}
                 value={question}
                 onChange={e => setQuestion(e.target.value)}
