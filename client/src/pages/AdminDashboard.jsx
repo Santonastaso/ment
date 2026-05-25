@@ -38,11 +38,48 @@ async function downloadBlob(apiPath, filename) {
   URL.revokeObjectURL(url);
 }
 
+function downloadTextFile(text, filename, type = 'text/csv') {
+  const url = URL.createObjectURL(new Blob([text], { type }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function csvEscape(value) {
+  const s = String(value ?? '');
+  return /[,"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function formatDate(value) {
+  if (!value) return '—';
+  return new Date(value).toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function shortId(value) {
+  return value ? `${String(value).slice(0, 8)}…` : '—';
+}
+
 export default function AdminDashboard() {
   const { user } = useAuth();
   const [stats, setStats] = useState(null);
   const [ownerStats, setOwnerStats] = useState(null);
   const [ownerLoading, setOwnerLoading] = useState(false);
+  const [orgNameDraft, setOrgNameDraft] = useState('');
+  const [creatingOrg, setCreatingOrg] = useState(false);
+  const [accessRequests, setAccessRequests] = useState([]);
+  const [accessRequestTotal, setAccessRequestTotal] = useState(0);
+  const [accessRequestsLoading, setAccessRequestsLoading] = useState(false);
+  const [updatingRequestId, setUpdatingRequestId] = useState(null);
+  const [privacyStatus, setPrivacyStatus] = useState(null);
+  const [privacyLoading, setPrivacyLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [rematching, setRematching] = useState(false);
@@ -103,7 +140,30 @@ export default function AdminDashboard() {
     }
   }
 
-  useEffect(() => { loadStats(); }, []);
+  async function loadAccessRequests() {
+    setAccessRequestsLoading(true);
+    try {
+      const res = await api.get('/admin/access-requests?limit=100');
+      setAccessRequests(res.data.requests || []);
+      setAccessRequestTotal(res.data.total || 0);
+    } finally {
+      setAccessRequestsLoading(false);
+    }
+  }
+
+  async function loadPrivacyStatus() {
+    setPrivacyLoading(true);
+    try {
+      const res = await api.get('/admin/privacy-status');
+      setPrivacyStatus(res.data);
+    } catch {
+      setPrivacyStatus(null);
+    } finally {
+      setPrivacyLoading(false);
+    }
+  }
+
+  useEffect(() => { loadStats(); loadPrivacyStatus(); }, []);
 
   async function handleUpload(file) {
     if (!file) return;
@@ -152,6 +212,73 @@ export default function AdminDashboard() {
       setTimeout(() => setBroadcastResult(null), 8000);
     } finally {
       setBroadcasting(false);
+    }
+  }
+
+  async function handleCreateOrganization(e) {
+    e.preventDefault();
+    const name = orgNameDraft.trim();
+    if (!name) return;
+    setCreatingOrg(true);
+    setNotice(null);
+    try {
+      const res = await api.post('/admin/organizations', { name });
+      setOrgNameDraft('');
+      setOwnerStats(prev => prev ? {
+        ...prev,
+        organizations: [...(prev.organizations || []), res.data].sort((a, b) =>
+          (a.organizationName || '').localeCompare(b.organizationName || '')
+        ),
+      } : prev);
+      loadOwnerStats();
+      setNotice({ variant: 'default', title: 'Organization created', message: `${res.data.organizationName} is ready for manual user import.` });
+    } catch (e) {
+      setNotice({
+        variant: 'destructive',
+        title: 'Could not create organization',
+        message: e.response?.data?.error || 'Try again.',
+      });
+    } finally {
+      setCreatingOrg(false);
+    }
+  }
+
+  function downloadOwnerCsv() {
+    const rows = ownerStats?.organizations || [];
+    const header = ['org_name', 'slug', 'org_id', 'users', 'onboarded', 'onboarding_rate', 'active_30d', 'sessions', 'churned'];
+    const body = rows.map(org => [
+      org.organizationName,
+      org.slug,
+      org.organizationId,
+      org.totalUsers,
+      org.onboarded,
+      org.onboardingRate,
+      org.activeMembers,
+      org.sessions,
+      org.churned,
+    ].map(csvEscape).join(',')).join('\n');
+    downloadTextFile(`${header.join(',')}\n${body}\n`, 'ment-owner-organizations.csv');
+  }
+
+  async function copyOrgId(org) {
+    await navigator.clipboard?.writeText(org.organizationId || '');
+    setNotice({ variant: 'default', title: 'Org ID copied', message: org.organizationName });
+  }
+
+  async function updateAccessRequestStatus(request, status) {
+    setUpdatingRequestId(request.id);
+    setNotice(null);
+    try {
+      const res = await api.put(`/admin/access-requests/${request.id}`, { status });
+      setAccessRequests(prev => prev.map(item => item.id === request.id ? res.data : item));
+    } catch (e) {
+      setNotice({
+        variant: 'destructive',
+        title: 'Could not update request',
+        message: e.response?.data?.error || 'Try again.',
+      });
+    } finally {
+      setUpdatingRequestId(null);
     }
   }
 
@@ -247,7 +374,10 @@ export default function AdminDashboard() {
         <Button type="button" variant={tab === 'overview' ? 'default' : 'outline'} size="sm" onClick={() => setTab('overview')}>Overview</Button>
         <Button type="button" variant={tab === 'users' ? 'default' : 'outline'} size="sm" onClick={() => { setTab('users'); loadUsers(); }}>Users</Button>
         {isPlatformAdmin && (
-          <Button type="button" variant={tab === 'owner' ? 'default' : 'outline'} size="sm" onClick={() => { setTab('owner'); loadOwnerStats(); }}>Owner</Button>
+          <>
+            <Button type="button" variant={tab === 'organizations' ? 'default' : 'outline'} size="sm" onClick={() => { setTab('organizations'); loadOwnerStats(); }}>Organizations</Button>
+            <Button type="button" variant={tab === 'access-requests' ? 'default' : 'outline'} size="sm" onClick={() => { setTab('access-requests'); loadAccessRequests(); }}>Access requests</Button>
+          </>
         )}
         <Button type="button" variant="outline" size="sm" onClick={handleRematch} disabled={rematching}>
           {rematching ? 'Computing…' : 'Re-run matching'}
@@ -274,6 +404,63 @@ export default function AdminDashboard() {
               </p>
             )}
           </SurfacePanel>
+
+          <Surface>
+            <SurfaceHeader
+              title="Privacy / AI status"
+              description="Current pilot defaults for peer visibility, AI classification, and backend functions."
+              action={
+                <Button type="button" variant="outline" size="sm" onClick={loadPrivacyStatus} disabled={privacyLoading}>
+                  {privacyLoading ? 'Checking…' : 'Refresh'}
+                </Button>
+              }
+            />
+            <SurfaceBody className="pt-5">
+              {privacyLoading && !privacyStatus ? (
+                <p className="text-sm text-muted-foreground">Loading…</p>
+              ) : privacyStatus ? (
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <div className="space-y-3 text-sm">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">AI classification</p>
+                      <p className="mt-1 font-medium text-foreground">{privacyStatus.aiClassification?.label || 'Off by default'}</p>
+                      <p className="text-xs text-muted-foreground">{privacyStatus.aiClassification?.source}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Supabase region</p>
+                      <p className="mt-1 font-medium text-foreground">{privacyStatus.supabaseRegion || 'eu-central-1'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Edge Functions</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {(privacyStatus.edgeFunctions || []).map(fn => (
+                          <span key={fn.name} className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                            {fn.name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Peer-visible</p>
+                      <ul className="mt-2 space-y-1 text-sm text-foreground">
+                        {(privacyStatus.peerVisibleFields || []).map(field => <li key={field}>{field}</li>)}
+                      </ul>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Hidden</p>
+                      <ul className="mt-2 space-y-1 text-sm text-foreground">
+                        {(privacyStatus.hiddenFields || []).map(field => <li key={field}>{field}</li>)}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Status is not available yet. Apply the latest Supabase migration and refresh.</p>
+              )}
+            </SurfaceBody>
+          </Surface>
 
           {/* Key metrics */}
           {loading ? (
@@ -522,13 +709,33 @@ export default function AdminDashboard() {
         </Surface>
       )}
 
-      {tab === 'owner' && isPlatformAdmin && (
+      {tab === 'organizations' && isPlatformAdmin && (
         <Surface>
           <SurfaceHeader
-            title="Owner dashboard"
-            description="Cross-organization activity for platform reporting."
+            title="Organizations"
+            description="Cross-organization activity and lightweight client provisioning."
+            action={
+              <Button type="button" variant="outline" size="sm" onClick={downloadOwnerCsv} disabled={!ownerStats?.organizations?.length}>
+                Download owner CSV
+              </Button>
+            }
           />
-          <SurfaceBody className="pt-5">
+          <SurfaceBody className="space-y-5 pt-5">
+            <form onSubmit={handleCreateOrganization} className="flex flex-col gap-3 rounded-lg border border-[var(--border)] bg-muted/30 p-3 sm:flex-row sm:items-end">
+              <div className="min-w-0 flex-1 space-y-2">
+                <Label htmlFor="organization-name">Create organization</Label>
+                <Input
+                  id="organization-name"
+                  value={orgNameDraft}
+                  onChange={e => setOrgNameDraft(e.target.value)}
+                  placeholder="Client company name"
+                />
+              </div>
+              <Button type="submit" disabled={creatingOrg || !orgNameDraft.trim()}>
+                {creatingOrg ? 'Creating…' : 'Create organization'}
+              </Button>
+            </form>
+
             {ownerLoading ? (
               <p className="text-sm text-muted-foreground">Loading…</p>
             ) : ownerStats?.organizations?.length ? (
@@ -537,6 +744,7 @@ export default function AdminDashboard() {
                   <thead>
                     <tr className="border-b text-left text-gray-500">
                       <th className="py-2 pr-4">Organization</th>
+                      <th className="py-2 pr-4">Org ID</th>
                       <th className="py-2 pr-4">Users</th>
                       <th className="py-2 pr-4">Onboarded</th>
                       <th className="py-2 pr-4">Active 30d</th>
@@ -551,6 +759,14 @@ export default function AdminDashboard() {
                           <p className="font-medium">{org.organizationName}</p>
                           <p className="text-xs text-muted-foreground">{org.slug}</p>
                         </td>
+                        <td className="py-2 pr-4">
+                          <div className="flex items-center gap-2">
+                            <code className="rounded bg-muted px-1.5 py-0.5 text-xs">{shortId(org.organizationId)}</code>
+                            <Button type="button" variant="link" size="sm" className="h-auto px-0 text-xs" onClick={() => copyOrgId(org)}>
+                              Copy
+                            </Button>
+                          </div>
+                        </td>
                         <td className="py-2 pr-4 tabular-nums">{org.totalUsers}</td>
                         <td className="py-2 pr-4 tabular-nums">{org.onboardingRate}% <span className="text-muted-foreground">({org.onboarded})</span></td>
                         <td className="py-2 pr-4 tabular-nums">{org.activeMembers}</td>
@@ -563,6 +779,71 @@ export default function AdminDashboard() {
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">No organizations yet.</p>
+            )}
+          </SurfaceBody>
+        </Surface>
+      )}
+
+      {tab === 'access-requests' && isPlatformAdmin && (
+        <Surface>
+          <SurfaceHeader
+            title="Access requests"
+            description={accessRequestTotal ? `${accessRequestTotal} total requests. Newest leads appear first.` : 'Public request-access submissions.'}
+            action={
+              <Button type="button" variant="outline" size="sm" onClick={loadAccessRequests} disabled={accessRequestsLoading}>
+                {accessRequestsLoading ? 'Refreshing…' : 'Refresh'}
+              </Button>
+            }
+          />
+          <SurfaceBody className="pt-5">
+            {accessRequestsLoading ? (
+              <p className="text-sm text-muted-foreground">Loading…</p>
+            ) : accessRequests.length ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-gray-500">
+                      <th className="py-2 pr-4">Submitted</th>
+                      <th className="py-2 pr-4">Contact</th>
+                      <th className="py-2 pr-4">Company</th>
+                      <th className="py-2 pr-4">Note</th>
+                      <th className="py-2">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {accessRequests.map(request => (
+                      <tr key={request.id} className="border-b border-gray-100 align-top">
+                        <td className="py-2 pr-4 whitespace-nowrap text-muted-foreground">{formatDate(request.createdAt)}</td>
+                        <td className="py-2 pr-4">
+                          <p className="font-medium">{request.name}</p>
+                          <p className="text-xs text-muted-foreground">{request.email}</p>
+                        </td>
+                        <td className="py-2 pr-4">
+                          <p className="font-medium">{request.company}</p>
+                          <p className="text-xs text-muted-foreground">{request.companySize} · {request.role}</p>
+                        </td>
+                        <td className="max-w-sm py-2 pr-4 text-muted-foreground">
+                          <p className="line-clamp-3 whitespace-pre-wrap">{request.note || '—'}</p>
+                        </td>
+                        <td className="py-2">
+                          <select
+                            className="input h-8 min-w-28"
+                            value={request.status}
+                            disabled={updatingRequestId === request.id}
+                            onChange={e => updateAccessRequestStatus(request, e.target.value)}
+                          >
+                            <option value="new">New</option>
+                            <option value="contacted">Contacted</option>
+                            <option value="closed">Closed</option>
+                          </select>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No access requests yet.</p>
             )}
           </SurfaceBody>
         </Surface>

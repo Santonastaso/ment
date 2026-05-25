@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -59,6 +60,12 @@ export default function Login() {
           </form>
         </CardContent>
       </Card>
+      <p className="mt-4 text-center text-sm text-muted-foreground">
+        Need a company pilot?{' '}
+        <Link to="/request-access" className="font-medium text-primary underline-offset-4 hover:underline">
+          Request access
+        </Link>
+      </p>
     </div>
   );
 }

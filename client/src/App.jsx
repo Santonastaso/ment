@@ -2,6 +2,7 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext.jsx';
 import Login from './pages/Login.jsx';
+import RequestAccess from './pages/RequestAccess.jsx';
 import ForcePasswordChange from './pages/ForcePasswordChange.jsx';
 import Onboarding from './pages/Onboarding.jsx';
 import Dashboard from './pages/Dashboard.jsx';
@@ -85,6 +86,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginRoute />} />
+      <Route path="/request-access" element={<RequestAccess />} />
       <Route path="/change-password" element={<ChangePasswordRoute />} />
       <Route path="/onboarding" element={<OnboardingRoute />} />
       <Route element={<ProtectedRoute />}>

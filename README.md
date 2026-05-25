@@ -32,6 +32,9 @@ The app is **server-less**: a React client talks directly to **Supabase** (Auth 
 │   ├── migrations/0006_org_privacy_demo_fixes.sql
 │   │                                   Organizations, redacted directory RPCs,
 │   │                                   org-scoped admin, privacy RLS
+│   ├── migrations/0007_access_requests_org_admin.sql
+│   │                                   Request-access leads, org creation RPCs,
+│   │                                   privacy/AI status RPC
 │   ├── functions/                     Deno Edge Functions:
 │   │   ├── admin-create-user/         CSV/XLSX bulk import
 │   │   ├── admin-reset-password/      Generates a fresh temp password
@@ -152,9 +155,12 @@ Seed/test users are managed in Supabase Auth. Admin-created users receive a one-
 - **Stats**: users, onboarding rate, sessions by status, top mentors, department activity, silos.
 - **Bulk import**: CSV/XLSX → Edge Function → `auth.admin.createUser` per row → automatic match recompute.
 - **Manage users**: set manager, reset password, deactivate.
+- **Organizations**: platform admins can create lightweight client orgs, copy org IDs, and export owner reporting CSV.
+- **Access requests**: platform admins can review public request-access submissions and mark them `new`, `contacted`, or `closed`.
+- **Privacy / AI status**: admins can see peer-visible fields, hidden fields, Supabase region, and configured Edge Functions.
 - **Audit log**: every important state change is captured by Postgres triggers; downloadable CSV.
 - **Send reflection notes**: manual override of the weekly `pg_cron` broadcast.
-- **Owner dashboard**: platform admins can see cross-organization usage, onboarding, active members, sessions, and deactivation counts.
+- **Owner reporting**: platform admins can see cross-organization usage, onboarding, active members, sessions, and deactivation counts.
 
 ---
 
@@ -194,7 +200,7 @@ Recompute fires:
 - Nightly at 03:15 UTC via `pg_cron` (`mt-nightly-rematch`).
 - On admin "Re-run matching".
 
-Client signup is intentionally deferred. New client organizations are provisioned manually in Supabase by creating an `organizations` row and assigning imported users to that `organization_id`.
+Client signup is intentionally deferred. Public `/request-access` submissions are stored as leads only; platform admins still provision new client organizations manually through the Admin Organizations tab and assign imported users to that `organization_id`.
 
 ---
 

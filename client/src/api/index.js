@@ -17,6 +17,8 @@ function ok(data, status = 200) {
   return { data, status };
 }
 
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
 async function getViewerId() {
   const { data } = await supabase.auth.getSession();
   const id = data?.session?.user?.id;
@@ -395,6 +397,18 @@ async function get(url) {
     if (error) throw new ApiError(error.message);
     return ok(data);
   }
+  if (url === '/admin/privacy-status') {
+    const { data, error } = await supabase.rpc('privacy_status');
+    if (error) throw new ApiError(error.message);
+    return ok(data);
+  }
+  if (url === '/admin/access-requests' || url.startsWith('/admin/access-requests?')) {
+    const params = new URLSearchParams(url.split('?')[1] || '');
+    const limit = Number(params.get('limit') || 100);
+    const { data, error } = await supabase.rpc('platform_access_requests', { p_limit: limit });
+    if (error) throw new ApiError(error.message);
+    return ok(data);
+  }
   if (url.startsWith('/admin/users/')) {
     const id = url.slice('/admin/users/'.length);
     const { data, error } = await supabase.rpc('admin_user_detail', { p_user_id: id });
@@ -442,6 +456,36 @@ async function get(url) {
 }
 
 async function post(url, body = {}, opts = {}) {
+  if (url === '/access-requests') {
+    const honeypot = (body.website || body.url || body.company_website || body.honeypot || '').toString().trim();
+    if (honeypot) throw new ApiError('invalid_submission', 400);
+
+    const name = (body.name || '').toString().trim();
+    const email = (body.email || body.work_email || '').toString().trim().toLowerCase();
+    const company = (body.company || '').toString().trim();
+    const companySize = (body.company_size || body.companySize || '').toString().trim();
+    const role = (body.role || '').toString().trim();
+    const note = (body.note || '').toString().trim();
+
+    if (!name || !email || !company || !companySize || !role) {
+      throw new ApiError('required_fields_missing', 400);
+    }
+    if (!EMAIL_RE.test(email)) throw new ApiError('invalid_email', 400);
+    if (note.length > 2000) throw new ApiError('note_too_long', 400);
+
+    const { error } = await supabase.from('access_requests').insert({
+      name,
+      email,
+      company,
+      company_size: companySize,
+      role,
+      note,
+    });
+    if (error?.code === '23505') throw new ApiError('request_already_open', 409);
+    if (error) throw new ApiError(error.message, 400);
+    return ok({ ok: true }, 201);
+  }
+
   const viewer = await getViewer();
 
   if (url === '/users/me/skills') {
@@ -609,6 +653,13 @@ async function post(url, body = {}, opts = {}) {
     });
   }
 
+  if (url === '/admin/organizations') {
+    const name = (body.name || '').toString().trim();
+    const { data, error } = await supabase.rpc('platform_create_organization', { p_name: name });
+    if (error) throw new ApiError(error.message);
+    return ok(data, 201);
+  }
+
   if (/^\/admin\/users\/[^/]+\/reset-password$/.test(url)) {
     const id = url.split('/')[3];
     const { data, error } = await supabase.functions.invoke('admin-reset-password', { body: { user_id: id } });
@@ -716,6 +767,16 @@ async function put(url, body = {}) {
     const id = Number(url.split('/')[2]);
     const { data, error } = await supabase.rpc('update_connection_status', {
       p_id: id, p_status: body.status,
+    });
+    if (error) throw new ApiError(error.message);
+    return ok(data);
+  }
+
+  if (/^\/admin\/access-requests\/\d+$/.test(url)) {
+    const id = Number(url.split('/')[3]);
+    const { data, error } = await supabase.rpc('platform_update_access_request', {
+      p_id: id,
+      p_status: body.status,
     });
     if (error) throw new ApiError(error.message);
     return ok(data);
