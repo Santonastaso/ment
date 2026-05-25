@@ -23,12 +23,24 @@ jobs:
         with:
           version: latest
 
-      - name: Deploy Edge Functions
+      - name: Check deployment credentials
+        id: credentials
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
         run: |
-          test -n "$SUPABASE_ACCESS_TOKEN"
-          test -n "$SUPABASE_PROJECT_REF"
+          if [ -n "$SUPABASE_ACCESS_TOKEN" ] && [ -n "$SUPABASE_PROJECT_REF" ]; then
+            echo "can_deploy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "can_deploy=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Skipping Supabase Edge Function deploy because SUPABASE_ACCESS_TOKEN or SUPABASE_PROJECT_REF is not configured."
+          fi
+
+      - name: Deploy Edge Functions
+        if: steps.credentials.outputs.can_deploy == 'true'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
           supabase functions deploy admin-create-user admin-reset-password profile-ingest reflection-classify \
             --project-ref "$SUPABASE_PROJECT_REF"
