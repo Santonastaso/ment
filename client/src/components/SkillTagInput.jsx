@@ -1,23 +1,17 @@
 import React, { useState } from 'react';
+import EscoSuggestInput from './EscoSuggestInput.jsx';
 
-export default function SkillTagInput({ value = [], onChange, placeholder = 'Type a skill and press Enter' }) {
+// Tagged-input for plain skill strings. Each entry is just a string in the
+// `value` array. ESCO autocomplete is suggestive: the user can still confirm
+// a custom skill by pressing Enter without picking a suggestion.
+export default function SkillTagInput({ value = [], onChange, placeholder = 'Type a skill and press Enter', lang, ariaLabel }) {
   const [input, setInput] = useState('');
 
   function addSkill(raw) {
-    const skill = raw.trim().toLowerCase();
-    if (skill && !value.map(v => v.toLowerCase()).includes(skill)) {
-      onChange([...value, raw.trim()]);
-    }
-    setInput('');
-  }
-
-  function handleKeyDown(e) {
-    if (e.key === 'Enter' || e.key === ',') {
-      e.preventDefault();
-      addSkill(input);
-    } else if (e.key === 'Backspace' && !input && value.length > 0) {
-      onChange(value.slice(0, -1));
-    }
+    const skill = (raw || '').trim();
+    if (!skill) return;
+    if (value.map((v) => v.toLowerCase()).includes(skill.toLowerCase())) return;
+    onChange([...value, skill]);
   }
 
   function removeSkill(idx) {
@@ -33,20 +27,23 @@ export default function SkillTagInput({ value = [], onChange, placeholder = 'Typ
             <button
               type="button"
               onClick={() => removeSkill(i)}
+              aria-label={`Remove ${skill}`}
               className="text-blue-400 hover:text-primary ml-0.5 leading-none"
             >
               ×
             </button>
           </span>
         ))}
-        <input
-          type="text"
+        <EscoSuggestInput
           value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onBlur={() => input.trim() && addSkill(input)}
+          onChange={setInput}
+          onCommitEsco={(item) => addSkill(item.label)}
+          onCommitCustom={(text) => addSkill(text)}
+          onBackspaceEmpty={() => value.length > 0 && onChange(value.slice(0, -1))}
           placeholder={value.length === 0 ? placeholder : ''}
-          className="flex-1 min-w-[140px] outline-none text-sm py-0.5 bg-transparent"
+          inputClassName="w-full outline-none text-sm py-0.5 bg-transparent"
+          lang={lang}
+          ariaLabel={ariaLabel || 'Add skill'}
         />
       </div>
     </div>

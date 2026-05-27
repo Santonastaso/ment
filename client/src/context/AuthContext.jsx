@@ -6,16 +6,19 @@ const AuthContext = createContext(null);
 const PROFILE_FIELDS =
   'id, name, department, seniority, job_title, tenure_years, location, bio, ' +
   'shadow_role_response, pending_checkin, manager_id, must_change_password, ' +
-  'deactivated_at, onboarding_complete, is_admin, admin_scope, organization_id';
+  'deactivated_at, onboarding_complete, is_admin, admin_scope, organization_id, ' +
+  'mentorship_paused, mentorship_unavailable_until, mentorship_note, ' +
+  'monthly_session_goal';
 
 async function loadProfile(userId) {
   try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select(PROFILE_FIELDS)
-      .eq('id', userId)
-      .single();
+    // After migration 0012 the `profiles` table-level SELECT is restricted
+    // to a column allowlist (it excludes `shadow_role_response`). Use the
+    // security-definer `my_profile()` RPC so we still get every column on
+    // our own row.
+    const { data, error } = await supabase.rpc('my_profile');
     if (error || !data) return null;
+    if (data.id !== userId) return null;
 
     // direct_reports drives Team-Skills nav visibility. Best-effort: a
     // failure here must not block the whole AuthContext from finishing.
@@ -38,6 +41,10 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  // Number of scheduled-but-not-yet-acknowledged sessions where the viewer is
+  // the mentee. Surfaced as a badge in the sidebar and used by the dashboard
+  // to decide whether to render the AcceptanceModal.
+  const [pendingAcceptanceCount, setPendingAcceptanceCount] = useState(0);
 
   useEffect(() => {
     let mounted = true;
@@ -108,6 +115,29 @@ export function AuthProvider({ children }) {
     setProfile((p) => (p ? { ...p, ...partial } : p));
   }
 
+  async function refreshPendingAcceptances() {
+    if (!session?.user?.id) {
+      setPendingAcceptanceCount(0);
+      return [];
+    }
+    try {
+      const { data, error } = await supabase.rpc('pending_acceptances');
+      if (error) throw error;
+      const rows = data || [];
+      setPendingAcceptanceCount(rows.length);
+      return rows;
+    } catch {
+      return [];
+    }
+  }
+
+  // Refresh on login + every time the active session id changes
+  useEffect(() => {
+    if (session?.user?.id) refreshPendingAcceptances();
+    else setPendingAcceptanceCount(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user?.id]);
+
   return (
     <AuthContext.Provider
       value={{
@@ -120,6 +150,8 @@ export function AuthProvider({ children }) {
         logout: signOut,
         updateUser: updateProfileLocal,
         refreshProfile,
+        pendingAcceptanceCount,
+        refreshPendingAcceptances,
       }}
     >
       {children}

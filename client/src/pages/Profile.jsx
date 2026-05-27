@@ -41,6 +41,23 @@ function inputToYM(value) {
   };
 }
 
+// Group an already-sorted (reverse-chronological) career list into runs
+// of consecutive entries that share the same company, LinkedIn-style.
+// Entries without a company stand alone (their group contains just them).
+function groupCareerByCompany(entries) {
+  const groups = [];
+  for (const entry of entries) {
+    const company = (entry.company || '').trim();
+    const last = groups[groups.length - 1];
+    if (company && last && last.company && last.company.toLowerCase() === company.toLowerCase()) {
+      last.entries.push(entry);
+    } else {
+      groups.push({ company, entries: [entry] });
+    }
+  }
+  return groups;
+}
+
 // Render a "Jun 2018 – Jul 2022" / "2018 – present" period label, handling
 // year-only legacy data gracefully.
 function formatPeriod(startY, startM, endY, endM) {
@@ -83,6 +100,10 @@ export default function Profile() {
   const [editCareerDraft, setEditCareerDraft] = useState(null);
   const [editingShadow, setEditingShadow] = useState(false);
   const [shadowDraft, setShadowDraft] = useState('');
+  // Availability (P3) — mentor pause + return-on date.
+  const [availabilitySaving, setAvailabilitySaving] = useState(false);
+  const [returnDateDraft, setReturnDateDraft] = useState('');
+  const [availabilityNoteDraft, setAvailabilityNoteDraft] = useState('');
 
   useEffect(() => {
     setEditing(false);
@@ -111,6 +132,8 @@ export default function Profile() {
           });
           setWantsToLearn(res.data.skills?.filter(s => s.type === 'wants_to_learn').map(s => s.skill) || []);
           setShadowDraft(res.data.shadow_role_response || '');
+          setReturnDateDraft(res.data.mentorship_unavailable_until || '');
+          setAvailabilityNoteDraft(res.data.mentorship_note || '');
         }
       } catch {
         navigate('/');
@@ -211,6 +234,21 @@ export default function Profile() {
     showToast('Saved');
   }
 
+  async function setAvailability({ paused, until, note }) {
+    setAvailabilitySaving(true);
+    try {
+      const payload = {};
+      if (paused !== undefined) payload.mentorship_paused = paused;
+      if (until !== undefined) payload.mentorship_unavailable_until = until || null;
+      if (note !== undefined) payload.mentorship_note = note || null;
+      await api.put('/users/me', payload);
+      await refreshProfile();
+      showToast('Availability updated');
+    } finally {
+      setAvailabilitySaving(false);
+    }
+  }
+
   async function handleAddCareer() {
     if (!newCareer.role.trim() || !newCareer.department.trim()) return;
     const start = inputToYM(newCareer.start_date);
@@ -226,7 +264,9 @@ export default function Profile() {
       end_month: end.month,
     };
     const res = await api.post('/users/me/career', payload);
-    setProfile(prev => ({ ...prev, career: [res.data, ...(prev.career || [])] }));
+    // Refetch so the chronological sort and company grouping picks up the
+    // new entry in the right position, instead of always pinning it on top.
+    await refreshProfile();
     setNewCareer({ role: '', department: '', company: '', description: '', start_date: '', end_date: '' });
     setShowAddCareer(false);
     showToast('Career entry added');
@@ -270,11 +310,10 @@ export default function Profile() {
       end_year: end.year,
       end_month: end.month,
     };
-    const res = await api.put(`/users/me/career/${editingCareerId}`, payload);
-    setProfile(prev => ({
-      ...prev,
-      career: prev.career.map(c => c.id === editingCareerId ? res.data : c),
-    }));
+    await api.put(`/users/me/career/${editingCareerId}`, payload);
+    // Refetch so chronological sort + grouping picks up changes to dates or
+    // company name.
+    await refreshProfile();
     cancelEditCareer();
     showToast('Entry updated');
   }
@@ -358,11 +397,22 @@ export default function Profile() {
                 ) : (
                   <Button variant="outline" size="sm" onClick={() => setEditing(true)}>Edit profile</Button>
                 )
+              ) : profile.mentorship_available === false ? (
+                <Button size="sm" variant="outline" disabled>
+                  Currently unavailable
+                </Button>
               ) : (
                 <Button size="sm" onClick={() => setShowModal(true)}>Request a session</Button>
               )}
             </div>
           </div>
+          {!isOwnProfile && profile.mentorship_available === false && (
+            <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-800 border border-amber-200">
+              {profile.mentorship_unavailable_until && new Date(profile.mentorship_unavailable_until) > new Date()
+                ? `Mentoring paused until ${profile.mentorship_unavailable_until}`
+                : 'Not accepting mentor requests right now'}
+            </p>
+          )}
           {editing ? (
             <textarea className="input resize-none text-sm" rows={2} value={form.bio} onChange={e => setForm(f => ({ ...f, bio: e.target.value }))} placeholder="A short bio…" />
           ) : profile.bio ? (
@@ -416,6 +466,7 @@ export default function Profile() {
               value={teachEditorValue}
               onChange={handleTeachSkillsChange}
               placeholder="Type a skill and press Enter"
+              ariaLabel="Add a skill you can teach"
             />
           </div>
 
@@ -428,8 +479,140 @@ export default function Profile() {
                 await handleWantsToLearnChange(v);
               }}
               placeholder="Type a skill and press Enter"
+              ariaLabel="Add a skill you want to learn"
             />
           </div>
+          </SurfaceBody>
+        </Surface>
+      )}
+
+      {isOwnProfile && (
+        <Surface>
+          <SurfaceHeader
+            title="Mentorship availability & goals"
+            description="Pause incoming mentor requests when you're out of office, and set a soft monthly target if it helps you keep cadence."
+          />
+          <SurfaceBody className="pt-5 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 p-4">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground">
+                  {profile.mentorship_paused
+                    ? 'Mentor requests are paused'
+                    : profile.mentorship_unavailable_until && new Date(profile.mentorship_unavailable_until) > new Date()
+                      ? `Back to accepting requests on ${profile.mentorship_unavailable_until}`
+                      : 'You\'re currently available for mentor requests'}
+                </p>
+                {profile.mentorship_note && (
+                  <p className="mt-1 text-xs text-muted-foreground">{profile.mentorship_note}</p>
+                )}
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                data-testid="toggle-availability"
+                variant={profile.mentorship_paused ? 'default' : 'outline'}
+                disabled={availabilitySaving}
+                onClick={() => setAvailability({ paused: !profile.mentorship_paused })}
+              >
+                {profile.mentorship_paused ? 'Resume mentoring' : 'Pause mentor requests'}
+              </Button>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-[2fr_3fr]">
+              <div>
+                <label className="label">Return on (optional)</label>
+                <input
+                  type="date"
+                  className="input text-sm"
+                  data-testid="availability-return-date"
+                  value={returnDateDraft}
+                  min={new Date().toISOString().slice(0, 10)}
+                  onChange={(e) => setReturnDateDraft(e.target.value)}
+                  disabled={availabilitySaving}
+                />
+                <p className="mt-1 text-[11px] text-muted-foreground">Until this date, you won't appear in mentor suggestions.</p>
+              </div>
+              <div>
+                <label className="label">Note for colleagues (optional)</label>
+                <input
+                  type="text"
+                  className="input text-sm"
+                  maxLength={120}
+                  placeholder='e.g. "Out for parental leave — back in September"'
+                  data-testid="availability-note"
+                  value={availabilityNoteDraft}
+                  onChange={(e) => setAvailabilityNoteDraft(e.target.value)}
+                  disabled={availabilitySaving}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setReturnDateDraft(profile.mentorship_unavailable_until || '');
+                  setAvailabilityNoteDraft(profile.mentorship_note || '');
+                }}
+                disabled={availabilitySaving}
+              >
+                Reset
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                data-testid="save-availability"
+                onClick={() => setAvailability({ until: returnDateDraft, note: availabilityNoteDraft })}
+                disabled={availabilitySaving}
+              >
+                {availabilitySaving ? 'Saving…' : 'Save'}
+              </Button>
+            </div>
+
+            <div className="rounded-lg border border-border bg-muted/40 p-4 space-y-2">
+              <p className="text-sm font-medium text-foreground">Monthly goal (optional)</p>
+              <p className="text-xs text-muted-foreground">
+                Pick a small number of mentoring sessions per month — we'll
+                surface a soft nudge on the dashboard. Set to 0 to turn it off.
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  max="30"
+                  step="1"
+                  className="input w-24 text-sm"
+                  value={profile.monthly_session_goal ?? 0}
+                  data-testid="monthly-goal-input"
+                  onChange={(e) => {
+                    const val = Math.max(0, Math.min(30, Number(e.target.value) || 0));
+                    setProfile(p => ({ ...p, monthly_session_goal: val }));
+                  }}
+                  disabled={availabilitySaving}
+                />
+                <span className="text-sm text-muted-foreground">sessions per month</span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  data-testid="save-goal"
+                  disabled={availabilitySaving}
+                  onClick={async () => {
+                    setAvailabilitySaving(true);
+                    try {
+                      await api.put('/users/me', { monthly_session_goal: profile.monthly_session_goal ?? 0 });
+                      await refreshProfile();
+                      showToast('Goal saved');
+                    } finally {
+                      setAvailabilitySaving(false);
+                    }
+                  }}
+                >
+                  Save goal
+                </Button>
+              </div>
+            </div>
           </SurfaceBody>
         </Surface>
       )}
@@ -483,8 +666,16 @@ export default function Profile() {
         )}
 
         {profile.career?.length > 0 ? (
-          <div className="space-y-3">
-            {profile.career.map(entry => (
+          <div className="space-y-5">
+            {groupCareerByCompany(profile.career).map((group, gIdx) => (
+              <div key={`group-${gIdx}-${group.company || 'no-co'}`} className="space-y-2">
+                {group.company && group.entries.length > 1 && (
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    {group.company}
+                  </p>
+                )}
+                <div className={group.entries.length > 1 ? 'space-y-3 border-l border-border pl-4' : 'space-y-3'}>
+            {group.entries.map(entry => (
               editingCareerId === entry.id && editCareerDraft ? (
                 <div key={entry.id} className="space-y-3 rounded-lg border border-[var(--border)] bg-muted/40 p-4">
                   <div className="grid grid-cols-2 gap-3">
@@ -542,7 +733,9 @@ export default function Profile() {
                     <p className="font-medium text-sm text-foreground">{entry.role}</p>
                     <p className="text-xs text-muted-foreground">
                       {entry.department}
-                      {entry.company && ` · ${entry.company}`}
+                      {/* Hide the company name on individual rows when it's
+                          already shown as the group header above. */}
+                      {entry.company && group.entries.length === 1 && ` · ${entry.company}`}
                       {(entry.start_year || entry.end_year) && ` · ${formatPeriod(entry.start_year, entry.start_month, entry.end_year, entry.end_month)}`}
                     </p>
                     {entry.description && (
@@ -559,6 +752,9 @@ export default function Profile() {
                   )}
                 </div>
               )
+            ))}
+                </div>
+              </div>
             ))}
           </div>
         ) : (

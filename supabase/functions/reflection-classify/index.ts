@@ -15,6 +15,7 @@ import {
   escoRelevantToInput,
   isAcceptableCanonicalization,
   isSubstantive,
+  normalizeLang,
 } from '../_shared/esco.ts';
 
 const CURATED = [
@@ -134,8 +135,8 @@ async function claudeExtractCandidates(supportNeeded: string, managedWell: strin
   }
 }
 
-async function canonicalizeViaEsco(phrase: string, contextText: string) {
-  const r = await escoExtract(phrase);
+async function canonicalizeViaEsco(phrase: string, contextText: string, lang: string) {
+  const r = await escoExtract(phrase, lang);
   for (const candidate of r ?? []) {
     if (isAcceptableCanonicalization(phrase, candidate.label) &&
         escoRelevantToInput(candidate.label, contextText + ' ' + phrase)) {
@@ -145,13 +146,13 @@ async function canonicalizeViaEsco(phrase: string, contextText: string) {
   return { label: phrase, uri: '' };
 }
 
-async function classifyOneText(text: string) {
+async function classifyOneText(text: string, lang: string) {
   const heuristicHits = heuristicMatch(text);
 
   if (heuristicHits.length > 0) {
     const enriched = await Promise.all(
       heuristicHits.map(async (phrase) => {
-        const r = await escoExtract(phrase);
+        const r = await escoExtract(phrase, lang);
         for (const candidate of r ?? []) {
           if (isAcceptableCanonicalization(phrase, candidate.label)) return candidate;
         }
@@ -163,7 +164,7 @@ async function classifyOneText(text: string) {
 
   if (!isSubstantive(text)) return { pairs: [] as { label: string; uri: string }[], usedEsco: false, usedHeuristic: false };
 
-  const escoHits = await escoExtract(text);
+  const escoHits = await escoExtract(text, lang);
   if (Array.isArray(escoHits) && escoHits.length > 0) {
     const relevant = escoHits.filter((h) => escoRelevantToInput(h.label, text));
     if (relevant.length > 0) return { pairs: relevant.slice(0, 5), usedEsco: true, usedHeuristic: false };
@@ -193,6 +194,9 @@ Deno.serve(async (req) => {
   const body = await req.json().catch(() => ({}));
   const reflectionId = Number(body.reflection_log_id);
   if (!Number.isFinite(reflectionId)) return jsonError('reflection_log_id_required');
+  // Caller may pass `lang` to request multi-language ESCO lookups. Anything
+  // unrecognised falls back to English via the shared allow-list.
+  const lang = normalizeLang(body.lang);
 
   const { data: log, error } = await ctx.sb
     .from('reflection_logs')
@@ -212,19 +216,24 @@ Deno.serve(async (req) => {
   let source: string;
 
   if (claude) {
-    gapPairs = await Promise.all(claude.gaps.map((p) => canonicalizeViaEsco(p, supportNeeded)));
-    strengthPairs = await Promise.all(claude.strengths.map((p) => canonicalizeViaEsco(p, managedWell)));
-    source = 'claude-haiku-4-5+esco';
+    gapPairs = await Promise.all(claude.gaps.map((p) => canonicalizeViaEsco(p, supportNeeded, lang)));
+    strengthPairs = await Promise.all(claude.strengths.map((p) => canonicalizeViaEsco(p, managedWell, lang)));
+    // Align with Path B: when Claude found nothing actionable, surface the
+    // "unclassified" sentinel so the retry loop and Re-run UI can react.
+    source = (gapPairs.length + strengthPairs.length) > 0
+      ? 'claude-haiku-4-5+esco'
+      : 'unclassified';
   } else {
     // Path B: heuristic / ESCO direct per text
-    const [g, s] = await Promise.all([classifyOneText(supportNeeded), classifyOneText(managedWell)]);
+    const [g, s] = await Promise.all([classifyOneText(supportNeeded, lang), classifyOneText(managedWell, lang)]);
     gapPairs = g.pairs;
     strengthPairs = s.pairs;
     const usedEsco = g.usedEsco || s.usedEsco;
     const usedHeuristic = g.usedHeuristic || s.usedHeuristic;
     source = usedEsco && usedHeuristic ? 'esco+heuristic'
            : usedEsco ? 'esco'
-           : usedHeuristic ? 'heuristic' : 'esco';
+           : usedHeuristic ? 'heuristic'
+           : 'unclassified';
   }
 
   const gaps = dedupe(gapPairs);

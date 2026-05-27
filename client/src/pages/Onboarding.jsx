@@ -296,6 +296,7 @@ export default function Onboarding() {
                 value={canTeach}
                 onChange={setCanTeach}
                 placeholder="e.g. React, system design, financial modeling…"
+                ariaLabel="Add a skill you can teach"
               />
               {canTeach.length === 0 && (
                 <p className="text-xs text-gray-400">Add at least one skill to get better matches. You can always update this later.</p>
@@ -314,6 +315,7 @@ export default function Onboarding() {
                 value={wantsToLearn}
                 onChange={setWantsToLearn}
                 placeholder="e.g. leadership, Python, SEO, project management…"
+                ariaLabel="Add a skill you want to learn"
               />
 
               <div className="pt-2">

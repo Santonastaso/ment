@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import MatchCard from '../components/MatchCard.jsx';
 import SessionCard from '../components/SessionCard.jsx';
 import ReflectionLog from '../components/ReflectionLog.jsx';
+import AcceptanceModal from '../components/AcceptanceModal.jsx';
 import { PageShell, PageSection } from '../components/PageShell.jsx';
 import { Surface, SurfaceBody } from '../components/Surface.jsx';
 import api from '../api/index.js';
@@ -13,6 +14,12 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const POLL_INTERVAL_MS = 30000;
+
+const NUMBER_WORDS = ['Zero', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+function numberWord(n) {
+  if (n >= 0 && n < NUMBER_WORDS.length) return NUMBER_WORDS[n];
+  return String(n);
+}
 
 function notificationsSupported() {
   return typeof window !== 'undefined' && 'Notification' in window;
@@ -38,7 +45,10 @@ function fireDesktopNotification({ adminTriggered }) {
 }
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, refreshPendingAcceptances } = useAuth();
+  const [pendingAcceptances, setPendingAcceptances] = useState([]);
+  const [acceptanceModalDismissed, setAcceptanceModalDismissed] = useState(false);
+  const [monthlyCompleted, setMonthlyCompleted] = useState(null);
   const [matches, setMatches] = useState([]);
   const [totalMatches, setTotalMatches] = useState(0);
   const [sessions, setSessions] = useState([]);
@@ -144,10 +154,36 @@ export default function Dashboard() {
     }
   }, []);
 
+  // Fetch the full list of pending acceptances (each enriched with mentor
+  // info) so the modal can render names + topics. Also refreshes the
+  // AuthContext badge so it always matches what the modal shows.
+  const loadPendingAcceptances = useCallback(async () => {
+    try {
+      const res = await api.get('/sessions/pending-acceptances');
+      setPendingAcceptances(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      setPendingAcceptances([]);
+    }
+    try {
+      await refreshPendingAcceptances?.();
+    } catch { /* noop */ }
+  }, [refreshPendingAcceptances]);
+
+  const loadMonthlyCount = useCallback(async () => {
+    try {
+      const res = await api.get('/users/me/monthly-count');
+      setMonthlyCompleted(res?.data?.completed ?? 0);
+    } catch {
+      setMonthlyCompleted(null);
+    }
+  }, []);
+
   useEffect(() => {
     loadMatches();
     loadSessions();
-  }, [loadMatches, loadSessions]);
+    loadPendingAcceptances();
+    loadMonthlyCount();
+  }, [loadMatches, loadSessions, loadPendingAcceptances, loadMonthlyCount]);
 
   function handleSessionUpdate(updated) {
     setSessions(prev => prev.map(s => s.id === updated.id ? updated : s));
@@ -189,6 +225,25 @@ export default function Dashboard() {
       className="gap-8"
     >
 
+      {pendingAcceptances.length > 0 && !acceptanceModalDismissed && (
+        <AcceptanceModal
+          sessions={pendingAcceptances}
+          onAcknowledged={async () => {
+            await loadPendingAcceptances();
+            await loadSessions();
+            await refreshPendingAcceptances();
+          }}
+          onClose={() => setAcceptanceModalDismissed(true)}
+        />
+      )}
+
+      {(user?.monthly_session_goal ?? 0) > 0 && monthlyCompleted !== null && (
+        <GoalNudge
+          goal={user.monthly_session_goal}
+          completed={monthlyCompleted}
+        />
+      )}
+
       {checkinDue && (
         <Alert className="relative border-primary/20 bg-primary/5">
           <AlertTitle>{pendingFromAdmin ? 'New weekly check-in from your admin' : 'Time for your weekly check-in'}</AlertTitle>
@@ -223,7 +278,15 @@ export default function Dashboard() {
               <ReflectionLog
                 initialOpen={showDashboardCheckin || checkinDue}
                 autoOpenToken={checkinOpenToken}
-                onSubmitted={() => loadCheckinStatus()}
+                onSubmitted={() => {
+                  // Keep the dashboard panel mounted after submit even if
+                  // checkinDue flips to false (the user just acknowledged it).
+                  // Otherwise the just-submitted entry would vanish along
+                  // with its skill-signal chips and apply CTA.
+                  setShowDashboardCheckin(true);
+                  loadCheckinStatus();
+                }}
+                hideHistory
               />
             </SurfaceBody>
           </Surface>
@@ -241,7 +304,15 @@ export default function Dashboard() {
 
       <PageSection
         title="Mentors for you"
-        description="Three colleagues who could mentor you on what you're trying to grow."
+        description={
+          loadingMatches
+            ? 'Looking for colleagues who could help you grow…'
+            : matches.length === 0
+              ? 'No mentor suggestions yet — complete your skills so we can match you.'
+              : matches.length === 1
+                ? 'One colleague who could mentor you on what you\'re trying to grow.'
+                : `${numberWord(matches.length)} colleagues who could mentor you on what you're trying to grow.`
+        }
         action={
           totalMatches > matches.length ? (
             <Link to="/explorer" className="text-sm font-medium text-primary hover:underline">
@@ -338,5 +409,30 @@ export default function Dashboard() {
         )}
       </PageSection>
     </PageShell>
+  );
+}
+
+// Soft goal nudge — non-blocking, no rigid targets. Uses copy that scales
+// with how close the user is to their monthly_session_goal.
+function GoalNudge({ goal, completed }) {
+  const ratio = goal > 0 ? completed / goal : 0;
+  let tone = 'border-primary/20 bg-primary/5 text-primary';
+  let msg;
+  if (completed >= goal) {
+    tone = 'border-emerald-200 bg-emerald-50 text-emerald-800';
+    msg = `Goal hit — ${completed}/${goal} sessions this month. Nice rhythm.`;
+  } else if (goal - completed === 1) {
+    tone = 'border-amber-200 bg-amber-50 text-amber-800';
+    msg = `You're one session away from your monthly goal of ${goal}.`;
+  } else if (ratio >= 0.5) {
+    tone = 'border-amber-200 bg-amber-50 text-amber-800';
+    msg = `${completed}/${goal} sessions done this month — over halfway there.`;
+  } else {
+    msg = `${completed}/${goal} sessions this month. Keep the conversations going.`;
+  }
+  return (
+    <div data-testid="goal-nudge" className={`rounded-xl border px-4 py-3 text-sm ${tone}`}>
+      {msg}
+    </div>
   );
 }

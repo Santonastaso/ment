@@ -78,6 +78,11 @@ export default function AdminDashboard() {
   const [accessRequestTotal, setAccessRequestTotal] = useState(0);
   const [accessRequestsLoading, setAccessRequestsLoading] = useState(false);
   const [updatingRequestId, setUpdatingRequestId] = useState(null);
+  const [feedback, setFeedback] = useState([]);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [feedbackFilter, setFeedbackFilter] = useState('');
+  const [updatingFeedbackId, setUpdatingFeedbackId] = useState(null);
+  const [savingOrgPrivacy, setSavingOrgPrivacy] = useState(false);
   const [privacyStatus, setPrivacyStatus] = useState(null);
   const [privacyLoading, setPrivacyLoading] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -148,6 +153,39 @@ export default function AdminDashboard() {
       setAccessRequestTotal(res.data.total || 0);
     } finally {
       setAccessRequestsLoading(false);
+    }
+  }
+
+  async function loadFeedback(status = feedbackFilter) {
+    setFeedbackLoading(true);
+    try {
+      const params = status ? `?status=${encodeURIComponent(status)}` : '';
+      const res = await api.get(`/admin/feedback${params}`);
+      setFeedback(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      setFeedback([]);
+    } finally {
+      setFeedbackLoading(false);
+    }
+  }
+
+  async function updateFeedbackStatus(id, nextStatus) {
+    setUpdatingFeedbackId(id);
+    try {
+      const res = await api.put(`/admin/feedback/${id}`, { status: nextStatus });
+      setFeedback(prev => prev.map(f => f.id === id ? { ...f, ...res.data } : f));
+    } finally {
+      setUpdatingFeedbackId(null);
+    }
+  }
+
+  async function updateOrgPrivacy(patch) {
+    setSavingOrgPrivacy(true);
+    try {
+      await api.put('/admin/org-privacy', patch);
+      await loadPrivacyStatus();
+    } finally {
+      setSavingOrgPrivacy(false);
     }
   }
 
@@ -373,6 +411,7 @@ export default function AdminDashboard() {
       <div className="flex flex-wrap items-center gap-2">
         <Button type="button" variant={tab === 'overview' ? 'default' : 'outline'} size="sm" onClick={() => setTab('overview')}>Overview</Button>
         <Button type="button" variant={tab === 'users' ? 'default' : 'outline'} size="sm" onClick={() => { setTab('users'); loadUsers(); }}>Users</Button>
+        <Button type="button" variant={tab === 'feedback' ? 'default' : 'outline'} size="sm" onClick={() => { setTab('feedback'); loadFeedback(); }}>Feedback</Button>
         {isPlatformAdmin && (
           <>
             <Button type="button" variant={tab === 'organizations' ? 'default' : 'outline'} size="sm" onClick={() => { setTab('organizations'); loadOwnerStats(); }}>Organizations</Button>
@@ -453,6 +492,53 @@ export default function AdminDashboard() {
                       <ul className="mt-2 space-y-1 text-sm text-foreground">
                         {(privacyStatus.hiddenFields || []).map(field => <li key={field}>{field}</li>)}
                       </ul>
+                    </div>
+                    <div className="sm:col-span-2 rounded-lg border border-border bg-muted/30 p-3 space-y-3">
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Organization privacy mode</p>
+                        <p className="mt-1 text-sm text-foreground">
+                          Current mode: <span className="font-semibold">{privacyStatus.orgType === 'inter' ? 'Inter-company (PMI)' : 'Intra-company (single employer)'}</span>
+                        </p>
+                        {Array.isArray(privacyStatus.interExtraRedactions) && privacyStatus.interExtraRedactions.length > 0 && (
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Inter mode also hides: {privacyStatus.interExtraRedactions.join(', ')}
+                          </p>
+                        )}
+                      </div>
+                      {isPlatformAdmin && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Button
+                            type="button" size="sm"
+                            variant={privacyStatus.orgType === 'intra' ? 'default' : 'outline'}
+                            onClick={() => updateOrgPrivacy({ type: 'intra' })}
+                            disabled={savingOrgPrivacy}
+                            data-testid="org-mode-intra"
+                          >Intra</Button>
+                          <Button
+                            type="button" size="sm"
+                            variant={privacyStatus.orgType === 'inter' ? 'default' : 'outline'}
+                            onClick={() => updateOrgPrivacy({ type: 'inter' })}
+                            disabled={savingOrgPrivacy}
+                            data-testid="org-mode-inter"
+                          >Inter</Button>
+                        </div>
+                      )}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <label className="text-xs text-muted-foreground">Team dashboard min reports</label>
+                        <input
+                          type="number" min={1} max={100}
+                          defaultValue={privacyStatus.minTeamDashboardSize ?? 3}
+                          data-testid="min-team-size-input"
+                          className="input w-20 text-sm"
+                          disabled={savingOrgPrivacy}
+                          onBlur={(e) => {
+                            const v = Math.max(1, Math.min(100, Number(e.target.value) || 3));
+                            if (v !== (privacyStatus.minTeamDashboardSize ?? 3)) {
+                              updateOrgPrivacy({ min_team_dashboard_size: v });
+                            }
+                          }}
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -844,6 +930,82 @@ export default function AdminDashboard() {
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">No access requests yet.</p>
+            )}
+          </SurfaceBody>
+        </Surface>
+      )}
+
+      {tab === 'feedback' && (
+        <Surface>
+          <SurfaceHeader
+            title="Help &amp; Feedback"
+            description={
+              feedback.length
+                ? `${feedback.length} message${feedback.length === 1 ? '' : 's'} from your team.`
+                : 'Messages submitted via the Help & Feedback dialog land here.'
+            }
+            action={
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  className="input h-8 min-w-32 text-sm"
+                  value={feedbackFilter}
+                  onChange={e => { setFeedbackFilter(e.target.value); loadFeedback(e.target.value); }}
+                >
+                  <option value="">All statuses</option>
+                  <option value="new">New</option>
+                  <option value="reviewing">Reviewing</option>
+                  <option value="resolved">Resolved</option>
+                </select>
+                <Button type="button" variant="outline" size="sm" onClick={() => loadFeedback(feedbackFilter)} disabled={feedbackLoading}>
+                  {feedbackLoading ? 'Refreshing…' : 'Refresh'}
+                </Button>
+              </div>
+            }
+          />
+          <SurfaceBody className="pt-5">
+            {feedbackLoading ? (
+              <p className="text-sm text-muted-foreground">Loading…</p>
+            ) : feedback.length ? (
+              <ul className="space-y-3">
+                {feedback.map(item => (
+                  <li
+                    key={item.id}
+                    data-testid="feedback-item"
+                    className="rounded-lg border border-border bg-card/40 p-4"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                          <span className="font-semibold uppercase tracking-wide text-foreground">{item.category}</span>
+                          <span className="text-muted-foreground">·</span>
+                          <span className="text-muted-foreground">{item.user?.name || 'Unknown user'}</span>
+                          {item.user?.department && (
+                            <>
+                              <span className="text-muted-foreground">·</span>
+                              <span className="text-muted-foreground">{item.user.department}</span>
+                            </>
+                          )}
+                          <span className="text-muted-foreground">·</span>
+                          <span className="text-muted-foreground">{formatDate(item.created_at)}</span>
+                        </div>
+                        <p className="mt-2 whitespace-pre-wrap text-sm text-foreground">{item.message}</p>
+                      </div>
+                      <select
+                        className="input h-8 min-w-28 text-sm"
+                        value={item.status}
+                        disabled={updatingFeedbackId === item.id}
+                        onChange={e => updateFeedbackStatus(item.id, e.target.value)}
+                      >
+                        <option value="new">New</option>
+                        <option value="reviewing">Reviewing</option>
+                        <option value="resolved">Resolved</option>
+                      </select>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted-foreground">No messages yet.</p>
             )}
           </SurfaceBody>
         </Surface>

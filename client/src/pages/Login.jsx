@@ -60,12 +60,21 @@ export default function Login() {
           </form>
         </CardContent>
       </Card>
-      <p className="mt-4 text-center text-sm text-muted-foreground">
-        Need a company pilot?{' '}
-        <Link to="/request-access" className="font-medium text-primary underline-offset-4 hover:underline">
-          Request access
-        </Link>
-      </p>
+      <div className="mt-4 flex flex-col items-center gap-2 text-center text-sm text-muted-foreground">
+        <p>
+          New here?{' '}
+          <Link to="/sign-up" className="font-medium text-primary underline-offset-4 hover:underline" data-testid="login-signup-link">
+            Start your team
+          </Link>
+        </p>
+        <p>
+          Or{' '}
+          <Link to="/request-access" className="font-medium text-primary underline-offset-4 hover:underline">
+            request a pilot
+          </Link>{' '}
+          if you'd rather we set it up for you.
+        </p>
+      </div>
     </div>
   );
 }

@@ -11,7 +11,7 @@ const NAV = [
 ];
 
 export default function Sidebar({ onNavigate }) {
-  const { user } = useAuth();
+  const { user, pendingAcceptanceCount } = useAuth();
   const location = useLocation();
 
   const links = [
@@ -35,6 +35,7 @@ export default function Sidebar({ onNavigate }) {
             ? item.match(location.pathname, user?.id)
             : location.pathname === item.to;
           const Icon = item.icon;
+          const showBadge = item.to === '/' && pendingAcceptanceCount > 0;
           return (
             <Link
               key={item.to}
@@ -48,7 +49,16 @@ export default function Sidebar({ onNavigate }) {
               )}
             >
               <Icon className={cn('size-[18px] shrink-0', active && 'text-primary')} strokeWidth={1.75} />
-              {item.label}
+              <span className="flex-1">{item.label}</span>
+              {showBadge && (
+                <span
+                  data-testid="home-pending-badge"
+                  className="ml-auto inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[10px] font-semibold"
+                  aria-label={`${pendingAcceptanceCount} pending acceptance${pendingAcceptanceCount === 1 ? '' : 's'}`}
+                >
+                  {pendingAcceptanceCount}
+                </span>
+              )}
             </Link>
           );
         })}

@@ -10,8 +10,18 @@ const PROMPTS = [
   { key: 'managed_well',   label: 'What did you feel you managed well this week?' },
 ];
 
-export default function ReflectionLog({ onSkillsApplied, onSubmitted, initialOpen = false, autoOpenToken = 0 }) {
+export default function ReflectionLog({
+  onSkillsApplied,
+  onSubmitted,
+  initialOpen = false,
+  autoOpenToken = 0,
+  // Dashboard mode: only render the new check-in form and the just-submitted
+  // entry. The history list and "no entries yet" empty state are suppressed
+  // so the dashboard panel stays focused on the current check-in.
+  hideHistory = false,
+}) {
   const [entries, setEntries] = useState([]);
+  const [latestEntryId, setLatestEntryId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(initialOpen);
   const [supportNeeded, setSupportNeeded] = useState('');
@@ -47,6 +57,13 @@ export default function ReflectionLog({ onSkillsApplied, onSubmitted, initialOpe
     }
   }
 
+  // In dashboard mode (hideHistory), surface only the freshly-submitted entry
+  // (the one this dashboard panel just produced). Past reflections stay on
+  // the profile page — the dashboard panel is "current check-in" only.
+  const visibleEntries = hideHistory
+    ? entries.filter((e) => e.id === latestEntryId)
+    : entries;
+
   async function handleSubmit() {
     setError('');
     if (!supportNeeded.trim() && !managedWell.trim()) {
@@ -55,10 +72,14 @@ export default function ReflectionLog({ onSkillsApplied, onSubmitted, initialOpe
     }
     setSubmitting(true);
     try {
-      await api.post('/reflections', { support_needed: supportNeeded, managed_well: managedWell });
+      const res = await api.post('/reflections', { support_needed: supportNeeded, managed_well: managedWell });
       setSupportNeeded('');
       setManagedWell('');
       setShowForm(false);
+      // Remember which row this panel produced so dashboard mode can show
+      // just that one entry.
+      const newId = res?.data?.id ?? null;
+      if (newId != null) setLatestEntryId(newId);
       await load();
       onSubmitted?.();
       setToast('Saved. We picked out some skill signals — review them below.');
@@ -91,7 +112,29 @@ export default function ReflectionLog({ onSkillsApplied, onSubmitted, initialOpe
   async function handleDelete(entry) {
     if (!confirm('Delete this reflection? This cannot be undone.')) return;
     await api.delete(`/reflections/${entry.id}`);
+    if (latestEntryId === entry.id) setLatestEntryId(null);
     await load();
+  }
+
+  async function handleReclassify(entry) {
+    try {
+      await api.post(`/reflections/${entry.id}/reclassify`, {});
+      await load();
+      setToast('Re-classified. Review the new skill signals below.');
+      setTimeout(() => setToast(''), 3000);
+    } catch (e) {
+      // Reload anyway so the UI reflects whatever ended up in the row.
+      try { await load(); } catch { /* noop */ }
+      const code = e?.response?.data?.error || e?.message || '';
+      const friendly =
+        code === 'reclassify_unclassified'
+          ? "We couldn't pull any skill signals out of this entry. Try expanding the wording and re-running."
+          : code === 'reclassify_failed'
+            ? 'The classifier was unreachable. Try again in a moment.'
+            : 'Could not re-classify this reflection. Try again in a moment.';
+      setError(friendly);
+      setTimeout(() => setError(''), 5000);
+    }
   }
 
   function timeAgo(iso) {
@@ -117,8 +160,9 @@ export default function ReflectionLog({ onSkillsApplied, onSubmitted, initialOpe
         </div>
       )}
 
-      {/* Check-in prompt */}
-      {dueForCheckIn && !showForm && (
+      {/* Check-in prompt — suppressed in dashboard mode (the dashboard
+          already renders its own "Open check-in" alert above this panel). */}
+      {!hideHistory && dueForCheckIn && !showForm && (
         <div className="bg-gradient-to-r from-blue-50 to-amber-50 border border-blue-200 rounded-xl p-4 flex items-start justify-between gap-4">
           <div>
             <p className="text-foreground font-semibold text-sm">Time for your weekly check-in</p>
@@ -164,24 +208,35 @@ export default function ReflectionLog({ onSkillsApplied, onSubmitted, initialOpe
         </div>
       )}
 
-      {/* Add manually if not due */}
-      {!showForm && !dueForCheckIn && (
+      {/* Add manually if not due — suppressed in dashboard mode so the
+          panel only renders the active check-in. */}
+      {!hideHistory && !showForm && !dueForCheckIn && (
         <button onClick={() => setShowForm(true)} className="text-sm text-primary hover:text-primary/80 font-medium">
           + Add a reflection now
         </button>
       )}
 
-      {/* Past entries */}
-      {loading ? (
+      {/* Entries — either the full history or just the freshly-submitted
+          entry when running inside the dashboard panel. In dashboard mode we
+          keep the rendered entry visible across `load()` refreshes so the
+          just-submitted card doesn't flicker. */}
+      {loading && !hideHistory ? (
         <p className="text-sm text-gray-400">Loading your log…</p>
-      ) : entries.length === 0 ? (
-        !showForm && !dueForCheckIn && (
+      ) : visibleEntries.length === 0 ? (
+        !hideHistory && !loading && !showForm && !dueForCheckIn && (
           <p className="text-sm text-gray-500">No entries yet. Your check-ins will live here, with the AI-extracted skill signals from each one.</p>
         )
       ) : (
         <div className="space-y-3">
-          {entries.map(entry => (
-            <Entry key={entry.id} entry={entry} onApply={handleApply} onDelete={handleDelete} timeAgo={timeAgo} />
+          {visibleEntries.map(entry => (
+            <Entry
+              key={entry.id}
+              entry={entry}
+              onApply={handleApply}
+              onDelete={handleDelete}
+              onReclassify={handleReclassify}
+              timeAgo={timeAgo}
+            />
           ))}
         </div>
       )}
@@ -190,7 +245,7 @@ export default function ReflectionLog({ onSkillsApplied, onSubmitted, initialOpe
 }
 
 function classifierLabel(source) {
-  if (!source) return 'unclassified';
+  if (!source || source === 'unclassified') return 'no match';
   if (source === 'claude-haiku-4-5+esco') return 'Claude + ESCO taxonomy';
   if (source === 'claude-haiku-4-5') return 'Claude';
   if (source === 'esco') return 'ESCO taxonomy';
@@ -236,10 +291,11 @@ function ChipWithEsco({ skill, uri, tone, onDismiss }) {
   );
 }
 
-function Entry({ entry, onApply, onDelete, timeAgo }) {
+function Entry({ entry, onApply, onDelete, onReclassify, timeAgo }) {
   // Track which suggestions the user has dismissed (locally, before applying)
   const [dismissedGaps, setDismissedGaps] = useState(() => new Set());
   const [dismissedStrengths, setDismissedStrengths] = useState(() => new Set());
+  const [reclassifying, setReclassifying] = useState(false);
 
   const allGaps = entry.extracted_gaps || [];
   const allStrengths = entry.extracted_strengths || [];
@@ -250,6 +306,22 @@ function Entry({ entry, onApply, onDelete, timeAgo }) {
   const totalDismissed = totalAll - totalKept;
   const hasSuggestions = totalAll > 0;
   const uris = entry.esco_uris || {};
+  // "Unclassified" = the edge function never returned a real classifier
+  // source, or returned the explicit "unclassified" sentinel because all
+  // paths produced zero signals. Surface a manual retry so users aren't
+  // stuck staring at a dead entry caused by a transient function failure.
+  const rawSource = (entry.classifier_source || '').trim().toLowerCase();
+  const isUnclassified = !rawSource || rawSource === 'unclassified';
+
+  async function handleReclassify() {
+    if (reclassifying || !onReclassify) return;
+    setReclassifying(true);
+    try {
+      await onReclassify(entry);
+    } finally {
+      setReclassifying(false);
+    }
+  }
 
   function dismiss(set, setter, skill) {
     const next = new Set(set);
@@ -276,7 +348,20 @@ function Entry({ entry, onApply, onDelete, timeAgo }) {
             </span>
           )}
         </div>
-        <button onClick={() => onDelete(entry)} className="text-xs text-gray-400 hover:text-rose-500">Delete</button>
+        <div className="flex items-center gap-2">
+          {isUnclassified && onReclassify && (
+            <button
+              type="button"
+              onClick={handleReclassify}
+              disabled={reclassifying}
+              data-testid="reclassify-button"
+              className="text-xs font-medium text-primary hover:text-primary/80 underline-offset-2 hover:underline disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {reclassifying ? 'Re-classifying…' : 'Re-run classification'}
+            </button>
+          )}
+          <button onClick={() => onDelete(entry)} className="text-xs text-gray-400 hover:text-rose-500">Delete</button>
+        </div>
       </div>
 
       <div className="p-4 space-y-3 text-sm">

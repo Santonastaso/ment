@@ -15,6 +15,7 @@ import {
   escoExtract,
   escoRelevantToInput,
   isAcceptableCanonicalization,
+  normalizeLang,
 } from '../_shared/esco.ts';
 
 const MONTHS: Record<string, number> = {
@@ -157,14 +158,14 @@ async function claudeExtractProfile(rawText: string) {
   }
 }
 
-async function canonicalizeSkills(phrases: string[], context: string) {
+async function canonicalizeSkills(phrases: string[], context: string, lang: string) {
   const out: { skill: string; uri: string }[] = [];
   const seen = new Set<string>();
   for (const phrase of (phrases || []).slice(0, 8)) {
     const p = (phrase || '').toString().trim();
     if (!p) continue;
     let canonical: { label: string; uri: string } = { label: p, uri: '' };
-    const r = await escoExtract(p);
+    const r = await escoExtract(p, lang);
     for (const candidate of r ?? []) {
       if (isAcceptableCanonicalization(p, candidate.label) &&
           escoRelevantToInput(candidate.label, context + ' ' + p)) {
@@ -190,6 +191,9 @@ Deno.serve(async (req) => {
   const body = await req.json().catch(() => ({}));
   const storagePath = (body.storage_path || '').toString();
   const kind = ['performance_review', 'cv', 'manual_text'].includes(body.kind) ? body.kind : 'performance_review';
+  // Optional language hint for ESCO canonicalization; falls back to English
+  // when missing or unknown.
+  const lang = normalizeLang(body.lang);
   if (!storagePath) return jsonError('storage_path_required');
 
   // Storage path is expected to be `<auth.uid()>/<filename>` so RLS allows the user to read.
@@ -208,8 +212,8 @@ Deno.serve(async (req) => {
   const base = claude ?? heuristicExtract(rawText);
   let classifier_source: string = claude ? 'claude' : 'heuristic';
 
-  const can_teach = await canonicalizeSkills(base.strengths || [], rawText);
-  const wants_to_learn = await canonicalizeSkills(base.growth_areas || [], rawText);
+  const can_teach = await canonicalizeSkills(base.strengths || [], rawText, lang);
+  const wants_to_learn = await canonicalizeSkills(base.growth_areas || [], rawText, lang);
   const usedEsco = [...can_teach, ...wants_to_learn].some((s) => s.uri);
   if (claude && usedEsco) classifier_source = 'claude+esco';
   else if (!claude && usedEsco) classifier_source = 'esco';

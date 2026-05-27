@@ -5,6 +5,7 @@
 // `supabase` directly from `client/src/lib/supabase.js`.
 
 import { supabase } from '../lib/supabase.js';
+import { browserLanguage } from '../lib/esco.js';
 
 class ApiError extends Error {
   constructor(message, status = 500) {
@@ -54,7 +55,25 @@ function shapeProfile(row, viewerId) {
 }
 
 function shapeCareer(rows) {
-  return (rows || []).map((c) => ({ ...c, role: c.role_title }));
+  // Sort reverse-chronologically by (start_year, start_month) so the latest
+  // role is always first regardless of insertion order. Null months treated
+  // as 0 so they fall behind dated entries within the same year. Null years
+  // get pushed to the bottom of the list.
+  const list = (rows || []).map((c) => ({ ...c, role: c.role_title }));
+  list.sort((a, b) => {
+    const ay = a.start_year ?? -Infinity;
+    const by = b.start_year ?? -Infinity;
+    if (by !== ay) return by - ay;
+    const am = a.start_month ?? 0;
+    const bm = b.start_month ?? 0;
+    if (bm !== am) return bm - am;
+    // Tie-break by end_year descending so an ongoing role wins over a
+    // completed one with the same start.
+    const aey = a.end_year ?? Infinity;
+    const bey = b.end_year ?? Infinity;
+    return bey - aey;
+  });
+  return list;
 }
 
 function shapeUser(u) {
@@ -98,13 +117,67 @@ function renderReasons(structured, viewer, other, opts = {}) {
 }
 
 // ============================================================
+// Reflection classification with retry + refetch
+// ============================================================
+
+// Classify a reflection_logs row. Invokes the edge function up to
+// `invocations` times with backoff, then refetches the row and returns it.
+// Always resolves (never throws): if every invocation fails we still refetch
+// so callers see the row in its current state and can surface a re-classify
+// affordance.
+//
+// `budgetMs` caps the total wall-clock spent blocking the caller. The retry
+// loop exits early once the budget is consumed; the caller can decide
+// whether to surface success or schedule another async retry.
+async function classifyReflectionWithRetry(reflectionLogId, opts = {}) {
+  const invocations = Math.max(1, opts.invocations ?? 3);
+  const budgetMs = Math.max(0, opts.budgetMs ?? 12000);
+  const backoff = [200, 600, 1500];
+  const start = Date.now();
+
+  const lang = browserLanguage();
+  for (let i = 0; i < invocations; i++) {
+    try {
+      await supabase.functions.invoke('reflection-classify', {
+        body: { reflection_log_id: reflectionLogId, lang },
+      });
+    } catch {
+      // invoke errors fall through to the refetch — the edge function may
+      // still have written the row (or another tab kicked the classifier).
+    }
+
+    // After the call (success or failure), read the row back. If
+    // classifier_source is populated we are done.
+    const { data: row } = await supabase
+      .from('reflection_logs')
+      .select('*')
+      .eq('id', reflectionLogId)
+      .maybeSingle();
+
+    if (!row) return null; // row deleted while we were retrying
+    const cs = (row.classifier_source || '').trim().toLowerCase();
+    // 'unclassified' is the explicit "edge function ran but nothing matched"
+    // sentinel — keep retrying, ESCO might come back with hits next round.
+    if (cs && cs !== 'unclassified') return row;
+
+    if (i >= invocations - 1) return row;
+    if (Date.now() - start >= budgetMs) return row;
+
+    await new Promise((r) => setTimeout(r, backoff[Math.min(i, backoff.length - 1)]));
+  }
+  return null;
+}
+
+// ============================================================
 // Profile composition for /users/me and /users/:id
 // ============================================================
 
 const PROFILE_FIELDS =
   'id, name, department, seniority, job_title, tenure_years, location, bio, ' +
   'shadow_role_response, pending_checkin, manager_id, must_change_password, ' +
-  'deactivated_at, onboarding_complete, is_admin, admin_scope, organization_id, created_at';
+  'deactivated_at, onboarding_complete, is_admin, admin_scope, organization_id, ' +
+  'mentorship_paused, mentorship_unavailable_until, mentorship_note, ' +
+  'monthly_session_goal, created_at';
 
 async function fetchAuthEmail(userId) {
   // We can't read auth.users directly from the client; cache email via supabase.auth.user() if it's the viewer.
@@ -122,11 +195,10 @@ async function loadProfile(userId, viewerId) {
     return data;
   }
 
-  const { data: row, error } = await supabase
-    .from('profiles')
-    .select(PROFILE_FIELDS)
-    .eq('id', userId)
-    .single();
+  // After 0012 we no longer have direct SELECT on the full profiles row from
+  // an authenticated session. Owner reads go through my_profile() (security
+  // definer) so the sensitive columns (shadow_role_response) come through.
+  const { data: row, error } = await supabase.rpc('my_profile');
   if (error) throw new ApiError(error.message);
   if (!row) throw new ApiError('User not found', 404);
 
@@ -305,6 +377,11 @@ async function get(url) {
   if (url === '/users/me') {
     return ok(await loadProfile(viewer.id, viewer.id));
   }
+  if (url === '/users/me/monthly-count') {
+    const { data, error } = await supabase.rpc('my_monthly_completed_count');
+    if (error) throw new ApiError(error.message);
+    return ok({ completed: data ?? 0 });
+  }
   if (url.startsWith('/users/')) {
     const id = url.slice('/users/'.length);
     return ok(await loadProfile(id, viewer.id));
@@ -321,6 +398,12 @@ async function get(url) {
 
   if (url === '/sessions') {
     const { data, error } = await supabase.rpc('my_sessions');
+    if (error) throw new ApiError(error.message);
+    const enriched = await Promise.all((data || []).map((s) => enrichSession(s, viewer.id)));
+    return ok(enriched);
+  }
+  if (url === '/sessions/pending-acceptances') {
+    const { data, error } = await supabase.rpc('pending_acceptances');
     if (error) throw new ApiError(error.message);
     const enriched = await Promise.all((data || []).map((s) => enrichSession(s, viewer.id)));
     return ok(enriched);
@@ -396,6 +479,13 @@ async function get(url) {
     const params = new URLSearchParams(url.split('?')[1] || '');
     const limit = Number(params.get('limit') || 100);
     const { data, error } = await supabase.rpc('platform_access_requests', { p_limit: limit });
+    if (error) throw new ApiError(error.message);
+    return ok(data);
+  }
+  if (url === '/admin/feedback' || url.startsWith('/admin/feedback?')) {
+    const params = new URLSearchParams(url.split('?')[1] || '');
+    const status = params.get('status') || null;
+    const { data, error } = await supabase.rpc('list_feedback', { p_status: status });
     if (error) throw new ApiError(error.message);
     return ok(data);
   }
@@ -543,10 +633,26 @@ async function post(url, body = {}, opts = {}) {
     return ok(await enrichSession(data, viewer.id), 201);
   }
 
+  if (/^\/sessions\/\d+\/acknowledge$/.test(url)) {
+    const id = Number(url.split('/')[2]);
+    const { error } = await supabase.rpc('acknowledge_session', { p_session_id: id });
+    if (error) throw new ApiError(error.message);
+    return ok({ id, acknowledged: true });
+  }
+
   if (url === '/connections') {
     const { data, error } = await supabase.rpc('upsert_connection', {
       p_addressee_id: body.addressee_id,
       p_status: body.status || 'pending',
+    });
+    if (error) throw new ApiError(error.message);
+    return ok(data, 201);
+  }
+
+  if (url === '/feedback') {
+    const { data, error } = await supabase.rpc('submit_feedback', {
+      p_category: body.category || 'general',
+      p_message: body.message || '',
     });
     if (error) throw new ApiError(error.message);
     return ok(data, 201);
@@ -565,11 +671,28 @@ async function post(url, body = {}, opts = {}) {
     if (error) throw new ApiError(error.message);
     // Acknowledge the admin nudge
     await supabase.rpc('acknowledge_checkin');
-    // Best-effort classification (Edge Function); ignore failures
-    try {
-      await supabase.functions.invoke('reflection-classify', { body: { reflection_log_id: row.id } });
-    } catch { /* noop */ }
-    return ok({ ...row, applied: false }, 201);
+    // Block on classification but cap the wait so the Save button never
+    // hangs for tens of seconds when the edge function is slow. The
+    // dashboard reloads on submit and the Re-run classification button
+    // covers the case where the row comes back unclassified.
+    const classified = await classifyReflectionWithRetry(row.id, { invocations: 2, budgetMs: 5000 });
+    return ok({ ...(classified || row), applied: false }, 201);
+  }
+
+  if (/^\/reflections\/\d+\/reclassify$/.test(url)) {
+    const id = Number(url.split('/')[2]);
+    const result = await classifyReflectionWithRetry(id, { invocations: 3, budgetMs: 15000 });
+    if (!result) throw new ApiError('reclassify_failed', 502);
+    const cs = (result.classifier_source || '').trim().toLowerCase();
+    if (!cs || cs === 'unclassified') {
+      // We refetched the row but the classifier still couldn't tag it.
+      // Surface a 502 rather than a false-success so the UI keeps prompting
+      // the user to retry.
+      const err = new ApiError('reclassify_unclassified', 502);
+      err.payload = result;
+      throw err;
+    }
+    return ok(result);
   }
 
   if (/^\/reflections\/\d+\/apply$/.test(url)) {
@@ -590,7 +713,7 @@ async function post(url, body = {}, opts = {}) {
     if (!file) throw new ApiError('no_file', 400);
     const path = await uploadToStorage('profile-uploads', viewer.id, file);
     const { data, error } = await supabase.functions.invoke('profile-ingest', {
-      body: { storage_path: path, kind },
+      body: { storage_path: path, kind, lang: browserLanguage() },
     });
     if (error) throw new ApiError(error.message);
     return ok(data);
@@ -658,7 +781,15 @@ async function put(url, body = {}) {
   const viewer = await getViewer();
 
   if (url === '/users/me') {
-    const allowed = ['name', 'department', 'seniority', 'bio', 'shadow_role_response', 'tenure_years', 'location'];
+    const allowed = [
+      'name', 'department', 'seniority', 'bio', 'shadow_role_response',
+      'tenure_years', 'location',
+      // Personal availability — drives whether the user shows up as a
+      // mentor candidate.
+      'mentorship_paused', 'mentorship_unavailable_until', 'mentorship_note',
+      // Optional monthly goal — feeds the soft nudge on the dashboard.
+      'monthly_session_goal',
+    ];
     const update = {};
     for (const k of allowed) if (Object.prototype.hasOwnProperty.call(body, k)) update[k] = body[k];
     if (Object.prototype.hasOwnProperty.call(body, 'current_role')) update.job_title = body.current_role;
@@ -750,6 +881,26 @@ async function put(url, body = {}) {
   if (/^\/admin\/access-requests\/\d+$/.test(url)) {
     const id = Number(url.split('/')[3]);
     const { data, error } = await supabase.rpc('platform_update_access_request', {
+      p_id: id,
+      p_status: body.status,
+    });
+    if (error) throw new ApiError(error.message);
+    return ok(data);
+  }
+
+  if (url === '/admin/org-privacy') {
+    const payload = {
+      p_type: body.type ?? null,
+      p_min_team_dashboard_size: body.min_team_dashboard_size ?? null,
+    };
+    const { data, error } = await supabase.rpc('set_org_privacy', payload);
+    if (error) throw new ApiError(error.message);
+    return ok(data);
+  }
+
+  if (/^\/admin\/feedback\/\d+$/.test(url)) {
+    const id = Number(url.split('/')[3]);
+    const { data, error } = await supabase.rpc('update_feedback_status', {
       p_id: id,
       p_status: body.status,
     });
