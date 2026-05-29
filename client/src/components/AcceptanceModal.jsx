@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import IcsDownloadButton from './IcsDownloadButton.jsx';
 import api from '../api/index.js';
+import { useModalA11y } from '../lib/useModalA11y.js';
 
 // Popup the mentee sees on their next dashboard load after a mentor accepts
 // one or more session requests. Lists each pending acceptance with:
@@ -37,6 +38,7 @@ export default function AcceptanceModal({ sessions, onAcknowledged, onClose }) {
   const [draftDate, setDraftDate] = useState('');
   const [localSessions, setLocalSessions] = useState(sessions);
   const [error, setError] = useState('');
+  const dialogRef = useModalA11y();
 
   // Keep local state in sync if the parent reloads the prop (e.g. after a
   // partial dismissAll retry).
@@ -108,12 +110,16 @@ export default function AcceptanceModal({ sessions, onAcknowledged, onClose }) {
 
   return (
     <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="acceptance-modal-title"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose?.(); }}
     >
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[85vh] flex flex-col">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="acceptance-modal-title"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[85vh] flex flex-col"
+      >
         <div className="p-6 border-b border-gray-100 flex-shrink-0">
           <div className="flex items-center justify-between gap-3">
             <h2 id="acceptance-modal-title" className="text-lg font-semibold text-foreground">

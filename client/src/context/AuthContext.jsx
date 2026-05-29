@@ -3,13 +3,6 @@ import { supabase } from '../lib/supabase.js';
 
 const AuthContext = createContext(null);
 
-const PROFILE_FIELDS =
-  'id, name, department, seniority, job_title, tenure_years, location, bio, ' +
-  'shadow_role_response, pending_checkin, manager_id, must_change_password, ' +
-  'deactivated_at, onboarding_complete, is_admin, admin_scope, organization_id, ' +
-  'mentorship_paused, mentorship_unavailable_until, mentorship_note, ' +
-  'monthly_session_goal';
-
 async function loadProfile(userId) {
   try {
     // After migration 0012 the `profiles` table-level SELECT is restricted

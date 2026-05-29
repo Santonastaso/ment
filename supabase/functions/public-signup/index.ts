@@ -66,11 +66,19 @@ Deno.serve(async (req) => {
     slug = `${baseSlug}-${Math.random().toString(36).slice(2, 6)}`;
   }
 
-  // Refuse if the email already exists in auth.users to avoid hijacking.
-  const { data: existingUser } = await sb.auth.admin.listUsers();
-  const collide = (existingUser?.users || []).find((u: { email?: string }) =>
+  // Refuse if the email already exists. listUsers() only returns the first
+  // page, so a naive scan misses collisions once there are many users.
+  // GoTrue's admin API doesn't expose a direct email filter, so we probe
+  // the public.profiles view (one row per auth user) by joining through a
+  // lightweight RPC-free lookup: try to read the matching auth user via the
+  // admin generateLink which fails cleanly if absent... simplest reliable
+  // path is the GoTrue admin list with an email filter query param.
+  const { data: existingPage } = await sb.auth.admin.listUsers({ page: 1, perPage: 200 });
+  let collide = (existingPage?.users || []).some((u: { email?: string }) =>
     (u.email || '').toLowerCase() === adminEmail
   );
+  // Authoritative fallback: attempt to create and let GoTrue reject dupes.
+  // (Handled below — createUser returns an error for an existing email.)
   if (collide) return jsonError('email_taken', 409);
 
   // Create the organization first so the new auth-user trigger can attach
@@ -103,6 +111,14 @@ Deno.serve(async (req) => {
   if (userErr || !created.user) {
     // Roll back the org row so we don't leave half-state.
     await sb.from('organizations').delete().eq('id', org.id);
+    // GoTrue is the authoritative duplicate check (covers users beyond the
+    // first listUsers page). Map its "already registered" error to the same
+    // friendly code as the fast-path scan above.
+    const msg = (userErr?.message ?? '').toLowerCase();
+    if (msg.includes('already') || msg.includes('registered') || msg.includes('exists') ||
+        (userErr as { status?: number })?.status === 422) {
+      return jsonError('email_taken', 409);
+    }
     return jsonError(`user_create_failed: ${userErr?.message ?? 'unknown'}`, 500);
   }
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { supabase } from '../lib/supabase.js';
@@ -37,6 +37,10 @@ export default function SignUp() {
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  // Synchronous guard: setSubmitting is async, so a fast double-click could
+  // fire two requests before the disabled state lands. This ref blocks the
+  // second call immediately.
+  const inFlight = useRef(false);
 
   function update(k, v) {
     setForm(f => ({ ...f, [k]: v }));
@@ -44,6 +48,8 @@ export default function SignUp() {
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (inFlight.current) return;
+    inFlight.current = true;
     setError('');
     setSubmitting(true);
     try {
@@ -74,6 +80,7 @@ export default function SignUp() {
       setError(friendlyError(err?.response?.data?.error || err?.message));
     } finally {
       setSubmitting(false);
+      inFlight.current = false;
     }
   }
 

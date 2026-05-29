@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import api from '../api/index.js';
+import { useModalA11y } from '../lib/useModalA11y.js';
 
 const CATEGORIES = [
   { value: 'general', label: 'General comment' },
@@ -17,6 +18,8 @@ export default function HelpFeedbackModal({ onClose }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [sentAt, setSentAt] = useState(null);
+  const dialogRef = useModalA11y();
+  const inFlight = useRef(false);
 
   useEffect(() => {
     function onKey(e) { if (e.key === 'Escape' && !busy) onClose?.(); }
@@ -25,12 +28,13 @@ export default function HelpFeedbackModal({ onClose }) {
   }, [busy, onClose]);
 
   async function submit() {
-    if (busy) return;
+    if (busy || inFlight.current) return;
     const text = (message || '').trim();
     if (!text) {
       setError('Add at least one sentence so we know how to help.');
       return;
     }
+    inFlight.current = true;
     setBusy(true);
     setError('');
     try {
@@ -41,17 +45,22 @@ export default function HelpFeedbackModal({ onClose }) {
       setError(e?.response?.data?.error || 'Could not send the message. Please try again.');
     } finally {
       setBusy(false);
+      inFlight.current = false;
     }
   }
 
   return (
     <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="help-modal-title"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose?.(); }}
     >
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="help-modal-title"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col"
+      >
         <div className="p-6 border-b border-gray-100">
           <div className="flex items-center justify-between gap-3">
             <h2 id="help-modal-title" className="text-lg font-semibold text-foreground">

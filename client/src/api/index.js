@@ -172,13 +172,6 @@ async function classifyReflectionWithRetry(reflectionLogId, opts = {}) {
 // Profile composition for /users/me and /users/:id
 // ============================================================
 
-const PROFILE_FIELDS =
-  'id, name, department, seniority, job_title, tenure_years, location, bio, ' +
-  'shadow_role_response, pending_checkin, manager_id, must_change_password, ' +
-  'deactivated_at, onboarding_complete, is_admin, admin_scope, organization_id, ' +
-  'mentorship_paused, mentorship_unavailable_until, mentorship_note, ' +
-  'monthly_session_goal, created_at';
-
 async function fetchAuthEmail(userId) {
   // We can't read auth.users directly from the client; cache email via supabase.auth.user() if it's the viewer.
   const { data } = await supabase.auth.getSession();
@@ -865,13 +858,22 @@ async function put(url, body = {}) {
       if (error) throw new ApiError(error.message);
       session = data;
     } else {
-      // Field-only update (reflection text, rating after-the-fact)
-      const update = {};
-      if (Object.prototype.hasOwnProperty.call(body, 'reflection')) update.reflection = body.reflection;
-      if (Object.prototype.hasOwnProperty.call(body, 'mentor_reflection')) update.mentor_reflection = body.mentor_reflection;
-      if (Object.prototype.hasOwnProperty.call(body, 'mentee_rating')) update.mentee_rating = body.mentee_rating;
-      if (Object.prototype.hasOwnProperty.call(body, 'mentor_rating')) update.mentor_rating = body.mentor_rating;
-      const { data, error } = await supabase.from('sessions').update(update).eq('id', id).select().single();
+      // Field-only update (reflection text, rating after-the-fact) — routed
+      // through a security-definer RPC that enforces participant-only,
+      // role-scoped writes. The RPC figures out the caller's role, so we
+      // collapse the mentor/mentee variants into a single reflection +
+      // rating pair.
+      const refl = Object.prototype.hasOwnProperty.call(body, 'mentor_reflection')
+        ? body.mentor_reflection
+        : (Object.prototype.hasOwnProperty.call(body, 'reflection') ? body.reflection : null);
+      const rating = Object.prototype.hasOwnProperty.call(body, 'mentor_rating')
+        ? body.mentor_rating
+        : (Object.prototype.hasOwnProperty.call(body, 'mentee_rating') ? body.mentee_rating : null);
+      const { data, error } = await supabase.rpc('update_session_feedback', {
+        p_session_id: id,
+        p_reflection: refl ?? null,
+        p_rating: rating ?? null,
+      });
       if (error) throw new ApiError(error.message);
       session = data;
     }
