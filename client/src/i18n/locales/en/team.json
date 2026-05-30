@@ -1,0 +1,17 @@
+{
+  "team.title": "Team skill landscape",
+  "team.description": "Anonymized counts only — never individual names. Suppressed below 3 direct reports.",
+  "team.loadError": "Could not load team report.",
+  "team.privacyTitle": "Privacy",
+  "team.privacyBody": "Aggregate counts help you plan L&D. With fewer than 3 reports, this view is hidden to prevent trivial de-anonymization.",
+  "team.noReportsTitle": "No direct reports linked",
+  "team.suppressedTitle": "Report suppressed",
+  "team.reportingOn": "Reporting on",
+  "team.directReports": "direct reports",
+  "team.topGapsTitle": "Top gaps",
+  "team.topGapsDesc": "Skills your team most often wants to develop.",
+  "team.topStrengthsTitle": "Top strengths",
+  "team.topStrengthsDesc": "Skills your team most often offers to teach.",
+  "team.noGapData": "No gap data yet.",
+  "team.noStrengthData": "No strength data yet."
+}

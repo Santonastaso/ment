@@ -1,18 +1,20 @@
 import React, { useEffect, useRef, useState } from 'react';
 import api from '../api/index.js';
 import { useModalA11y } from '../lib/useModalA11y.js';
+import { useT } from '../i18n/index.jsx';
 
 const CATEGORIES = [
-  { value: 'general', label: 'General comment' },
-  { value: 'bug', label: 'Bug or broken thing' },
-  { value: 'idea', label: 'Idea or suggestion' },
-  { value: 'question', label: 'Question for the team' },
+  { value: 'general', labelKey: 'components.help.categoryGeneral' },
+  { value: 'bug', labelKey: 'components.help.categoryBug' },
+  { value: 'idea', labelKey: 'components.help.categoryIdea' },
+  { value: 'question', labelKey: 'components.help.categoryQuestion' },
 ];
 
 // Small dialog opened from the profile dropdown. Lets any signed-in user
 // send a short note to the team. Submissions land in `feedback_messages`
 // and are reviewable by org/platform admins under Admin → Feedback.
 export default function HelpFeedbackModal({ onClose }) {
+  const { t } = useT();
   const [category, setCategory] = useState('general');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
@@ -31,7 +33,7 @@ export default function HelpFeedbackModal({ onClose }) {
     if (busy || inFlight.current) return;
     const text = (message || '').trim();
     if (!text) {
-      setError('Add at least one sentence so we know how to help.');
+      setError(t('components.help.errorEmpty'));
       return;
     }
     inFlight.current = true;
@@ -42,7 +44,7 @@ export default function HelpFeedbackModal({ onClose }) {
       setSentAt(Date.now());
       setMessage('');
     } catch (e) {
-      setError(e?.response?.data?.error || 'Could not send the message. Please try again.');
+      setError(e?.response?.data?.error || t('components.help.errorSend'));
     } finally {
       setBusy(false);
       inFlight.current = false;
@@ -64,12 +66,12 @@ export default function HelpFeedbackModal({ onClose }) {
         <div className="p-6 border-b border-gray-100">
           <div className="flex items-center justify-between gap-3">
             <h2 id="help-modal-title" className="text-lg font-semibold text-foreground">
-              Help &amp; Feedback
+              {t('components.help.title')}
             </h2>
             <button
               type="button"
               onClick={onClose}
-              aria-label="Close"
+              aria-label={t('components.help.close')}
               disabled={busy}
               className="text-gray-400 hover:text-gray-600 text-2xl leading-none disabled:opacity-50"
             >
@@ -77,22 +79,21 @@ export default function HelpFeedbackModal({ onClose }) {
             </button>
           </div>
           <p className="text-sm text-gray-500 mt-1">
-            Quick note for the team — we read every one. For account or security
-            issues, please reach out to your org admin directly.
+            {t('components.help.subtitle')}
           </p>
         </div>
 
         <div className="p-6 space-y-4">
           {sentAt ? (
             <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
-              <p className="font-medium">Thanks — we got it.</p>
-              <p className="mt-1">Your admin will see this message next time they open the feedback view.</p>
+              <p className="font-medium">{t('components.help.thanksTitle')}</p>
+              <p className="mt-1">{t('components.help.thanksBody')}</p>
             </div>
           ) : null}
 
           <div>
             <label className="block text-xs font-medium uppercase tracking-wide text-gray-500 mb-1.5">
-              What is this about?
+              {t('components.help.whatAbout')}
             </label>
             <div className="grid grid-cols-2 gap-2">
               {CATEGORIES.map((c) => (
@@ -108,7 +109,7 @@ export default function HelpFeedbackModal({ onClose }) {
                       : 'border-gray-200 bg-white text-foreground hover:bg-muted/40',
                   ].join(' ')}
                 >
-                  {c.label}
+                  {t(c.labelKey)}
                 </button>
               ))}
             </div>
@@ -116,7 +117,7 @@ export default function HelpFeedbackModal({ onClose }) {
 
           <div>
             <label htmlFor="help-message" className="block text-xs font-medium uppercase tracking-wide text-gray-500 mb-1.5">
-              Your message
+              {t('components.help.yourMessage')}
             </label>
             <textarea
               id="help-message"
@@ -125,7 +126,7 @@ export default function HelpFeedbackModal({ onClose }) {
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               disabled={busy}
-              placeholder="What's on your mind?"
+              placeholder={t('components.help.placeholder')}
               data-testid="help-message-input"
               className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
             />
@@ -142,7 +143,7 @@ export default function HelpFeedbackModal({ onClose }) {
             disabled={busy}
             className="rounded-lg px-4 py-2 text-sm text-gray-600 hover:bg-muted/40"
           >
-            {sentAt ? 'Close' : 'Cancel'}
+            {sentAt ? t('components.help.close') : t('components.help.cancel')}
           </button>
           <button
             type="button"
@@ -151,7 +152,7 @@ export default function HelpFeedbackModal({ onClose }) {
             data-testid="help-submit-button"
             className="rounded-lg bg-primary text-white text-sm font-medium px-4 py-2 disabled:opacity-50"
           >
-            {busy ? 'Sending…' : sentAt ? 'Send another' : 'Send message'}
+            {busy ? t('components.help.sending') : sentAt ? t('components.help.sendAnother') : t('components.help.send')}
           </button>
         </div>
       </div>

@@ -1,0 +1,17 @@
+{
+  "team.title": "Quadro delle competenze del team",
+  "team.description": "Solo conteggi anonimizzati — mai nomi individuali. Nascosto sotto i 3 riporti diretti.",
+  "team.loadError": "Impossibile caricare il report del team.",
+  "team.privacyTitle": "Privacy",
+  "team.privacyBody": "I conteggi aggregati ti aiutano a pianificare la formazione. Con meno di 3 riporti, questa vista è nascosta per evitare una banale de-anonimizzazione.",
+  "team.noReportsTitle": "Nessun riporto diretto collegato",
+  "team.suppressedTitle": "Report nascosto",
+  "team.reportingOn": "Report su",
+  "team.directReports": "riporti diretti",
+  "team.topGapsTitle": "Principali lacune",
+  "team.topGapsDesc": "Le competenze che il tuo team desidera sviluppare più spesso.",
+  "team.topStrengthsTitle": "Principali punti di forza",
+  "team.topStrengthsDesc": "Le competenze che il tuo team offre di insegnare più spesso.",
+  "team.noGapData": "Ancora nessun dato sulle lacune.",
+  "team.noStrengthData": "Ancora nessun dato sui punti di forza."
+}

@@ -2,12 +2,14 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronDown, LogOut, LifeBuoy } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useT } from '../i18n/index.jsx';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import HelpFeedbackModal from './HelpFeedbackModal.jsx';
 
 export default function UserMenu() {
   const { user, session, logout } = useAuth();
+  const { t } = useT();
   const email = session?.user?.email || '';
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -83,7 +85,7 @@ export default function UserMenu() {
             className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm hover:bg-muted"
           >
             <LifeBuoy className="size-4" />
-            Help &amp; Feedback
+            {t('common.helpFeedback')}
           </button>
           <button
             type="button"
@@ -92,7 +94,7 @@ export default function UserMenu() {
             className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm hover:bg-muted"
           >
             <LogOut className="size-4" />
-            Sign out
+            {t('common.signOut')}
           </button>
         </div>
       )}

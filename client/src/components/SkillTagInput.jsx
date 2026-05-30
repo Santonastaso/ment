@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import EscoSuggestInput from './EscoSuggestInput.jsx';
+import { useT } from '../i18n/index.jsx';
 
 // Tagged-input for plain skill strings. Each entry is just a string in the
 // `value` array. ESCO autocomplete is suggestive: the user can still confirm
 // a custom skill by pressing Enter without picking a suggestion.
-export default function SkillTagInput({ value = [], onChange, placeholder = 'Type a skill and press Enter', lang, ariaLabel }) {
+export default function SkillTagInput({ value = [], onChange, placeholder, lang, ariaLabel }) {
+  const { t } = useT();
   const [input, setInput] = useState('');
+  const effectivePlaceholder = placeholder || t('components.skillTag.placeholder');
 
   function addSkill(raw) {
     const skill = (raw || '').trim();
@@ -27,7 +30,7 @@ export default function SkillTagInput({ value = [], onChange, placeholder = 'Typ
             <button
               type="button"
               onClick={() => removeSkill(i)}
-              aria-label={`Remove ${skill}`}
+              aria-label={t('components.skillTag.remove', { skill })}
               className="text-blue-400 hover:text-primary ml-0.5 leading-none"
             >
               ×
@@ -40,10 +43,10 @@ export default function SkillTagInput({ value = [], onChange, placeholder = 'Typ
           onCommitEsco={(item) => addSkill(item.label)}
           onCommitCustom={(text) => addSkill(text)}
           onBackspaceEmpty={() => value.length > 0 && onChange(value.slice(0, -1))}
-          placeholder={value.length === 0 ? placeholder : ''}
+          placeholder={value.length === 0 ? effectivePlaceholder : ''}
           inputClassName="w-full outline-none text-sm py-0.5 bg-transparent"
           lang={lang}
-          ariaLabel={ariaLabel || 'Add skill'}
+          ariaLabel={ariaLabel || t('components.skillTag.ariaAdd')}
         />
       </div>
     </div>

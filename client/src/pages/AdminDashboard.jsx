@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../api/index.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useT } from '../i18n/index.jsx';
 import { PageShell } from '../components/PageShell.jsx';
 import { Surface, SurfaceBody, SurfaceHeader, SurfacePanel } from '../components/Surface.jsx';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -69,6 +70,7 @@ function shortId(value) {
 
 export default function AdminDashboard() {
   const { user } = useAuth();
+  const { t } = useT();
   const [stats, setStats] = useState(null);
   const [mostActiveUsers, setMostActiveUsers] = useState([]);
   const [ownerStats, setOwnerStats] = useState(null);
@@ -227,7 +229,7 @@ export default function AdminDashboard() {
       setUploadResult(res.data);
       loadStats();
     } catch (e) {
-      setUploadError(e.response?.data?.error || 'Upload failed. Check the file format and try again.');
+      setUploadError(e.response?.data?.error || t('admin.import.uploadFailed'));
     } finally {
       setUploading(false);
     }
@@ -239,12 +241,12 @@ export default function AdminDashboard() {
     try {
       const res = await api.post('/admin/rematch');
       setStats(prev => prev ? { ...prev, totalMatches: res.data.matchesGenerated } : prev);
-      setNotice({ variant: 'default', title: 'Matching complete', message: res.data.message });
+      setNotice({ variant: 'default', title: t('admin.notice.matchingCompleteTitle'), message: res.data.message });
     } catch (e) {
       setNotice({
         variant: 'destructive',
-        title: 'Matching failed',
-        message: e.response?.data?.error || 'Could not re-run matching.',
+        title: t('admin.notice.matchingFailedTitle'),
+        message: e.response?.data?.error || t('admin.notice.matchingFailedMsg'),
       });
     } finally {
       setRematching(false);
@@ -279,12 +281,12 @@ export default function AdminDashboard() {
         ),
       } : prev);
       loadOwnerStats();
-      setNotice({ variant: 'default', title: 'Organization created', message: `${res.data.organizationName} is ready for manual user import.` });
+      setNotice({ variant: 'default', title: t('admin.notice.orgCreatedTitle'), message: t('admin.notice.orgCreatedMsg', { name: res.data.organizationName }) });
     } catch (e) {
       setNotice({
         variant: 'destructive',
-        title: 'Could not create organization',
-        message: e.response?.data?.error || 'Try again.',
+        title: t('admin.notice.orgCreateFailTitle'),
+        message: e.response?.data?.error || t('admin.common.tryAgain'),
       });
     } finally {
       setCreatingOrg(false);
@@ -310,7 +312,7 @@ export default function AdminDashboard() {
 
   async function copyOrgId(org) {
     await navigator.clipboard?.writeText(org.organizationId || '');
-    setNotice({ variant: 'default', title: 'Org ID copied', message: org.organizationName });
+    setNotice({ variant: 'default', title: t('admin.notice.orgIdCopied'), message: org.organizationName });
   }
 
   async function updateAccessRequestStatus(request, status) {
@@ -322,8 +324,8 @@ export default function AdminDashboard() {
     } catch (e) {
       setNotice({
         variant: 'destructive',
-        title: 'Could not update request',
-        message: e.response?.data?.error || 'Try again.',
+        title: t('admin.notice.requestUpdateFailTitle'),
+        message: e.response?.data?.error || t('admin.common.tryAgain'),
       });
     } finally {
       setUpdatingRequestId(null);
@@ -332,9 +334,9 @@ export default function AdminDashboard() {
 
   function openResetPasswordConfirm(user) {
     setConfirmDialog({
-      title: 'Reset password?',
-      description: `Generate a new temporary password for ${user.name}. They must change it on next login.`,
-      confirmLabel: 'Generate password',
+      title: t('admin.dialog.resetTitle'),
+      description: t('admin.dialog.resetDescription', { name: user.name }),
+      confirmLabel: t('admin.dialog.resetConfirm'),
       onConfirm: async () => {
         const res = await api.post(`/admin/users/${user.id}/reset-password`);
         setTempPasswordDialog({
@@ -347,14 +349,14 @@ export default function AdminDashboard() {
 
   function openDeactivateConfirm(user) {
     setConfirmDialog({
-      title: 'Deactivate user?',
-      description: `${user.name} will not be able to log in.`,
-      confirmLabel: 'Deactivate',
+      title: t('admin.dialog.deactivateTitle'),
+      description: t('admin.dialog.deactivateDescription', { name: user.name }),
+      confirmLabel: t('admin.dialog.deactivateConfirm'),
       destructive: true,
       onConfirm: async () => {
         await api.put(`/admin/users/${user.id}`, { deactivate: true });
         loadUsers();
-        setNotice({ variant: 'default', title: 'User deactivated', message: `${user.name} has been deactivated.` });
+        setNotice({ variant: 'default', title: t('admin.notice.userDeactivatedTitle'), message: t('admin.notice.userDeactivatedMsg', { name: user.name }) });
       },
     });
   }
@@ -370,12 +372,12 @@ export default function AdminDashboard() {
       await api.put(`/admin/users/${managerDialog.userId}`, { manager_email: managerEmailDraft.trim() });
       setManagerDialog(null);
       loadUsers();
-      setNotice({ variant: 'default', title: 'Manager updated', message: 'Reporting line saved.' });
+      setNotice({ variant: 'default', title: t('admin.notice.managerUpdatedTitle'), message: t('admin.notice.managerUpdatedMsg') });
     } catch (e) {
       setNotice({
         variant: 'destructive',
-        title: 'Could not update manager',
-        message: e.response?.data?.error || 'Try again.',
+        title: t('admin.notice.managerUpdateFailTitle'),
+        message: e.response?.data?.error || t('admin.common.tryAgain'),
       });
     }
   }
@@ -389,8 +391,8 @@ export default function AdminDashboard() {
       setConfirmDialog(null);
       setNotice({
         variant: 'destructive',
-        title: 'Action failed',
-        message: e.response?.data?.error || 'Something went wrong.',
+        title: t('admin.notice.actionFailedTitle'),
+        message: e.response?.data?.error || t('admin.notice.somethingWrong'),
       });
     }
   }
@@ -400,7 +402,7 @@ export default function AdminDashboard() {
   const isPlatformAdmin = user?.admin_scope === 'platform';
 
   return (
-    <PageShell title="Admin" description="Usage, matching, imports, and weekly check-in broadcasts.">
+    <PageShell title={t('admin.pageTitle')} description={t('admin.pageDescription')}>
 
       {notice && (
         <Alert variant={notice.variant} className="relative pr-20">
@@ -413,23 +415,23 @@ export default function AdminDashboard() {
             className="absolute top-2 right-2"
             onClick={() => setNotice(null)}
           >
-            Dismiss
+            {t('admin.dismiss')}
           </Button>
         </Alert>
       )}
 
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" variant={tab === 'overview' ? 'default' : 'outline'} size="sm" onClick={() => setTab('overview')}>Overview</Button>
-        <Button type="button" variant={tab === 'users' ? 'default' : 'outline'} size="sm" onClick={() => { setTab('users'); loadUsers(); }}>Users</Button>
-        <Button type="button" variant={tab === 'feedback' ? 'default' : 'outline'} size="sm" onClick={() => { setTab('feedback'); loadFeedback(); }}>Feedback</Button>
+        <Button type="button" variant={tab === 'overview' ? 'default' : 'outline'} size="sm" onClick={() => setTab('overview')}>{t('admin.tab.overview')}</Button>
+        <Button type="button" variant={tab === 'users' ? 'default' : 'outline'} size="sm" onClick={() => { setTab('users'); loadUsers(); }}>{t('admin.tab.users')}</Button>
+        <Button type="button" variant={tab === 'feedback' ? 'default' : 'outline'} size="sm" onClick={() => { setTab('feedback'); loadFeedback(); }}>{t('admin.tab.feedback')}</Button>
         {isPlatformAdmin && (
           <>
-            <Button type="button" variant={tab === 'organizations' ? 'default' : 'outline'} size="sm" onClick={() => { setTab('organizations'); loadOwnerStats(); }}>Organizations</Button>
-            <Button type="button" variant={tab === 'access-requests' ? 'default' : 'outline'} size="sm" onClick={() => { setTab('access-requests'); loadAccessRequests(); }}>Access requests</Button>
+            <Button type="button" variant={tab === 'organizations' ? 'default' : 'outline'} size="sm" onClick={() => { setTab('organizations'); loadOwnerStats(); }}>{t('admin.tab.organizations')}</Button>
+            <Button type="button" variant={tab === 'access-requests' ? 'default' : 'outline'} size="sm" onClick={() => { setTab('access-requests'); loadAccessRequests(); }}>{t('admin.tab.accessRequests')}</Button>
           </>
         )}
         <Button type="button" variant="outline" size="sm" onClick={handleRematch} disabled={rematching}>
-          {rematching ? 'Computing…' : 'Re-run matching'}
+          {rematching ? t('admin.rematch.computing') : t('admin.rematch.action')}
         </Button>
       </div>
 
@@ -437,11 +439,11 @@ export default function AdminDashboard() {
         <>
           {/* Weekly reflection broadcast — demo trigger */}
           <SurfacePanel
-            title="Weekly reflection check-in"
-            description="Sends every employee an in-app banner and (when they've granted permission) a desktop notification asking them to log this week's reflection. In production this fires automatically; trigger it manually here for demos."
+            title={t('admin.broadcast.title')}
+            description={t('admin.broadcast.description')}
             action={
               <Button onClick={handleBroadcastCheckin} disabled={broadcasting} size="sm" className="shrink-0 whitespace-nowrap">
-                {broadcasting ? 'Sending…' : 'Send reflection notes'}
+                {broadcasting ? t('admin.broadcast.sending') : t('admin.broadcast.send')}
               </Button>
             }
           >
@@ -449,38 +451,38 @@ export default function AdminDashboard() {
               <p className="inline-flex flex-wrap items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
                 <span>✓</span>
                 <span>{broadcastResult.message}</span>
-                <span className="text-emerald-600">Employees with the app open will see it within 30 seconds.</span>
+                <span className="text-emerald-600">{t('admin.broadcast.resultHint')}</span>
               </p>
             )}
           </SurfacePanel>
 
           <Surface>
             <SurfaceHeader
-              title="Privacy / AI status"
-              description="Current pilot defaults for peer visibility, AI classification, and backend functions."
+              title={t('admin.privacy.title')}
+              description={t('admin.privacy.description')}
               action={
                 <Button type="button" variant="outline" size="sm" onClick={loadPrivacyStatus} disabled={privacyLoading}>
-                  {privacyLoading ? 'Checking…' : 'Refresh'}
+                  {privacyLoading ? t('admin.privacy.checking') : t('admin.common.refresh')}
                 </Button>
               }
             />
             <SurfaceBody className="pt-5">
               {privacyLoading && !privacyStatus ? (
-                <p className="text-sm text-muted-foreground">Loading…</p>
+                <p className="text-sm text-muted-foreground">{t('admin.common.loading')}</p>
               ) : privacyStatus ? (
                 <div className="grid gap-4 lg:grid-cols-2">
                   <div className="space-y-3 text-sm">
                     <div>
-                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">AI classification</p>
-                      <p className="mt-1 font-medium text-foreground">{privacyStatus.aiClassification?.label || 'Off by default'}</p>
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('admin.privacy.aiClassification')}</p>
+                      <p className="mt-1 font-medium text-foreground">{privacyStatus.aiClassification?.label || t('admin.privacy.offByDefault')}</p>
                       <p className="text-xs text-muted-foreground">{privacyStatus.aiClassification?.source}</p>
                     </div>
                     <div>
-                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Supabase region</p>
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('admin.privacy.supabaseRegion')}</p>
                       <p className="mt-1 font-medium text-foreground">{privacyStatus.supabaseRegion || 'eu-central-1'}</p>
                     </div>
                     <div>
-                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Edge Functions</p>
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('admin.privacy.edgeFunctions')}</p>
                       <div className="mt-2 flex flex-wrap gap-2">
                         {(privacyStatus.edgeFunctions || []).map(fn => (
                           <span key={fn.name} className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
@@ -492,26 +494,26 @@ export default function AdminDashboard() {
                   </div>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div>
-                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Peer-visible</p>
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('admin.privacy.peerVisible')}</p>
                       <ul className="mt-2 space-y-1 text-sm text-foreground">
                         {(privacyStatus.peerVisibleFields || []).map(field => <li key={field}>{field}</li>)}
                       </ul>
                     </div>
                     <div>
-                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Hidden</p>
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('admin.privacy.hidden')}</p>
                       <ul className="mt-2 space-y-1 text-sm text-foreground">
                         {(privacyStatus.hiddenFields || []).map(field => <li key={field}>{field}</li>)}
                       </ul>
                     </div>
                     <div className="sm:col-span-2 rounded-lg border border-border bg-muted/30 p-3 space-y-3">
                       <div>
-                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Organization privacy mode</p>
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('admin.privacy.orgMode')}</p>
                         <p className="mt-1 text-sm text-foreground">
-                          Current mode: <span className="font-semibold">{privacyStatus.orgType === 'inter' ? 'Inter-company (PMI)' : 'Intra-company (single employer)'}</span>
+                          {t('admin.privacy.currentMode', { mode: '' })}<span className="font-semibold">{privacyStatus.orgType === 'inter' ? t('admin.privacy.modeInter') : t('admin.privacy.modeIntra')}</span>
                         </p>
                         {Array.isArray(privacyStatus.interExtraRedactions) && privacyStatus.interExtraRedactions.length > 0 && (
                           <p className="mt-1 text-xs text-muted-foreground">
-                            Inter mode also hides: {privacyStatus.interExtraRedactions.join(', ')}
+                            {t('admin.privacy.interHides', { fields: privacyStatus.interExtraRedactions.join(', ') })}
                           </p>
                         )}
                       </div>
@@ -523,18 +525,18 @@ export default function AdminDashboard() {
                             onClick={() => updateOrgPrivacy({ type: 'intra' })}
                             disabled={savingOrgPrivacy}
                             data-testid="org-mode-intra"
-                          >Intra</Button>
+                          >{t('admin.privacy.intra')}</Button>
                           <Button
                             type="button" size="sm"
                             variant={privacyStatus.orgType === 'inter' ? 'default' : 'outline'}
                             onClick={() => updateOrgPrivacy({ type: 'inter' })}
                             disabled={savingOrgPrivacy}
                             data-testid="org-mode-inter"
-                          >Inter</Button>
+                          >{t('admin.privacy.inter')}</Button>
                         </div>
                       )}
                       <div className="flex flex-wrap items-center gap-2">
-                        <label className="text-xs text-muted-foreground">Team dashboard min reports</label>
+                        <label className="text-xs text-muted-foreground">{t('admin.privacy.minReports')}</label>
                         <input
                           type="number" min={1} max={100}
                           defaultValue={privacyStatus.minTeamDashboardSize ?? 3}
@@ -553,7 +555,7 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground">Status is not available yet. Apply the latest Supabase migration and refresh.</p>
+                <p className="text-sm text-muted-foreground">{t('admin.privacy.unavailable')}</p>
               )}
             </SurfaceBody>
           </Surface>
@@ -566,26 +568,26 @@ export default function AdminDashboard() {
           ) : stats && (
             <>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <StatCard label="Total employees" value={stats.totalUsers} />
-                <StatCard label="Onboarding complete" value={`${stats.onboardingRate}%`} sub={`${stats.onboarded} of ${stats.totalUsers} users`} />
-                <StatCard label="Sessions requested" value={(sessionsByStatus.pending || 0) + (sessionsByStatus.scheduled || 0) + (sessionsByStatus.completed || 0)} />
-                <StatCard label="Match pairs" value={stats.totalMatches} />
+                <StatCard label={t('admin.stats.totalEmployees')} value={stats.totalUsers} />
+                <StatCard label={t('admin.stats.onboardingComplete')} value={`${stats.onboardingRate}%`} sub={t('admin.stats.onboardedOf', { onboarded: stats.onboarded, total: stats.totalUsers })} />
+                <StatCard label={t('admin.stats.sessionsRequested')} value={(sessionsByStatus.pending || 0) + (sessionsByStatus.scheduled || 0) + (sessionsByStatus.completed || 0)} />
+                <StatCard label={t('admin.stats.matchPairs')} value={stats.totalMatches} />
               </div>
 
               <Surface>
-                <SurfaceHeader title="Sessions breakdown" />
+                <SurfaceHeader title={t('admin.sessions.breakdown')} />
                 <SurfaceBody className="pt-5">
                   <div className="grid grid-cols-3 gap-3">
-                    <SessionBox count={sessionsByStatus.pending || 0} label="Pending" tone="yellow" />
-                    <SessionBox count={sessionsByStatus.scheduled || 0} label="Scheduled" tone="blue" />
-                    <SessionBox count={sessionsByStatus.completed || 0} label="Completed" tone="green" />
+                    <SessionBox count={sessionsByStatus.pending || 0} label={t('admin.sessions.pending')} tone="yellow" />
+                    <SessionBox count={sessionsByStatus.scheduled || 0} label={t('admin.sessions.scheduled')} tone="blue" />
+                    <SessionBox count={sessionsByStatus.completed || 0} label={t('admin.sessions.completed')} tone="green" />
                   </div>
                 </SurfaceBody>
               </Surface>
 
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                 <Surface>
-                  <SurfaceHeader title="Most active mentors" />
+                  <SurfaceHeader title={t('admin.mentors.title')} />
                   <SurfaceBody className="pt-5">
                   {stats.topMentors?.length > 0 ? (
                     <div className="space-y-3">
@@ -599,16 +601,16 @@ export default function AdminDashboard() {
                             <p className="truncate text-sm font-medium text-foreground">{m.name}</p>
                             <p className="text-xs text-muted-foreground">{m.department}</p>
                           </div>
-                          <span className="shrink-0 text-sm font-semibold tabular-nums text-muted-foreground">{m.session_count} sessions</span>
+                          <span className="shrink-0 text-sm font-semibold tabular-nums text-muted-foreground">{t('admin.common.sessionsCount', { count: m.session_count })}</span>
                         </div>
                       ))}
                     </div>
-                  ) : <p className="text-sm text-muted-foreground">No completed sessions yet.</p>}
+                  ) : <p className="text-sm text-muted-foreground">{t('admin.mentors.empty')}</p>}
                   </SurfaceBody>
                 </Surface>
 
                 <Surface data-testid="most-active-users">
-                  <SurfaceHeader title="Most active users" />
+                  <SurfaceHeader title={t('admin.activeUsers.title')} />
                   <SurfaceBody className="pt-5">
                   {mostActiveUsers.length > 0 ? (
                     <div className="space-y-3">
@@ -622,16 +624,16 @@ export default function AdminDashboard() {
                             <p className="truncate text-sm font-medium text-foreground">{u.name}</p>
                             <p className="text-xs text-muted-foreground">{u.department}</p>
                           </div>
-                          <span className="shrink-0 text-sm font-semibold tabular-nums text-muted-foreground">{u.sessions} sessions</span>
+                          <span className="shrink-0 text-sm font-semibold tabular-nums text-muted-foreground">{t('admin.common.sessionsCount', { count: u.sessions })}</span>
                         </div>
                       ))}
                     </div>
-                  ) : <p className="text-sm text-muted-foreground">No session activity yet.</p>}
+                  ) : <p className="text-sm text-muted-foreground">{t('admin.activeUsers.empty')}</p>}
                   </SurfaceBody>
                 </Surface>
 
                 <Surface>
-                  <SurfaceHeader title="Department activity" />
+                  <SurfaceHeader title={t('admin.dept.title')} />
                   <SurfaceBody className="pt-5">
                   {stats.deptActivity?.length > 0 ? (
                     <div className="space-y-3">
@@ -640,19 +642,19 @@ export default function AdminDashboard() {
                           <div className="min-w-0 flex-1">
                             <div className="mb-1 flex justify-between gap-2 text-sm">
                               <span className="font-medium text-foreground">{d.department}</span>
-                              <span className="tabular-nums text-muted-foreground">{d.session_count} sessions</span>
+                              <span className="tabular-nums text-muted-foreground">{t('admin.common.sessionsCount', { count: d.session_count })}</span>
                             </div>
                             <div className="h-1.5 overflow-hidden rounded-full bg-muted">
                               <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, (d.session_count / deptActivityMax) * 100)}%` }} />
                             </div>
                           </div>
                           {d.session_count === 0 && (
-                            <span className="shrink-0 rounded-full bg-orange-100 px-2 py-0.5 text-xs text-orange-700">Silo risk</span>
+                            <span className="shrink-0 rounded-full bg-orange-100 px-2 py-0.5 text-xs text-orange-700">{t('admin.dept.siloRisk')}</span>
                           )}
                         </div>
                       ))}
                     </div>
-                  ) : <p className="text-sm text-muted-foreground">No data yet.</p>}
+                  ) : <p className="text-sm text-muted-foreground">{t('admin.dept.empty')}</p>}
                   </SurfaceBody>
                 </Surface>
               </div>
@@ -662,11 +664,11 @@ export default function AdminDashboard() {
           {/* Import */}
           <Surface>
             <SurfaceHeader
-              title="Import employees"
-              description="Upload a CSV or XLSX file to onboard employees in bulk."
+              title={t('admin.import.title')}
+              description={t('admin.import.description')}
               action={
                 <Button type="button" variant="link" size="sm" className="h-auto px-0" onClick={() => downloadBlob('/admin/template', 'ment-import-template.csv')}>
-                  Download template
+                  {t('admin.import.downloadTemplate')}
                 </Button>
               }
             />
@@ -680,7 +682,7 @@ export default function AdminDashboard() {
               {['insert', 'upsert', 'update'].map(m => (
                 <label key={m} className="flex items-center gap-2 cursor-pointer">
                   <input type="radio" name="importMode" checked={importMode === m} onChange={() => setImportMode(m)} />
-                  <span className="capitalize">{m}</span>
+                  <span>{t(`admin.import.mode.${m}`)}</span>
                 </label>
               ))}
             </div>
@@ -707,24 +709,26 @@ export default function AdminDashboard() {
               {uploading ? (
                 <div className="space-y-2">
                   <div className="mx-auto size-8 animate-spin rounded-full border-2 border-[#1264a3] border-t-transparent" />
-                  <p className="text-sm text-gray-500">Processing file…</p>
+                  <p className="text-sm text-gray-500">{t('admin.import.processing')}</p>
                 </div>
               ) : (
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Drop a CSV or XLSX file here, or click to browse</p>
-                  <p className="text-xs text-gray-400 mt-1">Max file size: 10MB</p>
+                  <p className="text-sm font-medium text-gray-600">{t('admin.import.dropzone')}</p>
+                  <p className="text-xs text-gray-400 mt-1">{t('admin.import.maxSize')}</p>
                 </div>
               )}
             </div>
 
             {uploadResult && (
               <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-4 text-sm text-green-700">
-                <p className="font-semibold mb-1">Import complete</p>
+                <p className="font-semibold mb-1">{t('admin.import.complete')}</p>
                 <ul className="space-y-0.5 text-green-600">
-                  <li>✓ {uploadResult.imported} imported{uploadResult.updated ? `, ${uploadResult.updated} updated` : ''} ({uploadResult.skipped} skipped)</li>
-                  <li>✓ {uploadResult.matchesGenerated} match pairs generated</li>
+                  <li>✓ {uploadResult.updated
+                    ? t('admin.import.importedUpdatedLine', { imported: uploadResult.imported, updated: uploadResult.updated, skipped: uploadResult.skipped })
+                    : t('admin.import.importedLine', { imported: uploadResult.imported, skipped: uploadResult.skipped })}</li>
+                  <li>✓ {t('admin.import.matchesLine', { matches: uploadResult.matchesGenerated })}</li>
                   {uploadResult.imported > 0 && (
-                    <li>✓ Temp password (new users): <code className="bg-green-100 px-1 rounded font-mono">{uploadResult.tempPassword}</code></li>
+                    <li>✓ {t('admin.import.tempPassword')} <code className="bg-green-100 px-1 rounded font-mono">{uploadResult.tempPassword}</code></li>
                   )}
                 </ul>
               </div>
@@ -738,11 +742,11 @@ export default function AdminDashboard() {
 
           <Surface>
             <SurfaceHeader
-              title="Audit log"
+              title={t('admin.audit.title')}
               description={
                 <>
-                  Recent platform events. Sensitive content (reflection text, profile field values) is never recorded — only actions and counts.
-                  {auditTotal > 0 && <span className="ml-1 text-muted-foreground/80">{auditTotal} total events.</span>}
+                  {t('admin.audit.description')}
+                  {auditTotal > 0 && <span className="ml-1 text-muted-foreground/80">{t('admin.audit.totalEvents', { count: auditTotal })}</span>}
                 </>
               }
               action={
@@ -754,7 +758,7 @@ export default function AdminDashboard() {
                     className="h-auto px-0"
                     onClick={() => { setAuditOpen(o => { if (!o) loadAudit(); return !o; }); }}
                   >
-                    {auditOpen ? 'Hide log' : 'Show recent events'}
+                    {auditOpen ? t('admin.audit.hide') : t('admin.audit.show')}
                   </Button>
                   <Button
                     type="button"
@@ -763,7 +767,7 @@ export default function AdminDashboard() {
                     className="h-auto px-0"
                     onClick={() => downloadBlob('/admin/audit/export', 'ment-audit-export.csv')}
                   >
-                    Export CSV
+                    {t('admin.audit.exportCsv')}
                   </Button>
                 </div>
               }
@@ -773,7 +777,7 @@ export default function AdminDashboard() {
             {auditOpen && (
               <div className="mt-4 border border-gray-100 rounded-lg overflow-hidden">
                 {auditEntries.length === 0 ? (
-                  <p className="text-sm text-gray-400 italic p-4">No events recorded yet.</p>
+                  <p className="text-sm text-gray-400 italic p-4">{t('admin.audit.empty')}</p>
                 ) : (
                   <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
                     {auditEntries.map(entry => <AuditRow key={entry.id} entry={entry} />)}
@@ -788,33 +792,33 @@ export default function AdminDashboard() {
 
       {tab === 'users' && (
         <Surface>
-          <SurfaceHeader title="Users" />
+          <SurfaceHeader title={t('admin.users.title')} />
           <SurfaceBody className="pt-5">
-          {usersLoading ? <p className="text-sm text-muted-foreground">Loading…</p> : (
+          {usersLoading ? <p className="text-sm text-muted-foreground">{t('admin.common.loading')}</p> : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-gray-500 border-b">
-                    <th className="py-2 pr-4">Name</th>
-                    <th className="py-2 pr-4">Email</th>
-                    <th className="py-2 pr-4">Dept</th>
-                    <th className="py-2 pr-4">Manager</th>
-                    <th className="py-2">Actions</th>
+                    <th className="py-2 pr-4">{t('admin.users.name')}</th>
+                    <th className="py-2 pr-4">{t('admin.users.email')}</th>
+                    <th className="py-2 pr-4">{t('admin.users.dept')}</th>
+                    <th className="py-2 pr-4">{t('admin.users.manager')}</th>
+                    <th className="py-2">{t('admin.users.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {users.map(u => (
                     <tr key={u.id} className="border-b border-gray-100">
-                      <td className="py-2 pr-4">{u.name}{u.deactivated_at ? ' (deactivated)' : ''}</td>
+                      <td className="py-2 pr-4">{u.name}{u.deactivated_at ? t('admin.users.deactivatedSuffix') : ''}</td>
                       <td className="py-2 pr-4 text-gray-600">{u.email}</td>
                       <td className="py-2 pr-4">{u.department}</td>
                       <td className="py-2 pr-4 text-gray-600">{u.manager_email || <span className="text-gray-300">—</span>}</td>
                       <td className="py-2 space-x-2 whitespace-nowrap">
                         {!u.deactivated_at && (
                           <>
-                            <Button type="button" variant="link" size="sm" className="h-auto px-0 text-xs" onClick={() => openSetManager(u)}>Set manager</Button>
-                            <Button type="button" variant="link" size="sm" className="h-auto px-0 text-xs" onClick={() => openResetPasswordConfirm(u)}>Reset password</Button>
-                            <Button type="button" variant="link" size="sm" className="h-auto px-0 text-xs text-destructive" onClick={() => openDeactivateConfirm(u)}>Deactivate</Button>
+                            <Button type="button" variant="link" size="sm" className="h-auto px-0 text-xs" onClick={() => openSetManager(u)}>{t('admin.users.setManager')}</Button>
+                            <Button type="button" variant="link" size="sm" className="h-auto px-0 text-xs" onClick={() => openResetPasswordConfirm(u)}>{t('admin.users.resetPassword')}</Button>
+                            <Button type="button" variant="link" size="sm" className="h-auto px-0 text-xs text-destructive" onClick={() => openDeactivateConfirm(u)}>{t('admin.users.deactivate')}</Button>
                           </>
                         )}
                       </td>
@@ -831,44 +835,44 @@ export default function AdminDashboard() {
       {tab === 'organizations' && isPlatformAdmin && (
         <Surface>
           <SurfaceHeader
-            title="Organizations"
-            description="Cross-organization activity and lightweight client provisioning."
+            title={t('admin.orgs.title')}
+            description={t('admin.orgs.description')}
             action={
               <Button type="button" variant="outline" size="sm" onClick={downloadOwnerCsv} disabled={!ownerStats?.organizations?.length}>
-                Download owner CSV
+                {t('admin.orgs.downloadCsv')}
               </Button>
             }
           />
           <SurfaceBody className="space-y-5 pt-5">
             <form onSubmit={handleCreateOrganization} className="flex flex-col gap-3 rounded-lg border border-[var(--border)] bg-muted/30 p-3 sm:flex-row sm:items-end">
               <div className="min-w-0 flex-1 space-y-2">
-                <Label htmlFor="organization-name">Create organization</Label>
+                <Label htmlFor="organization-name">{t('admin.orgs.createLabel')}</Label>
                 <Input
                   id="organization-name"
                   value={orgNameDraft}
                   onChange={e => setOrgNameDraft(e.target.value)}
-                  placeholder="Client company name"
+                  placeholder={t('admin.orgs.placeholder')}
                 />
               </div>
               <Button type="submit" disabled={creatingOrg || !orgNameDraft.trim()}>
-                {creatingOrg ? 'Creating…' : 'Create organization'}
+                {creatingOrg ? t('admin.orgs.creating') : t('admin.orgs.create')}
               </Button>
             </form>
 
             {ownerLoading ? (
-              <p className="text-sm text-muted-foreground">Loading…</p>
+              <p className="text-sm text-muted-foreground">{t('admin.common.loading')}</p>
             ) : ownerStats?.organizations?.length ? (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b text-left text-gray-500">
-                      <th className="py-2 pr-4">Organization</th>
-                      <th className="py-2 pr-4">Org ID</th>
-                      <th className="py-2 pr-4">Users</th>
-                      <th className="py-2 pr-4">Onboarded</th>
-                      <th className="py-2 pr-4">Active 30d</th>
-                      <th className="py-2 pr-4">Sessions</th>
-                      <th className="py-2">Churned</th>
+                      <th className="py-2 pr-4">{t('admin.orgs.colOrganization')}</th>
+                      <th className="py-2 pr-4">{t('admin.orgs.colOrgId')}</th>
+                      <th className="py-2 pr-4">{t('admin.orgs.colUsers')}</th>
+                      <th className="py-2 pr-4">{t('admin.orgs.colOnboarded')}</th>
+                      <th className="py-2 pr-4">{t('admin.orgs.colActive30d')}</th>
+                      <th className="py-2 pr-4">{t('admin.orgs.colSessions')}</th>
+                      <th className="py-2">{t('admin.orgs.colChurned')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -882,7 +886,7 @@ export default function AdminDashboard() {
                           <div className="flex items-center gap-2">
                             <code className="rounded bg-muted px-1.5 py-0.5 text-xs">{shortId(org.organizationId)}</code>
                             <Button type="button" variant="link" size="sm" className="h-auto px-0 text-xs" onClick={() => copyOrgId(org)}>
-                              Copy
+                              {t('admin.orgs.copy')}
                             </Button>
                           </div>
                         </td>
@@ -897,7 +901,7 @@ export default function AdminDashboard() {
                 </table>
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">No organizations yet.</p>
+              <p className="text-sm text-muted-foreground">{t('admin.orgs.empty')}</p>
             )}
           </SurfaceBody>
         </Surface>
@@ -906,27 +910,27 @@ export default function AdminDashboard() {
       {tab === 'access-requests' && isPlatformAdmin && (
         <Surface>
           <SurfaceHeader
-            title="Access requests"
-            description={accessRequestTotal ? `${accessRequestTotal} total requests. Newest leads appear first.` : 'Public request-access submissions.'}
+            title={t('admin.access.title')}
+            description={accessRequestTotal ? t('admin.access.descriptionTotal', { count: accessRequestTotal }) : t('admin.access.descriptionEmpty')}
             action={
               <Button type="button" variant="outline" size="sm" onClick={loadAccessRequests} disabled={accessRequestsLoading}>
-                {accessRequestsLoading ? 'Refreshing…' : 'Refresh'}
+                {accessRequestsLoading ? t('admin.common.refreshing') : t('admin.common.refresh')}
               </Button>
             }
           />
           <SurfaceBody className="pt-5">
             {accessRequestsLoading ? (
-              <p className="text-sm text-muted-foreground">Loading…</p>
+              <p className="text-sm text-muted-foreground">{t('admin.common.loading')}</p>
             ) : accessRequests.length ? (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b text-left text-gray-500">
-                      <th className="py-2 pr-4">Submitted</th>
-                      <th className="py-2 pr-4">Contact</th>
-                      <th className="py-2 pr-4">Company</th>
-                      <th className="py-2 pr-4">Note</th>
-                      <th className="py-2">Status</th>
+                      <th className="py-2 pr-4">{t('admin.access.colSubmitted')}</th>
+                      <th className="py-2 pr-4">{t('admin.access.colContact')}</th>
+                      <th className="py-2 pr-4">{t('admin.access.colCompany')}</th>
+                      <th className="py-2 pr-4">{t('admin.access.colNote')}</th>
+                      <th className="py-2">{t('admin.access.colStatus')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -951,9 +955,9 @@ export default function AdminDashboard() {
                             disabled={updatingRequestId === request.id}
                             onChange={e => updateAccessRequestStatus(request, e.target.value)}
                           >
-                            <option value="new">New</option>
-                            <option value="contacted">Contacted</option>
-                            <option value="closed">Closed</option>
+                            <option value="new">{t('admin.access.statusNew')}</option>
+                            <option value="contacted">{t('admin.access.statusContacted')}</option>
+                            <option value="closed">{t('admin.access.statusClosed')}</option>
                           </select>
                         </td>
                       </tr>
@@ -962,7 +966,7 @@ export default function AdminDashboard() {
                 </table>
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">No access requests yet.</p>
+              <p className="text-sm text-muted-foreground">{t('admin.access.empty')}</p>
             )}
           </SurfaceBody>
         </Surface>
@@ -971,11 +975,13 @@ export default function AdminDashboard() {
       {tab === 'feedback' && (
         <Surface>
           <SurfaceHeader
-            title="Help &amp; Feedback"
+            title={t('admin.feedback.title')}
             description={
               feedback.length
-                ? `${feedback.length} message${feedback.length === 1 ? '' : 's'} from your team.`
-                : 'Messages submitted via the Help & Feedback dialog land here.'
+                ? (feedback.length === 1
+                    ? t('admin.feedback.descriptionOne', { count: feedback.length })
+                    : t('admin.feedback.descriptionMany', { count: feedback.length }))
+                : t('admin.feedback.descriptionEmpty')
             }
             action={
               <div className="flex flex-wrap items-center gap-2">
@@ -984,20 +990,20 @@ export default function AdminDashboard() {
                   value={feedbackFilter}
                   onChange={e => { setFeedbackFilter(e.target.value); loadFeedback(e.target.value); }}
                 >
-                  <option value="">All statuses</option>
-                  <option value="new">New</option>
-                  <option value="reviewing">Reviewing</option>
-                  <option value="resolved">Resolved</option>
+                  <option value="">{t('admin.feedback.allStatuses')}</option>
+                  <option value="new">{t('admin.feedback.statusNew')}</option>
+                  <option value="reviewing">{t('admin.feedback.statusReviewing')}</option>
+                  <option value="resolved">{t('admin.feedback.statusResolved')}</option>
                 </select>
                 <Button type="button" variant="outline" size="sm" onClick={() => loadFeedback(feedbackFilter)} disabled={feedbackLoading}>
-                  {feedbackLoading ? 'Refreshing…' : 'Refresh'}
+                  {feedbackLoading ? t('admin.common.refreshing') : t('admin.common.refresh')}
                 </Button>
               </div>
             }
           />
           <SurfaceBody className="pt-5">
             {feedbackLoading ? (
-              <p className="text-sm text-muted-foreground">Loading…</p>
+              <p className="text-sm text-muted-foreground">{t('admin.common.loading')}</p>
             ) : feedback.length ? (
               <ul className="space-y-3">
                 {feedback.map(item => (
@@ -1011,7 +1017,7 @@ export default function AdminDashboard() {
                         <div className="flex flex-wrap items-center gap-2 text-xs">
                           <span className="font-semibold uppercase tracking-wide text-foreground">{item.category}</span>
                           <span className="text-muted-foreground">·</span>
-                          <span className="text-muted-foreground">{item.user?.name || 'Unknown user'}</span>
+                          <span className="text-muted-foreground">{item.user?.name || t('admin.feedback.unknownUser')}</span>
                           {item.user?.department && (
                             <>
                               <span className="text-muted-foreground">·</span>
@@ -1029,16 +1035,16 @@ export default function AdminDashboard() {
                         disabled={updatingFeedbackId === item.id}
                         onChange={e => updateFeedbackStatus(item.id, e.target.value)}
                       >
-                        <option value="new">New</option>
-                        <option value="reviewing">Reviewing</option>
-                        <option value="resolved">Resolved</option>
+                        <option value="new">{t('admin.feedback.statusNew')}</option>
+                        <option value="reviewing">{t('admin.feedback.statusReviewing')}</option>
+                        <option value="resolved">{t('admin.feedback.statusResolved')}</option>
                       </select>
                     </div>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-muted-foreground">No messages yet.</p>
+              <p className="text-sm text-muted-foreground">{t('admin.feedback.empty')}</p>
             )}
           </SurfaceBody>
         </Surface>
@@ -1051,13 +1057,13 @@ export default function AdminDashboard() {
             <DialogDescription>{confirmDialog?.description}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setConfirmDialog(null)}>Cancel</Button>
+            <Button type="button" variant="outline" onClick={() => setConfirmDialog(null)}>{t('admin.common.cancel')}</Button>
             <Button
               type="button"
               variant={confirmDialog?.destructive ? 'destructive' : 'default'}
               onClick={runConfirmDialog}
             >
-              {confirmDialog?.confirmLabel || 'Confirm'}
+              {confirmDialog?.confirmLabel || t('admin.dialog.confirm')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1066,9 +1072,9 @@ export default function AdminDashboard() {
       <Dialog open={!!tempPasswordDialog} onOpenChange={open => { if (!open) setTempPasswordDialog(null); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Temporary password</DialogTitle>
+            <DialogTitle>{t('admin.tempPwd.title')}</DialogTitle>
             <DialogDescription>
-              Share this with {tempPasswordDialog?.email}. They must change it on next login.
+              {t('admin.tempPwd.description', { email: tempPasswordDialog?.email })}
             </DialogDescription>
           </DialogHeader>
           <div className="rounded-lg border bg-muted px-3 py-2 font-mono text-sm">{tempPasswordDialog?.tempPassword}</div>
@@ -1080,9 +1086,9 @@ export default function AdminDashboard() {
                 navigator.clipboard?.writeText(tempPasswordDialog?.tempPassword || '');
               }}
             >
-              Copy password
+              {t('admin.tempPwd.copy')}
             </Button>
-            <Button type="button" onClick={() => setTempPasswordDialog(null)}>Done</Button>
+            <Button type="button" onClick={() => setTempPasswordDialog(null)}>{t('admin.tempPwd.done')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1090,11 +1096,11 @@ export default function AdminDashboard() {
       <Dialog open={!!managerDialog} onOpenChange={open => { if (!open) setManagerDialog(null); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Set manager</DialogTitle>
-            <DialogDescription>Reporting line for {managerDialog?.userName}. Leave empty to clear.</DialogDescription>
+            <DialogTitle>{t('admin.manager.title')}</DialogTitle>
+            <DialogDescription>{t('admin.manager.description', { name: managerDialog?.userName })}</DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
-            <Label htmlFor="manager-email">Manager email</Label>
+            <Label htmlFor="manager-email">{t('admin.manager.label')}</Label>
             <Input
               id="manager-email"
               type="email"
@@ -1104,8 +1110,8 @@ export default function AdminDashboard() {
             />
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setManagerDialog(null)}>Cancel</Button>
-            <Button type="button" onClick={handleSaveManager}>Save</Button>
+            <Button type="button" variant="outline" onClick={() => setManagerDialog(null)}>{t('admin.common.cancel')}</Button>
+            <Button type="button" onClick={handleSaveManager}>{t('admin.manager.save')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1128,6 +1134,7 @@ function SessionBox({ count, label, tone }) {
 }
 
 function AuditRow({ entry }) {
+  const { t } = useT();
   const when = new Date(entry.created_at + 'Z').toLocaleString(undefined, {
     year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
   });
@@ -1149,7 +1156,7 @@ function AuditRow({ entry }) {
             <span className="font-medium">{entry.actor.name}</span>
             <span className="text-gray-400 ml-1">({entry.actor.email})</span>
           </>
-        ) : <span className="text-gray-400">system</span>}
+        ) : <span className="text-gray-400">{t('admin.audit.system')}</span>}
         {entry.target_type && (
           <span className="text-gray-400 ml-2">→ {entry.target_type}{entry.target_id ? `#${entry.target_id}` : ''}</span>
         )}

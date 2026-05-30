@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api/index.js';
+import { useT } from '../i18n/index.jsx';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,16 +11,17 @@ import { Textarea } from '@/components/ui/textarea';
 
 const COMPANY_SIZES = ['1-50', '51-200', '201-1000', '1000+'];
 
-function errorMessage(error) {
+function errorMessage(t, error) {
   const code = error?.response?.data?.error || error?.message;
-  if (code === 'request_already_open') return 'There is already an open request for that email.';
-  if (code === 'invalid_email') return 'Use a valid work email address.';
-  if (code === 'note_too_long') return 'Keep the note under 2,000 characters.';
-  if (code === 'required_fields_missing') return 'Fill out all required fields.';
-  return 'Could not submit the request. Please try again.';
+  if (code === 'request_already_open') return t('auth.requestAccess.error.alreadyOpen');
+  if (code === 'invalid_email') return t('auth.requestAccess.error.invalidEmail');
+  if (code === 'note_too_long') return t('auth.requestAccess.error.noteTooLong');
+  if (code === 'required_fields_missing') return t('auth.requestAccess.error.requiredFieldsMissing');
+  return t('auth.requestAccess.error.generic');
 }
 
 export default function RequestAccess() {
+  const { t } = useT();
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -53,7 +55,7 @@ export default function RequestAccess() {
       });
       setSubmitted(true);
     } catch (err) {
-      setError(errorMessage(err));
+      setError(errorMessage(t, err));
     } finally {
       setSubmitting(false);
     }
@@ -68,17 +70,17 @@ export default function RequestAccess() {
 
       <Card className="w-full max-w-[520px] rounded-xl border-[var(--border)] shadow-none">
         <CardHeader>
-          <CardTitle className="text-lg font-semibold">Request access</CardTitle>
-          <CardDescription>Tell us who should own the pilot conversation on your side.</CardDescription>
+          <CardTitle className="text-lg font-semibold">{t('auth.requestAccess.title')}</CardTitle>
+          <CardDescription>{t('auth.requestAccess.description')}</CardDescription>
         </CardHeader>
         <CardContent>
           {submitted ? (
             <div className="space-y-4">
               <Alert>
-                <AlertDescription>Request received. We will follow up by email.</AlertDescription>
+                <AlertDescription>{t('auth.requestAccess.successMessage')}</AlertDescription>
               </Alert>
               <Link to="/login" className={buttonVariants({ variant: 'outline', className: 'w-full' })}>
-                Back to sign in
+                {t('auth.requestAccess.backToSignIn')}
               </Link>
             </div>
           ) : (
@@ -96,22 +98,22 @@ export default function RequestAccess() {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="request-name">Name</Label>
+                  <Label htmlFor="request-name">{t('auth.requestAccess.nameLabel')}</Label>
                   <Input id="request-name" value={form.name} onChange={e => update('name', e.target.value)} autoComplete="name" required autoFocus />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="request-email">Work email</Label>
+                  <Label htmlFor="request-email">{t('auth.requestAccess.emailLabel')}</Label>
                   <Input id="request-email" type="email" value={form.email} onChange={e => update('email', e.target.value)} autoComplete="email" required />
                 </div>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="request-company">Company</Label>
+                  <Label htmlFor="request-company">{t('auth.requestAccess.companyLabel')}</Label>
                   <Input id="request-company" value={form.company} onChange={e => update('company', e.target.value)} autoComplete="organization" required />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="request-size">Company size</Label>
+                  <Label htmlFor="request-size">{t('auth.requestAccess.companySizeLabel')}</Label>
                   <select
                     id="request-size"
                     className="input"
@@ -119,21 +121,21 @@ export default function RequestAccess() {
                     onChange={e => update('companySize', e.target.value)}
                     required
                   >
-                    <option value="">Select size</option>
+                    <option value="">{t('auth.requestAccess.selectSize')}</option>
                     {COMPANY_SIZES.map(size => <option key={size} value={size}>{size}</option>)}
                   </select>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="request-role">Role</Label>
+                <Label htmlFor="request-role">{t('auth.requestAccess.roleLabel')}</Label>
                 <Input id="request-role" value={form.role} onChange={e => update('role', e.target.value)} autoComplete="organization-title" required />
               </div>
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-3">
-                  <Label htmlFor="request-note">Note</Label>
-                  <span className="text-xs tabular-nums text-muted-foreground">{form.note.length}/2000</span>
+                  <Label htmlFor="request-note">{t('auth.requestAccess.noteLabel')}</Label>
+                  <span className="text-xs tabular-nums text-muted-foreground">{t('auth.requestAccess.noteCounter', { count: form.note.length })}</span>
                 </div>
                 <Textarea
                   id="request-note"
@@ -152,10 +154,10 @@ export default function RequestAccess() {
 
               <div className="space-y-3">
                 <Button type="submit" className="w-full" disabled={submitting}>
-                  {submitting ? 'Submitting…' : 'Submit request'}
+                  {submitting ? t('auth.requestAccess.submitting') : t('auth.requestAccess.submit')}
                 </Button>
                 <Link to="/login" className={buttonVariants({ variant: 'link', className: 'w-full' })}>
-                  Back to sign in
+                  {t('auth.requestAccess.backToSignIn')}
                 </Link>
               </div>
             </form>

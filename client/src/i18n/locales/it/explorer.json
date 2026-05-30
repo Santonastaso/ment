@@ -1,0 +1,22 @@
+{
+  "explorer.title": "Esplora",
+  "explorer.description": "Sfoglia i colleghi idonei nella tua organizzazione, ordinati per affinità.",
+  "explorer.searchPlaceholder": "Cerca per nome, ruolo, sede o competenza…",
+  "explorer.allDepartments": "Tutti i reparti",
+  "explorer.allLocations": "Tutte le sedi",
+  "explorer.clearFilterOne": "Cancella {count} filtro",
+  "explorer.clearFilterMany": "Cancella {count} filtri",
+  "explorer.loading": "Caricamento…",
+  "explorer.countColleaguesOne": "{filtered} di {total} collega",
+  "explorer.countColleagues": "{filtered} di {total} colleghi",
+  "explorer.topSuggestionsPrefix": "I suggerimenti principali restano su ",
+  "explorer.homeLink": "Home",
+  "explorer.emptyTitle": "Ancora nessun collega idoneo",
+  "explorer.emptyBody": "Altri colleghi compaiono qui man mano che completano l'onboarding.",
+  "explorer.noFilterMatches": "Nessun risultato corrisponde a questi filtri.",
+  "explorer.tierStrong": "forte",
+  "explorer.tierPromising": "promettente",
+  "explorer.tierWorth": "da considerare",
+  "explorer.tierMatch": "Affinità {tier}",
+  "explorer.requestSession": "Richiedi una sessione"
+}

@@ -1,9 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import api from '../api/index.js';
+import { useT } from '../i18n/index.jsx';
 
 const TOTAL_STEPS = 3;
 
 export default function SessionRequestModal({ mentor, onClose, onSuccess }) {
+  const { t } = useT();
   const [step, setStep] = useState(1);
   const [selectedTopics, setSelectedTopics] = useState([]);
   const [question, setQuestion] = useState('');
@@ -37,7 +39,7 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess }) {
 
   async function handleSubmit() {
     if (!question.trim()) {
-      setError('Please enter your focus question.');
+      setError(t('components.sessionRequest.errorFocusQuestion'));
       setStep(2);
       return;
     }
@@ -54,7 +56,7 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess }) {
       });
       onSuccess?.();
     } catch (e) {
-      setError(e.response?.data?.error || 'Something went wrong. Please try again.');
+      setError(e.response?.data?.error || t('components.sessionRequest.errorGeneric'));
     } finally {
       setSubmitting(false);
     }
@@ -65,10 +67,10 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess }) {
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
         <div className="p-6 border-b border-gray-100 flex-shrink-0">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-foreground">Request a session</h2>
+            <h2 className="text-lg font-semibold text-foreground">{t('components.sessionRequest.title')}</h2>
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
           </div>
-          <p className="text-sm text-gray-500 mt-1">with {mentor.name} · {mentor.department}</p>
+          <p className="text-sm text-gray-500 mt-1">{t('components.sessionRequest.subtitle', { name: mentor.name, department: mentor.department })}</p>
         </div>
 
         <div className="p-6 space-y-5 overflow-y-auto">
@@ -83,14 +85,14 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess }) {
           {step === 1 && (
             <div>
               <label className="label mb-1">
-                What would you like to focus on?
+                {t('components.sessionRequest.step1Label')}
               </label>
               <p className="text-xs text-gray-500 mb-3">
-                Pick one or more topics from {mentor.name.split(' ')[0]}'s areas of expertise. You can also skip this and just describe it in the next step.
+                {t('components.sessionRequest.step1Help', { name: mentor.name.split(' ')[0] })}
               </p>
               {teachSkills.length === 0 ? (
                 <p className="text-sm text-gray-400 italic">
-                  {mentor.name.split(' ')[0]} hasn't listed any teachable skills yet — skip ahead and describe what you want to discuss.
+                  {t('components.sessionRequest.step1NoSkills', { name: mentor.name.split(' ')[0] })}
                 </p>
               ) : (
                 <div className="flex flex-wrap gap-2">
@@ -116,7 +118,9 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess }) {
               )}
               {selectedTopics.length > 0 && (
                 <p className="text-xs text-gray-500 mt-3">
-                  {selectedTopics.length} topic{selectedTopics.length === 1 ? '' : 's'} selected.
+                  {selectedTopics.length === 1
+                    ? t('components.sessionRequest.step1SelectedOne', { count: selectedTopics.length })
+                    : t('components.sessionRequest.step1SelectedMany', { count: selectedTopics.length })}
                 </p>
               )}
             </div>
@@ -126,7 +130,7 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess }) {
           {step === 2 && (
             <div>
               <label className="label">
-                What is the one specific question you want to leave this session with an answer to?
+                {t('components.sessionRequest.step2Label')}
               </label>
               <textarea
                 className="input resize-none"
@@ -134,13 +138,13 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess }) {
                 maxLength={200}
                 value={question}
                 onChange={e => setQuestion(e.target.value)}
-                placeholder="e.g. How do I structure a large TypeScript project without the types becoming a maintenance burden?"
+                placeholder={t('components.sessionRequest.step2Placeholder')}
                 autoFocus
               />
               <div className="text-right text-xs text-gray-400 mt-1">{question.length}/200</div>
               {selectedTopics.length > 0 && (
                 <div className="mt-3 bg-blue-50/60 border border-blue-100 rounded-lg p-3">
-                  <p className="text-[11px] uppercase tracking-wide text-foreground font-medium mb-1">Topics you picked</p>
+                  <p className="text-[11px] uppercase tracking-wide text-foreground font-medium mb-1">{t('components.sessionRequest.step2TopicsPicked')}</p>
                   <div className="flex flex-wrap gap-1.5">
                     {selectedTopics.map(t => (
                       <span key={t} className="bg-white text-foreground border border-blue-200 rounded-full px-2.5 py-0.5 text-xs">
@@ -156,7 +160,7 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess }) {
           {/* STEP 3 — Date/time */}
           {step === 3 && (
             <div>
-              <label className="label">Proposed date and time <span className="text-gray-400 font-normal">(optional — you can set this later)</span></label>
+              <label className="label">{t('components.sessionRequest.step3Label')} <span className="text-gray-400 font-normal">{t('components.sessionRequest.step3Optional')}</span></label>
               <input
                 type="datetime-local"
                 className="input"
@@ -166,12 +170,12 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess }) {
               />
               <div className="mt-4 bg-gray-50 rounded-lg p-3 text-sm text-gray-600 space-y-2">
                 <div>
-                  <span className="font-medium text-foreground">Your focus question:</span>
+                  <span className="font-medium text-foreground">{t('components.sessionRequest.step3YourQuestion')}</span>
                   <p className="mt-1 italic">"{question}"</p>
                 </div>
                 {selectedTopics.length > 0 && (
                   <div>
-                    <span className="font-medium text-foreground">Topics:</span>
+                    <span className="font-medium text-foreground">{t('components.sessionRequest.step3Topics')}</span>
                     <div className="flex flex-wrap gap-1.5 mt-1">
                       {selectedTopics.map(t => (
                         <span key={t} className="bg-white text-foreground border border-blue-200 rounded-full px-2.5 py-0.5 text-xs">{t}</span>
@@ -189,28 +193,28 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess }) {
         <div className="px-6 pb-6 flex justify-between gap-3 flex-shrink-0">
           {step === 1 && (
             <>
-              <button onClick={onClose} className="btn-ghost">Cancel</button>
+              <button onClick={onClose} className="btn-ghost">{t('components.sessionRequest.cancel')}</button>
               <button onClick={() => setStep(2)} className="btn-primary">
-                {selectedTopics.length === 0 ? 'Skip — I\'ll describe it' : 'Continue'}
+                {selectedTopics.length === 0 ? t('components.sessionRequest.skip') : t('components.sessionRequest.continue')}
               </button>
             </>
           )}
           {step === 2 && (
             <>
-              <button onClick={() => { setStep(1); setError(''); }} className="btn-secondary">Back</button>
+              <button onClick={() => { setStep(1); setError(''); }} className="btn-secondary">{t('components.sessionRequest.back')}</button>
               <button
-                onClick={() => { if (question.trim()) { setStep(3); setError(''); } else setError('Please enter your focus question.'); }}
+                onClick={() => { if (question.trim()) { setStep(3); setError(''); } else setError(t('components.sessionRequest.errorFocusQuestion')); }}
                 className="btn-primary"
               >
-                Next
+                {t('components.sessionRequest.next')}
               </button>
             </>
           )}
           {step === 3 && (
             <>
-              <button onClick={() => { setStep(2); setError(''); }} className="btn-secondary">Back</button>
+              <button onClick={() => { setStep(2); setError(''); }} className="btn-secondary">{t('components.sessionRequest.back')}</button>
               <button onClick={handleSubmit} disabled={submitting} className="btn-primary">
-                {submitting ? 'Sending…' : 'Send request'}
+                {submitting ? t('components.sessionRequest.sending') : t('components.sessionRequest.send')}
               </button>
             </>
           )}

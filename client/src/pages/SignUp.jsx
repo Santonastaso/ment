@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useT } from '../i18n/index.jsx';
 import { supabase } from '../lib/supabase.js';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -13,21 +14,22 @@ import { Label } from '@/components/ui/label';
 // edge function, then signs the user in and ships them straight to the
 // dashboard. Used by the "Start your team" CTA on /login and /request-access.
 
-function friendlyError(code) {
+function friendlyError(t, code) {
   switch (code) {
-    case 'company_name_required': return 'Add a company name.';
-    case 'admin_name_required': return 'Add your name.';
-    case 'admin_email_invalid': return 'Use a valid email address.';
-    case 'password_too_short': return 'Password must be at least 8 characters.';
-    case 'password_too_long': return 'Password is too long.';
-    case 'email_taken': return 'That email already has an account. Sign in instead.';
-    default: return code ? `Could not create your team (${code}). Try again.` : 'Could not create your team. Try again.';
+    case 'company_name_required': return t('auth.signup.error.companyNameRequired');
+    case 'admin_name_required': return t('auth.signup.error.adminNameRequired');
+    case 'admin_email_invalid': return t('auth.signup.error.adminEmailInvalid');
+    case 'password_too_short': return t('auth.signup.error.passwordTooShort');
+    case 'password_too_long': return t('auth.signup.error.passwordTooLong');
+    case 'email_taken': return t('auth.signup.error.emailTaken');
+    default: return code ? t('auth.signup.error.genericWithCode', { code }) : t('auth.signup.error.generic');
   }
 }
 
 export default function SignUp() {
   const navigate = useNavigate();
   const { signIn } = useAuth();
+  const { t } = useT();
   const [form, setForm] = useState({
     company_name: '',
     admin_name: '',
@@ -66,18 +68,18 @@ export default function SignUp() {
             code = j?.error || code;
           }
         } catch { /* ignore */ }
-        setError(friendlyError(code));
+        setError(friendlyError(t, code));
         return;
       }
       if (!data?.organization) {
-        setError(friendlyError(data?.error));
+        setError(friendlyError(t, data?.error));
         return;
       }
       // Sign the new admin in immediately.
       await signIn(form.admin_email, form.admin_password);
       navigate('/');
     } catch (err) {
-      setError(friendlyError(err?.response?.data?.error || err?.message));
+      setError(friendlyError(t, err?.response?.data?.error || err?.message));
     } finally {
       setSubmitting(false);
       inFlight.current = false;
@@ -90,10 +92,9 @@ export default function SignUp() {
         <CardHeader>
           <div className="flex items-center justify-between gap-3">
             <div>
-              <CardTitle className="text-lg font-semibold">Start your team</CardTitle>
+              <CardTitle className="text-lg font-semibold">{t('auth.signup.title')}</CardTitle>
               <CardDescription>
-                Spin up a new MENT organization. You'll be the first admin and
-                can invite colleagues right after.
+                {t('auth.signup.description')}
               </CardDescription>
             </div>
           </div>
@@ -101,47 +102,47 @@ export default function SignUp() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <Label htmlFor="company_name">Company name</Label>
+              <Label htmlFor="company_name">{t('auth.signup.companyLabel')}</Label>
               <Input
                 id="company_name" type="text" required maxLength={80}
                 value={form.company_name}
                 onChange={e => update('company_name', e.target.value)}
-                placeholder="e.g. Atlas Consulting"
+                placeholder={t('auth.signup.companyPlaceholder')}
                 data-testid="signup-company"
               />
             </div>
             <div>
-              <Label htmlFor="admin_name">Your name</Label>
+              <Label htmlFor="admin_name">{t('auth.signup.nameLabel')}</Label>
               <Input
                 id="admin_name" type="text" required maxLength={80}
                 value={form.admin_name}
                 onChange={e => update('admin_name', e.target.value)}
-                placeholder="First and last name"
+                placeholder={t('auth.signup.namePlaceholder')}
                 data-testid="signup-name"
               />
             </div>
             <div>
-              <Label htmlFor="admin_email">Work email</Label>
+              <Label htmlFor="admin_email">{t('auth.signup.emailLabel')}</Label>
               <Input
                 id="admin_email" type="email" required
                 value={form.admin_email}
                 onChange={e => update('admin_email', e.target.value)}
-                placeholder="you@company.com"
+                placeholder={t('auth.signup.emailPlaceholder')}
                 data-testid="signup-email"
               />
             </div>
             <div>
-              <Label htmlFor="admin_password">Password</Label>
+              <Label htmlFor="admin_password">{t('auth.signup.passwordLabel')}</Label>
               <Input
                 id="admin_password" type="password" required minLength={8}
                 value={form.admin_password}
                 onChange={e => update('admin_password', e.target.value)}
-                placeholder="At least 8 characters"
+                placeholder={t('auth.signup.passwordPlaceholder')}
                 data-testid="signup-password"
               />
             </div>
             <div>
-              <Label>Privacy mode for the team</Label>
+              <Label>{t('auth.signup.privacyModeLabel')}</Label>
               <div className="mt-1 grid grid-cols-2 gap-2 text-sm">
                 <button
                   type="button"
@@ -152,8 +153,8 @@ export default function SignUp() {
                       : 'border-gray-200 bg-white hover:bg-muted/40'
                   }`}
                 >
-                  <p className="font-medium">Intra-company</p>
-                  <p className="text-xs text-muted-foreground">Single employer. Full peer profiles visible.</p>
+                  <p className="font-medium">{t('auth.signup.intraTitle')}</p>
+                  <p className="text-xs text-muted-foreground">{t('auth.signup.intraDescription')}</p>
                 </button>
                 <button
                   type="button"
@@ -164,8 +165,8 @@ export default function SignUp() {
                       : 'border-gray-200 bg-white hover:bg-muted/40'
                   }`}
                 >
-                  <p className="font-medium">Inter-company (PMI)</p>
-                  <p className="text-xs text-muted-foreground">Cross-company. Surnames, job titles and location hidden.</p>
+                  <p className="font-medium">{t('auth.signup.interTitle')}</p>
+                  <p className="text-xs text-muted-foreground">{t('auth.signup.interDescription')}</p>
                 </button>
               </div>
             </div>
@@ -182,11 +183,11 @@ export default function SignUp() {
               data-testid="signup-submit"
               className="w-full"
             >
-              {submitting ? 'Creating your team…' : 'Create my team'}
+              {submitting ? t('auth.signup.submitting') : t('auth.signup.submit')}
             </Button>
 
             <p className="text-center text-xs text-muted-foreground">
-              Already have an account? <Link to="/login" className="text-primary hover:underline">Sign in</Link>
+              {t('auth.signup.haveAccount')} <Link to="/login" className="text-primary hover:underline">{t('auth.signup.signInLink')}</Link>
             </p>
           </form>
         </CardContent>

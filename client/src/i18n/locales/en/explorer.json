@@ -1,0 +1,22 @@
+{
+  "explorer.title": "Explorer",
+  "explorer.description": "Browse eligible colleagues in your organization, sorted by match strength.",
+  "explorer.searchPlaceholder": "Search by name, role, location, or skill…",
+  "explorer.allDepartments": "All departments",
+  "explorer.allLocations": "All locations",
+  "explorer.clearFilterOne": "Clear {count} filter",
+  "explorer.clearFilterMany": "Clear {count} filters",
+  "explorer.loading": "Loading…",
+  "explorer.countColleaguesOne": "{filtered} of {total} colleague",
+  "explorer.countColleagues": "{filtered} of {total} colleagues",
+  "explorer.topSuggestionsPrefix": "Top suggestions stay on ",
+  "explorer.homeLink": "Home",
+  "explorer.emptyTitle": "No eligible colleagues yet",
+  "explorer.emptyBody": "More colleagues appear here as they complete onboarding.",
+  "explorer.noFilterMatches": "No matches fit those filters.",
+  "explorer.tierStrong": "Strong",
+  "explorer.tierPromising": "Promising",
+  "explorer.tierWorth": "Worth a look",
+  "explorer.tierMatch": "{tier} match",
+  "explorer.requestSession": "Request a session"
+}

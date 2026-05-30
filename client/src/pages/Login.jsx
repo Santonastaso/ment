@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useT } from '../i18n/index.jsx';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -9,6 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function Login() {
   const { signIn } = useAuth();
+  const { t } = useT();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -22,7 +24,7 @@ export default function Login() {
       await signIn(email, password);
       // AuthProvider's onAuthStateChange + ProtectedRoute handle the redirect.
     } catch (err) {
-      setError(err?.message || 'Login failed. Please try again.');
+      setError(err?.message || t('auth.login.errorGeneric'));
     } finally {
       setLoading(false);
     }
@@ -36,17 +38,17 @@ export default function Login() {
       </div>
       <Card className="w-full max-w-[400px] rounded-xl border-[var(--border)] shadow-none">
         <CardHeader>
-          <CardTitle className="text-lg font-semibold">Sign in</CardTitle>
-          <CardDescription>Use the email and temporary password from your HR admin.</CardDescription>
+          <CardTitle className="text-lg font-semibold">{t('auth.login.title')}</CardTitle>
+          <CardDescription>{t('auth.login.description')}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Work email</Label>
-              <Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" autoComplete="email" required autoFocus />
+              <Label htmlFor="email">{t('auth.login.emailLabel')}</Label>
+              <Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder={t('auth.login.emailPlaceholder')} autoComplete="email" required autoFocus />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{t('auth.login.passwordLabel')}</Label>
               <Input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} autoComplete="current-password" required />
             </div>
             {error && (
@@ -55,24 +57,24 @@ export default function Login() {
               </Alert>
             )}
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Signing in…' : 'Continue'}
+              {loading ? t('auth.login.submitting') : t('auth.login.submit')}
             </Button>
           </form>
         </CardContent>
       </Card>
       <div className="mt-4 flex flex-col items-center gap-2 text-center text-sm text-muted-foreground">
         <p>
-          New here?{' '}
+          {t('auth.login.newHerePrefix')}{' '}
           <Link to="/sign-up" className="font-medium text-primary underline-offset-4 hover:underline" data-testid="login-signup-link">
-            Start your team
+            {t('auth.login.startTeamLink')}
           </Link>
         </p>
         <p>
-          Or{' '}
+          {t('auth.login.orPrefix')}{' '}
           <Link to="/request-access" className="font-medium text-primary underline-offset-4 hover:underline">
-            request a pilot
+            {t('auth.login.requestPilotLink')}
           </Link>{' '}
-          if you'd rather we set it up for you.
+          {t('auth.login.requestPilotSuffix')}
         </p>
       </div>
     </div>

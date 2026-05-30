@@ -6,8 +6,10 @@ import { Surface, SurfaceBody } from './Surface.jsx';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import api from '../api/index.js';
+import { useT } from '../i18n/index.jsx';
 
 export default function MatchCard({ match, onDismiss }) {
+  const { t } = useT();
   const { user, score, reasons } = match;
   const [showModal, setShowModal] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
@@ -34,7 +36,7 @@ export default function MatchCard({ match, onDismiss }) {
             </Avatar>
             <div className="min-w-0 flex-1">
               <Link to={`/profile/${user.id}`} className="text-[15px] font-semibold text-foreground hover:text-primary hover:underline">
-                {user?.name || 'Unknown'}
+                {user?.name || t('components.match.unknown')}
               </Link>
               <p className="truncate text-[13px] text-muted-foreground">{user.current_role} · {user.department}</p>
               <div className="mt-1.5">
@@ -51,7 +53,7 @@ export default function MatchCard({ match, onDismiss }) {
                 className="text-[13px] font-medium text-muted-foreground hover:text-primary"
                 aria-expanded={showDetails}
               >
-                {showDetails ? 'Hide details' : 'Why this match?'}
+                {showDetails ? t('components.match.hideDetails') : t('components.match.whyMatch')}
               </button>
               {showDetails && (
                 <ul className="mt-2 space-y-1.5">
@@ -64,8 +66,8 @@ export default function MatchCard({ match, onDismiss }) {
           )}
 
           <div className="flex gap-2">
-            <Button onClick={() => setShowModal(true)} className="flex-1">Request a session</Button>
-            <Button variant="ghost" onClick={handleNotInterested} title="Remove from suggestions">Dismiss</Button>
+            <Button onClick={() => setShowModal(true)} className="flex-1">{t('components.match.requestSession')}</Button>
+            <Button variant="ghost" onClick={handleNotInterested} title={t('components.match.removeFromSuggestions')}>{t('components.match.dismiss')}</Button>
           </div>
         </SurfaceBody>
       </Surface>

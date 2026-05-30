@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Share2, ShieldAlert, RefreshCw, Building2, Languages, Info } from 'lucide-react';
 import api from '../api/index.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useT } from '../i18n/index.jsx';
 import { PageShell } from '../components/PageShell.jsx';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -118,6 +119,7 @@ function computeLayout(nodes, edges, iterations = 320) {
 
 export default function KnowledgeGraph() {
   const { user } = useAuth();
+  const { t } = useT();
   const isPlatform = user?.admin_scope === 'platform';
 
   const [graph, setGraph] = useState(null);
@@ -153,12 +155,12 @@ export default function KnowledgeGraph() {
       setGraph(res.data);
     } catch (e) {
       if (id !== reqId.current) return;
-      setError(e.response?.data?.error || 'Could not load the knowledge graph.');
+      setError(e.response?.data?.error || t('graph.error.loadFailed'));
       setGraph(null);
     } finally {
       if (id === reqId.current) setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => { loadPrivacy(); }, [loadPrivacy]);
   useEffect(() => { loadGraph(company, language); }, [company, language, loadGraph]);
@@ -215,7 +217,7 @@ export default function KnowledgeGraph() {
       setOrgType(res.data?.type || next);
       await loadGraph(company, language);
     } catch (e) {
-      setError(e.response?.data?.error || 'Could not change organization privacy mode.');
+      setError(e.response?.data?.error || t('graph.error.modeChangeFailed'));
     } finally {
       setSavingMode(false);
     }
@@ -223,14 +225,14 @@ export default function KnowledgeGraph() {
 
   return (
     <PageShell
-      title="Company knowledge graph"
-      description="Who teaches what, and who wants to learn it — the organization's skills network at a glance."
+      title={t('graph.pageTitle')}
+      description={t('graph.pageDescription')}
     >
       {/* Filters */}
       <div className="flex flex-wrap items-end gap-4 rounded-xl border border-border bg-card p-4">
         <div className="flex flex-col gap-1.5">
           <label htmlFor="kg-company" className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-            <Building2 className="size-3.5" /> Company
+            <Building2 className="size-3.5" /> {t('graph.filter.company')}
           </label>
           <select
             id="kg-company"
@@ -244,19 +246,19 @@ export default function KnowledgeGraph() {
               !isPlatform && 'cursor-not-allowed opacity-70'
             )}
           >
-            {isPlatform && <option value="">All organizations</option>}
+            {isPlatform && <option value="">{t('graph.filter.allOrganizations')}</option>}
             {organizations.map((o) => (
               <option key={o.id} value={o.id}>{o.name}</option>
             ))}
           </select>
           {!isPlatform && (
-            <span className="text-[11px] text-muted-foreground">Locked to your organization</span>
+            <span className="text-[11px] text-muted-foreground">{t('graph.filter.locked')}</span>
           )}
         </div>
 
         <div className="flex flex-col gap-1.5">
           <label htmlFor="kg-language" className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-            <Languages className="size-3.5" /> Working language
+            <Languages className="size-3.5" /> {t('graph.filter.language')}
           </label>
           <select
             id="kg-language"
@@ -268,7 +270,7 @@ export default function KnowledgeGraph() {
               'focus-visible:border-ring focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50'
             )}
           >
-            <option value="">All languages</option>
+            <option value="">{t('graph.filter.allLanguages')}</option>
             {languages.map((l) => (
               <option key={l} value={l}>{langLabel(l)}</option>
             ))}
@@ -281,7 +283,7 @@ export default function KnowledgeGraph() {
           onClick={() => loadGraph(company, language)}
           data-testid="kg-refresh"
         >
-          <RefreshCw className="size-4" /> Refresh
+          <RefreshCw className="size-4" /> {t('graph.refresh')}
         </Button>
       </div>
 
@@ -293,12 +295,12 @@ export default function KnowledgeGraph() {
         <div className="flex items-start gap-2.5">
           <ShieldAlert className={cn('mt-0.5 size-4 shrink-0', inter ? 'text-amber-500' : 'text-muted-foreground')} />
           <div className="text-sm">
-            <span className="font-medium text-foreground">Privacy mode: </span>
-            <span data-testid="kg-org-mode">{inter ? 'Inter-company' : 'Intra-company'}</span>
+            <span className="font-medium text-foreground">{t('graph.privacy.label')} </span>
+            <span data-testid="kg-org-mode">{inter ? t('graph.privacy.inter') : t('graph.privacy.intra')}</span>
             <p className="mt-0.5 text-[12px] text-muted-foreground">
               {inter
-                ? 'Cross-company graph — names are redacted and job title / location are hidden on every node.'
-                : 'Single-company graph — full names and roles are visible to admins.'}
+                ? t('graph.privacy.interDesc')
+                : t('graph.privacy.intraDesc')}
             </p>
           </div>
         </div>
@@ -315,7 +317,7 @@ export default function KnowledgeGraph() {
                   !inter ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'
                 )}
               >
-                Intra
+                {t('graph.privacy.intraBtn')}
               </button>
               <button
                 type="button"
@@ -327,12 +329,12 @@ export default function KnowledgeGraph() {
                   inter ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'
                 )}
               >
-                Inter
+                {t('graph.privacy.interBtn')}
               </button>
             </div>
           ) : (
             <Link to="/admin" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-              Manage in Admin
+              {t('graph.privacy.manageInAdmin')}
             </Link>
           )}
         </div>
@@ -340,7 +342,7 @@ export default function KnowledgeGraph() {
 
       {error && (
         <Alert variant="destructive">
-          <AlertTitle>Something went wrong</AlertTitle>
+          <AlertTitle>{t('graph.error.title')}</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
@@ -350,9 +352,9 @@ export default function KnowledgeGraph() {
       ) : nodes.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border py-20 text-center">
           <Share2 className="size-10 text-muted-foreground" />
-          <p className="font-semibold">No people match these filters</p>
+          <p className="font-semibold">{t('graph.empty.title')}</p>
           <p className="max-w-sm text-sm text-muted-foreground">
-            Nobody in the selected scope has the chosen working language yet. Try a different language or company.
+            {t('graph.empty.description')}
           </p>
         </div>
       ) : (
@@ -360,19 +362,19 @@ export default function KnowledgeGraph() {
           {/* Counts + legend */}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2" data-testid="kg-node-count">
-              <Badge variant="secondary">{peopleCount} people</Badge>
-              <Badge variant="secondary">{skillCount} skills</Badge>
-              <Badge variant="secondary">{edges.length} links</Badge>
+              <Badge variant="secondary">{t('graph.count.people', { count: peopleCount })}</Badge>
+              <Badge variant="secondary">{t('graph.count.skills', { count: skillCount })}</Badge>
+              <Badge variant="secondary">{t('graph.count.links', { count: edges.length })}</Badge>
             </div>
             <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
               <span className="flex items-center gap-1.5">
-                <span className="inline-block h-0.5 w-5 rounded" style={{ background: EDGE_COLORS.can_teach }} /> can teach
+                <span className="inline-block h-0.5 w-5 rounded" style={{ background: EDGE_COLORS.can_teach }} /> {t('graph.legend.canTeach')}
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="inline-block h-0.5 w-5 rounded" style={{ background: EDGE_COLORS.wants_to_learn }} /> wants to learn
+                <span className="inline-block h-0.5 w-5 rounded" style={{ background: EDGE_COLORS.wants_to_learn }} /> {t('graph.legend.wantsToLearn')}
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="inline-block size-2.5 rotate-45 rounded-[2px] bg-muted-foreground/60" /> skill
+                <span className="inline-block size-2.5 rotate-45 rounded-[2px] bg-muted-foreground/60" /> {t('graph.legend.skill')}
               </span>
             </div>
           </div>
@@ -395,7 +397,7 @@ export default function KnowledgeGraph() {
               viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
               className="block h-auto w-full"
               role="img"
-              aria-label="Company knowledge graph"
+              aria-label={t('graph.svgAria')}
               onMouseLeave={() => setHovered(null)}
             >
               {/* Edges */}
@@ -478,7 +480,7 @@ export default function KnowledgeGraph() {
           </div>
 
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Info className="size-3.5" /> Hover a node to highlight its connections. People are coloured by department; diamonds are skills.
+            <Info className="size-3.5" /> {t('graph.hoverHint')}
           </p>
         </div>
       )}

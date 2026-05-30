@@ -17,6 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { MapPin } from 'lucide-react';
 import api from '../api/index.js';
+import { useT } from '../i18n/index.jsx';
 
 const DEPARTMENTS = ['Engineering', 'Finance', 'Marketing', 'Operations', 'HR', 'Legal', 'Product', 'Design', 'Sales', 'Other'];
 
@@ -60,14 +61,14 @@ function groupCareerByCompany(entries) {
 
 // Render a "Jun 2018 – Jul 2022" / "2018 – present" period label, handling
 // year-only legacy data gracefully.
-function formatPeriod(startY, startM, endY, endM) {
+function formatPeriod(startY, startM, endY, endM, presentLabel = 'present') {
   const fmt = (y, m) => {
     if (!y) return '';
     if (m && m >= 1 && m <= 12) return `${MONTH_NAMES[m - 1]} ${y}`;
     return String(y);
   };
   const start = fmt(startY, startM);
-  const end = endY ? fmt(endY, endM) : 'present';
+  const end = endY ? fmt(endY, endM) : presentLabel;
   if (!start && (!endY)) return '';
   if (!start) return end;
   return `${start} – ${end}`;
@@ -77,6 +78,7 @@ export default function Profile() {
   const { id } = useParams();
   const { user: currentUser, updateUser } = useAuth();
   const navigate = useNavigate();
+  const { t } = useT();
 
   const isOwnProfile = !id || (currentUser?.id != null && id === currentUser.id);
   const targetId = isOwnProfile ? currentUser?.id : id;
@@ -156,7 +158,7 @@ export default function Profile() {
       setProfile(prev => ({ ...prev, ...res.data }));
       updateUser(res.data);
       setEditing(false);
-      showToast('Profile updated');
+      showToast(t('profile.toast.profileUpdated'));
     } finally {
       setSaving(false);
     }
@@ -169,13 +171,13 @@ export default function Profile() {
 
   async function handleDeleteSkillFromBubble(entry) {
     if (!entry?.id) return;
-    if (!confirm(`Remove "${entry.skill}" from your skill landscape?`)) return;
+    if (!confirm(t('profile.confirmRemoveSkill', { skill: entry.skill }))) return;
     try {
       await api.delete(`/users/me/skills/${entry.id}`);
       await refreshProfile();
-      showToast(`Removed “${entry.skill}”`);
+      showToast(t('profile.toast.skillRemoved', { skill: entry.skill }));
     } catch {
-      showToast('Could not remove that skill — try again.');
+      showToast(t('profile.toast.skillRemoveError'));
     }
   }
 
@@ -204,7 +206,7 @@ export default function Profile() {
       }
     }
     await refreshProfile();
-    showToast('Skills updated');
+    showToast(t('profile.toast.skillsUpdated'));
   }
 
   async function handleWantsToLearnChange(next) {
@@ -223,7 +225,7 @@ export default function Profile() {
       }
     }
     await refreshProfile();
-    showToast('Skills updated');
+    showToast(t('profile.toast.skillsUpdated'));
   }
 
   async function handleSaveShadow() {
@@ -231,7 +233,7 @@ export default function Profile() {
     await api.put('/users/me', { shadow_role_response: shadowDraft });
     await refreshProfile();
     setEditingShadow(false);
-    showToast('Saved');
+    showToast(t('profile.toast.saved'));
   }
 
   async function setAvailability({ paused, until, note }) {
@@ -243,7 +245,7 @@ export default function Profile() {
       if (note !== undefined) payload.mentorship_note = note || null;
       await api.put('/users/me', payload);
       await refreshProfile();
-      showToast('Availability updated');
+      showToast(t('profile.toast.availabilityUpdated'));
     } finally {
       setAvailabilitySaving(false);
     }
@@ -269,13 +271,13 @@ export default function Profile() {
     await refreshProfile();
     setNewCareer({ role: '', department: '', company: '', description: '', start_date: '', end_date: '' });
     setShowAddCareer(false);
-    showToast('Career entry added');
+    showToast(t('profile.toast.careerAdded'));
   }
 
   async function handleDeleteCareer(id) {
     await api.delete(`/users/me/career/${id}`);
     setProfile(prev => ({ ...prev, career: prev.career.filter(c => c.id !== id) }));
-    showToast('Entry removed');
+    showToast(t('profile.toast.entryRemoved'));
   }
 
   function startEditCareer(entry) {
@@ -315,7 +317,7 @@ export default function Profile() {
     // company name.
     await refreshProfile();
     cancelEditCareer();
-    showToast('Entry updated');
+    showToast(t('profile.toast.entryUpdated'));
   }
 
   if (loading) {
@@ -334,10 +336,13 @@ export default function Profile() {
   const learnSkills = skills.filter(s => s.type === 'wants_to_learn');
   const teachEditorValue = teachSkills.map(s => ({ id: s.id, skill: s.skill, example_project: s.example_project || '' }));
 
-  const skillTitle = isOwnProfile ? 'Your skill landscape' : `${profile.name?.split(' ')[0]}'s skill landscape`;
+  const firstName = profile.name?.split(' ')[0];
+  const skillTitle = isOwnProfile
+    ? t('profile.skillLandscape.titleOwn')
+    : t('profile.skillLandscape.titleOther', { name: firstName });
   const skillDescription = isOwnProfile
-    ? 'A snapshot of what you share and where you’re growing. Sessions push the bars forward.'
-    : `An overview of where ${profile.name?.split(' ')[0]} can help.`;
+    ? t('profile.skillLandscape.descOwn')
+    : t('profile.skillLandscape.descOther', { name: firstName });
 
   return (
     <PageShell>
@@ -366,11 +371,11 @@ export default function Profile() {
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   {editing ? (
                     <>
-                      <input className="input w-48 text-sm" placeholder="Role" value={form.current_role} onChange={e => setForm(f => ({ ...f, current_role: e.target.value }))} />
+                      <input className="input w-48 text-sm" placeholder={t('profile.placeholder.role')} value={form.current_role} onChange={e => setForm(f => ({ ...f, current_role: e.target.value }))} />
                       <select className="input w-40 text-sm" value={form.department} onChange={e => setForm(f => ({ ...f, department: e.target.value }))}>
                         {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
                       </select>
-                      <input className="input w-40 text-sm" placeholder="Location" value={form.location} onChange={e => setForm(f => ({ ...f, location: e.target.value }))} />
+                      <input className="input w-40 text-sm" placeholder={t('profile.placeholder.location')} value={form.location} onChange={e => setForm(f => ({ ...f, location: e.target.value }))} />
                     </>
                   ) : (
                     <>
@@ -391,30 +396,30 @@ export default function Profile() {
               {isOwnProfile ? (
                 editing ? (
                   <>
-                    <Button variant="ghost" size="sm" onClick={() => setEditing(false)}>Cancel</Button>
-                    <Button size="sm" onClick={handleSaveProfile} disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
+                    <Button variant="ghost" size="sm" onClick={() => setEditing(false)}>{t('profile.btn.cancel')}</Button>
+                    <Button size="sm" onClick={handleSaveProfile} disabled={saving}>{saving ? t('profile.btn.saving') : t('profile.btn.save')}</Button>
                   </>
                 ) : (
-                  <Button variant="outline" size="sm" onClick={() => setEditing(true)}>Edit profile</Button>
+                  <Button variant="outline" size="sm" onClick={() => setEditing(true)}>{t('profile.btn.editProfile')}</Button>
                 )
               ) : profile.mentorship_available === false ? (
                 <Button size="sm" variant="outline" disabled>
-                  Currently unavailable
+                  {t('profile.btn.currentlyUnavailable')}
                 </Button>
               ) : (
-                <Button size="sm" onClick={() => setShowModal(true)}>Request a session</Button>
+                <Button size="sm" onClick={() => setShowModal(true)}>{t('profile.btn.requestSession')}</Button>
               )}
             </div>
           </div>
           {!isOwnProfile && profile.mentorship_available === false && (
             <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-800 border border-amber-200">
               {profile.mentorship_unavailable_until && new Date(profile.mentorship_unavailable_until) > new Date()
-                ? `Mentoring paused until ${profile.mentorship_unavailable_until}`
-                : 'Not accepting mentor requests right now'}
+                ? t('profile.mentoring.pausedUntil', { date: profile.mentorship_unavailable_until })
+                : t('profile.mentoring.notAccepting')}
             </p>
           )}
           {editing ? (
-            <textarea className="input resize-none text-sm" rows={2} value={form.bio} onChange={e => setForm(f => ({ ...f, bio: e.target.value }))} placeholder="A short bio…" />
+            <textarea className="input resize-none text-sm" rows={2} value={form.bio} onChange={e => setForm(f => ({ ...f, bio: e.target.value }))} placeholder={t('profile.placeholder.bio')} />
           ) : profile.bio ? (
             <p className="text-sm text-muted-foreground">{profile.bio}</p>
           ) : null}
@@ -428,7 +433,7 @@ export default function Profile() {
           action={
             isOwnProfile ? (
               <Button variant="outline" size="sm" onClick={() => setShowSkillEditor(s => !s)}>
-                {showSkillEditor ? 'Done editing' : 'Edit skills'}
+                {showSkillEditor ? t('profile.btn.doneEditing') : t('profile.btn.editSkills')}
               </Button>
             ) : null
           }
@@ -444,7 +449,7 @@ export default function Profile() {
         {/* Expertise signature */}
         {profile.expertiseSignature?.length > 0 && (
           <div className="rounded-lg border border-border bg-muted/60 p-4">
-            <h3 className="mb-2 text-sm font-semibold">What colleagues seek {isOwnProfile ? 'you' : profile.name?.split(' ')[0]} out for</h3>
+            <h3 className="mb-2 text-sm font-semibold">{isOwnProfile ? t('profile.expertise.titleOwn') : t('profile.expertise.titleOther', { name: firstName })}</h3>
             <div className="flex flex-wrap gap-2">
               {profile.expertiseSignature.map(skill => (
                 <Badge key={skill}>{skill}</Badge>
@@ -458,28 +463,28 @@ export default function Profile() {
       {/* Skill editors — own profile, on demand */}
       {isOwnProfile && showSkillEditor && (
         <Surface>
-          <SurfaceHeader title="Manage your skills" />
+          <SurfaceHeader title={t('profile.manageSkills.title')} />
           <SurfaceBody className="space-y-5 pt-5">
           <div>
-            <h3 className="mb-2 text-sm font-semibold text-foreground">What you can teach</h3>
+            <h3 className="mb-2 text-sm font-semibold text-foreground">{t('profile.manageSkills.canTeach')}</h3>
             <TeachSkillsEditor
               value={teachEditorValue}
               onChange={handleTeachSkillsChange}
-              placeholder="Type a skill and press Enter"
-              ariaLabel="Add a skill you can teach"
+              placeholder={t('profile.skillInput.placeholder')}
+              ariaLabel={t('profile.skillInput.ariaTeach')}
             />
           </div>
 
           <div>
-            <h3 className="mb-2 text-sm font-semibold text-foreground">What you want to learn</h3>
+            <h3 className="mb-2 text-sm font-semibold text-foreground">{t('profile.manageSkills.wantsToLearn')}</h3>
             <SkillTagInput
               value={wantsToLearn}
               onChange={async (v) => {
                 setWantsToLearn(v);
                 await handleWantsToLearnChange(v);
               }}
-              placeholder="Type a skill and press Enter"
-              ariaLabel="Add a skill you want to learn"
+              placeholder={t('profile.skillInput.placeholder')}
+              ariaLabel={t('profile.skillInput.ariaLearn')}
             />
           </div>
           </SurfaceBody>
@@ -489,18 +494,18 @@ export default function Profile() {
       {isOwnProfile && (
         <Surface>
           <SurfaceHeader
-            title="Mentorship availability & goals"
-            description="Pause incoming mentor requests when you're out of office, and set a soft monthly target if it helps you keep cadence."
+            title={t('profile.availability.title')}
+            description={t('profile.availability.desc')}
           />
           <SurfaceBody className="pt-5 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 p-4">
               <div className="min-w-0">
                 <p className="text-sm font-medium text-foreground">
                   {profile.mentorship_paused
-                    ? 'Mentor requests are paused'
+                    ? t('profile.availability.paused')
                     : profile.mentorship_unavailable_until && new Date(profile.mentorship_unavailable_until) > new Date()
-                      ? `Back to accepting requests on ${profile.mentorship_unavailable_until}`
-                      : 'You\'re currently available for mentor requests'}
+                      ? t('profile.availability.backOn', { date: profile.mentorship_unavailable_until })
+                      : t('profile.availability.available')}
                 </p>
                 {profile.mentorship_note && (
                   <p className="mt-1 text-xs text-muted-foreground">{profile.mentorship_note}</p>
@@ -514,13 +519,13 @@ export default function Profile() {
                 disabled={availabilitySaving}
                 onClick={() => setAvailability({ paused: !profile.mentorship_paused })}
               >
-                {profile.mentorship_paused ? 'Resume mentoring' : 'Pause mentor requests'}
+                {profile.mentorship_paused ? t('profile.availability.resume') : t('profile.availability.pause')}
               </Button>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-[2fr_3fr]">
               <div>
-                <label className="label">Return on (optional)</label>
+                <label className="label">{t('profile.availability.returnOn')}</label>
                 <input
                   type="date"
                   className="input text-sm"
@@ -530,15 +535,15 @@ export default function Profile() {
                   onChange={(e) => setReturnDateDraft(e.target.value)}
                   disabled={availabilitySaving}
                 />
-                <p className="mt-1 text-[11px] text-muted-foreground">Until this date, you won't appear in mentor suggestions.</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">{t('profile.availability.returnHint')}</p>
               </div>
               <div>
-                <label className="label">Note for colleagues (optional)</label>
+                <label className="label">{t('profile.availability.note')}</label>
                 <input
                   type="text"
                   className="input text-sm"
                   maxLength={120}
-                  placeholder='e.g. "Out for parental leave — back in September"'
+                  placeholder={t('profile.availability.notePlaceholder')}
                   data-testid="availability-note"
                   value={availabilityNoteDraft}
                   onChange={(e) => setAvailabilityNoteDraft(e.target.value)}
@@ -557,7 +562,7 @@ export default function Profile() {
                 }}
                 disabled={availabilitySaving}
               >
-                Reset
+                {t('profile.availability.reset')}
               </Button>
               <Button
                 type="button"
@@ -566,15 +571,14 @@ export default function Profile() {
                 onClick={() => setAvailability({ until: returnDateDraft, note: availabilityNoteDraft })}
                 disabled={availabilitySaving}
               >
-                {availabilitySaving ? 'Saving…' : 'Save'}
+                {availabilitySaving ? t('profile.btn.saving') : t('profile.btn.save')}
               </Button>
             </div>
 
             <div className="rounded-lg border border-border bg-muted/40 p-4 space-y-2">
-              <p className="text-sm font-medium text-foreground">Monthly goal (optional)</p>
+              <p className="text-sm font-medium text-foreground">{t('profile.goal.title')}</p>
               <p className="text-xs text-muted-foreground">
-                Pick a small number of mentoring sessions per month — we'll
-                surface a soft nudge on the dashboard. Set to 0 to turn it off.
+                {t('profile.goal.desc')}
               </p>
               <div className="flex flex-wrap items-center gap-2">
                 <input
@@ -591,7 +595,7 @@ export default function Profile() {
                   }}
                   disabled={availabilitySaving}
                 />
-                <span className="text-sm text-muted-foreground">sessions per month</span>
+                <span className="text-sm text-muted-foreground">{t('profile.goal.perMonth')}</span>
                 <Button
                   type="button"
                   size="sm"
@@ -603,13 +607,13 @@ export default function Profile() {
                     try {
                       await api.put('/users/me', { monthly_session_goal: profile.monthly_session_goal ?? 0 });
                       await refreshProfile();
-                      showToast('Goal saved');
+                      showToast(t('profile.toast.goalSaved'));
                     } finally {
                       setAvailabilitySaving(false);
                     }
                   }}
                 >
-                  Save goal
+                  {t('profile.goal.save')}
                 </Button>
               </div>
             </div>
@@ -619,11 +623,11 @@ export default function Profile() {
 
       <Surface>
         <SurfaceHeader
-          title="Career history"
+          title={t('profile.career.title')}
           action={
             isOwnProfile ? (
               <Button variant="outline" size="sm" onClick={() => setShowAddCareer(!showAddCareer)}>
-                {showAddCareer ? 'Cancel' : '+ Add entry'}
+                {showAddCareer ? t('profile.btn.cancel') : t('profile.career.addEntry')}
               </Button>
             ) : null
           }
@@ -633,21 +637,21 @@ export default function Profile() {
         {isOwnProfile && showAddCareer && (
           <div className="mb-4 space-y-3 rounded-lg border border-[var(--border)] bg-muted/40 p-4">
             <div className="grid grid-cols-2 gap-3">
-              <input className="input text-sm" placeholder="Role title *" value={newCareer.role} onChange={e => setNewCareer(c => ({...c, role: e.target.value}))} />
+              <input className="input text-sm" placeholder={t('profile.career.roleTitle')} value={newCareer.role} onChange={e => setNewCareer(c => ({...c, role: e.target.value}))} />
               <select className="input text-sm" value={newCareer.department} onChange={e => setNewCareer(c => ({...c, department: e.target.value}))}>
-                <option value="">Department *</option>
+                <option value="">{t('profile.career.department')}</option>
                 {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
-              <input className="input text-sm" placeholder="Company" value={newCareer.company} onChange={e => setNewCareer(c => ({...c, company: e.target.value}))} />
+              <input className="input text-sm" placeholder={t('profile.career.company')} value={newCareer.company} onChange={e => setNewCareer(c => ({...c, company: e.target.value}))} />
               <div>
-                <label className="block text-[10px] text-ink-tertiary mb-1">From</label>
+                <label className="block text-[10px] text-ink-tertiary mb-1">{t('profile.career.from')}</label>
                 <MonthYearPicker
                   value={newCareer.start_date}
                   onChange={(v) => setNewCareer(c => ({...c, start_date: v}))}
                 />
               </div>
               <div>
-                <label className="block text-[10px] text-ink-tertiary mb-1">To <span className="text-ink-tertiary/70">(leave empty if this is your current role)</span></label>
+                <label className="block text-[10px] text-ink-tertiary mb-1">{t('profile.career.to')} <span className="text-ink-tertiary/70">{t('profile.career.toHint')}</span></label>
                 <MonthYearPicker
                   value={newCareer.end_date}
                   onChange={(v) => setNewCareer(c => ({...c, end_date: v}))}
@@ -657,11 +661,11 @@ export default function Profile() {
             <textarea
               className="input text-sm resize-none"
               rows={2}
-              placeholder="What did you do in this role? (optional)"
+              placeholder={t('profile.career.descPlaceholder')}
               value={newCareer.description}
               onChange={e => setNewCareer(c => ({...c, description: e.target.value}))}
             />
-            <Button size="sm" onClick={handleAddCareer}>Add</Button>
+            <Button size="sm" onClick={handleAddCareer}>{t('profile.career.add')}</Button>
           </div>
         )}
 
@@ -681,7 +685,7 @@ export default function Profile() {
                   <div className="grid grid-cols-2 gap-3">
                     <input
                       className="input text-sm"
-                      placeholder="Role title *"
+                      placeholder={t('profile.career.roleTitle')}
                       value={editCareerDraft.role}
                       onChange={e => setEditCareerDraft(d => ({...d, role: e.target.value}))}
                     />
@@ -690,25 +694,25 @@ export default function Profile() {
                       value={editCareerDraft.department}
                       onChange={e => setEditCareerDraft(d => ({...d, department: e.target.value}))}
                     >
-                      <option value="">Department *</option>
+                      <option value="">{t('profile.career.department')}</option>
                       {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
                     </select>
                     <input
                       className="input text-sm"
-                      placeholder="Company"
+                      placeholder={t('profile.career.company')}
                       value={editCareerDraft.company}
                       onChange={e => setEditCareerDraft(d => ({...d, company: e.target.value}))}
                     />
                     <div />
                     <div>
-                      <label className="block text-[10px] text-ink-tertiary mb-1">From</label>
+                      <label className="block text-[10px] text-ink-tertiary mb-1">{t('profile.career.from')}</label>
                       <MonthYearPicker
                         value={editCareerDraft.start_date}
                         onChange={(v) => setEditCareerDraft(d => ({...d, start_date: v}))}
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] text-ink-tertiary mb-1">To <span className="text-ink-tertiary/70">(leave empty if this is your current role)</span></label>
+                      <label className="block text-[10px] text-ink-tertiary mb-1">{t('profile.career.to')} <span className="text-ink-tertiary/70">{t('profile.career.toHint')}</span></label>
                       <MonthYearPicker
                         value={editCareerDraft.end_date}
                         onChange={(v) => setEditCareerDraft(d => ({...d, end_date: v}))}
@@ -718,13 +722,13 @@ export default function Profile() {
                   <textarea
                     className="input text-sm resize-none"
                     rows={2}
-                    placeholder="What did you do in this role? (optional)"
+                    placeholder={t('profile.career.descPlaceholder')}
                     value={editCareerDraft.description}
                     onChange={e => setEditCareerDraft(d => ({...d, description: e.target.value}))}
                   />
                   <div className="flex gap-2">
-                    <Button size="sm" onClick={handleSaveEditedCareer}>Save</Button>
-                    <Button size="sm" variant="ghost" onClick={cancelEditCareer}>Cancel</Button>
+                    <Button size="sm" onClick={handleSaveEditedCareer}>{t('profile.btn.save')}</Button>
+                    <Button size="sm" variant="ghost" onClick={cancelEditCareer}>{t('profile.btn.cancel')}</Button>
                   </div>
                 </div>
               ) : (
@@ -736,7 +740,7 @@ export default function Profile() {
                       {/* Hide the company name on individual rows when it's
                           already shown as the group header above. */}
                       {entry.company && group.entries.length === 1 && ` · ${entry.company}`}
-                      {(entry.start_year || entry.end_year) && ` · ${formatPeriod(entry.start_year, entry.start_month, entry.end_year, entry.end_month)}`}
+                      {(entry.start_year || entry.end_year) && ` · ${formatPeriod(entry.start_year, entry.start_month, entry.end_year, entry.end_month, t('profile.career.present'))}`}
                     </p>
                     {entry.description && (
                       <p className="text-xs text-gray-600 mt-1">{entry.description}</p>
@@ -744,9 +748,9 @@ export default function Profile() {
                   </div>
                   {isOwnProfile && (
                     <div className="flex shrink-0 items-center gap-2">
-                      <Button variant="ghost" size="sm" onClick={() => startEditCareer(entry)}>Edit</Button>
+                      <Button variant="ghost" size="sm" onClick={() => startEditCareer(entry)}>{t('profile.career.edit')}</Button>
                       <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDeleteCareer(entry.id)}>
-                        Remove
+                        {t('profile.career.remove')}
                       </Button>
                     </div>
                   )}
@@ -758,7 +762,7 @@ export default function Profile() {
             ))}
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">{isOwnProfile ? 'Add your previous roles to improve your matches.' : 'No career history listed.'}</p>
+          <p className="text-sm text-muted-foreground">{isOwnProfile ? t('profile.career.emptyOwn') : t('profile.career.emptyOther')}</p>
         )}
         </SurfaceBody>
       </Surface>
@@ -766,11 +770,11 @@ export default function Profile() {
       {isOwnProfile && (
         <Surface>
           <SurfaceHeader
-            title="Past meetings"
+            title={t('profile.pastMeetings.title')}
             description={
               <>
-                Completed mentoring sessions, both as mentor and mentee. Active sessions live on your{' '}
-                <Link to="/" className="text-primary hover:underline">dashboard</Link>.
+                {t('profile.pastMeetings.descPrefix')}
+                <Link to="/" className="text-primary hover:underline">{t('profile.pastMeetings.dashboard')}</Link>.
               </>
             }
           />
@@ -783,12 +787,12 @@ export default function Profile() {
       {isOwnProfile && (
         <Surface className="scroll-mt-8" id="reflection-log">
           <SurfaceHeader
-            title="Reflection log"
+            title={t('profile.reflection.title')}
             description={
               <>
-                A short weekly check-in. Answers are read by an AI and matched to the{' '}
-                <a href="https://esco.ec.europa.eu/en" target="_blank" rel="noreferrer" className="text-primary hover:underline">ESCO taxonomy</a>{' '}
-                of skills, then surfaced as one-click suggestions for your landscape. Only you can see this.
+                {t('profile.reflection.descPrefix')}
+                <a href="https://esco.ec.europa.eu/en" target="_blank" rel="noreferrer" className="text-primary hover:underline">{t('profile.reflection.escoLink')}</a>
+                {t('profile.reflection.descSuffix')}
               </>
             }
           />
@@ -801,12 +805,12 @@ export default function Profile() {
       {isOwnProfile && (
         <Surface>
           <SurfaceHeader
-            title="A role you'd love to shadow"
-            description="Only you can see this. We use it to surface unexpected matches over time."
+            title={t('profile.shadow.title')}
+            description={t('profile.shadow.desc')}
             action={
               !editingShadow ? (
                 <Button variant="outline" size="sm" onClick={() => setEditingShadow(true)}>
-                  {profile.shadow_role_response ? 'Edit' : '+ Add'}
+                  {profile.shadow_role_response ? t('profile.shadow.edit') : t('profile.shadow.add')}
                 </Button>
               ) : null
             }
@@ -819,17 +823,17 @@ export default function Profile() {
                 rows={3}
                 value={shadowDraft}
                 onChange={e => setShadowDraft(e.target.value)}
-                placeholder="If you could spend a day shadowing someone in a completely different role, what would that role look like?"
+                placeholder={t('profile.shadow.placeholder')}
               />
               <div className="flex gap-2">
-                <Button size="sm" onClick={handleSaveShadow}>Save</Button>
-                <Button size="sm" variant="ghost" onClick={() => { setEditingShadow(false); setShadowDraft(profile.shadow_role_response || ''); }}>Cancel</Button>
+                <Button size="sm" onClick={handleSaveShadow}>{t('profile.btn.save')}</Button>
+                <Button size="sm" variant="ghost" onClick={() => { setEditingShadow(false); setShadowDraft(profile.shadow_role_response || ''); }}>{t('profile.btn.cancel')}</Button>
               </div>
             </div>
           ) : profile.shadow_role_response ? (
             <p className="whitespace-pre-wrap text-sm text-foreground">{profile.shadow_role_response}</p>
           ) : (
-            <p className="text-sm italic text-muted-foreground">No answer yet — even a sentence helps.</p>
+            <p className="text-sm italic text-muted-foreground">{t('profile.shadow.empty')}</p>
           )}
           </SurfaceBody>
         </Surface>
@@ -837,7 +841,7 @@ export default function Profile() {
 
       {profile.badges?.length > 0 && (
         <Surface>
-          <SurfaceHeader title="Recognition" />
+          <SurfaceHeader title={t('profile.recognition.title')} />
           <SurfaceBody className="pt-5">
             <BadgeDisplay badges={profile.badges} />
           </SurfaceBody>
@@ -848,7 +852,7 @@ export default function Profile() {
         <SessionRequestModal
           mentor={profile}
           onClose={() => setShowModal(false)}
-          onSuccess={() => { setShowModal(false); showToast('Session request sent!'); }}
+          onSuccess={() => { setShowModal(false); showToast(t('profile.toast.sessionRequestSent')); }}
         />
       )}
     </PageShell>

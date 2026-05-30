@@ -1,0 +1,20 @@
+{
+  "common.save": "Salva",
+  "common.cancel": "Annulla",
+  "common.close": "Chiudi",
+  "common.edit": "Modifica",
+  "common.remove": "Rimuovi",
+  "common.delete": "Elimina",
+  "common.loading": "Caricamento…",
+  "common.refresh": "Aggiorna",
+  "common.search": "Cerca",
+  "common.signOut": "Esci",
+  "common.helpFeedback": "Aiuto e feedback",
+  "topbar.searchPlaceholder": "Cerca persone e competenze",
+  "nav.home": "Home",
+  "nav.explorer": "Esplora",
+  "nav.myProfile": "Il mio profilo",
+  "nav.teamInsights": "Analisi del team",
+  "nav.admin": "Amministrazione",
+  "nav.knowledgeGraph": "Grafo delle competenze"
+}

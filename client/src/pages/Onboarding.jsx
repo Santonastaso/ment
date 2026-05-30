@@ -6,6 +6,7 @@ import TeachSkillsEditor from '../components/TeachSkillsEditor.jsx';
 import MonthYearPicker from '../components/MonthYearPicker.jsx';
 import api from '../api/index.js';
 import SuggestedPill from '../components/SuggestedPill.jsx';
+import { useT } from '../i18n/index.jsx';
 
 const DEPARTMENTS = ['Engineering', 'Finance', 'Marketing', 'Operations', 'HR', 'Legal', 'Product', 'Design', 'Sales', 'Other'];
 
@@ -18,6 +19,7 @@ function monthYearToPicker(year, month) {
 export default function Onboarding() {
   const { user, updateUser } = useAuth();
   const navigate = useNavigate();
+  const { t } = useT();
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -108,7 +110,7 @@ export default function Onboarding() {
       applyProposed(res.data.proposed, res.data.classifier_source);
       setStep(1);
     } catch (e) {
-      setError(e.response?.data?.error || 'Could not read that file. Try another format or skip to enter manually.');
+      setError(e.response?.data?.error || t('onboarding.import.error'));
     } finally {
       setUploading(false);
     }
@@ -152,7 +154,7 @@ export default function Onboarding() {
       updateUser(res.data);
       navigate('/');
     } catch (e) {
-      setError(e.response?.data?.error || 'Something went wrong. Please try again.');
+      setError(e.response?.data?.error || t('onboarding.error.generic'));
     } finally {
       setSaving(false);
     }
@@ -163,8 +165,8 @@ export default function Onboarding() {
       <div className="flex items-center gap-2">
         <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">M</span>
         <div>
-          <h1 className="text-xl font-semibold text-foreground">Set up your profile</h1>
-          <p className="text-sm text-muted-foreground">A few steps so we can match you with mentors.</p>
+          <h1 className="text-xl font-semibold text-foreground">{t('onboarding.header.title')}</h1>
+          <p className="text-sm text-muted-foreground">{t('onboarding.header.subtitle')}</p>
         </div>
       </div>
 
@@ -178,7 +180,7 @@ export default function Onboarding() {
                   {step > s ? '✓' : s + 1}
                 </div>
                 <span className="text-xs font-medium hidden md:block">
-                  {s === 0 ? 'Import' : s === 1 ? 'Background' : s === 2 ? 'Teach' : 'Learn'}
+                  {s === 0 ? t('onboarding.steps.import') : s === 1 ? t('onboarding.steps.background') : s === 2 ? t('onboarding.steps.teach') : t('onboarding.steps.learn')}
                 </span>
               </div>
               {s < 3 && <div className={`flex-1 min-w-4 h-0.5 ${step > s ? 'bg-primary' : 'bg-gray-200'}`} />}
@@ -190,9 +192,9 @@ export default function Onboarding() {
           {step === 0 && (
             <>
               <div>
-                <h2 className="text-xl font-semibold text-foreground mb-1">Import your profile</h2>
+                <h2 className="text-xl font-semibold text-foreground mb-1">{t('onboarding.import.title')}</h2>
                 <p className="text-gray-500 text-sm">
-                  Upload a performance review or CV (.docx or .pdf). We pre-fill your profile — edit anything before saving.
+                  {t('onboarding.import.desc')}
                 </p>
               </div>
               <label className="block border-2 border-dashed border-gray-300 rounded-xl p-10 text-center cursor-pointer hover:border-primary-light hover:bg-gray-50">
@@ -203,10 +205,10 @@ export default function Onboarding() {
                   disabled={uploading}
                   onChange={e => { if (e.target.files[0]) handleUpload(e.target.files[0]); e.target.value = ''; }}
                 />
-                {uploading ? <p className="text-sm text-gray-500">Reading document…</p> : (
+                {uploading ? <p className="text-sm text-gray-500">{t('onboarding.import.reading')}</p> : (
                   <>
-                    <p className="text-sm font-medium text-gray-600">Drop a file or click to browse</p>
-                    <p className="text-xs text-gray-400 mt-1">.docx, .pdf, .txt — max 10MB</p>
+                    <p className="text-sm font-medium text-gray-600">{t('onboarding.import.drop')}</p>
+                    <p className="text-xs text-gray-400 mt-1">{t('onboarding.import.hint')}</p>
                   </>
                 )}
               </label>
@@ -216,67 +218,67 @@ export default function Onboarding() {
           {step === 1 && (
             <>
               <div>
-                <h2 className="text-xl font-semibold text-foreground mb-1">Your background</h2>
-                <p className="text-gray-500 text-sm">Tell us about your current role and experience. This helps us find relevant matches.</p>
+                <h2 className="text-xl font-semibold text-foreground mb-1">{t('onboarding.background.title')}</h2>
+                <p className="text-gray-500 text-sm">{t('onboarding.background.desc')}</p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="sm:col-span-2">
-                  <label className="label">Full name</label>
-                  <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder="Your name" />
+                  <label className="label">{t('onboarding.fields.fullName')}</label>
+                  <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder={t('onboarding.fields.fullNamePlaceholder')} />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="label">Department{suggested.has('department') && <SuggestedPill source={classifierSource} />}</label>
+                  <label className="label">{t('onboarding.fields.department')}{suggested.has('department') && <SuggestedPill source={classifierSource} />}</label>
                   <select className="input" value={department} onChange={e => setDepartment(e.target.value)}>
-                    <option value="">Select department</option>
+                    <option value="">{t('onboarding.fields.selectDepartment')}</option>
                     {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
                   </select>
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="label">Current role title{suggested.has('current_role') && <SuggestedPill source={classifierSource} />}</label>
-                  <input className="input" value={currentRole} onChange={e => setCurrentRole(e.target.value)} placeholder="e.g. Senior Software Engineer" />
+                  <label className="label">{t('onboarding.fields.currentRole')}{suggested.has('current_role') && <SuggestedPill source={classifierSource} />}</label>
+                  <input className="input" value={currentRole} onChange={e => setCurrentRole(e.target.value)} placeholder={t('onboarding.fields.currentRolePlaceholder')} />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="label">Location{suggested.has('location') && <SuggestedPill source={classifierSource} />} <span className="font-normal text-gray-400">(city or "Remote")</span></label>
-                  <input className="input" value={location} onChange={e => setLocation(e.target.value)} placeholder="e.g. London, San Francisco, Remote" list="ment-location-suggestions" />
+                  <label className="label">{t('onboarding.fields.location')}{suggested.has('location') && <SuggestedPill source={classifierSource} />} <span className="font-normal text-gray-400">{t('onboarding.fields.locationHint')}</span></label>
+                  <input className="input" value={location} onChange={e => setLocation(e.target.value)} placeholder={t('onboarding.fields.locationPlaceholder')} list="ment-location-suggestions" />
                   <datalist id="ment-location-suggestions">
                     {['New York','San Francisco','Toronto','Mexico City','London','Berlin','Paris','Madrid','Amsterdam','Stockholm','Dublin','Milan','Tokyo','Singapore','Sydney','Mumbai','Bangalore','Seoul','São Paulo','Dubai','Remote'].map(l => <option key={l} value={l} />)}
                   </datalist>
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="label">Short bio{suggested.has('bio') && <SuggestedPill source={classifierSource} />} <span className="font-normal text-gray-400">(optional)</span></label>
-                  <textarea className="input resize-none" rows={2} value={bio} onChange={e => setBio(e.target.value)} placeholder="A sentence about you, your interests, or what drives you." />
+                  <label className="label">{t('onboarding.fields.bio')}{suggested.has('bio') && <SuggestedPill source={classifierSource} />} <span className="font-normal text-gray-400">{t('onboarding.fields.optional')}</span></label>
+                  <textarea className="input resize-none" rows={2} value={bio} onChange={e => setBio(e.target.value)} placeholder={t('onboarding.fields.bioPlaceholder')} />
                 </div>
               </div>
 
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <label className="label mb-0">Previous roles{suggested.has('career') && <SuggestedPill source={classifierSource} />} <span className="font-normal text-gray-400">(optional)</span></label>
-                  <button type="button" onClick={addCareerRow} className="text-sm text-primary hover:text-foreground font-medium">+ Add role</button>
+                  <label className="label mb-0">{t('onboarding.career.previousRoles')}{suggested.has('career') && <SuggestedPill source={classifierSource} />} <span className="font-normal text-gray-400">{t('onboarding.fields.optional')}</span></label>
+                  <button type="button" onClick={addCareerRow} className="text-sm text-primary hover:text-foreground font-medium">{t('onboarding.career.addRole')}</button>
                 </div>
                 <div className="space-y-3">
                   {career.map((c, i) => (
                     <div key={i} className="bg-gray-50 rounded-lg p-3 space-y-2">
                       <div className="grid grid-cols-2 gap-2">
-                        <input className="input text-sm" placeholder="Role title" value={c.role} onChange={e => updateCareer(i, 'role', e.target.value)} />
+                        <input className="input text-sm" placeholder={t('onboarding.career.roleTitle')} value={c.role} onChange={e => updateCareer(i, 'role', e.target.value)} />
                         <select className="input text-sm" value={c.department} onChange={e => updateCareer(i, 'department', e.target.value)}>
-                          <option value="">Department</option>
+                          <option value="">{t('onboarding.fields.department')}</option>
                           {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
                         </select>
-                        <input className="input text-sm" placeholder="Company (optional)" value={c.company} onChange={e => updateCareer(i, 'company', e.target.value)} />
+                        <input className="input text-sm" placeholder={t('onboarding.career.companyOptional')} value={c.company} onChange={e => updateCareer(i, 'company', e.target.value)} />
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <label className="block text-[10px] text-ink-tertiary mb-1">From</label>
+                          <label className="block text-[10px] text-ink-tertiary mb-1">{t('onboarding.career.from')}</label>
                           <MonthYearPicker value={c.start_date} onChange={(v) => updateCareer(i, 'start_date', v)} />
                         </div>
                         <div>
-                          <label className="block text-[10px] text-ink-tertiary mb-1">To <span className="text-ink-tertiary/70">(empty = present)</span></label>
+                          <label className="block text-[10px] text-ink-tertiary mb-1">{t('onboarding.career.to')} <span className="text-ink-tertiary/70">{t('onboarding.career.toHint')}</span></label>
                           <MonthYearPicker value={c.end_date} onChange={(v) => updateCareer(i, 'end_date', v)} />
                         </div>
                       </div>
                       {career.length > 1 && (
-                        <button type="button" onClick={() => removeCareer(i)} className="text-xs text-red-400 hover:text-red-600">Remove</button>
+                        <button type="button" onClick={() => removeCareer(i)} className="text-xs text-red-400 hover:text-red-600">{t('onboarding.career.remove')}</button>
                       )}
                     </div>
                   ))}
@@ -289,17 +291,17 @@ export default function Onboarding() {
           {step === 2 && (
             <>
               <div>
-                <h2 className="text-xl font-semibold text-foreground mb-1">What you can teach{suggested.has('can_teach') && <SuggestedPill source={classifierSource} />}</h2>
-                <p className="text-gray-500 text-sm">What topics could you help a colleague with based on your experience? For each skill, you can optionally add an example project that shows you've done it.</p>
+                <h2 className="text-xl font-semibold text-foreground mb-1">{t('onboarding.teach.title')}{suggested.has('can_teach') && <SuggestedPill source={classifierSource} />}</h2>
+                <p className="text-gray-500 text-sm">{t('onboarding.teach.desc')}</p>
               </div>
               <TeachSkillsEditor
                 value={canTeach}
                 onChange={setCanTeach}
-                placeholder="e.g. React, system design, financial modeling…"
-                ariaLabel="Add a skill you can teach"
+                placeholder={t('onboarding.teach.placeholder')}
+                ariaLabel={t('onboarding.teach.aria')}
               />
               {canTeach.length === 0 && (
-                <p className="text-xs text-gray-400">Add at least one skill to get better matches. You can always update this later.</p>
+                <p className="text-xs text-gray-400">{t('onboarding.teach.empty')}</p>
               )}
             </>
           )}
@@ -308,27 +310,27 @@ export default function Onboarding() {
           {step === 3 && (
             <>
               <div>
-                <h2 className="text-xl font-semibold text-foreground mb-1">What you want to learn{suggested.has('wants_to_learn') && <SuggestedPill source={classifierSource} />}</h2>
-                <p className="text-gray-500 text-sm">What skills or areas do you want to develop in the next 6–12 months? Type a skill and press Enter.</p>
+                <h2 className="text-xl font-semibold text-foreground mb-1">{t('onboarding.learn.title')}{suggested.has('wants_to_learn') && <SuggestedPill source={classifierSource} />}</h2>
+                <p className="text-gray-500 text-sm">{t('onboarding.learn.desc')}</p>
               </div>
               <SkillTagInput
                 value={wantsToLearn}
                 onChange={setWantsToLearn}
-                placeholder="e.g. leadership, Python, SEO, project management…"
-                ariaLabel="Add a skill you want to learn"
+                placeholder={t('onboarding.learn.placeholder')}
+                ariaLabel={t('onboarding.learn.aria')}
               />
 
               <div className="pt-2">
                 <label className="label">
-                  If you could spend a day shadowing someone in a completely different role, what would that role look like?
-                  <span className="font-normal text-gray-400 ml-1">(optional)</span>
+                  {t('onboarding.learn.shadowLabel')}
+                  <span className="font-normal text-gray-400 ml-1">{t('onboarding.fields.optional')}</span>
                 </label>
                 <textarea
                   className="input resize-none"
                   rows={3}
                   value={shadowResponse}
                   onChange={e => setShadowResponse(e.target.value)}
-                  placeholder="A few sentences is plenty. Only you will see this."
+                  placeholder={t('onboarding.learn.shadowPlaceholder')}
                 />
               </div>
             </>
@@ -338,18 +340,18 @@ export default function Onboarding() {
 
           <div className="flex justify-between pt-2">
             {step > 0 ? (
-              <button onClick={() => setStep(s => s - 1)} className="btn-secondary">Back</button>
+              <button onClick={() => setStep(s => s - 1)} className="btn-secondary">{t('onboarding.nav.back')}</button>
             ) : <div />}
 
             {step === 0 ? (
-              <button onClick={() => setStep(1)} className="btn-primary">Skip — enter manually</button>
+              <button onClick={() => setStep(1)} className="btn-primary">{t('onboarding.nav.skip')}</button>
             ) : step < 3 ? (
               <button onClick={() => setStep(s => s + 1)} className="btn-primary">
-                Continue
+                {t('onboarding.nav.continue')}
               </button>
             ) : (
               <button onClick={handleFinish} disabled={saving} className="btn-primary">
-                {saving ? 'Saving…' : 'Finish & see my matches'}
+                {saving ? t('onboarding.nav.saving') : t('onboarding.nav.finish')}
               </button>
             )}
           </div>

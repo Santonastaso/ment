@@ -12,12 +12,12 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useT } from '../i18n/index.jsx';
 
 const POLL_INTERVAL_MS = 30000;
 
-const NUMBER_WORDS = ['Zero', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
-function numberWord(n) {
-  if (n >= 0 && n < NUMBER_WORDS.length) return NUMBER_WORDS[n];
+function numberWord(n, t) {
+  if (n >= 0 && n <= 9) return t(`dashboard.num${n}`);
   return String(n);
 }
 
@@ -25,13 +25,13 @@ function notificationsSupported() {
   return typeof window !== 'undefined' && 'Notification' in window;
 }
 
-function fireDesktopNotification({ adminTriggered }) {
+function fireDesktopNotification({ adminTriggered, t }) {
   if (!notificationsSupported() || Notification.permission !== 'granted') return;
   try {
-    const n = new Notification('MENT — weekly check-in', {
+    const n = new Notification(t('dashboard.notif.checkinTitle'), {
       body: adminTriggered
-        ? 'Your team admin just opened this week\'s reflection. Two short questions about your week.'
-        : 'It\'s time for your weekly check-in. Two short questions, helps refine your matches.',
+        ? t('dashboard.notif.checkinBodyAdmin')
+        : t('dashboard.notif.checkinBody'),
       tag: 'ment-checkin',          // collapses repeat notifications
       renotify: false,
       requireInteraction: false,
@@ -45,6 +45,7 @@ function fireDesktopNotification({ adminTriggered }) {
 }
 
 export default function Dashboard() {
+  const { t } = useT();
   const { user, refreshPendingAcceptances } = useAuth();
   const [pendingAcceptances, setPendingAcceptances] = useState([]);
   const [acceptanceModalDismissed, setAcceptanceModalDismissed] = useState(false);
@@ -91,12 +92,12 @@ export default function Dashboard() {
       const becameAdmin = fromAdmin && !prevAdminRef.current;
       const becameDue = due && !prevDueRef.current;
       if (becameAdmin || becameDue) {
-        fireDesktopNotification({ adminTriggered: fromAdmin });
+        fireDesktopNotification({ adminTriggered: fromAdmin, t });
       }
     }
     prevDueRef.current = due;
     prevAdminRef.current = fromAdmin;
-  }, []);
+  }, [t]);
 
   const openCheckin = useCallback(() => {
     setShowDashboardCheckin(true);
@@ -136,8 +137,8 @@ export default function Dashboard() {
       setNotifPermission(result);
       if (result === 'granted') {
         // Fire a confirmation toast so the user sees what to expect
-        new Notification('MENT desktop notifications enabled', {
-          body: 'You\'ll see a toast when your weekly check-in is ready.',
+        new Notification(t('dashboard.notif.enabledTitle'), {
+          body: t('dashboard.notif.enabledBody'),
           tag: 'ment-checkin-confirm',
         });
       }
@@ -220,8 +221,8 @@ export default function Dashboard() {
 
   return (
     <PageShell
-      title={`Welcome back, ${user?.name?.split(' ')[0]}`}
-      description="Mentor suggestions and sessions that need your attention."
+      title={t('dashboard.welcomeTitle', { name: user?.name?.split(' ')[0] })}
+      description={t('dashboard.welcomeDescription')}
       className="gap-8"
     >
 
@@ -246,23 +247,23 @@ export default function Dashboard() {
 
       {checkinDue && (
         <Alert className="relative border-primary/20 bg-primary/5">
-          <AlertTitle>{pendingFromAdmin ? 'New weekly check-in from your admin' : 'Time for your weekly check-in'}</AlertTitle>
+          <AlertTitle>{pendingFromAdmin ? t('dashboard.checkin.alertTitleAdmin') : t('dashboard.checkin.alertTitle')}</AlertTitle>
           <AlertDescription className="space-y-2">
             <p>
               {pendingFromAdmin
-                ? 'Two short questions about your week. Helps refine your matches and surface skills you can mentor on.'
+                ? t('dashboard.checkin.alertBodyAdmin')
                 : lastEntryDays === null
-                  ? 'Two short questions. Your answers feed your skill landscape over time.'
-                  : `It's been ${lastEntryDays} days. Two short questions, that's it.`}
+                  ? t('dashboard.checkin.alertBodyFirst')
+                  : t('dashboard.checkin.alertBodyDays', { days: lastEntryDays })}
             </p>
             {notifPermission === 'default' && (
               <button type="button" onClick={handleEnableNotifications} className="text-xs font-medium text-primary underline-offset-2 hover:underline">
-                Enable desktop notifications
+                {t('dashboard.checkin.enableNotifications')}
               </button>
             )}
           </AlertDescription>
           <Button type="button" onClick={openCheckin} className="mt-3 inline-flex sm:absolute sm:right-4 sm:top-4 sm:mt-0">
-            Open check-in
+            {t('dashboard.checkin.open')}
           </Button>
         </Alert>
       )}
@@ -272,8 +273,8 @@ export default function Dashboard() {
           <Surface className="border-primary/30 bg-primary/5">
             <SurfaceBody className="pt-5">
               <div className="mb-4">
-                <p className="text-sm font-semibold text-foreground">Weekly check-in</p>
-                <p className="mt-1 text-sm text-muted-foreground">Two short answers help keep your mentoring matches current.</p>
+                <p className="text-sm font-semibold text-foreground">{t('dashboard.checkin.panelTitle')}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{t('dashboard.checkin.panelSubtitle')}</p>
               </div>
               <ReflectionLog
                 initialOpen={showDashboardCheckin || checkinDue}
@@ -296,27 +297,27 @@ export default function Dashboard() {
       {!checkinDue && notifPermission === 'default' && (
         <p className="-mt-6 text-xs text-muted-foreground">
           <button type="button" onClick={handleEnableNotifications} className="font-medium text-primary hover:underline">
-            Enable desktop notifications
+            {t('dashboard.checkin.enableNotifications')}
           </button>{' '}
-          for OS-level toasts when your weekly check-in is ready.
+          {t('dashboard.notifInlineSuffix')}
         </p>
       )}
 
       <PageSection
-        title="Mentors for you"
+        title={t('dashboard.mentors.title')}
         description={
           loadingMatches
-            ? 'Looking for colleagues who could help you grow…'
+            ? t('dashboard.mentors.descLoading')
             : matches.length === 0
-              ? 'No mentor suggestions yet — complete your skills so we can match you.'
+              ? t('dashboard.mentors.descEmpty')
               : matches.length === 1
-                ? 'One colleague who could mentor you on what you\'re trying to grow.'
-                : `${numberWord(matches.length)} colleagues who could mentor you on what you're trying to grow.`
+                ? t('dashboard.mentors.descOne')
+                : t('dashboard.mentors.descMany', { count: numberWord(matches.length, t) })
         }
         action={
           totalMatches > matches.length ? (
             <Link to="/explorer" className="text-sm font-medium text-primary hover:underline">
-              Browse {totalMatches - matches.length} more in Explorer →
+              {t('dashboard.mentors.browseMore', { count: totalMatches - matches.length })}
             </Link>
           ) : null
         }
@@ -328,9 +329,9 @@ export default function Dashboard() {
         ) : matches.length === 0 ? (
           <Surface>
             <SurfaceBody className="py-10 text-center">
-              <p className="font-medium mb-1">No matches yet</p>
-              <p className="text-sm text-muted-foreground mb-4">Complete your profile skills so we can find mentors for you.</p>
-              <Link to="/profile" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>Complete profile</Link>
+              <p className="font-medium mb-1">{t('dashboard.mentors.emptyTitle')}</p>
+              <p className="text-sm text-muted-foreground mb-4">{t('dashboard.mentors.emptyBody')}</p>
+              <Link to="/profile" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>{t('dashboard.mentors.completeProfile')}</Link>
             </SurfaceBody>
           </Surface>
         ) : (
@@ -347,10 +348,10 @@ export default function Dashboard() {
       </PageSection>
 
       <PageSection
-        title="Your sessions"
+        title={t('dashboard.sessions.title')}
         description={
           <>
-            Past meetings live on your <Link to="/profile" className="text-primary hover:underline">profile</Link>.
+            {t('dashboard.sessions.descPrefix')}<Link to="/profile" className="text-primary hover:underline">{t('dashboard.sessions.profileLink')}</Link>{t('dashboard.sessions.descSuffix')}
           </>
         }
       >
@@ -361,7 +362,7 @@ export default function Dashboard() {
         ) : (needsAction.length === 0 && upcoming.length === 0) ? (
           <Surface>
             <SurfaceBody className="py-8 text-center text-sm text-muted-foreground">
-              No active sessions yet. Request one from your mentor suggestions above.
+              {t('dashboard.sessions.empty')}
             </SurfaceBody>
           </Surface>
         ) : (
@@ -370,7 +371,7 @@ export default function Dashboard() {
               <div>
                 <div className="flex items-center gap-2 mb-3">
                   <span className="w-1.5 h-1.5 rounded-full bg-accent" />
-                  <h3 className="label-meta mb-0">Needs your attention</h3>
+                  <h3 className="label-meta mb-0">{t('dashboard.sessions.needsAttention')}</h3>
                   <span className="text-xs text-muted-foreground">{needsAction.length}</span>
                 </div>
                 <div className="space-y-3">
@@ -390,7 +391,7 @@ export default function Dashboard() {
               <div>
                 <div className="flex items-center gap-2 mb-3">
                   <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-                  <h3 className="label-meta mb-0">Upcoming</h3>
+                  <h3 className="label-meta mb-0">{t('dashboard.sessions.upcoming')}</h3>
                   <span className="text-xs text-muted-foreground">{upcoming.length}</span>
                 </div>
                 <div className="space-y-3">
@@ -415,20 +416,21 @@ export default function Dashboard() {
 // Soft goal nudge — non-blocking, no rigid targets. Uses copy that scales
 // with how close the user is to their monthly_session_goal.
 function GoalNudge({ goal, completed }) {
+  const { t } = useT();
   const ratio = goal > 0 ? completed / goal : 0;
   let tone = 'border-primary/20 bg-primary/5 text-primary';
   let msg;
   if (completed >= goal) {
     tone = 'border-emerald-200 bg-emerald-50 text-emerald-800';
-    msg = `Goal hit — ${completed}/${goal} sessions this month. Nice rhythm.`;
+    msg = t('dashboard.goal.hit', { completed, goal });
   } else if (goal - completed === 1) {
     tone = 'border-amber-200 bg-amber-50 text-amber-800';
-    msg = `You're one session away from your monthly goal of ${goal}.`;
+    msg = t('dashboard.goal.one', { goal });
   } else if (ratio >= 0.5) {
     tone = 'border-amber-200 bg-amber-50 text-amber-800';
-    msg = `${completed}/${goal} sessions done this month — over halfway there.`;
+    msg = t('dashboard.goal.half', { completed, goal });
   } else {
-    msg = `${completed}/${goal} sessions this month. Keep the conversations going.`;
+    msg = t('dashboard.goal.default', { completed, goal });
   }
   return (
     <div data-testid="goal-nudge" className={`rounded-xl border px-4 py-3 text-sm ${tone}`}>

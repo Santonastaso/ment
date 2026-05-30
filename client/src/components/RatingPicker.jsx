@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useT } from '../i18n/index.jsx';
 
 // 5-star rating with optional hover preview, used both in the mark-complete
 // flow and in the ex-post reflection editor. The picker is intentionally
@@ -10,15 +11,16 @@ import React, { useState } from 'react';
 //   onChange    — (newValue) => void
 //   disabled    — read-only display
 //   showHint    — optional small label below the row
-const HINTS = {
-  1: 'Not useful',
-  2: 'Below expectations',
-  3: 'Useful',
-  4: 'Very useful',
-  5: 'Exceptional',
+const HINT_KEYS = {
+  1: 'components.rating.hint1',
+  2: 'components.rating.hint2',
+  3: 'components.rating.hint3',
+  4: 'components.rating.hint4',
+  5: 'components.rating.hint5',
 };
 
 export default function RatingPicker({ value = null, onChange, disabled = false, showHint = true }) {
+  const { t } = useT();
   const [hovered, setHovered] = useState(null);
   const display = hovered ?? value ?? 0;
   const hintFor = hovered ?? value;
@@ -35,7 +37,7 @@ export default function RatingPicker({ value = null, onChange, disabled = false,
         className="flex items-center gap-1"
         onMouseLeave={() => setHovered(null)}
         role="radiogroup"
-        aria-label="Session rating"
+        aria-label={t('components.rating.aria')}
       >
         {[1, 2, 3, 4, 5].map(n => {
           const filled = n <= display;
@@ -51,7 +53,7 @@ export default function RatingPicker({ value = null, onChange, disabled = false,
               className={`w-7 h-7 inline-flex items-center justify-center rounded transition-colors ${
                 disabled ? 'cursor-default' : 'cursor-pointer hover:bg-amber-50'
               }`}
-              title={HINTS[n]}
+              title={t(HINT_KEYS[n])}
             >
               <svg viewBox="0 0 24 24" width="22" height="22" className={filled ? 'text-amber-400' : 'text-gray-300'}>
                 <path
@@ -65,7 +67,7 @@ export default function RatingPicker({ value = null, onChange, disabled = false,
       </div>
       {showHint && (
         <p className="text-[11px] text-gray-500 h-4">
-          {hintFor ? HINTS[hintFor] : 'Tap a star to rate (optional, private to you)'}
+          {hintFor ? t(HINT_KEYS[hintFor]) : t('components.rating.tapToRate')}
         </p>
       )}
     </div>

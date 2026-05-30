@@ -1,0 +1,20 @@
+{
+  "common.save": "Save",
+  "common.cancel": "Cancel",
+  "common.close": "Close",
+  "common.edit": "Edit",
+  "common.remove": "Remove",
+  "common.delete": "Delete",
+  "common.loading": "Loading…",
+  "common.refresh": "Refresh",
+  "common.search": "Search",
+  "common.signOut": "Sign out",
+  "common.helpFeedback": "Help & Feedback",
+  "topbar.searchPlaceholder": "Search people and skills",
+  "nav.home": "Home",
+  "nav.explorer": "Explorer",
+  "nav.myProfile": "My profile",
+  "nav.teamInsights": "Team insights",
+  "nav.admin": "Admin",
+  "nav.knowledgeGraph": "Knowledge graph"
+}

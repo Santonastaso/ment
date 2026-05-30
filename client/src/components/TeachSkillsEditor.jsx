@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import EscoSuggestInput from './EscoSuggestInput.jsx';
+import { useT } from '../i18n/index.jsx';
 
 // Edits an array of { skill, example_project } pairs. Used for "what you can
 // teach" where the spec calls for an optional example project per skill.
 // ESCO autocomplete is suggestive: confirm a custom string with Enter to skip.
-export default function TeachSkillsEditor({ value = [], onChange, placeholder = 'e.g. system design, financial modeling…', lang, ariaLabel }) {
+export default function TeachSkillsEditor({ value = [], onChange, placeholder, lang, ariaLabel }) {
+  const { t } = useT();
   const [skillInput, setSkillInput] = useState('');
+  const effectivePlaceholder = placeholder || t('components.teachSkills.placeholder');
 
   function addSkill(raw) {
     const skill = (raw || '').trim();
@@ -31,10 +34,10 @@ export default function TeachSkillsEditor({ value = [], onChange, placeholder = 
           onCommitEsco={(item) => addSkill(item.label)}
           onCommitCustom={(text) => addSkill(text)}
           onBackspaceEmpty={() => value.length > 0 && onChange(value.slice(0, -1))}
-          placeholder={value.length === 0 ? placeholder : 'Add another skill — Enter to confirm'}
+          placeholder={value.length === 0 ? effectivePlaceholder : t('components.teachSkills.addAnother')}
           inputClassName="w-full outline-none text-sm py-0.5 bg-transparent"
           lang={lang}
-          ariaLabel={ariaLabel || 'Add skill you can teach'}
+          ariaLabel={ariaLabel || t('components.teachSkills.ariaAdd')}
         />
       </div>
 
@@ -49,14 +52,14 @@ export default function TeachSkillsEditor({ value = [], onChange, placeholder = 
                 type="text"
                 value={entry.example_project}
                 onChange={e => updateExample(i, e.target.value)}
-                placeholder="Example project (optional) — what shows you've done this?"
+                placeholder={t('components.teachSkills.examplePlaceholder')}
                 className="flex-1 min-w-0 outline-none text-sm bg-transparent border-b border-transparent focus:border-primary py-1"
               />
               <button
                 type="button"
                 onClick={() => removeSkill(i)}
                 className="text-gray-400 hover:text-red-500 text-sm flex-shrink-0 mt-1"
-                aria-label={`Remove ${entry.skill}`}
+                aria-label={t('components.teachSkills.remove', { skill: entry.skill })}
               >
                 ×
               </button>

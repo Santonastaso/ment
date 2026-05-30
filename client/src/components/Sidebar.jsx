@@ -2,23 +2,21 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Compass, User, Users, Shield, Share2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useT } from '../i18n/index.jsx';
 import { cn } from '@/lib/utils';
-
-const NAV = [
-  { to: '/', label: 'Home', icon: LayoutDashboard },
-  { to: '/explorer', label: 'Explorer', icon: Compass },
-  { to: '/profile', label: 'My profile', icon: User, match: (p, uid) => p === '/profile' || p === `/profile/${uid}` },
-];
 
 export default function Sidebar({ onNavigate }) {
   const { user, pendingAcceptanceCount } = useAuth();
+  const { t } = useT();
   const location = useLocation();
 
   const links = [
-    ...NAV,
-    ...(user?.direct_reports > 0 ? [{ to: '/team', label: 'Team insights', icon: Users }] : []),
-    ...(user?.is_admin ? [{ to: '/admin/graph', label: 'Knowledge graph', icon: Share2, testid: 'nav-knowledge-graph' }] : []),
-    ...(user?.is_admin ? [{ to: '/admin', label: 'Admin', icon: Shield }] : []),
+    { to: '/', label: t('nav.home'), icon: LayoutDashboard },
+    { to: '/explorer', label: t('nav.explorer'), icon: Compass },
+    { to: '/profile', label: t('nav.myProfile'), icon: User, match: (p, uid) => p === '/profile' || p === `/profile/${uid}` },
+    ...(user?.direct_reports > 0 ? [{ to: '/team', label: t('nav.teamInsights'), icon: Users }] : []),
+    ...(user?.is_admin ? [{ to: '/admin/graph', label: t('nav.knowledgeGraph'), icon: Share2, testid: 'nav-knowledge-graph' }] : []),
+    ...(user?.is_admin ? [{ to: '/admin', label: t('nav.admin'), icon: Shield }] : []),
   ];
 
   return (

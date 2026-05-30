@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Lock, Users } from 'lucide-react';
 import api from '../api/index.js';
+import { useT } from '../i18n/index.jsx';
 import { PageShell } from '../components/PageShell.jsx';
 import { Surface, SurfaceBody, SurfaceHeader } from '../components/Surface.jsx';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -8,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function TeamSkills() {
+  const { t } = useT();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -18,16 +20,16 @@ export default function TeamSkills() {
         const res = await api.get('/team/skill-gaps');
         setData(res.data);
       } catch (e) {
-        setError(e.response?.data?.error || 'Could not load team report.');
+        setError(e.response?.data?.error || t('team.loadError'));
       } finally {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [t]);
 
   if (loading) {
     return (
-      <PageShell title="Team skill landscape">
+      <PageShell title={t('team.title')}>
         <Skeleton className="h-24 w-full rounded-xl" />
         <Skeleton className="h-48 w-full rounded-xl" />
       </PageShell>
@@ -36,7 +38,7 @@ export default function TeamSkills() {
 
   if (error) {
     return (
-      <PageShell title="Team skill landscape">
+      <PageShell title={t('team.title')}>
         <Alert variant="destructive">
           <AlertDescription>{error}</AlertDescription>
         </Alert>
@@ -48,13 +50,13 @@ export default function TeamSkills() {
 
   return (
     <PageShell
-      title="Team skill landscape"
-      description="Anonymized counts only — never individual names. Suppressed below 3 direct reports."
+      title={t('team.title')}
+      description={t('team.description')}
     >
       <Alert className="border-primary/20 bg-primary/5">
-        <AlertTitle>Privacy</AlertTitle>
+        <AlertTitle>{t('team.privacyTitle')}</AlertTitle>
         <AlertDescription>
-          Aggregate counts help you plan L&D. With fewer than 3 reports, this view is hidden to prevent trivial de-anonymization.
+          {t('team.privacyBody')}
         </AlertDescription>
       </Alert>
 
@@ -62,7 +64,7 @@ export default function TeamSkills() {
         <Surface>
           <SurfaceBody className="py-12 text-center">
             <Users className="mx-auto size-10 text-muted-foreground mb-3" />
-            <p className="font-semibold">No direct reports linked</p>
+            <p className="font-semibold">{t('team.noReportsTitle')}</p>
             <p className="text-sm text-muted-foreground mt-1">{message}</p>
           </SurfaceBody>
         </Surface>
@@ -72,7 +74,7 @@ export default function TeamSkills() {
         <Surface>
           <SurfaceBody className="py-12 text-center">
             <Lock className="mx-auto size-10 text-muted-foreground mb-3" />
-            <p className="font-semibold">Report suppressed</p>
+            <p className="font-semibold">{t('team.suppressedTitle')}</p>
             <p className="text-sm text-muted-foreground mt-1">{message}</p>
           </SurfaceBody>
         </Surface>
@@ -82,20 +84,20 @@ export default function TeamSkills() {
         <>
           <Surface>
             <SurfaceBody>
-              <p className="text-sm text-muted-foreground">Reporting on</p>
+              <p className="text-sm text-muted-foreground">{t('team.reportingOn')}</p>
               <p className="mt-1 text-4xl font-bold tabular-nums tracking-tight">
                 {reportCount}
-                <span className="ml-2 text-lg font-medium text-muted-foreground">direct reports</span>
+                <span className="ml-2 text-lg font-medium text-muted-foreground">{t('team.directReports')}</span>
               </p>
             </SurfaceBody>
           </Surface>
 
           <div className="grid gap-6 lg:grid-cols-2">
             <Surface>
-              <SurfaceHeader title="Top gaps" description="Skills your team most often wants to develop." />
+              <SurfaceHeader title={t('team.topGapsTitle')} description={t('team.topGapsDesc')} />
               <SurfaceBody className="pt-5">
                 {gaps.length === 0 ? (
-                  <p className="text-sm text-muted-foreground italic">No gap data yet.</p>
+                  <p className="text-sm text-muted-foreground italic">{t('team.noGapData')}</p>
                 ) : (
                   <ul className="space-y-4">
                     {gaps.map((g, i) => (
@@ -107,10 +109,10 @@ export default function TeamSkills() {
             </Surface>
 
             <Surface>
-              <SurfaceHeader title="Top strengths" description="Skills your team most often offers to teach." />
+              <SurfaceHeader title={t('team.topStrengthsTitle')} description={t('team.topStrengthsDesc')} />
               <SurfaceBody className="pt-5">
                 {strengths.length === 0 ? (
-                  <p className="text-sm text-muted-foreground italic">No strength data yet.</p>
+                  <p className="text-sm text-muted-foreground italic">{t('team.noStrengthData')}</p>
                 ) : (
                   <ul className="space-y-4">
                     {strengths.map((s, i) => (

@@ -1,13 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import api from '../api/index.js';
+import { useT } from '../i18n/index.jsx';
 
 // Reflection log: weekly two-question check-in. Answers are classified by an AI
 // (or heuristic fallback) into skill gaps and strengths, which the user can apply
 // to their profile so matching improves over time.
 
 const PROMPTS = [
-  { key: 'support_needed', label: 'What did you feel you needed support on this week?' },
-  { key: 'managed_well',   label: 'What did you feel you managed well this week?' },
+  { key: 'support_needed', labelKey: 'components.reflection.promptSupportNeeded' },
+  { key: 'managed_well',   labelKey: 'components.reflection.promptManagedWell' },
 ];
 
 export default function ReflectionLog({
@@ -20,6 +21,7 @@ export default function ReflectionLog({
   // so the dashboard panel stays focused on the current check-in.
   hideHistory = false,
 }) {
+  const { t } = useT();
   const [entries, setEntries] = useState([]);
   const [latestEntryId, setLatestEntryId] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -67,7 +69,7 @@ export default function ReflectionLog({
   async function handleSubmit() {
     setError('');
     if (!supportNeeded.trim() && !managedWell.trim()) {
-      setError('Please answer at least one of the two questions.');
+      setError(t('components.reflection.errorAnswerOne'));
       return;
     }
     setSubmitting(true);
@@ -82,10 +84,10 @@ export default function ReflectionLog({
       if (newId != null) setLatestEntryId(newId);
       await load();
       onSubmitted?.();
-      setToast('Saved. We picked out some skill signals — review them below.');
+      setToast(t('components.reflection.toastSaved'));
       setTimeout(() => setToast(''), 4000);
     } catch (e) {
-      setError(e.response?.data?.error || 'Could not save your reflection. Try again.');
+      setError(e.response?.data?.error || t('components.reflection.errorSave'));
     } finally {
       setSubmitting(false);
     }
@@ -99,18 +101,20 @@ export default function ReflectionLog({
       });
       const total = (keptGaps?.length || 0) + (keptStrengths?.length || 0);
       setToast(total === 0
-        ? 'Nothing to apply — entry kept in the log.'
-        : `Added ${total} skill${total === 1 ? '' : 's'} to your landscape.`);
+        ? t('components.reflection.applyNothing')
+        : total === 1
+          ? t('components.reflection.applyAddedOne', { count: total })
+          : t('components.reflection.applyAddedMany', { count: total }));
       setTimeout(() => setToast(''), 3000);
       onSkillsApplied?.();
       await load();
     } catch {
-      setError('Could not apply suggestions.');
+      setError(t('components.reflection.errorApply'));
     }
   }
 
   async function handleDelete(entry) {
-    if (!confirm('Delete this reflection? This cannot be undone.')) return;
+    if (!confirm(t('components.reflection.confirmDelete'))) return;
     await api.delete(`/reflections/${entry.id}`);
     if (latestEntryId === entry.id) setLatestEntryId(null);
     await load();
@@ -120,7 +124,7 @@ export default function ReflectionLog({
     try {
       await api.post(`/reflections/${entry.id}/reclassify`, {});
       await load();
-      setToast('Re-classified. Review the new skill signals below.');
+      setToast(t('components.reflection.toastReclassified'));
       setTimeout(() => setToast(''), 3000);
     } catch (e) {
       // Reload anyway so the UI reflects whatever ended up in the row.
@@ -128,10 +132,10 @@ export default function ReflectionLog({
       const code = e?.response?.data?.error || e?.message || '';
       const friendly =
         code === 'reclassify_unclassified'
-          ? "We couldn't pull any skill signals out of this entry. Try expanding the wording and re-running."
+          ? t('components.reflection.errorReclassifyUnclassified')
           : code === 'reclassify_failed'
-            ? 'The classifier was unreachable. Try again in a moment.'
-            : 'Could not re-classify this reflection. Try again in a moment.';
+            ? t('components.reflection.errorReclassifyFailed')
+            : t('components.reflection.errorReclassifyGeneric');
       setError(friendly);
       setTimeout(() => setError(''), 5000);
     }
@@ -142,13 +146,18 @@ export default function ReflectionLog({
     const normalized = Number.isNaN(date.getTime()) && typeof iso === 'string' && !/[zZ]|[+-]\d\d:?\d\d$/.test(iso)
       ? new Date(`${iso}Z`)
       : date;
-    if (Number.isNaN(normalized.getTime())) return 'recently';
+    if (Number.isNaN(normalized.getTime())) return t('components.reflection.timeAgoRecently');
     const ms = Date.now() - normalized.getTime();
     const days = Math.floor(ms / (1000 * 60 * 60 * 24));
-    if (days === 0) return 'today';
-    if (days === 1) return 'yesterday';
-    if (days < 7) return `${days} days ago`;
-    if (days < 30) return `${Math.floor(days / 7)} week${Math.floor(days/7) === 1 ? '' : 's'} ago`;
+    if (days === 0) return t('components.reflection.timeAgoToday');
+    if (days === 1) return t('components.reflection.timeAgoYesterday');
+    if (days < 7) return t('components.reflection.timeAgoDaysAgo', { count: days });
+    if (days < 30) {
+      const weeks = Math.floor(days / 7);
+      return weeks === 1
+        ? t('components.reflection.timeAgoWeekAgo', { count: weeks })
+        : t('components.reflection.timeAgoWeeksAgo', { count: weeks });
+    }
     return normalized.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
   }
 
@@ -165,15 +174,15 @@ export default function ReflectionLog({
       {!hideHistory && dueForCheckIn && !showForm && (
         <div className="bg-gradient-to-r from-blue-50 to-amber-50 border border-blue-200 rounded-xl p-4 flex items-start justify-between gap-4">
           <div>
-            <p className="text-foreground font-semibold text-sm">Time for your weekly check-in</p>
+            <p className="text-foreground font-semibold text-sm">{t('components.reflection.dueTitle')}</p>
             <p className="text-xs text-gray-600 mt-0.5">
               {lastEntryDays === null
-                ? 'A short reflection helps us refine your matches and surface skills you might want to teach or learn.'
-                : `It's been ${lastEntryDays} days. Two short answers, that's it.`}
+                ? t('components.reflection.dueBodyFirst')
+                : t('components.reflection.dueBodyDays', { days: lastEntryDays })}
             </p>
           </div>
           <button onClick={() => setShowForm(true)} className="btn-primary text-sm whitespace-nowrap">
-            Start check-in
+            {t('components.reflection.startCheckIn')}
           </button>
         </div>
       )}
@@ -182,27 +191,27 @@ export default function ReflectionLog({
       {showForm && (
         <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-foreground">Weekly check-in</h3>
+            <h3 className="text-sm font-semibold text-foreground">{t('components.reflection.weeklyCheckIn')}</h3>
             <button onClick={() => { setShowForm(false); setError(''); }} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
           </div>
           {PROMPTS.map(p => (
             <div key={p.key}>
-              <label className="label">{p.label}</label>
+              <label className="label">{t(p.labelKey)}</label>
               <textarea
                 ref={p.key === 'support_needed' ? firstFieldRef : undefined}
                 rows={3}
                 className="input resize-none"
                 value={p.key === 'support_needed' ? supportNeeded : managedWell}
                 onChange={e => p.key === 'support_needed' ? setSupportNeeded(e.target.value) : setManagedWell(e.target.value)}
-                placeholder="A few sentences is plenty. Only you will see this."
+                placeholder={t('components.reflection.formPlaceholder')}
               />
             </div>
           ))}
           {error && <p className="text-rose-600 text-sm">{error}</p>}
           <div className="flex justify-end gap-2">
-            <button onClick={() => { setShowForm(false); setError(''); }} className="btn-ghost text-sm">Cancel</button>
+            <button onClick={() => { setShowForm(false); setError(''); }} className="btn-ghost text-sm">{t('components.reflection.cancel')}</button>
             <button onClick={handleSubmit} disabled={submitting} className="btn-primary text-sm">
-              {submitting ? 'Saving…' : 'Save reflection'}
+              {submitting ? t('components.reflection.saving') : t('components.reflection.save')}
             </button>
           </div>
         </div>
@@ -212,7 +221,7 @@ export default function ReflectionLog({
           panel only renders the active check-in. */}
       {!hideHistory && !showForm && !dueForCheckIn && (
         <button onClick={() => setShowForm(true)} className="text-sm text-primary hover:text-primary/80 font-medium">
-          + Add a reflection now
+          {t('components.reflection.addNow')}
         </button>
       )}
 
@@ -221,10 +230,10 @@ export default function ReflectionLog({
           keep the rendered entry visible across `load()` refreshes so the
           just-submitted card doesn't flicker. */}
       {loading && !hideHistory ? (
-        <p className="text-sm text-gray-400">Loading your log…</p>
+        <p className="text-sm text-gray-400">{t('components.reflection.loading')}</p>
       ) : visibleEntries.length === 0 ? (
         !hideHistory && !loading && !showForm && !dueForCheckIn && (
-          <p className="text-sm text-gray-500">No entries yet. Your check-ins will live here, with the AI-extracted skill signals from each one.</p>
+          <p className="text-sm text-gray-500">{t('components.reflection.empty')}</p>
         )
       ) : (
         <div className="space-y-3">
@@ -244,17 +253,18 @@ export default function ReflectionLog({
   );
 }
 
-function classifierLabel(source) {
-  if (!source || source === 'unclassified') return 'no match';
-  if (source === 'claude-haiku-4-5+esco') return 'Claude + ESCO taxonomy';
-  if (source === 'claude-haiku-4-5') return 'Claude';
-  if (source === 'esco') return 'ESCO taxonomy';
-  if (source === 'esco+heuristic') return 'ESCO taxonomy (with keyword fallback)';
-  if (source === 'heuristic') return 'keyword match (offline)';
+function classifierLabel(source, t) {
+  if (!source || source === 'unclassified') return t('components.reflection.classifierNoMatch');
+  if (source === 'claude-haiku-4-5+esco') return t('components.reflection.classifierClaudeEsco');
+  if (source === 'claude-haiku-4-5') return t('components.reflection.classifierClaude');
+  if (source === 'esco') return t('components.reflection.classifierEsco');
+  if (source === 'esco+heuristic') return t('components.reflection.classifierEscoHeuristic');
+  if (source === 'heuristic') return t('components.reflection.classifierHeuristic');
   return source;
 }
 
 function ChipWithEsco({ skill, uri, tone, onDismiss }) {
+  const { t } = useT();
   const colors = tone === 'gap'
     ? 'bg-rose-50 text-rose-700 border-rose-300'
     : 'bg-emerald-50 text-emerald-700 border-emerald-300';
@@ -270,7 +280,7 @@ function ChipWithEsco({ skill, uri, tone, onDismiss }) {
           target="_blank"
           rel="noreferrer"
           className="ml-0.5 inline-flex items-center justify-center px-1.5 py-0.5 rounded-full bg-white/70 text-[9px] font-semibold tracking-wider text-gray-700 hover:text-foreground"
-          title={`Open in ESCO taxonomy: ${uri}`}
+          title={t('components.reflection.escoOpenTitle', { uri })}
           onClick={e => e.stopPropagation()}
         >
           ESCO
@@ -280,8 +290,8 @@ function ChipWithEsco({ skill, uri, tone, onDismiss }) {
         <button
           type="button"
           onClick={onDismiss}
-          aria-label={`Dismiss ${skill}`}
-          title="Dismiss this suggestion"
+          aria-label={t('components.reflection.dismissSkill', { skill })}
+          title={t('components.reflection.dismissSuggestion')}
           className={`inline-flex items-center justify-center w-4 h-4 rounded-full text-[12px] leading-none transition-colors ${dismissColors}`}
         >
           ×
@@ -292,6 +302,7 @@ function ChipWithEsco({ skill, uri, tone, onDismiss }) {
 }
 
 function Entry({ entry, onApply, onDelete, onReclassify, timeAgo }) {
+  const { t } = useT();
   // Track which suggestions the user has dismissed (locally, before applying)
   const [dismissedGaps, setDismissedGaps] = useState(() => new Set());
   const [dismissedStrengths, setDismissedStrengths] = useState(() => new Set());
@@ -340,11 +351,11 @@ function Entry({ entry, onApply, onDelete, onReclassify, timeAgo }) {
           <span className="font-medium text-foreground">{timeAgo(entry.created_at)}</span>
           <span className="text-gray-400">·</span>
           <span className="text-gray-500">
-            classified via {classifierLabel(entry.classifier_source)}
+            {t('components.reflection.classifiedVia', { label: classifierLabel(entry.classifier_source, t) })}
           </span>
           {entry.applied && (
             <span className="ml-1 inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 rounded-full px-2 py-0.5 text-[10px] font-medium">
-              ✓ Applied to skills
+              {t('components.reflection.appliedToSkills')}
             </span>
           )}
         </div>
@@ -357,23 +368,23 @@ function Entry({ entry, onApply, onDelete, onReclassify, timeAgo }) {
               data-testid="reclassify-button"
               className="text-xs font-medium text-primary hover:text-primary/80 underline-offset-2 hover:underline disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {reclassifying ? 'Re-classifying…' : 'Re-run classification'}
+              {reclassifying ? t('components.reflection.reclassifying') : t('components.reflection.reclassify')}
             </button>
           )}
-          <button onClick={() => onDelete(entry)} className="text-xs text-gray-400 hover:text-rose-500">Delete</button>
+          <button onClick={() => onDelete(entry)} className="text-xs text-gray-400 hover:text-rose-500">{t('components.reflection.delete')}</button>
         </div>
       </div>
 
       <div className="p-4 space-y-3 text-sm">
         {entry.support_needed && (
           <div>
-            <p className="text-[11px] uppercase tracking-wide text-rose-500 font-medium mb-1">What I needed support on</p>
+            <p className="text-[11px] uppercase tracking-wide text-rose-500 font-medium mb-1">{t('components.reflection.neededSupport')}</p>
             <p className="text-gray-700 whitespace-pre-wrap">{entry.support_needed}</p>
           </div>
         )}
         {entry.managed_well && (
           <div>
-            <p className="text-[11px] uppercase tracking-wide text-emerald-600 font-medium mb-1">What I managed well</p>
+            <p className="text-[11px] uppercase tracking-wide text-emerald-600 font-medium mb-1">{t('components.reflection.managedWellLabel')}</p>
             <p className="text-gray-700 whitespace-pre-wrap">{entry.managed_well}</p>
           </div>
         )}
@@ -382,22 +393,22 @@ function Entry({ entry, onApply, onDelete, onReclassify, timeAgo }) {
           <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-3 mt-2">
             <div className="flex items-baseline justify-between mb-2 gap-2 flex-wrap">
               <p className="text-[11px] uppercase tracking-wide text-foreground font-medium">
-                Skill signals
-                <span className="text-gray-500 normal-case font-normal ml-1">— click × on any chip to drop it before applying</span>
+                {t('components.reflection.skillSignals')}
+                <span className="text-gray-500 normal-case font-normal ml-1">{t('components.reflection.skillSignalsHint')}</span>
               </p>
               {totalDismissed > 0 && !entry.applied && (
                 <button
                   onClick={restoreAll}
                   className="text-[11px] text-primary hover:text-primary/80 underline-offset-2 hover:underline"
                 >
-                  Restore {totalDismissed} dismissed
+                  {t('components.reflection.restoreDismissed', { count: totalDismissed })}
                 </button>
               )}
             </div>
             <div className="space-y-2">
               {keptGaps.length > 0 && (
                 <div>
-                  <p className="text-xs text-gray-600 mb-1">Could be added to <strong>skills you're growing</strong>:</p>
+                  <p className="text-xs text-gray-600 mb-1">{t('components.reflection.couldAddPrefix')} <strong>{t('components.reflection.skillsGrowing')}</strong>:</p>
                   <div className="flex flex-wrap gap-1.5">
                     {keptGaps.map((s, i) => (
                       <ChipWithEsco
@@ -413,7 +424,7 @@ function Entry({ entry, onApply, onDelete, onReclassify, timeAgo }) {
               )}
               {keptStrengths.length > 0 && (
                 <div>
-                  <p className="text-xs text-gray-600 mb-1">Could be added to <strong>skills you share</strong>:</p>
+                  <p className="text-xs text-gray-600 mb-1">{t('components.reflection.couldAddPrefix')} <strong>{t('components.reflection.skillsShare')}</strong>:</p>
                   <div className="flex flex-wrap gap-1.5">
                     {keptStrengths.map((s, i) => (
                       <ChipWithEsco
@@ -428,7 +439,7 @@ function Entry({ entry, onApply, onDelete, onReclassify, timeAgo }) {
                 </div>
               )}
               {totalKept === 0 && (
-                <p className="text-xs text-gray-400 italic">All suggestions dismissed.</p>
+                <p className="text-xs text-gray-400 italic">{t('components.reflection.allDismissed')}</p>
               )}
             </div>
             {!entry.applied && (
@@ -438,8 +449,8 @@ function Entry({ entry, onApply, onDelete, onReclassify, timeAgo }) {
                 className="mt-3 btn-secondary text-xs disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {totalKept === 0
-                  ? 'Apply (nothing selected)'
-                  : `Apply ${totalKept} to my skill landscape`}
+                  ? t('components.reflection.applyNothingSelected')
+                  : t('components.reflection.applyToLandscape', { count: totalKept })}
               </button>
             )}
           </div>
@@ -447,7 +458,7 @@ function Entry({ entry, onApply, onDelete, onReclassify, timeAgo }) {
 
         {!hasSuggestions && (
           <p className="text-xs text-gray-400 italic">
-            No clear skill signals were detected in this entry — it was either too short or only contained generic phrases.
+            {t('components.reflection.noSignals')}
           </p>
         )}
       </div>

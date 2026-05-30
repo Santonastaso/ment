@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { searchEscoSkills, browserLanguage } from '../lib/esco.js';
+import { useT } from '../i18n/index.jsx';
 
 // EscoSuggestInput wraps a single-line text input with an ESCO-backed
 // suggestions dropdown. Behaviour matches the plan:
@@ -35,6 +36,7 @@ export default function EscoSuggestInput({
   inputId,
   ariaLabel,
 }) {
+  const { t } = useT();
   const effectiveLang = useMemo(() => lang || browserLanguage(), [lang]);
   const [open, setOpen] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
@@ -248,7 +250,7 @@ export default function EscoSuggestInput({
             );
           })}
           {loading && (
-            <li className="px-3 py-1.5 text-[11px] text-gray-400 italic">Searching ESCO…</li>
+            <li className="px-3 py-1.5 text-[11px] text-gray-400 italic">{t('components.esco.searching')}</li>
           )}
         </ul>
       )}

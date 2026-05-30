@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import SessionRequestModal from '../components/SessionRequestModal.jsx';
 import { PageShell } from '../components/PageShell.jsx';
 import { Surface, SurfaceBody } from '../components/Surface.jsx';
@@ -8,14 +8,26 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import api from '../api/index.js';
+import { useT } from '../i18n/index.jsx';
 
 export default function Explorer() {
+  const { t } = useT();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [query, setQuery] = useState('');
+  // Seed the query from the top-bar search (?q=) so the header search works.
+  const [query, setQuery] = useState(() => searchParams.get('q') || '');
   const [departmentFilter, setDepartmentFilter] = useState('');
   const [locationFilter, setLocationFilter] = useState('');
   const [requestingMentor, setRequestingMentor] = useState(null);
+
+  // Keep the local query in sync when the URL ?q= changes (e.g. a second
+  // header search while already on Explorer).
+  useEffect(() => {
+    const urlQ = searchParams.get('q') || '';
+    setQuery((prev) => (prev === urlQ ? prev : urlQ));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   useEffect(() => {
     async function load() {
@@ -67,14 +79,14 @@ export default function Explorer() {
 
   return (
       <PageShell
-        title="Explorer"
-        description="Browse eligible colleagues in your organization, sorted by match strength."
+        title={t('explorer.title')}
+        description={t('explorer.description')}
       >
 
       <Surface>
         <SurfaceBody className="space-y-3">
           <Input
-            placeholder="Search by name, role, location, or skill…"
+            placeholder={t('explorer.searchPlaceholder')}
             value={query}
             onChange={e => setQuery(e.target.value)}
           />
@@ -84,7 +96,7 @@ export default function Explorer() {
               value={departmentFilter}
               onChange={e => setDepartmentFilter(e.target.value)}
             >
-              <option value="">All departments</option>
+              <option value="">{t('explorer.allDepartments')}</option>
               {departments.map(d => <option key={d} value={d}>{d}</option>)}
             </select>
             <select
@@ -92,22 +104,22 @@ export default function Explorer() {
               value={locationFilter}
               onChange={e => setLocationFilter(e.target.value)}
             >
-              <option value="">All locations</option>
+              <option value="">{t('explorer.allLocations')}</option>
               {locations.map(l => <option key={l} value={l}>{l}</option>)}
             </select>
           </div>
           {activeFilterCount > 0 && (
             <Button type="button" variant="link" className="h-auto p-0 text-xs" onClick={() => { setDepartmentFilter(''); setLocationFilter(''); }}>
-              Clear {activeFilterCount} filter{activeFilterCount === 1 ? '' : 's'}
+              {t(activeFilterCount === 1 ? 'explorer.clearFilterOne' : 'explorer.clearFilterMany', { count: activeFilterCount })}
             </Button>
           )}
         </SurfaceBody>
       </Surface>
 
       <div className="flex items-center justify-between text-sm text-muted-foreground">
-        <span>{loading ? 'Loading…' : `${filtered.length} of ${matches.length} colleagues`}</span>
+        <span>{loading ? t('explorer.loading') : t(matches.length === 1 ? 'explorer.countColleaguesOne' : 'explorer.countColleagues', { filtered: filtered.length, total: matches.length })}</span>
         {!loading && (
-          <span>Top suggestions stay on <Link to="/" className="font-medium text-primary hover:underline">Home</Link></span>
+          <span>{t('explorer.topSuggestionsPrefix')}<Link to="/" className="font-medium text-primary hover:underline">{t('explorer.homeLink')}</Link></span>
         )}
       </div>
 
@@ -120,11 +132,11 @@ export default function Explorer() {
           <SurfaceBody className="py-12 text-center">
             {matches.length === 0 ? (
               <>
-                <p className="font-semibold text-foreground">No eligible colleagues yet</p>
-                <p className="mt-1 text-sm text-muted-foreground">More colleagues appear here as they complete onboarding.</p>
+                <p className="font-semibold text-foreground">{t('explorer.emptyTitle')}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{t('explorer.emptyBody')}</p>
               </>
             ) : (
-              <p className="text-sm text-muted-foreground">No matches fit those filters.</p>
+              <p className="text-sm text-muted-foreground">{t('explorer.noFilterMatches')}</p>
             )}
           </SurfaceBody>
         </Surface>
@@ -151,9 +163,10 @@ export default function Explorer() {
 }
 
 function ExplorerCard({ match, onRequest }) {
+  const { t } = useT();
   const { user, score, reasons } = match;
   const pct = Math.min(score, 100);
-  const tier = score >= 70 ? 'Strong' : score >= 50 ? 'Promising' : 'Worth a look';
+  const tier = score >= 70 ? t('explorer.tierStrong') : score >= 50 ? t('explorer.tierPromising') : t('explorer.tierWorth');
   const tierColor = score >= 70 ? 'text-primary' : score >= 50 ? 'text-primary/80' : 'text-muted-foreground';
   const initials = (user?.name || '?').split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase();
 
@@ -174,7 +187,7 @@ function ExplorerCard({ match, onRequest }) {
         </div>
         <div>
           <div className="flex items-baseline justify-between mb-1">
-            <span className={`text-xs font-semibold ${tierColor}`}>{tier} match</span>
+            <span className={`text-xs font-semibold ${tierColor}`}>{t('explorer.tierMatch', { tier })}</span>
             <span className="text-xs text-muted-foreground">{score}/100</span>
           </div>
           <div className="bg-muted rounded-full h-1.5 overflow-hidden">
@@ -182,7 +195,7 @@ function ExplorerCard({ match, onRequest }) {
           </div>
         </div>
         {reasons?.[0] && <p className="text-xs text-muted-foreground line-clamp-2">{reasons[0]}</p>}
-        <Button variant="outline" className="w-full" onClick={onRequest}>Request a session</Button>
+        <Button variant="outline" className="w-full" onClick={onRequest}>{t('explorer.requestSession')}</Button>
       </SurfaceBody>
     </Surface>
   );

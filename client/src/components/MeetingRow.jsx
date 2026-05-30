@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import RatingPicker from './RatingPicker.jsx';
 import api from '../api/index.js';
+import { useT } from '../i18n/index.jsx';
 
 // Shared collapsed/expandable row used by both Past and Upcoming meetings.
 //
@@ -15,6 +16,7 @@ import api from '../api/index.js';
 // In the expanded view: full topics list, the original focus question, and
 // (for past meetings) the mentee's private reflection where applicable.
 export default function MeetingRow({ session, currentUserId, mode = 'past', onUpdate }) {
+  const { t } = useT();
   const [expanded, setExpanded] = useState(false);
   const [editingReflection, setEditingReflection] = useState(false);
   const [reflectionDraft, setReflectionDraft] = useState('');
@@ -28,7 +30,7 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
   const dateLabel = hasDate ? date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : null;
   const timeLabel = hasDate ? date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '';
   const relative = hasDate
-    ? (mode === 'upcoming' ? upcomingRelative(date) : pastRelative(date))
+    ? (mode === 'upcoming' ? upcomingRelative(date, t) : pastRelative(date, t))
     : null;
   const awaitingMark = mode === 'past' && session.status === 'scheduled';
 
@@ -37,10 +39,10 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
   let statusBadge = null;
   if (session.status === 'pending') {
     statusBadge = isMentor
-      ? { label: 'Awaiting your acceptance', className: 'bg-amber-100 text-amber-800 border border-amber-300' }
-      : { label: 'Awaiting their acceptance', className: 'bg-amber-50 text-amber-700 border border-amber-200' };
+      ? { label: t('components.meeting.statusAwaitingYours'), className: 'bg-amber-100 text-amber-800 border border-amber-300' }
+      : { label: t('components.meeting.statusAwaitingTheirs'), className: 'bg-amber-50 text-amber-700 border border-amber-200' };
   } else if (session.status === 'scheduled' && !hasDate) {
-    statusBadge = { label: 'Confirmed — date to be set', className: 'bg-blue-50 text-primary border border-blue-200' };
+    statusBadge = { label: t('components.meeting.statusConfirmedNoDate'), className: 'bg-blue-50 text-primary border border-blue-200' };
   }
 
   const topics = session.topics || [];
@@ -48,8 +50,8 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
   const extraTopics = Math.max(0, topics.length - visibleTopics.length);
 
   const roleBadge = isMentor
-    ? { label: "You're the mentor", className: 'bg-primary text-primary-foreground' }
-    : { label: "You're the mentee", className: 'bg-amber-100 text-amber-800 border border-amber-300' };
+    ? { label: t('components.meeting.roleMentor'), className: 'bg-primary text-primary-foreground' }
+    : { label: t('components.meeting.roleMentee'), className: 'bg-amber-100 text-amber-800 border border-amber-300' };
 
   return (
     <div className="border border-gray-200 rounded-xl overflow-hidden">
@@ -68,13 +70,13 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
               <>
                 <span className="text-xs text-gray-400">·</span>
                 <span className="text-xs text-gray-500">
-                  {dateLabel}{timeLabel ? ` at ${timeLabel}` : ''}
+                  {dateLabel}{timeLabel ? ` ${t('components.meeting.at')} ${timeLabel}` : ''}
                 </span>
               </>
             ) : (
               <>
                 <span className="text-xs text-gray-400">·</span>
-                <span className="text-xs text-gray-500 italic">no date proposed</span>
+                <span className="text-xs text-gray-500 italic">{t('components.meeting.noDateProposed')}</span>
               </>
             )}
             {relative && (
@@ -89,7 +91,7 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
             )}
             {awaitingMark && (
               <span className="text-[10px] uppercase tracking-wide bg-amber-100 text-amber-800 rounded-full px-2 py-0.5">
-                Awaiting your mark-as-complete
+                {t('components.meeting.awaitingMark')}
               </span>
             )}
           </div>
@@ -98,7 +100,7 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
               {roleBadge.label}
             </span>
             <span className="text-xs text-gray-600">
-              with{' '}
+              {t('components.meeting.with')}{' '}
               <Link to={`/profile/${counterpart?.id}`} className="text-primary hover:underline" onClick={e => e.stopPropagation()}>
                 {counterpart?.name}
               </Link>
@@ -113,7 +115,7 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
                 </span>
               ))}
               {extraTopics > 0 && (
-                <span className="text-[11px] text-gray-500 italic">+{extraTopics} more</span>
+                <span className="text-[11px] text-gray-500 italic">{t('components.meeting.moreOne', { count: extraTopics })}</span>
               )}
             </div>
           )}
@@ -126,7 +128,7 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
           {topics.length > visibleTopics.length && (
             <div>
               <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-1.5">
-                {mode === 'upcoming' ? 'Topics to cover' : 'Topics covered'}
+                {mode === 'upcoming' ? t('components.meeting.topicsToCover') : t('components.meeting.topicsCovered')}
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {topics.map((t, i) => (
@@ -139,7 +141,7 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
           )}
           {session.pre_session_question && (
             <div>
-              <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-0.5">Focus question</p>
+              <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-0.5">{t('components.meeting.focusQuestion')}</p>
               <p className="text-gray-700 italic">“{session.pre_session_question}”</p>
             </div>
           )}
@@ -151,9 +153,9 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
             const reflectionField = isMentor ? 'mentor_reflection' : 'reflection';
             const ratingField = isMentor ? 'mentor_rating' : 'mentee_rating';
             const reflectionPrompt = isMentor
-              ? 'What did you take away from supporting them?'
-              : 'What is one thing you will do differently based on this conversation?';
-            const partnerName = counterpart?.name?.split(' ')[0] || 'They';
+              ? t('components.meeting.reflectionPromptMentor')
+              : t('components.meeting.reflectionPromptMentee');
+            const partnerName = counterpart?.name?.split(' ')[0] || t('components.meeting.theyFallback');
 
             async function saveReflection() {
               setSavingReflection(true);
@@ -172,19 +174,19 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
               return (
                 <div className="space-y-3">
                   <div>
-                    <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-0.5">Your reflection (private)</p>
+                    <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-0.5">{t('components.meeting.yourReflectionPrivate')}</p>
                     <p className="text-xs text-gray-600 mb-1">{reflectionPrompt}</p>
                     <textarea
                       className="input resize-none text-sm"
                       rows={3}
                       value={reflectionDraft}
                       onChange={e => setReflectionDraft(e.target.value)}
-                      placeholder="Take a moment to put words to what you took away…"
+                      placeholder={t('components.meeting.reflectionPlaceholder')}
                       autoFocus
                     />
                   </div>
                   <div>
-                    <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-0.5">Your rating (private)</p>
+                    <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-0.5">{t('components.meeting.yourRatingPrivate')}</p>
                     <RatingPicker value={ratingDraft} onChange={setRatingDraft} />
                   </div>
                   <div className="flex gap-2">
@@ -193,13 +195,13 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
                       disabled={savingReflection || (!reflectionDraft.trim() && ratingDraft === null)}
                       className="btn-primary text-sm"
                     >
-                      {savingReflection ? 'Saving…' : 'Save'}
+                      {savingReflection ? t('components.meeting.saving') : t('components.meeting.save')}
                     </button>
                     <button
                       onClick={() => { setEditingReflection(false); setReflectionDraft(''); setRatingDraft(null); }}
                       className="btn-ghost text-sm"
                     >
-                      Cancel
+                      {t('components.meeting.cancel')}
                     </button>
                   </div>
                 </div>
@@ -210,18 +212,18 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
               return (
                 <div className="space-y-2">
                   <div className="flex items-baseline justify-between gap-2 mb-0.5">
-                    <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium">Your reflection (private)</p>
+                    <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium">{t('components.meeting.yourReflectionPrivate')}</p>
                     <button
                       onClick={() => { setReflectionDraft(myReflection || ''); setRatingDraft(myRating ?? null); setEditingReflection(true); }}
                       className="text-xs text-primary hover:text-foreground font-medium"
                     >
-                      Edit
+                      {t('components.meeting.edit')}
                     </button>
                   </div>
                   {myReflection && <p className="text-gray-700 whitespace-pre-wrap">{myReflection}</p>}
                   {myRating && (
                     <div className="text-xs text-gray-500">
-                      Your rating: <RatingPicker value={myRating} onChange={() => {}} disabled showHint={false} />
+                      {t('components.meeting.yourRating')}<RatingPicker value={myRating} onChange={() => {}} disabled showHint={false} />
                     </div>
                   )}
                 </div>
@@ -231,13 +233,13 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
             return (
               <div>
                 <p className="text-gray-400 text-xs italic mb-2">
-                  You haven't written a reflection for this one. {partnerName}'s reflection and rating (if any) are private to them.
+                  {t('components.meeting.noReflection', { name: partnerName })}
                 </p>
                 <button
                   onClick={() => { setReflectionDraft(''); setRatingDraft(null); setEditingReflection(true); }}
                   className="btn-secondary text-xs"
                 >
-                  + Add a reflection
+                  {t('components.meeting.addReflection')}
                 </button>
               </div>
             );
@@ -249,27 +251,37 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
 }
 
 // Helpers — produce short, human-friendly relative time strings.
-function pastRelative(date) {
+function pastRelative(date, t) {
   const ms = Date.now() - date.getTime();
   if (ms < 0) return null;
   const days = Math.floor(ms / 86400000);
-  if (days === 0) return 'today';
-  if (days === 1) return 'yesterday';
-  if (days < 7) return `${days} days ago`;
-  if (days < 30) return `${Math.floor(days / 7)} week${Math.floor(days / 7) === 1 ? '' : 's'} ago`;
+  if (days === 0) return t('components.meeting.relToday');
+  if (days === 1) return t('components.meeting.relYesterday');
+  if (days < 7) return t('components.meeting.relDaysAgo', { count: days });
+  if (days < 30) {
+    const weeks = Math.floor(days / 7);
+    return weeks === 1
+      ? t('components.meeting.relWeekAgo', { count: weeks })
+      : t('components.meeting.relWeeksAgo', { count: weeks });
+  }
   return null;
 }
-function upcomingRelative(date) {
+function upcomingRelative(date, t) {
   const ms = date.getTime() - Date.now();
   if (ms < 0) return null;
   const minutes = Math.floor(ms / 60000);
-  if (minutes < 60) return minutes <= 1 ? 'in <1 min' : `in ${minutes} min`;
+  if (minutes < 60) return minutes <= 1 ? t('components.meeting.relInMinLt1') : t('components.meeting.relInMin', { count: minutes });
   const hours = Math.floor(ms / 3600000);
-  if (hours < 24) return `in ${hours} hour${hours === 1 ? '' : 's'}`;
+  if (hours < 24) return hours === 1 ? t('components.meeting.relInHour', { count: hours }) : t('components.meeting.relInHours', { count: hours });
   const days = Math.floor(ms / 86400000);
-  if (days === 0) return 'today';
-  if (days === 1) return 'tomorrow';
-  if (days < 7) return `in ${days} days`;
-  if (days < 30) return `in ${Math.floor(days / 7)} week${Math.floor(days / 7) === 1 ? '' : 's'}`;
+  if (days === 0) return t('components.meeting.relToday');
+  if (days === 1) return t('components.meeting.relTomorrow');
+  if (days < 7) return t('components.meeting.relInDays', { count: days });
+  if (days < 30) {
+    const weeks = Math.floor(days / 7);
+    return weeks === 1
+      ? t('components.meeting.relInWeek', { count: weeks })
+      : t('components.meeting.relInWeeks', { count: weeks });
+  }
   return null;
 }

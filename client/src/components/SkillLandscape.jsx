@@ -1,5 +1,6 @@
 import React, { useState, useRef, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useT } from '../i18n/index.jsx';
 
 // Visual, interactive overview of a user's skills.
 // Uses bubble-style chips with a red→green spectrum for "growing" skills (gaps you're closing)
@@ -28,25 +29,25 @@ const teachPresets = {
   untapped: {
     bubble: 'bg-muted text-foreground border border-border hover:bg-muted/80',
     dot: 'bg-border',
-    label: 'Untapped',
+    labelKey: 'components.skillLandscape.tierUntapped',
     extraClass: '',
   },
   active: {
     bubble: 'bg-secondary text-secondary-foreground border border-border hover:opacity-90',
     dot: 'bg-muted-foreground/40',
-    label: 'Active',
+    labelKey: 'components.skillLandscape.tierActive',
     extraClass: '',
   },
   trusted: {
     bubble: 'bg-primary/90 text-primary-foreground border border-primary hover:bg-primary',
     dot: 'bg-primary',
-    label: 'Trusted',
+    labelKey: 'components.skillLandscape.tierTrusted',
     extraClass: '',
   },
   expert: {
     bubble: 'bg-primary text-primary-foreground border border-primary font-semibold ring-2 ring-accent',
     dot: 'bg-accent',
-    label: 'Deep expert',
+    labelKey: 'components.skillLandscape.tierExpert',
     extraClass: 'skill-bubble-glow',
   },
 };
@@ -55,25 +56,25 @@ const learnPresets = {
   missing: {
     bubble: 'bg-rose-50 text-rose-700 border border-rose-300 border-dashed hover:bg-rose-100',
     dot: 'bg-rose-400',
-    label: 'Missing',
+    labelKey: 'components.skillLandscape.tierMissing',
     extraClass: 'skill-bubble-pulse-red',
   },
   started: {
     bubble: 'bg-orange-50 text-orange-800 border border-orange-300 hover:bg-orange-100',
     dot: 'bg-orange-400',
-    label: 'Just started',
+    labelKey: 'components.skillLandscape.tierStarted',
     extraClass: '',
   },
   growing: {
     bubble: 'bg-lime-50 text-lime-800 border border-lime-400 hover:bg-lime-100',
     dot: 'bg-lime-500',
-    label: 'Growing',
+    labelKey: 'components.skillLandscape.tierGrowing',
     extraClass: '',
   },
   steady: {
     bubble: 'bg-emerald-100 text-emerald-900 border border-emerald-500 font-semibold hover:bg-emerald-200',
     dot: 'bg-emerald-500',
-    label: 'Steady',
+    labelKey: 'components.skillLandscape.tierSteady',
     extraClass: '',
   },
 };
@@ -83,6 +84,7 @@ const LEARN_ORDER = ['missing', 'started', 'growing', 'steady'];
 
 // ---------- Bubble component ----------
 function Bubble({ entry, kind, tier, preset, index, isOwnProfile, onDelete }) {
+  const { t } = useT();
   const [hover, setHover] = useState(false);
   const wrapRef = useRef(null);
   const popRef = useRef(null);
@@ -98,13 +100,17 @@ function Bubble({ entry, kind, tier, preset, index, isOwnProfile, onDelete }) {
 
   const tooltipText = (() => {
     if (kind === 'teach') {
-      const sessions = `${count} mentoring session${count === 1 ? '' : 's'}`;
+      const sessions = count === 1
+        ? t('components.skillLandscape.tooltipSessionsOne', { count })
+        : t('components.skillLandscape.tooltipSessionsMany', { count });
       return entry.example_project
-        ? `${entry.example_project}\n\n${sessions} so far`
-        : (count > 0 ? sessions : 'No mentoring sessions yet — your first match could change that.');
+        ? `${entry.example_project}\n\n${t('components.skillLandscape.tooltipSoFar', { sessions })}`
+        : (count > 0 ? sessions : t('components.skillLandscape.tooltipNoSessions'));
     }
-    if (count === 0) return 'You have not explored this skill yet.';
-    return `${count} session${count === 1 ? '' : 's'} attended on this topic so far.`;
+    if (count === 0) return t('components.skillLandscape.tooltipNotExplored');
+    return count === 1
+      ? t('components.skillLandscape.tooltipAttendedOne', { count })
+      : t('components.skillLandscape.tooltipAttendedMany', { count });
   })();
 
   const isExpert = tier === 'expert';
@@ -180,8 +186,8 @@ function Bubble({ entry, kind, tier, preset, index, isOwnProfile, onDelete }) {
           <button
             type="button"
             onClick={handleDelete}
-            aria-label={`Remove ${entry.skill}`}
-            title="Remove this skill"
+            aria-label={t('components.skillLandscape.removeSkill', { skill: entry.skill })}
+            title={t('components.skillLandscape.removeThis')}
             className={`inline-flex items-center justify-center w-4 h-4 rounded-full text-[12px] leading-none ${closeBtnTone} transition-colors`}
           >
             ×
@@ -205,7 +211,7 @@ function Bubble({ entry, kind, tier, preset, index, isOwnProfile, onDelete }) {
           <div className="font-semibold text-foreground mb-1">{entry.skill}</div>
           <div className="text-[10px] uppercase tracking-wide font-medium mb-1.5"
             style={{ color: kind === 'teach' && tier === 'expert' ? '#92400e' : kind === 'teach' ? '#1B3A5C' : tier === 'missing' ? '#be123c' : '#15803d' }}>
-            {preset.label}
+            {t(preset.labelKey)}
           </div>
           {tooltipText}
         </div>,
@@ -217,12 +223,13 @@ function Bubble({ entry, kind, tier, preset, index, isOwnProfile, onDelete }) {
 
 // ---------- Legend ----------
 function Legend({ presets, order }) {
+  const { t } = useT();
   return (
     <div className="flex flex-wrap items-center gap-3 text-[11px] text-gray-500">
       {order.map(key => (
         <span key={key} className="inline-flex items-center gap-1.5">
           <span className={`w-2 h-2 rounded-full ${presets[key].dot}`} />
-          {presets[key].label}
+          {t(presets[key].labelKey)}
         </span>
       ))}
     </div>
@@ -274,13 +281,14 @@ function Section({ title, subtitle, items, kind, tierFn, presets, order, firstNa
 
 // ---------- Top-level component ----------
 export default function SkillLandscape({ skillProgress = [], isOwnProfile, firstName, onDeleteSkill }) {
+  const { t } = useT();
   const teach = skillProgress.filter(s => s.type === 'can_teach');
   const learn = skillProgress.filter(s => s.type === 'wants_to_learn');
 
   if (teach.length === 0 && learn.length === 0) {
     return (
       <p className="text-sm text-gray-400 italic">
-        {isOwnProfile ? 'Add some skills below to see your landscape.' : 'No skills listed yet.'}
+        {isOwnProfile ? t('components.skillLandscape.emptyOwn') : t('components.skillLandscape.emptyOther')}
       </p>
     );
   }
@@ -301,7 +309,7 @@ export default function SkillLandscape({ skillProgress = [], isOwnProfile, first
                 {totalActiveTeaching}<span className="text-muted-foreground text-lg font-medium">/{totalTeaching}</span>
               </div>
               <div className="text-xs text-muted-foreground mt-1">
-                {isOwnProfile ? 'skills you’re actively teaching' : `skills ${firstName} actively teaches`}
+                {isOwnProfile ? t('components.skillLandscape.summaryTeachingOwn') : t('components.skillLandscape.summaryTeachingOther', { name: firstName })}
               </div>
             </div>
           )}
@@ -311,7 +319,7 @@ export default function SkillLandscape({ skillProgress = [], isOwnProfile, first
                 {totalGrowing}<span className="text-muted-foreground text-lg font-medium">/{totalLearning}</span>
               </div>
               <div className="text-xs text-muted-foreground mt-1">
-                {isOwnProfile ? 'learning goals you’ve started' : `learning goals ${firstName} has started`}
+                {isOwnProfile ? t('components.skillLandscape.summaryLearningOwn') : t('components.skillLandscape.summaryLearningOther', { name: firstName })}
               </div>
             </div>
           )}
@@ -320,11 +328,11 @@ export default function SkillLandscape({ skillProgress = [], isOwnProfile, first
 
       {/* Skills you share */}
       <Section
-        title={isOwnProfile ? 'Skills you share' : `What ${firstName} shares`}
+        title={isOwnProfile ? t('components.skillLandscape.shareTitleOwn') : t('components.skillLandscape.shareTitleOther', { name: firstName })}
         subtitle={
           isOwnProfile
-            ? 'Topics you can mentor on. Bubbles deepen and gild as you complete sessions. Click × on any bubble to remove it.'
-            : 'Topics they can mentor on.'
+            ? t('components.skillLandscape.shareSubtitleOwn')
+            : t('components.skillLandscape.shareSubtitleOther')
         }
         items={teach}
         kind="teach"
@@ -338,11 +346,11 @@ export default function SkillLandscape({ skillProgress = [], isOwnProfile, first
 
       {/* Skills you're growing — red→green */}
       <Section
-        title={isOwnProfile ? 'Skills you’re growing' : `What ${firstName} wants to learn`}
+        title={isOwnProfile ? t('components.skillLandscape.growTitleOwn') : t('components.skillLandscape.growTitleOther', { name: firstName })}
         subtitle={
           isOwnProfile
-            ? 'Red bubbles are gaps you haven’t explored yet — green bubbles light up as you take sessions on them. Click × to remove.'
-            : 'Areas they want to develop. Red are gaps; green are areas they’re actively exploring.'
+            ? t('components.skillLandscape.growSubtitleOwn')
+            : t('components.skillLandscape.growSubtitleOther')
         }
         items={learn}
         kind="learn"

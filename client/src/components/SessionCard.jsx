@@ -5,6 +5,7 @@ import RatingPicker from './RatingPicker.jsx';
 import { Surface, SurfaceBody } from './Surface.jsx';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import api from '../api/index.js';
+import { useT } from '../i18n/index.jsx';
 
 // Softer status badges — slate borders, subtle backgrounds. Trust-palette
 // rather than the saturated yellow/blue/green of the previous version.
@@ -13,13 +14,6 @@ const statusColors = {
   scheduled: 'bg-primary/10 text-primary border-primary/20',
   completed: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   cancelled: 'bg-muted text-muted-foreground border-border',
-};
-
-const statusLabels = {
-  pending:   'Awaiting acceptance',
-  scheduled: 'Scheduled',
-  completed: 'Completed',
-  cancelled: 'Cancelled',
 };
 
 // Min datetime (HTML form attribute) — 1 hour from now
@@ -38,6 +32,7 @@ function isoToLocalInput(iso) {
 }
 
 export default function SessionCard({ session, currentUserId, onUpdate }) {
+  const { t } = useT();
   const [reflection, setReflection] = useState('');
   const [rating, setRating] = useState(null);
   const [showReflection, setShowReflection] = useState(false);
@@ -48,7 +43,11 @@ export default function SessionCard({ session, currentUserId, onUpdate }) {
   const isMentor = session.mentor?.id === currentUserId;
   const isMentee = session.mentee?.id === currentUserId;
   const other = isMentor ? session.mentee : session.mentor;
-  const otherRole = isMentor ? 'Mentee' : 'Mentor';
+  const otherRole = isMentor ? t('components.session.role.mentee') : t('components.session.role.mentor');
+  const statusLabel = (s) => {
+    const known = ['pending', 'scheduled', 'completed', 'cancelled'];
+    return known.includes(s) ? t(`components.session.status.${s}`) : s;
+  };
 
   const sessionTime = session.scheduled_at ? new Date(session.scheduled_at).getTime() : null;
   const isPastScheduled  = session.status === 'scheduled' && sessionTime !== null && sessionTime < Date.now();
@@ -59,8 +58,8 @@ export default function SessionCard({ session, currentUserId, onUpdate }) {
   // Both sides can mark a past session complete — each writes their own reflection.
   const showMarkComplete  = (isMentee || isMentor) && isPastScheduled;
   const reflectionPrompt  = isMentor
-    ? 'What did you take away from supporting them?'
-    : 'What is one thing you will do differently based on this conversation?';
+    ? t('components.session.reflectionPrompt.mentor')
+    : t('components.session.reflectionPrompt.mentee');
   const showReschedule    =
     !isPastScheduled &&
     (session.status === 'pending' || session.status === 'scheduled') &&
@@ -74,7 +73,7 @@ export default function SessionCard({ session, currentUserId, onUpdate }) {
     onUpdate?.(updated.data);
   }
   async function handleDecline() {
-    if (!confirm('Decline this request?')) return;
+    if (!confirm(t('components.session.confirmDecline'))) return;
     const updated = await api.put(`/sessions/${session.id}`, { status: 'cancelled' });
     onUpdate?.(updated.data);
   }
@@ -113,8 +112,10 @@ export default function SessionCard({ session, currentUserId, onUpdate }) {
     }
   }
   async function handleCancelSession() {
-    const noun = isMentor && session.status === 'pending' ? 'request' : 'session';
-    if (!confirm(`Cancel this ${noun}? This cannot be undone.`)) return;
+    const msg = isMentor && session.status === 'pending'
+      ? t('components.session.confirmCancelRequest')
+      : t('components.session.confirmCancelSession');
+    if (!confirm(msg)) return;
     const updated = await api.put(`/sessions/${session.id}`, { status: 'cancelled' });
     onUpdate?.(updated.data);
   }
@@ -142,7 +143,7 @@ export default function SessionCard({ session, currentUserId, onUpdate }) {
                 {new Date(session.scheduled_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
               </p>
             ) : isUndated ? (
-              <p className="text-xs text-muted-foreground italic mt-0.5">No date set yet</p>
+              <p className="text-xs text-muted-foreground italic mt-0.5">{t('components.session.noDateSet')}</p>
             ) : null}
             {session.topics?.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-1.5">
@@ -156,14 +157,14 @@ export default function SessionCard({ session, currentUserId, onUpdate }) {
           </div>
         </div>
         <span className={`text-[10px] font-semibold uppercase tracking-label px-2 py-1 rounded-full border ${statusColors[session.status] || statusColors.pending}`}>
-          {statusLabels[session.status] || session.status}
+          {statusLabel(session.status)}
         </span>
       </div>
 
       {/* Pre-session question */}
       {session.pre_session_question && (
         <div className="mt-4 bg-muted rounded-lg p-3 text-sm text-muted-foreground border border-border">
-          <span className="font-medium text-foreground">Focus question: </span>
+          <span className="font-medium text-foreground">{t('components.session.focusQuestion')}</span>
           <span className="italic">"{session.pre_session_question}"</span>
         </div>
       )}
@@ -173,7 +174,7 @@ export default function SessionCard({ session, currentUserId, onUpdate }) {
         (isMentee && session.reflection) || (isMentor && session.mentor_reflection)
       ) && (
         <div className="mt-3 bg-emerald-50 rounded-lg p-3 text-sm text-muted-foreground border border-emerald-100">
-          <span className="font-medium text-emerald-700">Your reflection: </span>
+          <span className="font-medium text-emerald-700">{t('components.session.yourReflection')}</span>
           <span className="italic">"{isMentor ? session.mentor_reflection : session.reflection}"</span>
         </div>
       )}
@@ -188,12 +189,12 @@ export default function SessionCard({ session, currentUserId, onUpdate }) {
               rows={3}
               value={reflection}
               onChange={e => setReflection(e.target.value)}
-              placeholder="Write your reflection here (optional but encouraged)…"
+              placeholder={t('components.session.reflectionPlaceholder')}
               autoFocus
             />
           </div>
           <div>
-            <label className="label text-sm">How useful was this session for you?</label>
+            <label className="label text-sm">{t('components.session.howUseful')}</label>
             <RatingPicker value={rating} onChange={setRating} />
           </div>
         </div>
@@ -204,8 +205,8 @@ export default function SessionCard({ session, currentUserId, onUpdate }) {
         <div className="mt-4 bg-muted rounded-lg p-3 border border-border space-y-2">
           <label className="label">
             {isMentor && session.status === 'pending'
-              ? 'Choose a date and time to accept'
-              : session.scheduled_at ? 'Pick a new date and time' : 'Set a date and time'}
+              ? t('components.session.dateLabelAccept')
+              : session.scheduled_at ? t('components.session.dateLabelReschedule') : t('components.session.dateLabelSet')}
           </label>
           <input
             type="datetime-local"
@@ -222,14 +223,14 @@ export default function SessionCard({ session, currentUserId, onUpdate }) {
       <div className="mt-4 flex flex-wrap gap-2 items-center">
         {showAcceptDecline && (
           <>
-            <button onClick={handleAccept} className="btn-primary text-sm">Accept</button>
-            <button onClick={handleDecline} className="btn-ghost text-sm text-red-500 hover:bg-red-50">Decline</button>
+            <button onClick={handleAccept} className="btn-primary text-sm">{t('components.session.accept')}</button>
+            <button onClick={handleDecline} className="btn-ghost text-sm text-red-500 hover:bg-red-50">{t('components.session.decline')}</button>
           </>
         )}
 
         {showMarkComplete && !editingDate && (
           <button onClick={handleComplete} disabled={submitting} className="btn-primary text-sm">
-            {showReflection ? (submitting ? 'Saving…' : 'Save reflection & mark complete') : 'Mark as completed'}
+            {showReflection ? (submitting ? t('components.session.saving') : t('components.session.saveReflectionComplete')) : t('components.session.markCompleted')}
           </button>
         )}
 
@@ -240,17 +241,17 @@ export default function SessionCard({ session, currentUserId, onUpdate }) {
             className="btn-secondary text-sm"
           >
             {isMentor && session.status === 'pending'
-              ? 'Accept & schedule'
-              : session.scheduled_at ? 'Reschedule' : 'Set a date'}
+              ? t('components.session.acceptSchedule')
+              : session.scheduled_at ? t('components.session.reschedule') : t('components.session.setDate')}
           </button>
         )}
         {editingDate && (
           <>
             <button onClick={handleSaveDate} disabled={submitting || !draftDate} className="btn-primary text-sm">
-              {submitting ? 'Saving…' : 'Save'}
+              {submitting ? t('components.session.saving') : t('components.session.save')}
             </button>
             <button onClick={() => { setEditingDate(false); setDraftDate(isoToLocalInput(session.scheduled_at)); }} className="btn-ghost text-sm">
-              Discard
+              {t('components.session.discard')}
             </button>
           </>
         )}
@@ -260,7 +261,7 @@ export default function SessionCard({ session, currentUserId, onUpdate }) {
             don't double up. */}
         {showCancel && !showAcceptDecline && !editingDate && !showReflection && (
           <button onClick={handleCancelSession} className="btn-ghost text-sm text-red-500 hover:bg-red-50">
-            Cancel
+            {t('components.session.cancel')}
           </button>
         )}
 
@@ -269,7 +270,7 @@ export default function SessionCard({ session, currentUserId, onUpdate }) {
 
         {showReflection && !submitting && (
           <button onClick={() => setShowReflection(false)} className="btn-ghost text-sm">
-            Discard reflection
+            {t('components.session.discardReflection')}
           </button>
         )}
       </div>

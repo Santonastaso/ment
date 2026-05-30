@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import IcsDownloadButton from './IcsDownloadButton.jsx';
 import api from '../api/index.js';
 import { useModalA11y } from '../lib/useModalA11y.js';
+import { useT } from '../i18n/index.jsx';
 
 // Popup the mentee sees on their next dashboard load after a mentor accepts
 // one or more session requests. Lists each pending acceptance with:
@@ -33,6 +34,7 @@ function minDateTimeLocal() {
 }
 
 export default function AcceptanceModal({ sessions, onAcknowledged, onClose }) {
+  const { t } = useT();
   const [busy, setBusy] = useState(false);
   const [editingDateFor, setEditingDateFor] = useState(null);
   const [draftDate, setDraftDate] = useState('');
@@ -80,7 +82,7 @@ export default function AcceptanceModal({ sessions, onAcknowledged, onClose }) {
         setLocalSessions((prev) => prev.filter((s) => !acknowledgedIds.has(s.id)));
         try { await onAcknowledged?.(); } catch { /* noop */ }
       }
-      setError(e?.response?.data?.error || 'Could not save your acknowledgement. Try again.');
+      setError(e?.response?.data?.error || t('components.acceptance.errorAck'));
     } finally {
       setBusy(false);
     }
@@ -102,7 +104,7 @@ export default function AcceptanceModal({ sessions, onAcknowledged, onClose }) {
       setEditingDateFor(null);
       setDraftDate('');
     } catch (e) {
-      setError(e?.response?.data?.error || 'Could not save the date. Try again.');
+      setError(e?.response?.data?.error || t('components.acceptance.errorDate'));
     } finally {
       setBusy(false);
     }
@@ -123,11 +125,11 @@ export default function AcceptanceModal({ sessions, onAcknowledged, onClose }) {
         <div className="p-6 border-b border-gray-100 flex-shrink-0">
           <div className="flex items-center justify-between gap-3">
             <h2 id="acceptance-modal-title" className="text-lg font-semibold text-foreground">
-              {localSessions.length === 1 ? 'A mentor accepted your session' : 'Mentors accepted your sessions'}
+              {localSessions.length === 1 ? t('components.acceptance.titleOne') : t('components.acceptance.titleMany')}
             </h2>
             <button
               onClick={onClose}
-              aria-label="Close"
+              aria-label={t('components.acceptance.close')}
               disabled={busy}
               className="text-gray-400 hover:text-gray-600 text-2xl leading-none disabled:opacity-50"
             >
@@ -135,7 +137,7 @@ export default function AcceptanceModal({ sessions, onAcknowledged, onClose }) {
             </button>
           </div>
           <p className="text-sm text-gray-500 mt-1">
-            Add it to your calendar so you don't miss it. We'll only show this once.
+            {t('components.acceptance.subtitle')}
           </p>
         </div>
 
@@ -151,24 +153,24 @@ export default function AcceptanceModal({ sessions, onAcknowledged, onClose }) {
               >
                 <div>
                   <p className="text-sm font-semibold text-foreground">
-                    {session.title || 'Mentoring session'}
+                    {session.title || t('components.acceptance.sessionFallback')}
                   </p>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    with {session.mentor?.name || 'your mentor'}
+                    {t('components.acceptance.withMentor', { name: session.mentor?.name || t('components.acceptance.yourMentor') })}
                   </p>
                 </div>
 
                 {scheduled ? (
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <p className="text-sm text-foreground">
-                      <span className="font-medium">Scheduled for</span> {scheduled}
+                      <span className="font-medium">{t('components.acceptance.scheduledFor')}</span> {scheduled}
                     </p>
                     <IcsDownloadButton sessionId={session.id} />
                   </div>
                 ) : isEditing ? (
                   <div className="space-y-2">
                     <label className="block text-xs font-medium text-gray-600">
-                      Propose a date and time
+                      {t('components.acceptance.proposeDate')}
                     </label>
                     <div className="flex flex-wrap items-center gap-2">
                       <input
@@ -184,7 +186,7 @@ export default function AcceptanceModal({ sessions, onAcknowledged, onClose }) {
                         onClick={() => saveDateFor(session)}
                         className="rounded-lg bg-primary text-white text-sm font-medium px-3 py-1.5 disabled:opacity-50"
                       >
-                        Save date
+                        {t('components.acceptance.saveDate')}
                       </button>
                       <button
                         type="button"
@@ -192,14 +194,14 @@ export default function AcceptanceModal({ sessions, onAcknowledged, onClose }) {
                         onClick={() => { setEditingDateFor(null); setDraftDate(''); }}
                         className="text-xs text-gray-500 hover:text-gray-700"
                       >
-                        Cancel
+                        {t('components.acceptance.cancel')}
                       </button>
                     </div>
                   </div>
                 ) : (
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <p className="text-sm text-gray-600">
-                      No time agreed yet — pick a slot to lock it in.
+                      {t('components.acceptance.noTime')}
                     </p>
                     <button
                       type="button"
@@ -210,7 +212,7 @@ export default function AcceptanceModal({ sessions, onAcknowledged, onClose }) {
                       }}
                       className="rounded-lg border border-primary text-primary text-sm font-medium px-3 py-1.5 hover:bg-primary/5"
                     >
-                      Set a date
+                      {t('components.acceptance.setDate')}
                     </button>
                   </div>
                 )}
@@ -229,7 +231,7 @@ export default function AcceptanceModal({ sessions, onAcknowledged, onClose }) {
               disabled={busy}
               className="rounded-lg bg-primary text-white text-sm font-medium px-4 py-2 disabled:opacity-50"
             >
-              {busy ? 'Saving…' : 'Got it'}
+              {busy ? t('components.acceptance.saving') : t('components.acceptance.gotIt')}
             </button>
           </div>
         </div>

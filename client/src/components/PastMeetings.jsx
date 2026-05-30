@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import api from '../api/index.js';
 import MeetingRow from './MeetingRow.jsx';
+import { useT } from '../i18n/index.jsx';
 
 // Past = sessions you've explicitly marked complete. Sessions whose time has
 // passed but haven't been marked are surfaced on the Dashboard's
 // "Needs your attention" panel instead, where the action lives.
 export default function PastMeetings({ currentUserId }) {
+  const { t } = useT();
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -32,12 +34,12 @@ export default function PastMeetings({ currentUserId }) {
   }, []);
 
   if (loading) {
-    return <p className="text-sm text-gray-400">Loading past meetings…</p>;
+    return <p className="text-sm text-gray-400">{t('components.pastMeetings.loading')}</p>;
   }
   if (sessions.length === 0) {
     return (
       <p className="text-sm text-gray-500">
-        No completed meetings yet. Once you finish a session and mark it complete, it'll show up here.
+        {t('components.pastMeetings.empty')}
       </p>
     );
   }

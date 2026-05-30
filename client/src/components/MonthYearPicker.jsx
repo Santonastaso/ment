@@ -1,4 +1,5 @@
 import React from 'react';
+import { useT } from '../i18n/index.jsx';
 
 // Unambiguous month/year picker — two dropdowns instead of <input type="month">
 // because that native control renders very differently across browsers and
@@ -7,14 +8,7 @@ import React from 'react';
 // Value shape: a "YYYY-MM" string (matching the format the server expects),
 // or empty string when nothing's selected. Both selects can be cleared.
 
-const MONTH_OPTIONS = [
-  { value: '01', label: 'Jan' }, { value: '02', label: 'Feb' },
-  { value: '03', label: 'Mar' }, { value: '04', label: 'Apr' },
-  { value: '05', label: 'May' }, { value: '06', label: 'Jun' },
-  { value: '07', label: 'Jul' }, { value: '08', label: 'Aug' },
-  { value: '09', label: 'Sep' }, { value: '10', label: 'Oct' },
-  { value: '11', label: 'Nov' }, { value: '12', label: 'Dec' },
-];
+const MONTH_VALUES = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
 
 function buildYearOptions() {
   const current = new Date().getFullYear();
@@ -24,6 +18,7 @@ function buildYearOptions() {
 }
 
 export default function MonthYearPicker({ value = '', onChange, allowEmpty = true }) {
+  const { t } = useT();
   const [year, month] = (value || '').split('-');
 
   function update(nextYear, nextMonth) {
@@ -41,20 +36,20 @@ export default function MonthYearPicker({ value = '', onChange, allowEmpty = tru
         className="input text-sm flex-1"
         value={month || ''}
         onChange={e => update(year, e.target.value)}
-        aria-label="Month"
+        aria-label={t('components.monthYear.monthLabel')}
       >
-        <option value="">Month</option>
-        {MONTH_OPTIONS.map(m => (
-          <option key={m.value} value={m.value}>{m.label}</option>
+        <option value="">{t('components.monthYear.monthLabel')}</option>
+        {MONTH_VALUES.map(v => (
+          <option key={v} value={v}>{t(`components.monthYear.month${v}`)}</option>
         ))}
       </select>
       <select
         className="input text-sm flex-1"
         value={year || ''}
         onChange={e => update(e.target.value, month)}
-        aria-label="Year"
+        aria-label={t('components.monthYear.yearLabel')}
       >
-        <option value="">Year</option>
+        <option value="">{t('components.monthYear.yearLabel')}</option>
         {buildYearOptions().map(y => (
           <option key={y} value={y}>{y}</option>
         ))}
