@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 // Visual, interactive overview of a user's skills.
 // Uses bubble-style chips with a red→green spectrum for "growing" skills (gaps you're closing)
@@ -83,6 +84,12 @@ const LEARN_ORDER = ['missing', 'started', 'growing', 'steady'];
 // ---------- Bubble component ----------
 function Bubble({ entry, kind, tier, preset, index, isOwnProfile, onDelete }) {
   const [hover, setHover] = useState(false);
+  const wrapRef = useRef(null);
+  const popRef = useRef(null);
+  // Popover renders in a portal with fixed positioning so no ancestor with
+  // overflow-hidden/auto (e.g. the shadcn Card) can clip it. Coords are
+  // computed from the bubble's viewport rect and clamped to the viewport.
+  const [coords, setCoords] = useState(null);
   const count = entry.session_count || 0;
   const sizeClass = kind === 'teach'
     ? (count >= 4 ? 'text-sm pl-4 pr-3 py-2' : count >= 2 ? 'text-sm pl-3.5 pr-2.5 py-1.5' : 'text-sm pl-3 pr-2 py-1.5')
@@ -112,11 +119,44 @@ function Bubble({ entry, kind, tier, preset, index, isOwnProfile, onDelete }) {
     onDelete?.(entry);
   }
 
+  function openPopover() {
+    setHover(true);
+  }
+  function closePopover() {
+    setHover(false);
+    setCoords(null);
+  }
+
+  // Position the portal popover once it's mounted: centered under the bubble,
+  // clamped horizontally to the viewport, and flipped above when there's no
+  // room below. Measured after layout so popover height is known.
+  useLayoutEffect(() => {
+    if (!hover || !wrapRef.current) return;
+    const margin = 8;
+    const rect = wrapRef.current.getBoundingClientRect();
+    const pop = popRef.current;
+    const popW = pop ? pop.offsetWidth : 256;
+    const popH = pop ? pop.offsetHeight : 0;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    let left = rect.left + rect.width / 2 - popW / 2;
+    left = Math.max(margin, Math.min(left, vw - popW - margin));
+
+    let top = rect.bottom + margin;
+    if (top + popH > vh - margin) {
+      const above = rect.top - popH - margin;
+      top = above >= margin ? above : Math.max(margin, vh - popH - margin);
+    }
+    setCoords({ left, top });
+  }, [hover]);
+
   return (
     <div
+      ref={wrapRef}
       className="relative inline-block"
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      onMouseEnter={openPopover}
+      onMouseLeave={closePopover}
     >
       <div
         className={[
@@ -126,8 +166,8 @@ function Bubble({ entry, kind, tier, preset, index, isOwnProfile, onDelete }) {
         ].join(' ')}
         style={{ animationDelay: `${index * 30}ms` }}
         tabIndex={0}
-        onFocus={() => setHover(true)}
-        onBlur={() => setHover(false)}
+        onFocus={openPopover}
+        onBlur={closePopover}
       >
         <span>{entry.skill}</span>
         {count > 0 && (
@@ -149,16 +189,27 @@ function Bubble({ entry, kind, tier, preset, index, isOwnProfile, onDelete }) {
         )}
       </div>
 
-      {/* Hover popover */}
-      {hover && (
-        <div className="absolute z-30 left-1/2 -translate-x-1/2 mt-2 w-64 rounded-lg border border-border bg-card p-3 text-xs text-muted-foreground shadow-lg leading-relaxed pointer-events-none whitespace-pre-line">
+      {/* Hover popover — rendered in a portal with fixed positioning so it
+          floats above every card and is never clipped by an ancestor's
+          overflow-hidden/auto. */}
+      {hover && createPortal(
+        <div
+          ref={popRef}
+          className="fixed z-50 w-64 rounded-lg border border-border bg-card p-3 text-xs text-muted-foreground shadow-lg leading-relaxed pointer-events-none whitespace-pre-line"
+          style={{
+            left: coords ? coords.left : -9999,
+            top: coords ? coords.top : -9999,
+            visibility: coords ? 'visible' : 'hidden',
+          }}
+        >
           <div className="font-semibold text-foreground mb-1">{entry.skill}</div>
           <div className="text-[10px] uppercase tracking-wide font-medium mb-1.5"
             style={{ color: kind === 'teach' && tier === 'expert' ? '#92400e' : kind === 'teach' ? '#1B3A5C' : tier === 'missing' ? '#be123c' : '#15803d' }}>
             {preset.label}
           </div>
           {tooltipText}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
