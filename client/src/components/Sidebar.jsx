@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Compass, User, Users, Shield } from 'lucide-react';
+import { LayoutDashboard, Compass, User, Users, Shield, Share2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { cn } from '@/lib/utils';
 
@@ -17,6 +17,7 @@ export default function Sidebar({ onNavigate }) {
   const links = [
     ...NAV,
     ...(user?.direct_reports > 0 ? [{ to: '/team', label: 'Team insights', icon: Users }] : []),
+    ...(user?.is_admin ? [{ to: '/admin/graph', label: 'Knowledge graph', icon: Share2, testid: 'nav-knowledge-graph' }] : []),
     ...(user?.is_admin ? [{ to: '/admin', label: 'Admin', icon: Shield }] : []),
   ];
 
@@ -41,6 +42,7 @@ export default function Sidebar({ onNavigate }) {
               key={item.to}
               to={item.to}
               onClick={onNavigate}
+              data-testid={item.testid}
               className={cn(
                 'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                 active

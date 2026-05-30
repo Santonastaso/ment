@@ -70,6 +70,7 @@ function shortId(value) {
 export default function AdminDashboard() {
   const { user } = useAuth();
   const [stats, setStats] = useState(null);
+  const [mostActiveUsers, setMostActiveUsers] = useState([]);
   const [ownerStats, setOwnerStats] = useState(null);
   const [ownerLoading, setOwnerLoading] = useState(false);
   const [orgNameDraft, setOrgNameDraft] = useState('');
@@ -114,6 +115,15 @@ export default function AdminDashboard() {
       setStats(res.data);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadMostActiveUsers() {
+    try {
+      const res = await api.get('/admin/most-active-users?limit=10');
+      setMostActiveUsers(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      setMostActiveUsers([]);
     }
   }
 
@@ -201,7 +211,7 @@ export default function AdminDashboard() {
     }
   }
 
-  useEffect(() => { loadStats(); loadPrivacyStatus(); }, []);
+  useEffect(() => { loadStats(); loadMostActiveUsers(); loadPrivacyStatus(); }, []);
 
   async function handleUpload(file) {
     if (!file) return;
@@ -594,6 +604,29 @@ export default function AdminDashboard() {
                       ))}
                     </div>
                   ) : <p className="text-sm text-muted-foreground">No completed sessions yet.</p>}
+                  </SurfaceBody>
+                </Surface>
+
+                <Surface data-testid="most-active-users">
+                  <SurfaceHeader title="Most active users" />
+                  <SurfaceBody className="pt-5">
+                  {mostActiveUsers.length > 0 ? (
+                    <div className="space-y-3">
+                      {mostActiveUsers.map((u, i) => (
+                        <div key={u.id} data-testid="most-active-users-row" className="flex items-center gap-3">
+                          <span className="w-5 text-sm font-bold tabular-nums text-muted-foreground">{i + 1}</span>
+                          <div className="flex size-8 items-center justify-center rounded-md bg-primary text-sm font-bold text-primary-foreground">
+                            {u.name?.charAt(0)}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium text-foreground">{u.name}</p>
+                            <p className="text-xs text-muted-foreground">{u.department}</p>
+                          </div>
+                          <span className="shrink-0 text-sm font-semibold tabular-nums text-muted-foreground">{u.sessions} sessions</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : <p className="text-sm text-muted-foreground">No session activity yet.</p>}
                   </SurfaceBody>
                 </Surface>
 

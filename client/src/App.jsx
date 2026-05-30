@@ -11,6 +11,7 @@ import Explorer from './pages/Explorer.jsx';
 import Profile from './pages/Profile.jsx';
 import TeamSkills from './pages/TeamSkills.jsx';
 import AdminDashboard from './pages/AdminDashboard.jsx';
+import KnowledgeGraph from './pages/KnowledgeGraph.jsx';
 import AppLayout from './components/AppLayout.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -98,6 +99,7 @@ export default function App() {
         <Route path="/profile/:id" element={<Profile />} />
         <Route path="/team" element={<TeamSkills />} />
         <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+        <Route path="/admin/graph" element={<AdminRoute><KnowledgeGraph /></AdminRoute>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
