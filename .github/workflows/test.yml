@@ -50,6 +50,19 @@ jobs:
       - run: npm audit --omit=dev --audit-level=high
       - run: npm audit --prefix client --omit=dev --audit-level=high
 
+      - name: RLS smoke test
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          MENT_EMP_EMAIL: ${{ secrets.MENT_EMP_EMAIL }}
+          MENT_EMP_PASSWORD: ${{ secrets.MENT_EMP_PASSWORD }}
+          MENT_ADMIN_EMAIL: ${{ secrets.MENT_ADMIN_EMAIL }}
+          MENT_ADMIN_PASSWORD: ${{ secrets.MENT_ADMIN_PASSWORD }}
+        run: |
+          # Self-skips when SUPABASE_URL / seed users are not configured.
+          python3 scripts/rls_smoke_test.py
+
       - uses: supabase/setup-cli@v1
         with:
           version: latest

@@ -39,6 +39,7 @@ export default function SessionCard({ session, currentUserId, onUpdate }) {
   const [editingDate, setEditingDate] = useState(false);
   const [draftDate, setDraftDate] = useState(isoToLocalInput(session.scheduled_at));
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
   const isMentor = session.mentor?.id === currentUserId;
   const isMentee = session.mentee?.id === currentUserId;
@@ -54,9 +55,16 @@ export default function SessionCard({ session, currentUserId, onUpdate }) {
   const isFuture         = session.status === 'scheduled' && sessionTime !== null && sessionTime >= Date.now();
   const isUndated        = session.status === 'scheduled' && sessionTime === null;
 
+  // Has the current viewer already submitted their own completion?
+  const viewerCompleted = isMentor
+    ? !!session.mentor_completed_at
+    : isMentee ? !!session.mentee_completed_at : false;
+
   const showAcceptDecline = isMentor && session.status === 'pending';
-  // Both sides can mark a past session complete — each writes their own reflection.
-  const showMarkComplete  = (isMentee || isMentor) && isPastScheduled;
+  // Both sides can mark a past session complete — each writes their own
+  // reflection. Once the viewer has completed their side, the card moves to
+  // Past meetings, so we no longer offer the action here.
+  const showMarkComplete  = (isMentee || isMentor) && isPastScheduled && !viewerCompleted;
   const reflectionPrompt  = isMentor
     ? t('components.session.reflectionPrompt.mentor')
     : t('components.session.reflectionPrompt.mentee');
@@ -80,6 +88,7 @@ export default function SessionCard({ session, currentUserId, onUpdate }) {
   async function handleComplete() {
     if (showReflection) {
       setSubmitting(true);
+      setError('');
       // Send the reflection + rating to the right fields based on viewer's role
       const body = { status: 'completed' };
       if (reflection.trim()) {
@@ -90,10 +99,15 @@ export default function SessionCard({ session, currentUserId, onUpdate }) {
         if (isMentor) body.mentor_rating = rating;
         else body.mentee_rating = rating;
       }
-      const updated = await api.put(`/sessions/${session.id}`, body);
-      onUpdate?.(updated.data);
-      setSubmitting(false);
-      setShowReflection(false);
+      try {
+        const updated = await api.put(`/sessions/${session.id}`, body);
+        setShowReflection(false);
+        onUpdate?.(updated.data);
+      } catch (e) {
+        setError(e?.message || t('components.session.saveError'));
+      } finally {
+        setSubmitting(false);
+      }
     } else {
       setShowReflection(true);
     }
@@ -197,6 +211,9 @@ export default function SessionCard({ session, currentUserId, onUpdate }) {
             <label className="label text-sm">{t('components.session.howUseful')}</label>
             <RatingPicker value={rating} onChange={setRating} />
           </div>
+          {error && (
+            <p className="text-sm text-red-600" role="alert">{error}</p>
+          )}
         </div>
       )}
 

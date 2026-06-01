@@ -26,6 +26,9 @@
   "graph.legend.canTeach": "can teach",
   "graph.legend.wantsToLearn": "wants to learn",
   "graph.legend.skill": "skill",
+  "graph.legend.peerLink": "Thicker links = more shared skills",
+  "graph.view.bipartite": "People & Skills",
+  "graph.view.people": "People ↔ People",
   "graph.svgAria": "Company knowledge graph",
-  "graph.hoverHint": "Hover a node to highlight its connections. People are coloured by department; diamonds are skills."
+  "graph.hoverHint": "Drag to pan, scroll to zoom, drag a node to reposition it. Hover to highlight connections. People are coloured by department; diamonds are skills."
 }

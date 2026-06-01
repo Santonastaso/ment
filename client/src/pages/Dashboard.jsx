@@ -201,6 +201,10 @@ export default function Dashboard() {
   //   "Upcoming"             — everything else that isn't completed/cancelled.
   const now = Date.now();
   const needsAction = sessions.filter(s => {
+    // Once the viewer has marked their side complete, the session belongs in
+    // Past meetings — not in their active queue, even if the counterpart
+    // hasn't completed yet (status stays 'scheduled').
+    if (s.viewer_completed) return false;
     if (s.status === 'pending' && s.mentor?.id === user?.id) return true;
     if (s.status === 'scheduled' && s.scheduled_at && new Date(s.scheduled_at).getTime() < now) return true;
     return false;
@@ -208,6 +212,7 @@ export default function Dashboard() {
   const needsActionIds = new Set(needsAction.map(s => s.id));
   const upcoming = sessions.filter(s => {
     if (needsActionIds.has(s.id)) return false;
+    if (s.viewer_completed) return false;
     return s.status !== 'completed' && s.status !== 'cancelled';
   }).sort((a, b) => {
     // Confirmed-with-date first, then by date; pending without a date sorted by created_at desc

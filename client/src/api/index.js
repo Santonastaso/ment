@@ -6,6 +6,8 @@
 
 import { supabase } from '../lib/supabase.js';
 import { browserLanguage } from '../lib/esco.js';
+import { firstPersonize } from '../lib/utils.js';
+import { translate } from '../i18n/index.jsx';
 
 class ApiError extends Error {
   constructor(message, status = 500) {
@@ -95,25 +97,33 @@ function renderReasons(structured, viewer, other, opts = {}) {
     if (r.type === 'teach_overlap') {
       const skills = (r.skills || []).slice(0, 3).join(', ');
       if (r.teacher_id === other.id) {
-        out.push(`${them} can teach ${skills} — areas you're growing in`);
+        out.push(translate('components.matchReason.teachOverlapThem', { them, skills }));
       } else if (r.teacher_id === viewer.id) {
         if (mentorOnly) continue;
-        out.push(`You can teach ${skills} — and ${them} wants to learn it`);
+        out.push(translate('components.matchReason.teachOverlapYou', { them, skills }));
       }
     } else if (r.type === 'career_bridge') {
       if (r.who_id === other.id) {
-        out.push(`${them} has worked in ${r.into_dept} before — they understand your world`);
+        out.push(translate('components.matchReason.careerBridgeThem', { them, dept: r.into_dept }));
       } else if (r.who_id === viewer.id) {
         if (mentorOnly) continue;
-        out.push(`You've worked in ${other.department} — common ground with ${them}`);
+        out.push(translate('components.matchReason.careerBridgeYou', { them, dept: other.department }));
       }
     } else if (r.type === 'dept_diversity') {
       const otherDept = r.a_id === other.id ? r.a_dept : r.b_dept;
       const yourDept = r.a_id === viewer.id ? r.a_dept : r.b_dept;
-      out.push(`${them} works in ${otherDept} — a fresh angle from ${yourDept}`);
+      out.push(translate('components.matchReason.deptDiversity', { them, otherDept, yourDept }));
     }
   }
   return out;
+}
+
+// Server-side "extra reasons" arrive as structured tokens { type, dept } (0020)
+// so they can be localized client-side. Tolerate legacy plain strings too.
+function renderExtraReason(x) {
+  if (typeof x === 'string') return x;
+  if (!x || typeof x !== 'object' || !x.type) return null;
+  return translate(`components.matchReason.${x.type}`, { dept: x.dept });
 }
 
 // ============================================================
@@ -289,6 +299,10 @@ async function enrichSession(session, viewerId) {
   const scheduled = session.scheduled_at ? new Date(session.scheduled_at) : null;
   const myCompleted = isMentor ? session.mentor_completed_at : session.mentee_completed_at;
   const needs_my_completion = !!((isMentor || isMentee) && scheduled && scheduled < new Date() && !myCompleted);
+  // True once the viewer has submitted their own reflection/completion, even
+  // if the counterpart hasn't yet (so status is still 'scheduled'). Used to
+  // move the session out of the viewer's active lists into Past meetings.
+  const viewer_completed = !!((isMentor || isMentee) && myCompleted);
 
   return {
     ...session,
@@ -298,6 +312,7 @@ async function enrichSession(session, viewerId) {
     isMentee,
     topics,
     needs_my_completion,
+    viewer_completed,
     reflection: isMentee ? session.reflection : undefined,
     mentor_reflection: isMentor ? session.mentor_reflection : undefined,
     mentee_rating: isMentee ? session.mentee_rating : undefined,
@@ -333,7 +348,7 @@ async function listMatches({ limit, role, includeDirectory = false } = {}) {
     const renderedBase = renderReasons(m.structuredReasons, { id: viewer.id, name: viewer.name, department: viewer.department }, {
       id: candidate.id, name: candidate.name, department: candidate.department,
     }, { mentorOnly: role === 'mentor' });
-    const reasons = [...renderedBase, ...(m.extraReasons || [])];
+    const reasons = [...renderedBase, ...(m.extraReasons || []).map(renderExtraReason).filter(Boolean)];
     return {
       matchId: m.matchId,
       score: m.score,
@@ -374,6 +389,15 @@ async function get(url) {
     const { data, error } = await supabase.rpc('my_monthly_completed_count');
     if (error) throw new ApiError(error.message);
     return ok({ completed: data ?? 0 });
+  }
+  if (url === '/users/me/unavailable-periods') {
+    const { data, error } = await supabase
+      .from('mentorship_unavailable_periods')
+      .select('id, start_date, end_date, note')
+      .eq('user_id', viewer.id)
+      .order('start_date', { ascending: true });
+    if (error) throw new ApiError(error.message);
+    return ok(data || []);
   }
   if (url.startsWith('/users/')) {
     const id = url.slice('/users/'.length);
@@ -455,6 +479,13 @@ async function get(url) {
 
   if (url === '/admin/stats') {
     const { data, error } = await supabase.rpc('admin_stats');
+    if (error) throw new ApiError(error.message);
+    return ok(data);
+  }
+  if (url === '/admin/kpis' || url.startsWith('/admin/kpis?')) {
+    const params = new URLSearchParams(url.split('?')[1] || '');
+    const org = params.get('org');
+    const { data, error } = await supabase.rpc('admin_kpis', { p_org: org || null });
     if (error) throw new ApiError(error.message);
     return ok(data);
   }
@@ -586,13 +617,30 @@ async function post(url, body = {}, opts = {}) {
     return ok(data, 201);
   }
 
+  if (url === '/users/me/unavailable-periods') {
+    if (!body.start_date || !body.end_date) throw new ApiError('start_date and end_date are required', 400);
+    if (body.end_date < body.start_date) throw new ApiError('end_date must be on or after start_date', 400);
+    const { data, error } = await supabase
+      .from('mentorship_unavailable_periods')
+      .insert({
+        user_id: viewer.id,
+        start_date: body.start_date,
+        end_date: body.end_date,
+        note: (body.note || '').toString().trim() || null,
+      })
+      .select('id, start_date, end_date, note')
+      .single();
+    if (error) throw new ApiError(error.message);
+    return ok(data, 201);
+  }
+
   if (url === '/users/me/career') {
     const payload = {
       user_id: viewer.id,
       role_title: body.role,
       department: body.department,
       company: body.company || '',
-      description: body.description || '',
+      description: firstPersonize(body.description || ''),
       start_year: body.start_year ?? null,
       start_month: body.start_month ?? null,
       end_year: body.end_year ?? null,
@@ -618,7 +666,7 @@ async function post(url, body = {}, opts = {}) {
         role_title: c.role,
         department: c.department,
         company: c.company || '',
-        description: c.description || '',
+        description: firstPersonize(c.description || ''),
         start_year: c.start_year ?? null,
         start_month: c.start_month ?? null,
         end_year: c.end_year ?? null,
@@ -773,7 +821,8 @@ async function post(url, body = {}, opts = {}) {
 
   if (url === '/admin/organizations') {
     const name = (body.name || '').toString().trim();
-    const { data, error } = await supabase.rpc('platform_create_organization', { p_name: name });
+    const type = body.type === 'inter' ? 'inter' : 'intra';
+    const { data, error } = await supabase.rpc('platform_create_organization', { p_name: name, p_type: type });
     if (error) throw new ApiError(error.message);
     return ok(data, 201);
   }
@@ -828,6 +877,9 @@ async function put(url, body = {}) {
     if (Object.prototype.hasOwnProperty.call(body, 'role')) update.role_title = body.role;
     for (const k of ['department','company','description','start_year','start_month','end_year','end_month']) {
       if (Object.prototype.hasOwnProperty.call(body, k)) update[k] = body[k];
+    }
+    if (Object.prototype.hasOwnProperty.call(update, 'description')) {
+      update.description = firstPersonize(update.description || '');
     }
     const { data, error } = await supabase
       .from('career_history')
@@ -936,6 +988,12 @@ async function put(url, body = {}) {
       });
       if (error) throw new ApiError(error.message);
     }
+    if (Object.prototype.hasOwnProperty.call(body, 'role')) {
+      const { error } = await supabase.rpc('admin_set_role', {
+        p_user_id: id, p_role: body.role,
+      });
+      if (error) throw new ApiError(error.message);
+    }
     if (body.deactivate === true) {
       const { error } = await supabase.rpc('admin_deactivate', { p_user_id: id });
       if (error) throw new ApiError(error.message);
@@ -966,6 +1024,12 @@ async function del(url) {
   if (/^\/reflections\/\d+$/.test(url)) {
     const id = Number(url.split('/')[2]);
     const { error } = await supabase.from('reflection_logs').delete().eq('id', id).eq('user_id', viewer.id);
+    if (error) throw new ApiError(error.message);
+    return ok({ ok: true });
+  }
+  if (/^\/users\/me\/unavailable-periods\/\d+$/.test(url)) {
+    const id = Number(url.split('/')[4]);
+    const { error } = await supabase.from('mentorship_unavailable_periods').delete().eq('id', id).eq('user_id', viewer.id);
     if (error) throw new ApiError(error.message);
     return ok({ ok: true });
   }

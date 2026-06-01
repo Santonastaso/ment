@@ -15,7 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MapPin } from 'lucide-react';
+import { MapPin, CalendarDays } from 'lucide-react';
 import api from '../api/index.js';
 import { useT } from '../i18n/index.jsx';
 
@@ -61,10 +61,10 @@ function groupCareerByCompany(entries) {
 
 // Render a "Jun 2018 – Jul 2022" / "2018 – present" period label, handling
 // year-only legacy data gracefully.
-function formatPeriod(startY, startM, endY, endM, presentLabel = 'present') {
+function formatPeriod(startY, startM, endY, endM, presentLabel = 'present', months = MONTH_NAMES) {
   const fmt = (y, m) => {
     if (!y) return '';
-    if (m && m >= 1 && m <= 12) return `${MONTH_NAMES[m - 1]} ${y}`;
+    if (m && m >= 1 && m <= 12) return `${months[m - 1]} ${y}`;
     return String(y);
   };
   const start = fmt(startY, startM);
@@ -106,6 +106,12 @@ export default function Profile() {
   const [availabilitySaving, setAvailabilitySaving] = useState(false);
   const [returnDateDraft, setReturnDateDraft] = useState('');
   const [availabilityNoteDraft, setAvailabilityNoteDraft] = useState('');
+  // Multi-period OOO (P4) — list of [start, end] unavailability windows.
+  const [periods, setPeriods] = useState([]);
+  const [periodStart, setPeriodStart] = useState('');
+  const [periodEnd, setPeriodEnd] = useState('');
+  const [periodNote, setPeriodNote] = useState('');
+  const [periodSaving, setPeriodSaving] = useState(false);
 
   useEffect(() => {
     setEditing(false);
@@ -136,6 +142,10 @@ export default function Profile() {
           setShadowDraft(res.data.shadow_role_response || '');
           setReturnDateDraft(res.data.mentorship_unavailable_until || '');
           setAvailabilityNoteDraft(res.data.mentorship_note || '');
+          try {
+            const p = await api.get('/users/me/unavailable-periods');
+            setPeriods(p.data || []);
+          } catch { /* non-fatal */ }
         }
       } catch {
         navigate('/');
@@ -248,6 +258,36 @@ export default function Profile() {
       showToast(t('profile.toast.availabilityUpdated'));
     } finally {
       setAvailabilitySaving(false);
+    }
+  }
+
+  async function reloadPeriods() {
+    const p = await api.get('/users/me/unavailable-periods');
+    setPeriods(p.data || []);
+  }
+
+  async function addPeriod() {
+    if (!periodStart || !periodEnd) return;
+    setPeriodSaving(true);
+    try {
+      await api.post('/users/me/unavailable-periods', {
+        start_date: periodStart, end_date: periodEnd, note: periodNote,
+      });
+      setPeriodStart(''); setPeriodEnd(''); setPeriodNote('');
+      await reloadPeriods();
+      showToast(t('profile.toast.availabilityUpdated'));
+    } finally {
+      setPeriodSaving(false);
+    }
+  }
+
+  async function removePeriod(id) {
+    setPeriodSaving(true);
+    try {
+      await api.delete(`/users/me/unavailable-periods/${id}`);
+      await reloadPeriods();
+    } finally {
+      setPeriodSaving(false);
     }
   }
 
@@ -494,7 +534,12 @@ export default function Profile() {
       {isOwnProfile && (
         <Surface>
           <SurfaceHeader
-            title={t('profile.availability.title')}
+            title={
+              <span className="inline-flex items-center gap-2">
+                <CalendarDays className="h-4 w-4 text-primary" aria-hidden="true" />
+                {t('profile.availability.title')}
+              </span>
+            }
             description={t('profile.availability.desc')}
           />
           <SurfaceBody className="pt-5 space-y-4">
@@ -573,6 +618,84 @@ export default function Profile() {
               >
                 {availabilitySaving ? t('profile.btn.saving') : t('profile.btn.save')}
               </Button>
+            </div>
+
+            {/* Multi-period out-of-office windows (P4) */}
+            <div className="rounded-lg border border-border bg-muted/40 p-4 space-y-3">
+              <div>
+                <p className="text-sm font-medium text-foreground">{t('profile.availability.periodsTitle')}</p>
+                <p className="text-xs text-muted-foreground">{t('profile.availability.periodsDesc')}</p>
+              </div>
+
+              {periods.length > 0 ? (
+                <ul className="space-y-2" data-testid="unavailable-periods">
+                  {periods.map((p) => (
+                    <li key={p.id} className="flex items-center justify-between gap-3 rounded-md border border-border bg-card px-3 py-2 text-sm">
+                      <span className="min-w-0">
+                        <span className="font-medium text-foreground">{p.start_date} → {p.end_date}</span>
+                        {p.note && <span className="ml-2 text-xs text-muted-foreground">{p.note}</span>}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removePeriod(p.id)}
+                        disabled={periodSaving}
+                        aria-label={t('profile.availability.periodRemove')}
+                        className="text-muted-foreground hover:text-red-500 text-sm leading-none"
+                      >
+                        ×
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-muted-foreground italic">{t('profile.availability.periodsEmpty')}</p>
+              )}
+
+              <div className="grid gap-2 sm:grid-cols-[1fr_1fr_2fr_auto] sm:items-end">
+                <div>
+                  <label className="label">{t('profile.availability.periodStart')}</label>
+                  <input
+                    type="date"
+                    className="input text-sm"
+                    value={periodStart}
+                    min={new Date().toISOString().slice(0, 10)}
+                    onChange={(e) => setPeriodStart(e.target.value)}
+                    disabled={periodSaving}
+                  />
+                </div>
+                <div>
+                  <label className="label">{t('profile.availability.periodEnd')}</label>
+                  <input
+                    type="date"
+                    className="input text-sm"
+                    value={periodEnd}
+                    min={periodStart || new Date().toISOString().slice(0, 10)}
+                    onChange={(e) => setPeriodEnd(e.target.value)}
+                    disabled={periodSaving}
+                  />
+                </div>
+                <div>
+                  <label className="label">{t('profile.availability.note')}</label>
+                  <input
+                    type="text"
+                    className="input text-sm"
+                    maxLength={120}
+                    placeholder={t('profile.availability.periodNotePlaceholder')}
+                    value={periodNote}
+                    onChange={(e) => setPeriodNote(e.target.value)}
+                    disabled={periodSaving}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  data-testid="add-period"
+                  onClick={addPeriod}
+                  disabled={periodSaving || !periodStart || !periodEnd || periodEnd < periodStart}
+                >
+                  {t('profile.availability.periodAdd')}
+                </Button>
+              </div>
             </div>
 
             <div className="rounded-lg border border-border bg-muted/40 p-4 space-y-2">
@@ -740,7 +863,7 @@ export default function Profile() {
                       {/* Hide the company name on individual rows when it's
                           already shown as the group header above. */}
                       {entry.company && group.entries.length === 1 && ` · ${entry.company}`}
-                      {(entry.start_year || entry.end_year) && ` · ${formatPeriod(entry.start_year, entry.start_month, entry.end_year, entry.end_month, t('profile.career.present'))}`}
+                      {(entry.start_year || entry.end_year) && ` · ${formatPeriod(entry.start_year, entry.start_month, entry.end_year, entry.end_month, t('profile.career.present'), t('profile.career.monthsShort').split(','))}`}
                     </p>
                     {entry.description && (
                       <p className="text-xs text-gray-600 mt-1">{entry.description}</p>

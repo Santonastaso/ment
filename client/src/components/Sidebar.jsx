@@ -14,7 +14,7 @@ export default function Sidebar({ onNavigate }) {
     { to: '/', label: t('nav.home'), icon: LayoutDashboard },
     { to: '/explorer', label: t('nav.explorer'), icon: Compass },
     { to: '/profile', label: t('nav.myProfile'), icon: User, match: (p, uid) => p === '/profile' || p === `/profile/${uid}` },
-    ...(user?.direct_reports > 0 ? [{ to: '/team', label: t('nav.teamInsights'), icon: Users }] : []),
+    ...(['team_lead', 'manager'].includes(user?.role) ? [{ to: '/team', label: t('nav.teamInsights'), icon: Users }] : []),
     ...(user?.is_admin ? [{ to: '/admin/graph', label: t('nav.knowledgeGraph'), icon: Share2, testid: 'nav-knowledge-graph' }] : []),
     ...(user?.is_admin ? [{ to: '/admin', label: t('nav.admin'), icon: Shield }] : []),
   ];

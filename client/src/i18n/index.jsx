@@ -28,7 +28,7 @@ const CATALOG = {
 const SUPPORTED = ['en', 'it'];
 const STORAGE_KEY = 'ment.lang';
 
-function detectInitial() {
+export function getLang() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved && SUPPORTED.includes(saved)) return saved;
@@ -40,9 +40,22 @@ function detectInitial() {
   return 'en';
 }
 
+function detectInitial() {
+  return getLang();
+}
+
 function interpolate(str, vars) {
   if (!vars) return str;
   return str.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? String(vars[k]) : m));
+}
+
+// Standalone translator for non-React modules (e.g. the api shim) that can't
+// use the useT() hook. Resolves the active language from storage by default.
+export function translate(key, vars, lang) {
+  const l = lang || getLang();
+  const dict = CATALOG[l] || CATALOG.en;
+  const raw = (key in dict) ? dict[key] : (key in CATALOG.en) ? CATALOG.en[key] : key;
+  return interpolate(raw, vars);
 }
 
 const LanguageContext = createContext(null);

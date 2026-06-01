@@ -15,6 +15,7 @@ import {
   escoExtract,
   escoRelevantToInput,
   isAcceptableCanonicalization,
+  meetsEscoSimilarity,
   normalizeLang,
 } from '../_shared/esco.ts';
 
@@ -168,7 +169,8 @@ async function canonicalizeSkills(phrases: string[], context: string, lang: stri
     const r = await escoExtract(p, lang);
     for (const candidate of r ?? []) {
       if (isAcceptableCanonicalization(p, candidate.label) &&
-          escoRelevantToInput(candidate.label, context + ' ' + p)) {
+          escoRelevantToInput(candidate.label, context + ' ' + p) &&
+          meetsEscoSimilarity(p, candidate.label)) {
         canonical = candidate;
         break;
       }

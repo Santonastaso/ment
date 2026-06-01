@@ -29,6 +29,34 @@ function StatCard({ label, value, sub }) {
   );
 }
 
+// Horizontal bar list for KPI breakdowns (most requested/shared skills, etc).
+function KpiBars({ title, items, valueKey = 'count', labelKey = 'skill', emptyLabel, suffix }) {
+  const max = Math.max(1, ...items.map((i) => Number(i[valueKey]) || 0));
+  return (
+    <div>
+      <p className="mb-2 text-sm font-semibold text-foreground">{title}</p>
+      {items.length === 0 ? (
+        <p className="text-xs text-muted-foreground italic">{emptyLabel}</p>
+      ) : (
+        <div className="space-y-1.5">
+          {items.map((it, idx) => {
+            const v = Number(it[valueKey]) || 0;
+            return (
+              <div key={idx} className="flex items-center gap-2">
+                <span className="w-40 shrink-0 truncate text-xs text-foreground" title={it[labelKey]}>{it[labelKey]}</span>
+                <div className="h-3 flex-1 rounded-full bg-muted">
+                  <div className="h-3 rounded-full bg-primary" style={{ width: `${(v / max) * 100}%` }} />
+                </div>
+                <span className="w-10 shrink-0 text-right text-xs tabular-nums text-muted-foreground">{v}{suffix || ''}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 async function downloadBlob(apiPath, filename) {
   const res = await api.get(apiPath, { responseType: 'blob' });
   const url = URL.createObjectURL(res.data);
@@ -76,6 +104,7 @@ export default function AdminDashboard() {
   const [ownerStats, setOwnerStats] = useState(null);
   const [ownerLoading, setOwnerLoading] = useState(false);
   const [orgNameDraft, setOrgNameDraft] = useState('');
+  const [orgTypeDraft, setOrgTypeDraft] = useState('intra');
   const [creatingOrg, setCreatingOrg] = useState(false);
   const [accessRequests, setAccessRequests] = useState([]);
   const [accessRequestTotal, setAccessRequestTotal] = useState(0);
@@ -108,7 +137,21 @@ export default function AdminDashboard() {
   const [confirmDialog, setConfirmDialog] = useState(null);
   const [managerDialog, setManagerDialog] = useState(null);
   const [managerEmailDraft, setManagerEmailDraft] = useState('');
+  const [kpis, setKpis] = useState(null);
+  const [kpisLoading, setKpisLoading] = useState(false);
   const fileRef = useRef(null);
+
+  async function loadKpis() {
+    setKpisLoading(true);
+    try {
+      const res = await api.get('/admin/kpis');
+      setKpis(res.data);
+    } catch {
+      setKpis(null);
+    } finally {
+      setKpisLoading(false);
+    }
+  }
 
   async function loadStats() {
     setLoading(true);
@@ -272,8 +315,9 @@ export default function AdminDashboard() {
     setCreatingOrg(true);
     setNotice(null);
     try {
-      const res = await api.post('/admin/organizations', { name });
+      const res = await api.post('/admin/organizations', { name, type: orgTypeDraft });
       setOrgNameDraft('');
+      setOrgTypeDraft('intra');
       setOwnerStats(prev => prev ? {
         ...prev,
         organizations: [...(prev.organizations || []), res.data].sort((a, b) =>
@@ -295,7 +339,7 @@ export default function AdminDashboard() {
 
   function downloadOwnerCsv() {
     const rows = ownerStats?.organizations || [];
-    const header = ['org_name', 'slug', 'org_id', 'users', 'onboarded', 'onboarding_rate', 'active_30d', 'sessions', 'churned'];
+    const header = ['org_name', 'slug', 'org_id', 'users', 'onboarded', 'onboarding_rate', 'active_30d', 'sessions', 'churned', 'churn_rate'];
     const body = rows.map(org => [
       org.organizationName,
       org.slug,
@@ -306,6 +350,7 @@ export default function AdminDashboard() {
       org.activeMembers,
       org.sessions,
       org.churned,
+      org.churnRate ?? 0,
     ].map(csvEscape).join(',')).join('\n');
     downloadTextFile(`${header.join(',')}\n${body}\n`, 'ment-owner-organizations.csv');
   }
@@ -382,6 +427,20 @@ export default function AdminDashboard() {
     }
   }
 
+  async function handleSetRole(user, role) {
+    try {
+      await api.put(`/admin/users/${user.id}`, { role });
+      loadUsers();
+      setNotice({ variant: 'default', title: t('admin.notice.roleUpdatedTitle'), message: t('admin.notice.roleUpdatedMsg', { name: user.name, role: t(`admin.users.role.${role}`) }) });
+    } catch (e) {
+      setNotice({
+        variant: 'destructive',
+        title: t('admin.notice.roleUpdateFailTitle'),
+        message: e.response?.data?.error || t('admin.common.tryAgain'),
+      });
+    }
+  }
+
   async function runConfirmDialog() {
     if (!confirmDialog) return;
     try {
@@ -422,6 +481,7 @@ export default function AdminDashboard() {
 
       <div className="flex flex-wrap items-center gap-2">
         <Button type="button" variant={tab === 'overview' ? 'default' : 'outline'} size="sm" onClick={() => setTab('overview')}>{t('admin.tab.overview')}</Button>
+        <Button type="button" variant={tab === 'kpis' ? 'default' : 'outline'} size="sm" onClick={() => { setTab('kpis'); loadKpis(); }}>{t('admin.tab.kpis')}</Button>
         <Button type="button" variant={tab === 'users' ? 'default' : 'outline'} size="sm" onClick={() => { setTab('users'); loadUsers(); }}>{t('admin.tab.users')}</Button>
         <Button type="button" variant={tab === 'feedback' ? 'default' : 'outline'} size="sm" onClick={() => { setTab('feedback'); loadFeedback(); }}>{t('admin.tab.feedback')}</Button>
         {isPlatformAdmin && (
@@ -517,24 +577,22 @@ export default function AdminDashboard() {
                           </p>
                         )}
                       </div>
-                      {isPlatformAdmin && (
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Button
-                            type="button" size="sm"
-                            variant={privacyStatus.orgType === 'intra' ? 'default' : 'outline'}
-                            onClick={() => updateOrgPrivacy({ type: 'intra' })}
-                            disabled={savingOrgPrivacy}
-                            data-testid="org-mode-intra"
-                          >{t('admin.privacy.intra')}</Button>
-                          <Button
-                            type="button" size="sm"
-                            variant={privacyStatus.orgType === 'inter' ? 'default' : 'outline'}
-                            onClick={() => updateOrgPrivacy({ type: 'inter' })}
-                            disabled={savingOrgPrivacy}
-                            data-testid="org-mode-inter"
-                          >{t('admin.privacy.inter')}</Button>
-                        </div>
-                      )}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          type="button" size="sm"
+                          variant={privacyStatus.orgType === 'intra' ? 'default' : 'outline'}
+                          onClick={() => updateOrgPrivacy({ type: 'intra' })}
+                          disabled={savingOrgPrivacy}
+                          data-testid="org-mode-intra"
+                        >{t('admin.privacy.intra')}</Button>
+                        <Button
+                          type="button" size="sm"
+                          variant={privacyStatus.orgType === 'inter' ? 'default' : 'outline'}
+                          onClick={() => updateOrgPrivacy({ type: 'inter' })}
+                          disabled={savingOrgPrivacy}
+                          data-testid="org-mode-inter"
+                        >{t('admin.privacy.inter')}</Button>
+                      </div>
                       <div className="flex flex-wrap items-center gap-2">
                         <label className="text-xs text-muted-foreground">{t('admin.privacy.minReports')}</label>
                         <input
@@ -790,6 +848,59 @@ export default function AdminDashboard() {
         </>
       )}
 
+      {tab === 'kpis' && (
+        <Surface>
+          <SurfaceHeader title={t('admin.kpis.title')} description={t('admin.kpis.desc')} />
+          <SurfaceBody className="space-y-6 pt-5">
+            {kpisLoading || !kpis ? (
+              <p className="text-sm text-muted-foreground">{t('admin.common.loading')}</p>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <StatCard label={t('admin.kpis.activeMentors')} value={kpis.activeMentors} sub={t('admin.kpis.ofPotential', { n: kpis.potentialMentors })} />
+                  <StatCard label={t('admin.kpis.inactiveMentors')} value={kpis.inactiveMentors} />
+                  <StatCard label={t('admin.kpis.pausedMentors')} value={kpis.pausedMentors} />
+                  <StatCard label={t('admin.kpis.participation')} value={`${kpis.participationRate}%`} />
+                  <StatCard label={t('admin.kpis.avgRating')} value={kpis.avgRating || '—'} />
+                  <StatCard label={t('admin.kpis.repeatRate')} value={`${kpis.repeatRate}%`} />
+                  <StatCard label={t('admin.kpis.avgResponse')} value={kpis.avgResponseHours ? `${kpis.avgResponseHours}h` : '—'} />
+                  <StatCard label={t('admin.kpis.isolated')} value={kpis.isolatedEmployees} />
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <StatCard label={t('admin.kpis.crossDept')} value={kpis.crossDeptSessions} sub={t('admin.kpis.sameDept', { n: kpis.sameDeptSessions })} />
+                  <StatCard label={t('admin.kpis.onboarded')} value={`${kpis.onboarded}/${kpis.totalUsers}`} />
+                </div>
+
+                <div className="grid gap-6 sm:grid-cols-2">
+                  <KpiBars title={t('admin.kpis.mostRequested')} items={kpis.mostRequested} emptyLabel={t('admin.kpis.none')} />
+                  <KpiBars title={t('admin.kpis.mostShared')} items={kpis.mostShared} emptyLabel={t('admin.kpis.none')} />
+                </div>
+
+                <div>
+                  <p className="mb-2 text-sm font-semibold text-foreground">{t('admin.kpis.demandGaps')}</p>
+                  {kpis.demandSupplyGaps.length === 0 ? (
+                    <p className="text-xs text-muted-foreground italic">{t('admin.kpis.none')}</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {kpis.demandSupplyGaps.map((g, i) => (
+                        <div key={i} className="flex items-center gap-2 text-xs">
+                          <span className="w-40 shrink-0 truncate text-foreground" title={g.skill}>{g.skill}</span>
+                          <span className="rounded-full bg-rose-50 px-2 py-0.5 text-rose-700 border border-rose-200">{t('admin.kpis.demand')}: {g.demand}</span>
+                          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-700 border border-emerald-200">{t('admin.kpis.supply')}: {g.supply}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <KpiBars title={t('admin.kpis.growth')} items={kpis.growth} valueKey="sessions" labelKey="month" emptyLabel={t('admin.kpis.none')} />
+              </>
+            )}
+          </SurfaceBody>
+        </Surface>
+      )}
+
       {tab === 'users' && (
         <Surface>
           <SurfaceHeader title={t('admin.users.title')} />
@@ -802,6 +913,7 @@ export default function AdminDashboard() {
                     <th className="py-2 pr-4">{t('admin.users.name')}</th>
                     <th className="py-2 pr-4">{t('admin.users.email')}</th>
                     <th className="py-2 pr-4">{t('admin.users.dept')}</th>
+                    <th className="py-2 pr-4">{t('admin.users.role.title')}</th>
                     <th className="py-2 pr-4">{t('admin.users.manager')}</th>
                     <th className="py-2">{t('admin.users.actions')}</th>
                   </tr>
@@ -812,6 +924,22 @@ export default function AdminDashboard() {
                       <td className="py-2 pr-4">{u.name}{u.deactivated_at ? t('admin.users.deactivatedSuffix') : ''}</td>
                       <td className="py-2 pr-4 text-gray-600">{u.email}</td>
                       <td className="py-2 pr-4">{u.department}</td>
+                      <td className="py-2 pr-4">
+                        {u.deactivated_at ? (
+                          <span className="text-gray-400">{t(`admin.users.role.${u.role || 'employee'}`)}</span>
+                        ) : (
+                          <select
+                            value={u.role || 'employee'}
+                            onChange={e => handleSetRole(u, e.target.value)}
+                            className="input h-8 text-xs py-0"
+                            aria-label={t('admin.users.role.title')}
+                          >
+                            <option value="employee">{t('admin.users.role.employee')}</option>
+                            <option value="manager">{t('admin.users.role.manager')}</option>
+                            <option value="team_lead">{t('admin.users.role.team_lead')}</option>
+                          </select>
+                        )}
+                      </td>
                       <td className="py-2 pr-4 text-gray-600">{u.manager_email || <span className="text-gray-300">—</span>}</td>
                       <td className="py-2 space-x-2 whitespace-nowrap">
                         {!u.deactivated_at && (
@@ -854,6 +982,18 @@ export default function AdminDashboard() {
                   placeholder={t('admin.orgs.placeholder')}
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="organization-type">{t('admin.orgs.typeLabel')}</Label>
+                <select
+                  id="organization-type"
+                  value={orgTypeDraft}
+                  onChange={e => setOrgTypeDraft(e.target.value)}
+                  className="input text-sm h-10"
+                >
+                  <option value="intra">{t('admin.privacy.modeIntra')}</option>
+                  <option value="inter">{t('admin.privacy.modeInter')}</option>
+                </select>
+              </div>
               <Button type="submit" disabled={creatingOrg || !orgNameDraft.trim()}>
                 {creatingOrg ? t('admin.orgs.creating') : t('admin.orgs.create')}
               </Button>
@@ -872,7 +1012,8 @@ export default function AdminDashboard() {
                       <th className="py-2 pr-4">{t('admin.orgs.colOnboarded')}</th>
                       <th className="py-2 pr-4">{t('admin.orgs.colActive30d')}</th>
                       <th className="py-2 pr-4">{t('admin.orgs.colSessions')}</th>
-                      <th className="py-2">{t('admin.orgs.colChurned')}</th>
+                      <th className="py-2 pr-4">{t('admin.orgs.colChurned')}</th>
+                      <th className="py-2">{t('admin.orgs.colChurnRate')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -894,7 +1035,8 @@ export default function AdminDashboard() {
                         <td className="py-2 pr-4 tabular-nums">{org.onboardingRate}% <span className="text-muted-foreground">({org.onboarded})</span></td>
                         <td className="py-2 pr-4 tabular-nums">{org.activeMembers}</td>
                         <td className="py-2 pr-4 tabular-nums">{org.sessions}</td>
-                        <td className="py-2 tabular-nums">{org.churned}</td>
+                        <td className="py-2 pr-4 tabular-nums">{org.churned}</td>
+                        <td className="py-2 tabular-nums">{org.churnRate ?? 0}%</td>
                       </tr>
                     ))}
                   </tbody>

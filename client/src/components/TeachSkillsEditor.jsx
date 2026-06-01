@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import EscoSuggestInput from './EscoSuggestInput.jsx';
 import { useT } from '../i18n/index.jsx';
 
@@ -8,6 +8,7 @@ import { useT } from '../i18n/index.jsx';
 export default function TeachSkillsEditor({ value = [], onChange, placeholder, lang, ariaLabel }) {
   const { t } = useT();
   const [skillInput, setSkillInput] = useState('');
+  const inputRef = useRef(null);
   const effectivePlaceholder = placeholder || t('components.teachSkills.placeholder');
 
   function addSkill(raw) {
@@ -27,10 +28,20 @@ export default function TeachSkillsEditor({ value = [], onChange, placeholder, l
 
   return (
     <div className="space-y-3">
-      <div className="border border-gray-300 rounded-lg px-3 py-2 focus-within:ring-2 focus-within:ring-primary/40 focus-within:border-transparent bg-white min-h-[44px]">
+      <div className="border border-gray-300 rounded-lg px-3 py-2 focus-within:ring-2 focus-within:ring-primary/40 focus-within:border-transparent bg-white min-h-[44px] flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => inputRef.current?.focus()}
+          aria-label={ariaLabel || t('components.teachSkills.ariaAdd')}
+          title={t('components.teachSkills.ariaAdd')}
+          className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary hover:bg-primary/20 text-base leading-none flex-shrink-0"
+        >
+          +
+        </button>
         <EscoSuggestInput
           value={skillInput}
           onChange={setSkillInput}
+          inputRef={inputRef}
           onCommitEsco={(item) => addSkill(item.label)}
           onCommitCustom={(text) => addSkill(text)}
           onBackspaceEmpty={() => value.length > 0 && onChange(value.slice(0, -1))}

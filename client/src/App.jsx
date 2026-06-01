@@ -84,6 +84,16 @@ function AdminRoute({ children }) {
   return children;
 }
 
+// Team Insights is for team leads and managers only (admins can view via the
+// admin tools). Employees are redirected home.
+function TeamRoute({ children }) {
+  const { user } = useAuth();
+  if (!(['team_lead', 'manager'].includes(user?.role) || user?.is_admin)) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
 export default function App() {
   return (
     <Routes>
@@ -97,7 +107,7 @@ export default function App() {
         <Route path="/explorer" element={<Explorer />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/profile/:id" element={<Profile />} />
-        <Route path="/team" element={<TeamSkills />} />
+        <Route path="/team" element={<TeamRoute><TeamSkills /></TeamRoute>} />
         <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
         <Route path="/admin/graph" element={<AdminRoute><KnowledgeGraph /></AdminRoute>} />
       </Route>

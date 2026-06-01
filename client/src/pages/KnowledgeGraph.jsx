@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import ForceGraph2D from 'react-force-graph-2d';
 import { Share2, ShieldAlert, RefreshCw, Building2, Languages, Info } from 'lucide-react';
 import api from '../api/index.js';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -11,8 +12,7 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
-const WIDTH = 1000;
-const HEIGHT = 720;
+const GRAPH_HEIGHT = 600;
 
 const DEPT_COLORS = {
   Engineering: '#6366f1',
@@ -44,79 +44,6 @@ function deptColor(dept) {
   return `hsl(${h} 65% 55%)`;
 }
 
-// Deterministic Fruchterman–Reingold force layout. Runs synchronously so the
-// graph settles to a stable position (good for screenshots) without animation
-// jank or extra dependencies.
-function computeLayout(nodes, edges, iterations = 320) {
-  const N = nodes.length;
-  if (N === 0) return [];
-  const idx = new Map(nodes.map((n, i) => [n.id, i]));
-  const pos = nodes.map((n, i) => {
-    const angle = i * 2.399963229; // golden angle for an even initial spread
-    const r = Math.sqrt((i + 1) / N) * Math.min(WIDTH, HEIGHT) * 0.42;
-    return {
-      x: WIDTH / 2 + Math.cos(angle) * r,
-      y: HEIGHT / 2 + Math.sin(angle) * r,
-      dx: 0,
-      dy: 0,
-    };
-  });
-  const links = edges
-    .map((e) => ({ s: idx.get(e.source), t: idx.get(e.target) }))
-    .filter((l) => l.s != null && l.t != null);
-
-  const area = WIDTH * HEIGHT;
-  const k = Math.sqrt(area / N);
-  let temp = WIDTH * 0.12;
-
-  for (let it = 0; it < iterations; it++) {
-    for (let i = 0; i < N; i++) { pos[i].dx = 0; pos[i].dy = 0; }
-
-    // Repulsion (every pair).
-    for (let i = 0; i < N; i++) {
-      for (let j = i + 1; j < N; j++) {
-        let ddx = pos[i].x - pos[j].x;
-        let ddy = pos[i].y - pos[j].y;
-        let dist = Math.sqrt(ddx * ddx + ddy * ddy) || 0.01;
-        const rep = (k * k) / dist;
-        const fx = (ddx / dist) * rep;
-        const fy = (ddy / dist) * rep;
-        pos[i].dx += fx; pos[i].dy += fy;
-        pos[j].dx -= fx; pos[j].dy -= fy;
-      }
-    }
-
-    // Attraction along edges.
-    for (const l of links) {
-      let ddx = pos[l.s].x - pos[l.t].x;
-      let ddy = pos[l.s].y - pos[l.t].y;
-      let dist = Math.sqrt(ddx * ddx + ddy * ddy) || 0.01;
-      const att = (dist * dist) / k;
-      const fx = (ddx / dist) * att;
-      const fy = (ddy / dist) * att;
-      pos[l.s].dx -= fx; pos[l.s].dy -= fy;
-      pos[l.t].dx += fx; pos[l.t].dy += fy;
-    }
-
-    for (let i = 0; i < N; i++) {
-      // Gentle gravity to keep disconnected pieces in frame.
-      const gx = (WIDTH / 2 - pos[i].x) * 0.018;
-      const gy = (HEIGHT / 2 - pos[i].y) * 0.018;
-      let ddx = pos[i].dx + gx;
-      let ddy = pos[i].dy + gy;
-      const d = Math.sqrt(ddx * ddx + ddy * ddy) || 0.01;
-      const lim = Math.min(d, temp);
-      pos[i].x += (ddx / d) * lim;
-      pos[i].y += (ddy / d) * lim;
-      pos[i].x = Math.max(28, Math.min(WIDTH - 28, pos[i].x));
-      pos[i].y = Math.max(28, Math.min(HEIGHT - 28, pos[i].y));
-    }
-    temp *= 0.985;
-  }
-
-  return nodes.map((n, i) => ({ ...n, x: pos[i].x, y: pos[i].y }));
-}
-
 export default function KnowledgeGraph() {
   const { user } = useAuth();
   const { t } = useT();
@@ -130,8 +57,14 @@ export default function KnowledgeGraph() {
   const [orgType, setOrgType] = useState(null);
   const [savingMode, setSavingMode] = useState(false);
   const [hovered, setHovered] = useState(null);
+  // 'bipartite' = people <-> skills; 'people' = people connected via shared
+  // skills (skills become invisible connectors).
+  const [view, setView] = useState('bipartite');
+  const [graphWidth, setGraphWidth] = useState(900);
 
   const reqId = useRef(0);
+  const fgRef = useRef(null);
+  const containerRef = useRef(null);
 
   const loadPrivacy = useCallback(async () => {
     try {
@@ -171,37 +104,97 @@ export default function KnowledgeGraph() {
   const nodes = graph?.nodes || [];
   const edges = graph?.edges || [];
 
+  const kindById = useMemo(() => new Map(nodes.map((n) => [n.id, n.kind])), [nodes]);
+
+  // Build the force-graph dataset for the active view. New object identities are
+  // produced only when the underlying data or the view changes, so the
+  // simulation isn't reheated on every render.
+  const graphData = useMemo(() => {
+    if (view === 'people') {
+      const people = nodes.filter((n) => n.kind === 'person');
+      // skill id -> people who touch it (teach or learn)
+      const bySkill = new Map();
+      for (const e of edges) {
+        const personId = kindById.get(e.source) === 'person' ? e.source : e.target;
+        const skillId = personId === e.source ? e.target : e.source;
+        if (!bySkill.has(skillId)) bySkill.set(skillId, []);
+        bySkill.get(skillId).push(personId);
+      }
+      const pairValue = new Map(); // "a|b" -> shared skill count
+      for (const arr of bySkill.values()) {
+        const uniq = [...new Set(arr)];
+        for (let i = 0; i < uniq.length; i++) {
+          for (let j = i + 1; j < uniq.length; j++) {
+            const key = uniq[i] < uniq[j] ? `${uniq[i]}|${uniq[j]}` : `${uniq[j]}|${uniq[i]}`;
+            pairValue.set(key, (pairValue.get(key) || 0) + 1);
+          }
+        }
+      }
+      const links = [...pairValue.entries()].map(([key, value]) => {
+        const [source, target] = key.split('|');
+        return { source, target, value, type: 'peer' };
+      });
+      return { nodes: people.map((n) => ({ ...n })), links };
+    }
+    return {
+      nodes: nodes.map((n) => ({ ...n })),
+      links: edges.map((e) => ({ source: e.source, target: e.target, type: e.type, value: 1 })),
+    };
+  }, [nodes, edges, view, kindById]);
+
+  // Degree (within the active view) drives node size.
   const degree = useMemo(() => {
     const d = new Map();
-    for (const e of edges) {
-      d.set(e.source, (d.get(e.source) || 0) + 1);
-      d.set(e.target, (d.get(e.target) || 0) + 1);
+    for (const l of graphData.links) {
+      const s = typeof l.source === 'object' ? l.source.id : l.source;
+      const tt = typeof l.target === 'object' ? l.target.id : l.target;
+      d.set(s, (d.get(s) || 0) + 1);
+      d.set(tt, (d.get(tt) || 0) + 1);
     }
     return d;
-  }, [edges]);
+  }, [graphData]);
 
-  // Layout is recomputed only when the set of node/edge ids changes.
-  const signature = useMemo(
-    () => `${nodes.map((n) => n.id).join('|')}__${edges.map((e) => `${e.source}>${e.target}`).join('|')}`,
-    [nodes, edges]
-  );
-  const laidOut = useMemo(() => computeLayout(nodes, edges), [signature]); // eslint-disable-line react-hooks/exhaustive-deps
-  const posById = useMemo(() => new Map(laidOut.map((n) => [n.id, n])), [laidOut]);
-
-  // Neighbour set for hover highlighting.
+  // Neighbour set for hover highlighting, derived from the active links.
   const neighbours = useMemo(() => {
     if (!hovered) return null;
     const set = new Set([hovered]);
-    for (const e of edges) {
-      if (e.source === hovered) set.add(e.target);
-      if (e.target === hovered) set.add(e.source);
+    for (const l of graphData.links) {
+      const s = typeof l.source === 'object' ? l.source.id : l.source;
+      const tt = typeof l.target === 'object' ? l.target.id : l.target;
+      if (s === hovered) set.add(tt);
+      if (tt === hovered) set.add(s);
     }
     return set;
-  }, [hovered, edges]);
+  }, [hovered, graphData]);
 
   const peopleCount = nodes.filter((n) => n.kind === 'person').length;
   const skillCount = nodes.filter((n) => n.kind === 'skill').length;
   const inter = orgType === 'inter';
+
+  // Measure the container so the canvas fills available width.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const update = () => setGraphWidth(el.clientWidth || 900);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [loading, view]);
+
+  // Configure d3 forces: stronger repulsion so clusters breathe, and link
+  // distance that carries meaning in the people view (more shared skills =>
+  // closer together).
+  useEffect(() => {
+    const fg = fgRef.current;
+    if (!fg) return;
+    fg.d3Force('charge')?.strength(-180);
+    const link = fg.d3Force('link');
+    if (link) {
+      link.distance((l) => (view === 'people' ? Math.max(24, 110 / ((l.value || 1) + 0.5)) : 46));
+    }
+    fg.d3ReheatSimulation?.();
+  }, [graphData, view]);
 
   const departments = useMemo(() => {
     const set = new Set();
@@ -359,23 +352,51 @@ export default function KnowledgeGraph() {
         </div>
       ) : (
         <div className="flex flex-col gap-3">
+          {/* View toggle */}
+          <div className="inline-flex w-fit overflow-hidden rounded-lg border border-border">
+            <button
+              type="button"
+              data-testid="kg-view-bipartite"
+              onClick={() => setView('bipartite')}
+              className={cn('px-3 py-1.5 text-xs font-medium transition-colors',
+                view === 'bipartite' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted')}
+            >
+              {t('graph.view.bipartite')}
+            </button>
+            <button
+              type="button"
+              data-testid="kg-view-people"
+              onClick={() => setView('people')}
+              className={cn('px-3 py-1.5 text-xs font-medium transition-colors',
+                view === 'people' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted')}
+            >
+              {t('graph.view.people')}
+            </button>
+          </div>
+
           {/* Counts + legend */}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2" data-testid="kg-node-count">
               <Badge variant="secondary">{t('graph.count.people', { count: peopleCount })}</Badge>
-              <Badge variant="secondary">{t('graph.count.skills', { count: skillCount })}</Badge>
-              <Badge variant="secondary">{t('graph.count.links', { count: edges.length })}</Badge>
+              {view === 'bipartite' && <Badge variant="secondary">{t('graph.count.skills', { count: skillCount })}</Badge>}
+              <Badge variant="secondary">{t('graph.count.links', { count: graphData.links.length })}</Badge>
             </div>
             <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1.5">
-                <span className="inline-block h-0.5 w-5 rounded" style={{ background: EDGE_COLORS.can_teach }} /> {t('graph.legend.canTeach')}
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="inline-block h-0.5 w-5 rounded" style={{ background: EDGE_COLORS.wants_to_learn }} /> {t('graph.legend.wantsToLearn')}
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="inline-block size-2.5 rotate-45 rounded-[2px] bg-muted-foreground/60" /> {t('graph.legend.skill')}
-              </span>
+              {view === 'bipartite' ? (
+                <>
+                  <span className="flex items-center gap-1.5">
+                    <span className="inline-block h-0.5 w-5 rounded" style={{ background: EDGE_COLORS.can_teach }} /> {t('graph.legend.canTeach')}
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="inline-block h-0.5 w-5 rounded" style={{ background: EDGE_COLORS.wants_to_learn }} /> {t('graph.legend.wantsToLearn')}
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="inline-block size-2.5 rotate-45 rounded-[2px] bg-muted-foreground/60" /> {t('graph.legend.skill')}
+                  </span>
+                </>
+              ) : (
+                <span className="flex items-center gap-1.5">{t('graph.legend.peerLink')}</span>
+              )}
             </div>
           </div>
 
@@ -391,92 +412,67 @@ export default function KnowledgeGraph() {
             </div>
           )}
 
-          <div className="overflow-hidden rounded-xl border border-border bg-card">
-            <svg
-              data-testid="knowledge-graph-svg"
-              viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-              className="block h-auto w-full"
-              role="img"
-              aria-label={t('graph.svgAria')}
-              onMouseLeave={() => setHovered(null)}
-            >
-              {/* Edges */}
-              <g>
-                {edges.map((e, i) => {
-                  const a = posById.get(e.source);
-                  const b = posById.get(e.target);
-                  if (!a || !b) return null;
-                  const active = !neighbours || (neighbours.has(e.source) && neighbours.has(e.target));
-                  return (
-                    <line
-                      key={`${e.source}-${e.target}-${e.type}-${i}`}
-                      data-testid="kg-edge"
-                      data-type={e.type}
-                      x1={a.x}
-                      y1={a.y}
-                      x2={b.x}
-                      y2={b.y}
-                      stroke={EDGE_COLORS[e.type] || '#94a3b8'}
-                      strokeWidth={active ? 1.4 : 0.8}
-                      strokeOpacity={neighbours ? (active ? 0.85 : 0.05) : 0.35}
-                    />
-                  );
-                })}
-              </g>
-
-              {/* Nodes */}
-              <g>
-                {laidOut.map((n) => {
-                  const deg = degree.get(n.id) || 0;
-                  const dim = neighbours && !neighbours.has(n.id);
-                  const isPerson = n.kind === 'person';
-                  const r = isPerson ? 7 + Math.min(deg, 8) : 4 + Math.min(deg, 6) * 0.7;
-                  const fill = isPerson ? deptColor(n.department) : 'var(--muted-foreground, #64748b)';
-                  const showLabel = isPerson || deg >= 4 || (neighbours && neighbours.has(n.id));
-                  return (
-                    <g
-                      key={n.id}
-                      data-testid="kg-node"
-                      data-kind={n.kind}
-                      transform={`translate(${n.x} ${n.y})`}
-                      style={{ cursor: 'pointer', opacity: dim ? 0.18 : 1, transition: 'opacity 120ms' }}
-                      onMouseEnter={() => setHovered(n.id)}
-                    >
-                      {isPerson ? (
-                        <circle r={r} fill={fill} stroke="var(--card, #fff)" strokeWidth={1.5} />
-                      ) : (
-                        <rect
-                          x={-r}
-                          y={-r}
-                          width={r * 2}
-                          height={r * 2}
-                          transform="rotate(45)"
-                          fill={fill}
-                          fillOpacity={0.55}
-                          stroke="var(--card, #fff)"
-                          strokeWidth={1}
-                        />
-                      )}
-                      {showLabel && (
-                        <text
-                          x={r + 3}
-                          y={3}
-                          fontSize={isPerson ? 11 : 9}
-                          fontWeight={isPerson ? 600 : 400}
-                          fill="var(--foreground, #0f172a)"
-                          style={{ paintOrder: 'stroke', pointerEvents: 'none' }}
-                          stroke="var(--card, #fff)"
-                          strokeWidth={3}
-                          strokeLinejoin="round"
-                        >
-                          {n.label}
-                        </text>
-                      )}
-                    </g>
-                  );
-                })}
-              </g>
-            </svg>
+          <div
+            ref={containerRef}
+            data-testid="knowledge-graph-canvas"
+            className="overflow-hidden rounded-xl border border-border bg-card"
+            style={{ height: GRAPH_HEIGHT }}
+          >
+            <ForceGraph2D
+              ref={fgRef}
+              width={graphWidth}
+              height={GRAPH_HEIGHT}
+              graphData={graphData}
+              cooldownTicks={120}
+              onEngineStop={() => fgRef.current?.zoomToFit(400, 40)}
+              nodeRelSize={5}
+              nodeVal={(n) => 1 + Math.min(degree.get(n.id) || 0, 10)}
+              nodeLabel={(n) => (n.kind === 'person'
+                ? `${n.label}${n.department ? ` · ${n.department}` : ''}`
+                : n.label)}
+              onNodeHover={(n) => setHovered(n ? n.id : null)}
+              onNodeDragEnd={(n) => { n.fx = n.x; n.fy = n.y; }}
+              linkColor={(l) => {
+                const s = typeof l.source === 'object' ? l.source.id : l.source;
+                const tt = typeof l.target === 'object' ? l.target.id : l.target;
+                const active = !neighbours || (neighbours.has(s) && neighbours.has(tt));
+                if (!active) return 'rgba(148,163,184,0.06)';
+                return EDGE_COLORS[l.type] || 'rgba(148,163,184,0.4)';
+              }}
+              linkWidth={(l) => Math.min(1 + (l.value || 1) * 0.6, 5)}
+              nodeCanvasObject={(node, ctx, globalScale) => {
+                const deg = degree.get(node.id) || 0;
+                const isPerson = node.kind === 'person';
+                const r = (isPerson ? 4 + Math.min(deg, 8) * 0.7 : 3 + Math.min(deg, 6) * 0.5);
+                const dim = neighbours && !neighbours.has(node.id);
+                ctx.globalAlpha = dim ? 0.15 : 1;
+                ctx.fillStyle = isPerson ? deptColor(node.department) : '#64748b';
+                ctx.beginPath();
+                if (isPerson) {
+                  ctx.arc(node.x, node.y, r, 0, 2 * Math.PI);
+                  ctx.fill();
+                } else {
+                  // diamond for skills
+                  ctx.save();
+                  ctx.translate(node.x, node.y);
+                  ctx.rotate(Math.PI / 4);
+                  ctx.globalAlpha = (dim ? 0.15 : 0.6);
+                  ctx.fillRect(-r, -r, r * 2, r * 2);
+                  ctx.restore();
+                  ctx.globalAlpha = dim ? 0.15 : 1;
+                }
+                // Labels: people always; skills when zoomed in or hovered.
+                const showLabel = isPerson || globalScale > 1.6 || (neighbours && neighbours.has(node.id));
+                if (showLabel) {
+                  const fontSize = Math.max(9, (isPerson ? 11 : 9) / Math.sqrt(globalScale));
+                  ctx.font = `${isPerson ? '600' : '400'} ${fontSize}px sans-serif`;
+                  ctx.textBaseline = 'middle';
+                  ctx.fillStyle = '#0f172a';
+                  ctx.fillText(node.label, node.x + r + 2, node.y);
+                }
+                ctx.globalAlpha = 1;
+              }}
+            />
           </div>
 
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground">

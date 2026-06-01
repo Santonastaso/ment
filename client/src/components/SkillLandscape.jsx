@@ -25,22 +25,27 @@ function learnTier(n) {
 
 // ---------- Visual presets ----------
 // Each preset returns { bubble: tailwind classes, dot: legend dot color, label }
+// Teach tiers use a distinct, intensifying cool-color ramp so the proficiency
+// level is legible at a glance (the previous muted/secondary greys were nearly
+// identical, which is what "non ci sono i colori per i vari livelli" flagged):
+//   untapped (0 sessions) → slate, active (1) → sky, trusted (2-3) → indigo,
+//   expert (4+) → deep primary with accent ring.
 const teachPresets = {
   untapped: {
-    bubble: 'bg-muted text-foreground border border-border hover:bg-muted/80',
-    dot: 'bg-border',
+    bubble: 'bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200',
+    dot: 'bg-slate-400',
     labelKey: 'components.skillLandscape.tierUntapped',
     extraClass: '',
   },
   active: {
-    bubble: 'bg-secondary text-secondary-foreground border border-border hover:opacity-90',
-    dot: 'bg-muted-foreground/40',
+    bubble: 'bg-sky-100 text-sky-900 border border-sky-300 hover:bg-sky-200',
+    dot: 'bg-sky-400',
     labelKey: 'components.skillLandscape.tierActive',
     extraClass: '',
   },
   trusted: {
-    bubble: 'bg-primary/90 text-primary-foreground border border-primary hover:bg-primary',
-    dot: 'bg-primary',
+    bubble: 'bg-indigo-100 text-indigo-900 border border-indigo-400 font-medium hover:bg-indigo-200',
+    dot: 'bg-indigo-500',
     labelKey: 'components.skillLandscape.tierTrusted',
     extraClass: '',
   },
@@ -210,7 +215,9 @@ function Bubble({ entry, kind, tier, preset, index, isOwnProfile, onDelete }) {
         >
           <div className="font-semibold text-foreground mb-1">{entry.skill}</div>
           <div className="text-[10px] uppercase tracking-wide font-medium mb-1.5"
-            style={{ color: kind === 'teach' && tier === 'expert' ? '#92400e' : kind === 'teach' ? '#1B3A5C' : tier === 'missing' ? '#be123c' : '#15803d' }}>
+            style={{ color: kind === 'teach'
+              ? (tier === 'expert' ? '#92400e' : tier === 'trusted' ? '#4338ca' : tier === 'active' ? '#0369a1' : '#475569')
+              : (tier === 'missing' ? '#be123c' : '#15803d') }}>
             {t(preset.labelKey)}
           </div>
           {tooltipText}

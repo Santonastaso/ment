@@ -26,6 +26,9 @@
   "graph.legend.canTeach": "può insegnare",
   "graph.legend.wantsToLearn": "vuole imparare",
   "graph.legend.skill": "competenza",
+  "graph.legend.peerLink": "Collegamenti più spessi = più competenze in comune",
+  "graph.view.bipartite": "Persone e competenze",
+  "graph.view.people": "Persone ↔ Persone",
   "graph.svgAria": "Grafo della conoscenza aziendale",
-  "graph.hoverHint": "Passa il mouse su un nodo per evidenziare le sue connessioni. Le persone sono colorate per reparto; i rombi sono competenze."
+  "graph.hoverHint": "Trascina per spostarti, scorri per zoomare, trascina un nodo per riposizionarlo. Passa il mouse per evidenziare le connessioni. Le persone sono colorate per reparto; i rombi sono competenze."
 }

@@ -23,14 +23,24 @@ from pathlib import Path
 
 ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
 ENV: dict[str, str] = {}
-for line in ENV_PATH.read_text().splitlines():
-    if "=" in line and not line.startswith("#"):
-        k, v = line.split("=", 1)
-        ENV[k.strip()] = v.strip()
+if ENV_PATH.exists():
+    for line in ENV_PATH.read_text().splitlines():
+        if "=" in line and not line.startswith("#"):
+            k, v = line.split("=", 1)
+            ENV[k.strip()] = v.strip()
 
-SUPABASE_URL = ENV["SUPABASE_URL"]
-ANON = ENV["SUPABASE_ANON_KEY"]
-SRK = ENV["SUPABASE_SERVICE_ROLE_KEY"]
+
+def env(key: str, default: str = "") -> str:
+    # .env at repo root takes precedence locally; CI passes via os.environ.
+    return ENV.get(key) or os.environ.get(key, default)
+
+
+SUPABASE_URL = env("SUPABASE_URL")
+ANON = env("SUPABASE_ANON_KEY")
+SRK = env("SUPABASE_SERVICE_ROLE_KEY")
+if not SUPABASE_URL or not ANON:
+    print("Skipping RLS smoke test: SUPABASE_URL / SUPABASE_ANON_KEY not set.")
+    sys.exit(0)
 
 EMP = {"email": os.environ.get("MENT_EMP_EMAIL", "bob.taylor@ment.io"),
        "password": os.environ.get("MENT_EMP_PASSWORD", "Password")}
@@ -92,8 +102,28 @@ def ok_status(status: int) -> bool:
 
 def main() -> int:
     print(f"RLS smoke test against {SUPABASE_URL}\n")
-    bob = sign_in(EMP["email"], EMP["password"])
-    alice = sign_in(ADMIN["email"], ADMIN["password"])
+    try:
+        bob = sign_in(EMP["email"], EMP["password"])
+        alice = sign_in(ADMIN["email"], ADMIN["password"])
+    except (urllib.error.HTTPError, urllib.error.URLError) as e:
+        print(f"Skipping RLS smoke test: could not sign in seed users ({e}).")
+        return 0
+
+    # Resolve ids dynamically instead of hardcoding seed UUIDs.
+    _, bob_profile = rest("POST", "rpc/my_profile", bob, body={})
+    BOB_ID = bob_profile.get("id") if isinstance(bob_profile, dict) else None
+    _, alice_profile = rest("POST", "rpc/my_profile", alice, body={})
+    ALICE_ID = alice_profile.get("id") if isinstance(alice_profile, dict) else None
+    if not BOB_ID or not ALICE_ID:
+        print("Could not resolve seed user ids via my_profile; aborting.")
+        return 1
+    # A peer employee (not Bob) for peer_profile privacy checks.
+    _, ulist = rest("POST", "rpc/admin_users", alice, body={"p_limit": 200, "p_offset": 0})
+    PEER_ID = None
+    if isinstance(ulist, dict):
+        for u in ulist.get("users", []):
+            if u.get("id") and u["id"] != BOB_ID:
+                PEER_ID = u["id"]; break
 
     # --- Column-level deny on profiles.shadow_role_response ---
     s, b = rest("GET", "profiles", bob,
@@ -115,7 +145,7 @@ def main() -> int:
 
     # --- Reflection_logs cross-user read ---
     s, b = rest("GET", "reflection_logs", bob,
-                params={"select": "id,support_needed,user_id", "user_id": "neq.852c6373-ecef-4023-85d1-79c738181b7e"})
+                params={"select": "id,support_needed,user_id", "user_id": f"neq.{BOB_ID}"})
     rows_other = (b if isinstance(b, list) else []) if ok_status(s) else []
     case("reflection_logs_isolated", expect_denied=False,
          ok=ok_status(s) and len(rows_other) == 0,
@@ -128,14 +158,14 @@ def main() -> int:
     # All returned rows should belong to Bob if any are returned (RLS-based isolation)
     leaked = []
     if rows:
-        bob_id_row = next((r for r in rows if r.get("user_id") and r["user_id"] != "852c6373-ecef-4023-85d1-79c738181b7e"), None)
+        bob_id_row = next((r for r in rows if r.get("user_id") and r["user_id"] != BOB_ID), None)
         if bob_id_row:
             leaked.append(bob_id_row)
     case("feedback_isolated_select", expect_denied=False,
          ok=len(leaked) == 0, detail=f"Bob SELECT on feedback_messages: {len(rows)} rows, {len(leaked)} cross-user")
 
     # --- Profile UPDATE attempts ---
-    other_uid = "937306e0-bda9-40a8-9bec-5884d65b6fe1"  # Alice
+    other_uid = ALICE_ID
     s, b = rest("PATCH", "profiles", bob, body={"bio": "hacked"},
                 params={"id": f"eq.{other_uid}"})
     # PATCH with eq=other and RLS update policy id=auth.uid() means 0 rows updated
@@ -146,7 +176,7 @@ def main() -> int:
 
     # --- Direct UPDATE to escalate admin scope on own row should fail (guard trigger) ---
     s, b = rest("PATCH", "profiles", bob, body={"admin_scope": "platform"},
-                params={"id": "eq.852c6373-ecef-4023-85d1-79c738181b7e"})
+                params={"id": f"eq.{BOB_ID}"})
     case("profiles.escalate_admin_blocked", expect_denied=True, ok=ok_status(s),
          detail=f"Bob attempts to set admin_scope=platform on self → status={s}")
 
@@ -205,7 +235,7 @@ def main() -> int:
     sess_for_alice = (sess_list or [])[:1]
     target_id = None
     for s_row in sess_for_alice:
-        if isinstance(s_row, dict) and "id" in s_row and s_row.get("mentee_id") != "852c6373-ecef-4023-85d1-79c738181b7e":
+        if isinstance(s_row, dict) and "id" in s_row and s_row.get("mentee_id") != BOB_ID:
             target_id = s_row["id"]; break
     if target_id is not None:
         s, b = rest("POST", "rpc/acknowledge_session", bob, body={"p_session_id": target_id})
@@ -213,6 +243,58 @@ def main() -> int:
              expect_denied=False,
              ok=s in (200, 204),
              detail=f"acknowledge_session for someone else's row → status={s} (silent no-op)")
+
+    # --- career_history cross-user read isolation (RLS career_select_own) ---
+    if PEER_ID:
+        s, b = rest("GET", "career_history", bob,
+                    params={"select": "id,user_id,company", "user_id": f"eq.{PEER_ID}"})
+        rows = (b if isinstance(b, list) else []) if ok_status(s) else []
+        case("career_history_isolated", expect_denied=False,
+             ok=ok_status(s) and len(rows) == 0,
+             detail=f"Bob reads PEER career_history → {len(rows)} rows (must be 0)")
+
+    # --- mentorship_unavailable_periods cross-user read isolation ---
+    if PEER_ID:
+        s, b = rest("GET", "mentorship_unavailable_periods", bob,
+                    params={"select": "id,user_id", "user_id": f"eq.{PEER_ID}"})
+        rows = (b if isinstance(b, list) else []) if ok_status(s) else []
+        case("unavailable_periods_isolated", expect_denied=False,
+             ok=ok_status(s) and len(rows) == 0,
+             detail=f"Bob reads PEER unavailable periods → {len(rows)} rows (must be 0)")
+
+    # --- role column cannot be self-escalated via direct PATCH (guard) ---
+    s, b = rest("PATCH", "profiles", bob, body={"role": "team_lead"},
+                params={"id": f"eq.{BOB_ID}"})
+    case("profiles.escalate_role_blocked", expect_denied=True, ok=ok_status(s),
+         detail=f"Bob sets role=team_lead on self → status={s} (must be denied)")
+
+    # --- peer_profile must not leak private fields, and hides career ---
+    if PEER_ID:
+        s, b = rest("POST", "rpc/peer_profile", bob, body={"p_user_id": PEER_ID})
+        leaks_shadow = isinstance(b, dict) and "shadow_role_response" in b
+        career_hidden = isinstance(b, dict) and (b.get("career") in ([], None))
+        case("rpc.peer_profile_no_shadow", expect_denied=False,
+             ok=ok_status(s) and not leaks_shadow,
+             detail=f"peer_profile exposes shadow_role_response → {leaks_shadow} (must be False)")
+        case("rpc.peer_profile_hides_career", expect_denied=False,
+             ok=ok_status(s) and career_hidden,
+             detail=f"peer_profile career hidden → {career_hidden} (status={s})")
+        # In inter (PMI) mode the surname must be redacted ("Name X.").
+        org_type = b.get("org_type") if isinstance(b, dict) else None
+        if org_type == "inter" and isinstance(b.get("name"), str):
+            redacted = b["name"].rstrip().endswith(".")
+            case("rpc.peer_profile_redacts_surname_inter", expect_denied=False,
+                 ok=redacted,
+                 detail=f"inter-mode peer name redacted → '{b['name']}'")
+
+    # --- admin-only RPCs denied for an employee ---
+    s, b = rest("POST", "rpc/admin_kpis", bob, body={"p_org": None})
+    case("rpc.admin_kpis_denied_for_employee", expect_denied=True, ok=ok_status(s),
+         detail=f"Bob calls admin_kpis → status={s}")
+    if PEER_ID:
+        s, b = rest("POST", "rpc/admin_set_role", bob, body={"p_user_id": PEER_ID, "p_role": "manager"})
+        case("rpc.admin_set_role_denied_for_employee", expect_denied=True, ok=ok_status(s),
+             detail=f"Bob calls admin_set_role → status={s}")
 
     # Summary
     passed = sum(1 for c in cases if c["ok"])

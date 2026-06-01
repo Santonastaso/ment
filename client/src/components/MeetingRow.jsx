@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import RatingPicker from './RatingPicker.jsx';
+import SessionRequestModal from './SessionRequestModal.jsx';
 import api from '../api/index.js';
 import { useT } from '../i18n/index.jsx';
 
@@ -22,9 +23,29 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
   const [reflectionDraft, setReflectionDraft] = useState('');
   const [ratingDraft, setRatingDraft] = useState(null);
   const [savingReflection, setSavingReflection] = useState(false);
+  const [followupMentor, setFollowupMentor] = useState(null);
+  const [loadingFollowup, setLoadingFollowup] = useState(false);
+  const [followupDone, setFollowupDone] = useState(false);
 
   const isMentor = session.mentor?.id === currentUserId;
   const counterpart = isMentor ? session.mentee : session.mentor;
+
+  // Follow-up: request another session with the same counterpart. We fetch
+  // their peer profile first so the request modal can offer their teachable
+  // topics. Deactivated counterparts can't be re-requested.
+  async function openFollowup() {
+    if (!counterpart?.id) return;
+    setLoadingFollowup(true);
+    try {
+      const res = await api.get(`/users/${counterpart.id}`);
+      setFollowupMentor(res.data);
+    } catch {
+      // Fall back to the minimal counterpart payload (topics step is skippable).
+      setFollowupMentor({ id: counterpart.id, name: counterpart.name, department: counterpart.department, skills: [] });
+    } finally {
+      setLoadingFollowup(false);
+    }
+  }
   const hasDate = !!session.scheduled_at;
   const date = hasDate ? new Date(session.scheduled_at) : null;
   const dateLabel = hasDate ? date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : null;
@@ -244,7 +265,34 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
               </div>
             );
           })()}
+
+          {/* Follow-up: book another session with the same counterpart. */}
+          {mode === 'past' && counterpart?.id && !counterpart?.deactivated_at && (
+            <div className="pt-1 border-t border-gray-100">
+              {followupDone ? (
+                <p className="text-xs text-emerald-700 font-medium pt-2">{t('components.meeting.followUpSent')}</p>
+              ) : (
+                <button
+                  onClick={openFollowup}
+                  disabled={loadingFollowup}
+                  className="btn-secondary text-xs mt-2"
+                >
+                  {loadingFollowup
+                    ? t('components.meeting.followUpLoading')
+                    : t('components.meeting.followUp', { name: counterpart?.name?.split(' ')[0] || '' })}
+                </button>
+              )}
+            </div>
+          )}
         </div>
+      )}
+
+      {followupMentor && (
+        <SessionRequestModal
+          mentor={followupMentor}
+          onClose={() => setFollowupMentor(null)}
+          onSuccess={() => { setFollowupMentor(null); setFollowupDone(true); onUpdate?.(); }}
+        />
       )}
     </div>
   );

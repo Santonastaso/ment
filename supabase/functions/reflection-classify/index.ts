@@ -15,6 +15,7 @@ import {
   escoRelevantToInput,
   isAcceptableCanonicalization,
   isSubstantive,
+  meetsEscoSimilarity,
   normalizeLang,
 } from '../_shared/esco.ts';
 
@@ -139,7 +140,8 @@ async function canonicalizeViaEsco(phrase: string, contextText: string, lang: st
   const r = await escoExtract(phrase, lang);
   for (const candidate of r ?? []) {
     if (isAcceptableCanonicalization(phrase, candidate.label) &&
-        escoRelevantToInput(candidate.label, contextText + ' ' + phrase)) {
+        escoRelevantToInput(candidate.label, contextText + ' ' + phrase) &&
+        meetsEscoSimilarity(phrase, candidate.label)) {
       return candidate;
     }
   }
@@ -154,7 +156,8 @@ async function classifyOneText(text: string, lang: string) {
       heuristicHits.map(async (phrase) => {
         const r = await escoExtract(phrase, lang);
         for (const candidate of r ?? []) {
-          if (isAcceptableCanonicalization(phrase, candidate.label)) return candidate;
+          if (isAcceptableCanonicalization(phrase, candidate.label) &&
+              meetsEscoSimilarity(phrase, candidate.label)) return candidate;
         }
         return { label: phrase, uri: '' };
       }),

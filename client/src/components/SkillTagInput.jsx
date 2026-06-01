@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import EscoSuggestInput from './EscoSuggestInput.jsx';
 import { useT } from '../i18n/index.jsx';
 
@@ -8,6 +8,7 @@ import { useT } from '../i18n/index.jsx';
 export default function SkillTagInput({ value = [], onChange, placeholder, lang, ariaLabel }) {
   const { t } = useT();
   const [input, setInput] = useState('');
+  const inputRef = useRef(null);
   const effectivePlaceholder = placeholder || t('components.skillTag.placeholder');
 
   function addSkill(raw) {
@@ -37,9 +38,19 @@ export default function SkillTagInput({ value = [], onChange, placeholder, lang,
             </button>
           </span>
         ))}
+        <button
+          type="button"
+          onClick={() => inputRef.current?.focus()}
+          aria-label={ariaLabel || t('components.skillTag.ariaAdd')}
+          title={t('components.skillTag.ariaAdd')}
+          className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary hover:bg-primary/20 text-base leading-none flex-shrink-0"
+        >
+          +
+        </button>
         <EscoSuggestInput
           value={input}
           onChange={setInput}
+          inputRef={inputRef}
           onCommitEsco={(item) => addSkill(item.label)}
           onCommitCustom={(text) => addSkill(text)}
           onBackspaceEmpty={() => value.length > 0 && onChange(value.slice(0, -1))}

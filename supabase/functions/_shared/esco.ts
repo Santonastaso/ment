@@ -71,6 +71,47 @@ export function escoRelevantToInput(label: string, inputText: string): boolean {
   return false;
 }
 
+// Two tokens "match" if equal or share a strong (>=5 char) stem, so
+// singular/plural and light inflections still count (relationship ~ relationships).
+function tokensMatch(a: string, b: string): boolean {
+  if (a === b) return true;
+  if (a.length >= 4 && b.length >= 4) {
+    const pa = a.slice(0, 5);
+    const pb = b.slice(0, 5);
+    if (a.startsWith(pb) || b.startsWith(pa)) return true;
+  }
+  return false;
+}
+
+// Dice-coefficient similarity over the *distinctive* (non-generic) tokens of the
+// phrase and the ESCO label. 1.0 = same distinctive tokens, 0 = none shared.
+// This is what catches "class content" -> "teach kindergarten class content"
+// (0.67) while keeping clean canonicalizations ("data pipelines" ->
+// "build data pipelines" = 0.8).
+export function escoSimilarity(phrase: string, label: string): number {
+  const p = nonGenericTokens(phrase);
+  const l = nonGenericTokens(label);
+  if (p.length === 0 || l.length === 0) return 0;
+  let inter = 0;
+  const used = new Set<number>();
+  for (const a of p) {
+    for (let i = 0; i < l.length; i++) {
+      if (used.has(i)) continue;
+      if (tokensMatch(a, l[i])) { inter++; used.add(i); break; }
+    }
+  }
+  return (2 * inter) / (p.length + l.length);
+}
+
+// Minimum similarity for an automatic ESCO canonicalization to be trusted.
+// Modeled on PowerQuery-style fuzzy matching: only high-confidence rewrites
+// are applied; anything weaker keeps the user's original phrase.
+export const ESCO_MIN_SIMILARITY = 0.7;
+
+export function meetsEscoSimilarity(phrase: string, label: string): boolean {
+  return escoSimilarity(phrase, label) >= ESCO_MIN_SIMILARITY;
+}
+
 export function isAcceptableCanonicalization(phrase: string, label: string): boolean {
   if (!label || !phrase) return false;
   const p = phrase.toLowerCase().trim();
