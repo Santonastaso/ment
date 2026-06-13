@@ -186,5 +186,14 @@
   "admin.notice.managerUpdatedMsg": "Reporting line saved.",
   "admin.notice.managerUpdateFailTitle": "Could not update manager",
   "admin.notice.actionFailedTitle": "Action failed",
-  "admin.notice.somethingWrong": "Something went wrong."
+  "admin.notice.somethingWrong": "Something went wrong.",
+  "admin.common.saving": "Saving…",
+  "admin.privacy.requestTierChange": "Request tier change",
+  "admin.privacy.requestTierChangeDescription": "Ask the platform owners to switch this organisation from {from} to {to}. They'll review the request and apply the change manually.",
+  "admin.privacy.requestTierChangeNoteLabel": "Why are you requesting this?",
+  "admin.privacy.requestTierChangeNotePlaceholder": "e.g. We've joined the SME network and want cross-company matching turned on.",
+  "admin.privacy.requestTierChangeNoteHint": "Optional, but a short note speeds up review.",
+  "admin.privacy.requestTierChangeSubmit": "Submit request",
+  "admin.privacy.requestTierChangeSent": "Request sent — the platform owners will be in touch.",
+  "admin.privacy.requestTierChangeError": "Could not send the request. Please try again."
 }
