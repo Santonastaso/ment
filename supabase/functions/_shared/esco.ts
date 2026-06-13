@@ -124,7 +124,14 @@ export function isAcceptableCanonicalization(phrase: string, label: string): boo
   if (pWords === 1 && lWords > 3) return false;
   if (pWords === 2 && lWords > 4) return false;
   if (pWords >= 3 && lWords > pWords + 2) return false;
-  return true;
+  // Final gate: Dice similarity must clear the threshold so spurious
+  // canonicalizations are rejected — e.g. phrase "kindergarten" against
+  // label "kindergarten teacher" scores 0.67 and gets dropped, while
+  // "data pipelines" against "build data pipelines" scores 0.8 and passes.
+  // Without this, the structural word-count rules above let any short
+  // label containing the input phrase through, which is what surfaced the
+  // unexpected "kindergarten"/"healthcare suppliers" suggestions.
+  return meetsEscoSimilarity(p, l);
 }
 
 const ESCO_BASE = 'https://ec.europa.eu/esco/api/search';
