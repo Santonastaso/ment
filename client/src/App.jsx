@@ -1,6 +1,7 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext.jsx';
+import LandingPage from './pages/LandingPage.jsx';
 import Login from './pages/Login.jsx';
 import RequestAccess from './pages/RequestAccess.jsx';
 import SignUp from './pages/SignUp.jsx';
@@ -43,7 +44,7 @@ function LoginRoute() {
 function ProtectedRoute() {
   const { user, loading } = useAuth();
   if (loading) return <LoadingScreen />;
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to="/welcome" replace />;
   if (user.must_change_password) return <Navigate to="/change-password" replace />;
   if (!user.onboarding_complete && !user.is_admin) return <Navigate to="/onboarding" replace />;
   return (
@@ -97,6 +98,7 @@ function TeamRoute({ children }) {
 export default function App() {
   return (
     <Routes>
+      <Route path="/welcome" element={<LandingPage />} />
       <Route path="/login" element={<LoginRoute />} />
       <Route path="/sign-up" element={<SignUp />} />
       <Route path="/request-access" element={<RequestAccess />} />

@@ -186,5 +186,14 @@
   "admin.notice.managerUpdatedMsg": "Linea di riporto salvata.",
   "admin.notice.managerUpdateFailTitle": "Impossibile aggiornare il responsabile",
   "admin.notice.actionFailedTitle": "Azione non riuscita",
-  "admin.notice.somethingWrong": "Qualcosa è andato storto."
+  "admin.notice.somethingWrong": "Qualcosa è andato storto.",
+  "admin.common.saving": "Salvataggio…",
+  "admin.privacy.requestTierChange": "Richiedi cambio di profilo",
+  "admin.privacy.requestTierChangeDescription": "Chiedi ai proprietari della piattaforma di passare questa organizzazione da {from} a {to}. Valuteranno la richiesta e applicheranno la modifica manualmente.",
+  "admin.privacy.requestTierChangeNoteLabel": "Perché stai richiedendo questo cambio?",
+  "admin.privacy.requestTierChangeNotePlaceholder": "es. Siamo entrati nella rete PMI e vogliamo attivare il matching cross-company.",
+  "admin.privacy.requestTierChangeNoteHint": "Facoltativa, ma una breve nota velocizza la valutazione.",
+  "admin.privacy.requestTierChangeSubmit": "Invia richiesta",
+  "admin.privacy.requestTierChangeSent": "Richiesta inviata — i proprietari della piattaforma ti contatteranno.",
+  "admin.privacy.requestTierChangeError": "Impossibile inviare la richiesta. Riprova."
 }

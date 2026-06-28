@@ -117,6 +117,11 @@ export default function AdminDashboard() {
   const [savingOrgPrivacy, setSavingOrgPrivacy] = useState(false);
   const [privacyStatus, setPrivacyStatus] = useState(null);
   const [privacyLoading, setPrivacyLoading] = useState(false);
+  const [tierRequestOpen, setTierRequestOpen] = useState(false);
+  const [tierRequestTarget, setTierRequestTarget] = useState('intra');
+  const [tierRequestNote, setTierRequestNote] = useState('');
+  const [tierRequestSubmitting, setTierRequestSubmitting] = useState(false);
+  const [tierRequestResult, setTierRequestResult] = useState('');
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [rematching, setRematching] = useState(false);
@@ -241,6 +246,25 @@ export default function AdminDashboard() {
       await loadPrivacyStatus();
     } finally {
       setSavingOrgPrivacy(false);
+    }
+  }
+
+  async function submitTierChangeRequest() {
+    setTierRequestSubmitting(true);
+    setTierRequestResult('');
+    try {
+      await api.put('/admin/org-privacy/request', {
+        type: tierRequestTarget,
+        note: tierRequestNote,
+      });
+      setTierRequestResult('ok');
+      setTierRequestNote('');
+      // Auto-close on success after a brief confirmation pulse.
+      setTimeout(() => { setTierRequestOpen(false); setTierRequestResult(''); }, 1400);
+    } catch (e) {
+      setTierRequestResult(e?.message || 'error');
+    } finally {
+      setTierRequestSubmitting(false);
     }
   }
 
@@ -578,20 +602,35 @@ export default function AdminDashboard() {
                         )}
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <Button
-                          type="button" size="sm"
-                          variant={privacyStatus.orgType === 'intra' ? 'default' : 'outline'}
-                          onClick={() => updateOrgPrivacy({ type: 'intra' })}
-                          disabled={savingOrgPrivacy}
-                          data-testid="org-mode-intra"
-                        >{t('admin.privacy.intra')}</Button>
-                        <Button
-                          type="button" size="sm"
-                          variant={privacyStatus.orgType === 'inter' ? 'default' : 'outline'}
-                          onClick={() => updateOrgPrivacy({ type: 'inter' })}
-                          disabled={savingOrgPrivacy}
-                          data-testid="org-mode-inter"
-                        >{t('admin.privacy.inter')}</Button>
+                        {isPlatformAdmin ? (
+                          <>
+                            <Button
+                              type="button" size="sm"
+                              variant={privacyStatus.orgType === 'intra' ? 'default' : 'outline'}
+                              onClick={() => updateOrgPrivacy({ type: 'intra' })}
+                              disabled={savingOrgPrivacy}
+                              data-testid="org-mode-intra"
+                            >{t('admin.privacy.intra')}</Button>
+                            <Button
+                              type="button" size="sm"
+                              variant={privacyStatus.orgType === 'inter' ? 'default' : 'outline'}
+                              onClick={() => updateOrgPrivacy({ type: 'inter' })}
+                              disabled={savingOrgPrivacy}
+                              data-testid="org-mode-inter"
+                            >{t('admin.privacy.inter')}</Button>
+                          </>
+                        ) : (
+                          <Button
+                            type="button" size="sm" variant="outline"
+                            data-testid="org-mode-request-change"
+                            onClick={() => {
+                              setTierRequestTarget(privacyStatus.orgType === 'intra' ? 'inter' : 'intra');
+                              setTierRequestNote('');
+                              setTierRequestResult('');
+                              setTierRequestOpen(true);
+                            }}
+                          >{t('admin.privacy.requestTierChange')}</Button>
+                        )}
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
                         <label className="text-xs text-muted-foreground">{t('admin.privacy.minReports')}</label>
@@ -1254,6 +1293,53 @@ export default function AdminDashboard() {
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setManagerDialog(null)}>{t('admin.common.cancel')}</Button>
             <Button type="button" onClick={handleSaveManager}>{t('admin.manager.save')}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={tierRequestOpen} onOpenChange={open => { if (!open) { setTierRequestOpen(false); setTierRequestResult(''); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('admin.privacy.requestTierChange')}</DialogTitle>
+            <DialogDescription>
+              {t('admin.privacy.requestTierChangeDescription', {
+                from: privacyStatus?.orgType === 'inter' ? t('admin.privacy.modeInter') : t('admin.privacy.modeIntra'),
+                to: tierRequestTarget === 'inter' ? t('admin.privacy.modeInter') : t('admin.privacy.modeIntra'),
+              })}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label htmlFor="tier-request-note">{t('admin.privacy.requestTierChangeNoteLabel')}</Label>
+              <textarea
+                id="tier-request-note"
+                rows={3}
+                value={tierRequestNote}
+                onChange={e => setTierRequestNote(e.target.value)}
+                className="input min-h-[80px] w-full resize-y text-sm"
+                placeholder={t('admin.privacy.requestTierChangeNotePlaceholder')}
+                data-testid="tier-request-note"
+              />
+              <p className="text-xs text-muted-foreground">{t('admin.privacy.requestTierChangeNoteHint')}</p>
+            </div>
+            {tierRequestResult === 'ok' && (
+              <Alert>
+                <AlertDescription>{t('admin.privacy.requestTierChangeSent')}</AlertDescription>
+              </Alert>
+            )}
+            {tierRequestResult && tierRequestResult !== 'ok' && (
+              <Alert variant="destructive">
+                <AlertDescription>{t('admin.privacy.requestTierChangeError')}</AlertDescription>
+              </Alert>
+            )}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setTierRequestOpen(false)} disabled={tierRequestSubmitting}>
+              {t('admin.common.cancel')}
+            </Button>
+            <Button type="button" onClick={submitTierChangeRequest} disabled={tierRequestSubmitting} data-testid="tier-request-submit">
+              {tierRequestSubmitting ? t('admin.common.saving') : t('admin.privacy.requestTierChangeSubmit')}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

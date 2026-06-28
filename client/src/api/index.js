@@ -970,6 +970,18 @@ async function put(url, body = {}) {
     return ok(data);
   }
 
+  // Org-scoped admin asks platform owners to flip intra<->inter.
+  // The platform admins see the resulting request in the existing feedback
+  // queue and act on it via set_org_privacy.
+  if (url === '/admin/org-privacy/request') {
+    const { data, error } = await supabase.rpc('request_org_tier_change', {
+      p_requested_type: body.type,
+      p_note: body.note ?? '',
+    });
+    if (error) throw new ApiError(error.message);
+    return ok(data);
+  }
+
   if (/^\/admin\/feedback\/\d+$/.test(url)) {
     const id = Number(url.split('/')[3]);
     const { data, error } = await supabase.rpc('update_feedback_status', {
