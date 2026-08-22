@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useT } from '../i18n/index.jsx';
 
 // 5-star rating with optional hover preview, used both in the mark-complete
@@ -7,10 +7,10 @@ import { useT } from '../i18n/index.jsx';
 // clicking the currently-selected star a second time.
 //
 // Props:
-//   value       — current rating (1-5) or null
-//   onChange    — (newValue) => void
-//   disabled    — read-only display
-//   showHint    — optional small label below the row
+//   value       â€” current rating (1-5) or null
+//   onChange    â€” (newValue) => void
+//   disabled    â€” read-only display
+//   showHint    â€” optional small label below the row
 const HINT_KEYS = {
   1: 'components.rating.hint1',
   2: 'components.rating.hint2',
@@ -66,7 +66,7 @@ export default function RatingPicker({ value = null, onChange, disabled = false,
         })}
       </div>
       {showHint && (
-        <p className="text-[11px] text-gray-500 h-4">
+        <p className="text-[11px] text-muted-foreground h-4">
           {hintFor ? t(HINT_KEYS[hintFor]) : t('components.rating.tapToRate')}
         </p>
       )}

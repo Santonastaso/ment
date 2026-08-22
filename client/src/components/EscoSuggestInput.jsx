@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { searchEscoSkills, browserLanguage } from '../lib/esco.js';
 import { useT } from '../i18n/index.jsx';
 
@@ -6,7 +6,7 @@ import { useT } from '../i18n/index.jsx';
 // suggestions dropdown. Behaviour matches the plan:
 //   * debounce 250 ms, min 2 chars, abort previous fetch
 //   * Arrow Up / Down / Enter / Escape keyboard navigation
-//   * Suggestive only — pressing Enter without a highlighted suggestion
+//   * Suggestive only â€” pressing Enter without a highlighted suggestion
 //     still confirms the user's raw text (`onCommitCustom`).
 //
 // Props:
@@ -228,7 +228,7 @@ export default function EscoSuggestInput({
         <ul
           id={listboxId}
           role="listbox"
-          className="absolute z-50 left-0 right-0 mt-1 max-h-64 overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg text-sm"
+          className="absolute z-50 left-0 right-0 mt-1 max-h-64 overflow-auto rounded-lg border border-[var(--border)] bg-white [box-shadow:var(--shadow-card)] text-sm"
         >
           {suggestions.map((item, idx) => {
             const active = idx === highlight;
@@ -240,17 +240,17 @@ export default function EscoSuggestInput({
                 aria-selected={active}
                 onMouseDown={(e) => { e.preventDefault(); selectEsco(item); }}
                 onMouseEnter={() => setHighlight(idx)}
-                className={`flex items-center justify-between gap-2 px-3 py-2 cursor-pointer ${active ? 'bg-blue-50 text-primary' : 'text-foreground hover:bg-gray-50'}`}
+                className={`flex items-center justify-between gap-2 px-3 py-2 cursor-pointer ${active ? 'bg-muted text-foreground' : 'text-foreground hover:bg-muted'}`}
               >
                 <span className="truncate">{item.label}</span>
-                <span className="shrink-0 text-[10px] uppercase tracking-wide text-gray-400">
-                  ESCO{item.language && item.language !== 'en' ? ` · ${item.language}` : ''}
+                <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">
+                  ESCO{item.language && item.language !== 'en' ? ` Â· ${item.language}` : ''}
                 </span>
               </li>
             );
           })}
           {loading && (
-            <li className="px-3 py-1.5 text-[11px] text-gray-400 italic">{t('components.esco.searching')}</li>
+            <li className="px-3 py-1.5 text-[11px] text-muted-foreground italic">{t('components.esco.searching')}</li>
           )}
         </ul>
       )}

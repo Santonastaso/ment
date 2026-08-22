@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+﻿import React, { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useT } from '../i18n/index.jsx';
@@ -92,7 +92,7 @@ export default function SignUp() {
         <CardHeader>
           <div className="flex items-center justify-between gap-3">
             <div>
-              <CardTitle className="text-lg font-semibold">{t('auth.signup.title')}</CardTitle>
+              <CardTitle className="text-lg font-medium">{t('auth.signup.title')}</CardTitle>
               <CardDescription>
                 {t('auth.signup.description')}
               </CardDescription>
@@ -147,10 +147,10 @@ export default function SignUp() {
                 <button
                   type="button"
                   onClick={() => update('org_type', 'intra')}
-                  className={`rounded-lg border px-3 py-2 text-left transition-colors ${
+                  className={`rounded-xl border px-3 py-2 text-left transition-colors duration-150 ${
                     form.org_type === 'intra'
-                      ? 'border-primary bg-primary/10 text-primary'
-                      : 'border-gray-200 bg-white hover:bg-muted/40'
+                      ? 'border-foreground bg-muted text-foreground'
+                      : 'border-[var(--border)] bg-card hover:bg-muted/60'
                   }`}
                 >
                   <p className="font-medium">{t('auth.signup.intraTitle')}</p>
@@ -159,10 +159,10 @@ export default function SignUp() {
                 <button
                   type="button"
                   onClick={() => update('org_type', 'inter')}
-                  className={`rounded-lg border px-3 py-2 text-left transition-colors ${
+                  className={`rounded-xl border px-3 py-2 text-left transition-colors duration-150 ${
                     form.org_type === 'inter'
-                      ? 'border-primary bg-primary/10 text-primary'
-                      : 'border-gray-200 bg-white hover:bg-muted/40'
+                      ? 'border-foreground bg-muted text-foreground'
+                      : 'border-[var(--border)] bg-card hover:bg-muted/60'
                   }`}
                 >
                   <p className="font-medium">{t('auth.signup.interTitle')}</p>

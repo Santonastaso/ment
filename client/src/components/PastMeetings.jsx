@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import api from '../api/index.js';
 import MeetingRow from './MeetingRow.jsx';
 import { useT } from '../i18n/index.jsx';
@@ -36,11 +36,11 @@ export default function PastMeetings({ currentUserId }) {
   }, []);
 
   if (loading) {
-    return <p className="text-sm text-gray-400">{t('components.pastMeetings.loading')}</p>;
+    return <p className="text-sm text-muted-foreground">{t('components.pastMeetings.loading')}</p>;
   }
   if (sessions.length === 0) {
     return (
-      <p className="text-sm text-gray-500">
+      <p className="text-sm text-muted-foreground">
         {t('components.pastMeetings.empty')}
       </p>
     );

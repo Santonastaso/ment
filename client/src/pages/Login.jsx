@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useT } from '../i18n/index.jsx';
@@ -38,7 +38,7 @@ export default function Login() {
       </div>
       <Card className="w-full max-w-[400px] rounded-xl border-[var(--border)] shadow-none">
         <CardHeader>
-          <CardTitle className="text-lg font-semibold">{t('auth.login.title')}</CardTitle>
+          <CardTitle className="text-lg font-medium">{t('auth.login.title')}</CardTitle>
           <CardDescription>{t('auth.login.description')}</CardDescription>
         </CardHeader>
         <CardContent>

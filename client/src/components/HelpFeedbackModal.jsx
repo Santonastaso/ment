@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
 import api from '../api/index.js';
 import { useModalA11y } from '../lib/useModalA11y.js';
 import { useT } from '../i18n/index.jsx';
+import { Button } from './ui/button.jsx';
 
 const CATEGORIES = [
   { value: 'general', labelKey: 'components.help.categoryGeneral' },
@@ -12,7 +13,7 @@ const CATEGORIES = [
 
 // Small dialog opened from the profile dropdown. Lets any signed-in user
 // send a short note to the team. Submissions land in `feedback_messages`
-// and are reviewable by org/platform admins under Admin → Feedback.
+// and are reviewable by org/platform admins under Admin â†’ Feedback.
 export default function HelpFeedbackModal({ onClose }) {
   const { t } = useT();
   const [category, setCategory] = useState('general');
@@ -61,9 +62,9 @@ export default function HelpFeedbackModal({ onClose }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="help-modal-title"
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col"
+        className="bg-white rounded-2xl [box-shadow:var(--shadow-overlay)] w-full max-w-md flex flex-col"
       >
-        <div className="p-6 border-b border-gray-100">
+        <div className="p-6 border-b border-[var(--border-subtle)]">
           <div className="flex items-center justify-between gap-3">
             <h2 id="help-modal-title" className="text-lg font-semibold text-foreground">
               {t('components.help.title')}
@@ -73,26 +74,26 @@ export default function HelpFeedbackModal({ onClose }) {
               onClick={onClose}
               aria-label={t('components.help.close')}
               disabled={busy}
-              className="text-gray-400 hover:text-gray-600 text-2xl leading-none disabled:opacity-50"
+              className="text-muted-foreground hover:text-secondary-foreground text-2xl leading-none disabled:opacity-50"
             >
               &times;
             </button>
           </div>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             {t('components.help.subtitle')}
           </p>
         </div>
 
         <div className="p-6 space-y-4">
           {sentAt ? (
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+            <div className="rounded-lg border border-[var(--border)] bg-muted/40 p-4 text-sm text-foreground">
               <p className="font-medium">{t('components.help.thanksTitle')}</p>
               <p className="mt-1">{t('components.help.thanksBody')}</p>
             </div>
           ) : null}
 
           <div>
-            <label className="block text-xs font-medium uppercase tracking-wide text-gray-500 mb-1.5">
+            <label className="block text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1.5">
               {t('components.help.whatAbout')}
             </label>
             <div className="grid grid-cols-2 gap-2">
@@ -103,10 +104,10 @@ export default function HelpFeedbackModal({ onClose }) {
                   onClick={() => setCategory(c.value)}
                   disabled={busy}
                   className={[
-                    'rounded-lg border px-3 py-2 text-left text-sm transition-colors',
+                    'rounded-xl border px-3 py-2 text-left text-sm transition-colors duration-150',
                     category === c.value
-                      ? 'border-primary bg-primary/10 text-primary'
-                      : 'border-gray-200 bg-white text-foreground hover:bg-muted/40',
+                      ? 'border-foreground bg-muted text-foreground'
+                      : 'border-[var(--border)] bg-card text-foreground hover:bg-muted/60',
                   ].join(' ')}
                 >
                   {t(c.labelKey)}
@@ -116,7 +117,7 @@ export default function HelpFeedbackModal({ onClose }) {
           </div>
 
           <div>
-            <label htmlFor="help-message" className="block text-xs font-medium uppercase tracking-wide text-gray-500 mb-1.5">
+            <label htmlFor="help-message" className="block text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1.5">
               {t('components.help.yourMessage')}
             </label>
             <textarea
@@ -128,32 +129,33 @@ export default function HelpFeedbackModal({ onClose }) {
               disabled={busy}
               placeholder={t('components.help.placeholder')}
               data-testid="help-message-input"
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+              className="w-full rounded-lg border border-[var(--input)] bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
             />
-            <p className="mt-1 text-[11px] text-gray-400">{message.length}/2000</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">{message.length}/2000</p>
           </div>
 
           {error && <p className="text-sm text-rose-600">{error}</p>}
         </div>
 
-        <div className="p-5 border-t border-gray-100 flex justify-end gap-2">
-          <button
+        <div className="p-5 border-t border-[var(--border-subtle)] flex justify-end gap-2">
+          <Button
             type="button"
             onClick={onClose}
             disabled={busy}
-            className="rounded-lg px-4 py-2 text-sm text-gray-600 hover:bg-muted/40"
+            variant="ghost"
+            size="sm"
           >
             {sentAt ? t('components.help.close') : t('components.help.cancel')}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={submit}
             disabled={busy || !message.trim()}
             data-testid="help-submit-button"
-            className="rounded-lg bg-primary text-white text-sm font-medium px-4 py-2 disabled:opacity-50"
+            size="sm"
           >
             {busy ? t('components.help.sending') : sentAt ? t('components.help.sendAnother') : t('components.help.send')}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

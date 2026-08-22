@@ -18,7 +18,7 @@ export function SurfaceHeader({ title, description, action, className }) {
       )}
     >
       <div className="min-w-0 space-y-1">
-        {title && <CardTitle className="text-base font-semibold leading-snug">{title}</CardTitle>}
+        {title && <CardTitle className="text-base font-medium leading-snug">{title}</CardTitle>}
         {description && <CardDescription>{description}</CardDescription>}
       </div>
       {action ? <div className="shrink-0 pl-4">{action}</div> : null}

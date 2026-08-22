@@ -49,5 +49,12 @@
   "onboarding.nav.skip": "Salta — inserisci manualmente",
   "onboarding.nav.continue": "Continua",
   "onboarding.nav.finish": "Concludi e vedi i miei match",
-  "onboarding.nav.saving": "Salvataggio…"
+  "onboarding.nav.saving": "Salvataggio…",
+  "onboarding.fields.nameLocked": "Il tuo nome è impostato dalla scuola e non può essere modificato.",
+  "onboarding.persona.title": "Sono…",
+  "onboarding.persona.student": "Studente",
+  "onboarding.persona.alumnus": "Alumni",
+  "onboarding.fields.program": "Programma",
+  "onboarding.fields.programPlaceholder": "es. Laurea Magistrale in Management",
+  "onboarding.fields.cohortYear": "Anno di immatricolazione"
 }

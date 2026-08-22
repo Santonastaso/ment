@@ -35,7 +35,9 @@ export default function AppLayout() {
           }
         />
         <main className="flex-1 overflow-auto px-6 py-8 lg:px-10">
-          <Outlet />
+          <div className="mx-auto w-full max-w-[1160px]">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

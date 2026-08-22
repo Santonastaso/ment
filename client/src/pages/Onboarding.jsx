@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import SkillTagInput from '../components/SkillTagInput.jsx';
@@ -7,6 +7,7 @@ import MonthYearPicker from '../components/MonthYearPicker.jsx';
 import api from '../api/index.js';
 import SuggestedPill from '../components/SuggestedPill.jsx';
 import { useT } from '../i18n/index.jsx';
+import { Button } from '../components/ui/button.jsx';
 
 const DEPARTMENTS = ['Engineering', 'Finance', 'Marketing', 'Operations', 'HR', 'Legal', 'Product', 'Design', 'Sales', 'Other'];
 
@@ -28,8 +29,11 @@ export default function Onboarding() {
   const [classifierSource, setClassifierSource] = useState('');
   const [suggested, setSuggested] = useState(() => new Set());
 
-  // Step 1 — Background
-  const [name, setName] = useState(user?.name || '');
+  // Step 1 â€” Background
+  const [name] = useState(user?.name || ''); // read-only â€” users cannot change their name
+  const [persona, setPersona] = useState('student');
+  const [program, setProgram] = useState('');
+  const [cohortYear, setCohortYear] = useState('');
   const [department, setDepartment] = useState(user?.department || '');
   const [currentRole, setCurrentRole] = useState(user?.current_role || '');
   const [location, setLocation] = useState(user?.location || '');
@@ -37,12 +41,11 @@ export default function Onboarding() {
   // start_date / end_date are "YYYY-MM" strings (native <input type="month"> format)
   const [career, setCareer] = useState([{ role: '', department: '', company: '', start_date: '', end_date: '' }]);
 
-  // Step 2 — Can teach: array of { skill, example_project }
+  // Step 2 â€” Can teach: array of { skill, example_project }
   const [canTeach, setCanTeach] = useState([]);
 
-  // Step 3 — Wants to learn + day-shadow open question
+  // Step 3 â€” Wants to learn
   const [wantsToLearn, setWantsToLearn] = useState([]);
-  const [shadowResponse, setShadowResponse] = useState(user?.shadow_role_response || '');
 
   function addCareerRow() {
     setCareer([...career, { role: '', department: '', company: '', start_date: '', end_date: '' }]);
@@ -145,11 +148,13 @@ export default function Onboarding() {
         await api.post(`/profile/ingest/${draftId}/accept`, { accepted_json: accepted });
       }
       const res = await api.post('/users/me/onboarding', {
-        name, department, current_role: currentRole, location, bio,
-        shadow_role_response: shadowResponse,
+        department, current_role: currentRole, location, bio,
         career: validCareer,
         can_teach: canTeach,
-        wants_to_learn: wantsToLearn
+        wants_to_learn: wantsToLearn,
+        program,
+        cohort_year: cohortYear,
+        persona
       });
       updateUser(res.data);
       navigate('/');
@@ -165,7 +170,7 @@ export default function Onboarding() {
       <div className="flex items-center gap-2">
         <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">M</span>
         <div>
-          <h1 className="text-xl font-semibold text-foreground">{t('onboarding.header.title')}</h1>
+          <h1 className="text-xl font-medium tracking-[-0.01em] text-foreground">{t('onboarding.header.title')}</h1>
           <p className="text-sm text-muted-foreground">{t('onboarding.header.subtitle')}</p>
         </div>
       </div>
@@ -175,9 +180,9 @@ export default function Onboarding() {
         <div className="flex items-center gap-2 mb-8">
           {[0, 1, 2, 3].map(s => (
             <React.Fragment key={s}>
-              <div className={`flex items-center gap-1 shrink-0 ${step >= s ? 'text-foreground' : 'text-gray-400'}`}>
-                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold border-2 ${step > s ? 'bg-primary border-primary text-white' : step === s ? 'border-primary text-foreground' : 'border-gray-300 text-gray-400'}`}>
-                  {step > s ? '✓' : s + 1}
+              <div className={`flex items-center gap-1 shrink-0 ${step >= s ? 'text-foreground' : 'text-muted-foreground'}`}>
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold border-2 ${step > s ? 'bg-primary border-primary text-white' : step === s ? 'border-primary text-foreground' : 'border-[var(--input)] text-muted-foreground'}`}>
+                  {step > s ? 'âœ“' : s + 1}
                 </div>
                 <span className="text-xs font-medium hidden md:block">
                   {s === 0 ? t('onboarding.steps.import') : s === 1 ? t('onboarding.steps.background') : s === 2 ? t('onboarding.steps.teach') : t('onboarding.steps.learn')}
@@ -192,12 +197,12 @@ export default function Onboarding() {
           {step === 0 && (
             <>
               <div>
-                <h2 className="text-xl font-semibold text-foreground mb-1">{t('onboarding.import.title')}</h2>
-                <p className="text-gray-500 text-sm">
+                <h2 className="text-xl font-medium tracking-[-0.01em] text-foreground mb-1">{t('onboarding.import.title')}</h2>
+                <p className="text-muted-foreground text-sm">
                   {t('onboarding.import.desc')}
                 </p>
               </div>
-              <label className="block border-2 border-dashed border-gray-300 rounded-xl p-10 text-center cursor-pointer hover:border-primary-light hover:bg-gray-50">
+              <label className="block border-2 border-dashed border-[var(--input)] rounded-xl p-10 text-center cursor-pointer transition-colors duration-150 hover:border-foreground/30 hover:bg-muted">
                 <input
                   type="file"
                   accept=".docx,.pdf,.txt"
@@ -205,10 +210,10 @@ export default function Onboarding() {
                   disabled={uploading}
                   onChange={e => { if (e.target.files[0]) handleUpload(e.target.files[0]); e.target.value = ''; }}
                 />
-                {uploading ? <p className="text-sm text-gray-500">{t('onboarding.import.reading')}</p> : (
+                {uploading ? <p className="text-sm text-muted-foreground">{t('onboarding.import.reading')}</p> : (
                   <>
-                    <p className="text-sm font-medium text-gray-600">{t('onboarding.import.drop')}</p>
-                    <p className="text-xs text-gray-400 mt-1">{t('onboarding.import.hint')}</p>
+                    <p className="text-sm font-medium text-secondary-foreground">{t('onboarding.import.drop')}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{t('onboarding.import.hint')}</p>
                   </>
                 )}
               </label>
@@ -218,14 +223,39 @@ export default function Onboarding() {
           {step === 1 && (
             <>
               <div>
-                <h2 className="text-xl font-semibold text-foreground mb-1">{t('onboarding.background.title')}</h2>
-                <p className="text-gray-500 text-sm">{t('onboarding.background.desc')}</p>
+                <h2 className="text-xl font-medium tracking-[-0.01em] text-foreground mb-1">{t('onboarding.background.title')}</h2>
+                <p className="text-muted-foreground text-sm">{t('onboarding.background.desc')}</p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="sm:col-span-2">
                   <label className="label">{t('onboarding.fields.fullName')}</label>
-                  <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder={t('onboarding.fields.fullNamePlaceholder')} />
+                  <input className="input" value={name} disabled readOnly />
+                  <p className="mt-1 text-xs text-muted-foreground">{t('onboarding.fields.nameLocked')}</p>
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="label">{t('onboarding.persona.title')}</label>
+                  <div className="flex gap-2">
+                    {['student', 'alumnus'].map(p => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setPersona(p)}
+                        aria-pressed={persona === p}
+                        className={`h-14 flex-1 rounded-lg border text-base font-semibold transition-colors ${persona === p ? 'border-transparent bg-primary text-primary-foreground' : 'border-[var(--border)] bg-card text-muted-foreground hover:border-foreground/30 hover:text-foreground'}`}
+                      >
+                        {t(`onboarding.persona.${p}`)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="label">{t('onboarding.fields.program')}</label>
+                  <input className="input" value={program} onChange={e => setProgram(e.target.value)} placeholder={t('onboarding.fields.programPlaceholder')} />
+                </div>
+                <div>
+                  <label className="label">{t('onboarding.fields.cohortYear')}</label>
+                  <input className="input" type="number" min="1900" max="2100" value={cohortYear} onChange={e => setCohortYear(e.target.value)} placeholder="2024" />
                 </div>
                 <div className="sm:col-span-2">
                   <label className="label">{t('onboarding.fields.department')}{suggested.has('department') && <SuggestedPill source={classifierSource} />}</label>
@@ -239,26 +269,26 @@ export default function Onboarding() {
                   <input className="input" value={currentRole} onChange={e => setCurrentRole(e.target.value)} placeholder={t('onboarding.fields.currentRolePlaceholder')} />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="label">{t('onboarding.fields.location')}{suggested.has('location') && <SuggestedPill source={classifierSource} />} <span className="font-normal text-gray-400">{t('onboarding.fields.locationHint')}</span></label>
+                  <label className="label">{t('onboarding.fields.location')}{suggested.has('location') && <SuggestedPill source={classifierSource} />} <span className="font-normal text-muted-foreground">{t('onboarding.fields.locationHint')}</span></label>
                   <input className="input" value={location} onChange={e => setLocation(e.target.value)} placeholder={t('onboarding.fields.locationPlaceholder')} list="ment-location-suggestions" />
                   <datalist id="ment-location-suggestions">
-                    {['New York','San Francisco','Toronto','Mexico City','London','Berlin','Paris','Madrid','Amsterdam','Stockholm','Dublin','Milan','Tokyo','Singapore','Sydney','Mumbai','Bangalore','Seoul','São Paulo','Dubai','Remote'].map(l => <option key={l} value={l} />)}
+                    {['New York','San Francisco','Toronto','Mexico City','London','Berlin','Paris','Madrid','Amsterdam','Stockholm','Dublin','Milan','Tokyo','Singapore','Sydney','Mumbai','Bangalore','Seoul','SÃ£o Paulo','Dubai','Remote'].map(l => <option key={l} value={l} />)}
                   </datalist>
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="label">{t('onboarding.fields.bio')}{suggested.has('bio') && <SuggestedPill source={classifierSource} />} <span className="font-normal text-gray-400">{t('onboarding.fields.optional')}</span></label>
+                  <label className="label">{t('onboarding.fields.bio')}{suggested.has('bio') && <SuggestedPill source={classifierSource} />} <span className="font-normal text-muted-foreground">{t('onboarding.fields.optional')}</span></label>
                   <textarea className="input resize-none" rows={2} value={bio} onChange={e => setBio(e.target.value)} placeholder={t('onboarding.fields.bioPlaceholder')} />
                 </div>
               </div>
 
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <label className="label mb-0">{t('onboarding.career.previousRoles')}{suggested.has('career') && <SuggestedPill source={classifierSource} />} <span className="font-normal text-gray-400">{t('onboarding.fields.optional')}</span></label>
+                  <label className="label mb-0">{t('onboarding.career.previousRoles')}{suggested.has('career') && <SuggestedPill source={classifierSource} />} <span className="font-normal text-muted-foreground">{t('onboarding.fields.optional')}</span></label>
                   <button type="button" onClick={addCareerRow} className="text-sm text-primary hover:text-foreground font-medium">{t('onboarding.career.addRole')}</button>
                 </div>
                 <div className="space-y-3">
                   {career.map((c, i) => (
-                    <div key={i} className="bg-gray-50 rounded-lg p-3 space-y-2">
+                    <div key={i} className="bg-muted rounded-lg p-3 space-y-2">
                       <div className="grid grid-cols-2 gap-2">
                         <input className="input text-sm" placeholder={t('onboarding.career.roleTitle')} value={c.role} onChange={e => updateCareer(i, 'role', e.target.value)} />
                         <select className="input text-sm" value={c.department} onChange={e => updateCareer(i, 'department', e.target.value)}>
@@ -291,8 +321,8 @@ export default function Onboarding() {
           {step === 2 && (
             <>
               <div>
-                <h2 className="text-xl font-semibold text-foreground mb-1">{t('onboarding.teach.title')}{suggested.has('can_teach') && <SuggestedPill source={classifierSource} />}</h2>
-                <p className="text-gray-500 text-sm">{t('onboarding.teach.desc')}</p>
+                <h2 className="text-xl font-medium tracking-[-0.01em] text-foreground mb-1">{t('onboarding.teach.title')}{suggested.has('can_teach') && <SuggestedPill source={classifierSource} />}</h2>
+                <p className="text-muted-foreground text-sm">{t('onboarding.teach.desc')}</p>
               </div>
               <TeachSkillsEditor
                 value={canTeach}
@@ -301,7 +331,7 @@ export default function Onboarding() {
                 ariaLabel={t('onboarding.teach.aria')}
               />
               {canTeach.length === 0 && (
-                <p className="text-xs text-gray-400">{t('onboarding.teach.empty')}</p>
+                <p className="text-xs text-muted-foreground">{t('onboarding.teach.empty')}</p>
               )}
             </>
           )}
@@ -310,8 +340,8 @@ export default function Onboarding() {
           {step === 3 && (
             <>
               <div>
-                <h2 className="text-xl font-semibold text-foreground mb-1">{t('onboarding.learn.title')}{suggested.has('wants_to_learn') && <SuggestedPill source={classifierSource} />}</h2>
-                <p className="text-gray-500 text-sm">{t('onboarding.learn.desc')}</p>
+                <h2 className="text-xl font-medium tracking-[-0.01em] text-foreground mb-1">{t('onboarding.learn.title')}{suggested.has('wants_to_learn') && <SuggestedPill source={classifierSource} />}</h2>
+                <p className="text-muted-foreground text-sm">{t('onboarding.learn.desc')}</p>
               </div>
               <SkillTagInput
                 value={wantsToLearn}
@@ -319,20 +349,6 @@ export default function Onboarding() {
                 placeholder={t('onboarding.learn.placeholder')}
                 ariaLabel={t('onboarding.learn.aria')}
               />
-
-              <div className="pt-2">
-                <label className="label">
-                  {t('onboarding.learn.shadowLabel')}
-                  <span className="font-normal text-gray-400 ml-1">{t('onboarding.fields.optional')}</span>
-                </label>
-                <textarea
-                  className="input resize-none"
-                  rows={3}
-                  value={shadowResponse}
-                  onChange={e => setShadowResponse(e.target.value)}
-                  placeholder={t('onboarding.learn.shadowPlaceholder')}
-                />
-              </div>
             </>
           )}
 
@@ -340,19 +356,19 @@ export default function Onboarding() {
 
           <div className="flex justify-between pt-2">
             {step > 0 ? (
-              <button onClick={() => setStep(s => s - 1)} className="btn-secondary">{t('onboarding.nav.back')}</button>
+              <Button onClick={() => setStep(s => s - 1)} variant="outline">{t('onboarding.nav.back')}</Button>
             ) : <div />}
 
             {step === 0 ? (
-              <button onClick={() => setStep(1)} className="btn-primary">{t('onboarding.nav.skip')}</button>
+              <Button onClick={() => setStep(1)}>{t('onboarding.nav.skip')}</Button>
             ) : step < 3 ? (
-              <button onClick={() => setStep(s => s + 1)} className="btn-primary">
+              <Button onClick={() => setStep(s => s + 1)}>
                 {t('onboarding.nav.continue')}
-              </button>
+              </Button>
             ) : (
-              <button onClick={handleFinish} disabled={saving} className="btn-primary">
+              <Button onClick={handleFinish} disabled={saving}>
                 {saving ? t('onboarding.nav.saving') : t('onboarding.nav.finish')}
-              </button>
+              </Button>
             )}
           </div>
         </div>

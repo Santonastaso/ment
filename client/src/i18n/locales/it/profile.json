@@ -1,4 +1,12 @@
 {
+  "profile.tabs.label": "Sezioni del profilo",
+  "profile.tab.overview": "Panoramica",
+  "profile.tab.skills": "Competenze",
+  "profile.tab.availability": "Disponibilità",
+  "profile.tab.experience": "Esperienze",
+  "profile.tab.meetings": "Incontri",
+  "profile.tab.reflections": "Riflessioni",
+  "profile.manageSkills.desc": "In cosa puoi aiutare gli altri e cosa stai cercando di sviluppare.",
   "profile.toast.profileUpdated": "Profilo aggiornato",
   "profile.toast.skillRemoved": "“{skill}” rimossa",
   "profile.toast.skillRemoveError": "Impossibile rimuovere la competenza — riprova.",
@@ -89,5 +97,10 @@
   "profile.shadow.add": "+ Aggiungi",
   "profile.shadow.placeholder": "Se potessi passare una giornata ad affiancare qualcuno in un ruolo completamente diverso, come sarebbe quel ruolo?",
   "profile.shadow.empty": "Ancora nessuna risposta — anche una frase aiuta.",
-  "profile.recognition.title": "Riconoscimenti"
+  "profile.recognition.title": "Riconoscimenti",
+  "profile.fields.program": "Programma",
+  "profile.fields.cohortYear": "Anno di immatricolazione",
+  "profile.fields.classOf": "Coorte {year}",
+  "profile.persona.student": "Studente",
+  "profile.persona.alumnus": "Alumni"
 }

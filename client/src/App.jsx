@@ -10,8 +10,8 @@ import Onboarding from './pages/Onboarding.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import Explorer from './pages/Explorer.jsx';
 import Profile from './pages/Profile.jsx';
-import TeamSkills from './pages/TeamSkills.jsx';
 import AdminDashboard from './pages/AdminDashboard.jsx';
+import AdminOps from './pages/AdminOps.jsx';
 import KnowledgeGraph from './pages/KnowledgeGraph.jsx';
 import AppLayout from './components/AppLayout.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -85,13 +85,10 @@ function AdminRoute({ children }) {
   return children;
 }
 
-// Team Insights is for team leads and managers only (admins can view via the
-// admin tools). Employees are redirected home.
-function TeamRoute({ children }) {
+function PlatformAdminRoute({ children }) {
   const { user } = useAuth();
-  if (!(['team_lead', 'manager'].includes(user?.role) || user?.is_admin)) {
-    return <Navigate to="/" replace />;
-  }
+  if (!user?.is_admin) return <Navigate to="/" replace />;
+  if (user.admin_scope !== 'platform') return <Navigate to="/admin" replace />;
   return children;
 }
 
@@ -109,8 +106,8 @@ export default function App() {
         <Route path="/explorer" element={<Explorer />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/profile/:id" element={<Profile />} />
-        <Route path="/team" element={<TeamRoute><TeamSkills /></TeamRoute>} />
         <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+        <Route path="/admin/ops" element={<PlatformAdminRoute><AdminOps /></PlatformAdminRoute>} />
         <Route path="/admin/graph" element={<AdminRoute><KnowledgeGraph /></AdminRoute>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

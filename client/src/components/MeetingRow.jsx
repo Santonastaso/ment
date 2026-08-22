@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import RatingPicker from './RatingPicker.jsx';
 import SessionRequestModal from './SessionRequestModal.jsx';
 import api from '../api/index.js';
 import { useT } from '../i18n/index.jsx';
+import { Button } from './ui/button.jsx';
 
 // Shared collapsed/expandable row used by both Past and Upcoming meetings.
 //
@@ -63,7 +64,7 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
       ? { label: t('components.meeting.statusAwaitingYours'), className: 'bg-amber-100 text-amber-800 border border-amber-300' }
       : { label: t('components.meeting.statusAwaitingTheirs'), className: 'bg-amber-50 text-amber-700 border border-amber-200' };
   } else if (session.status === 'scheduled' && !hasDate) {
-    statusBadge = { label: t('components.meeting.statusConfirmedNoDate'), className: 'bg-blue-50 text-primary border border-blue-200' };
+    statusBadge = { label: t('components.meeting.statusConfirmedNoDate'), className: 'bg-muted text-muted-foreground border border-[var(--border)]' };
   }
 
   const topics = session.topics || [];
@@ -72,14 +73,14 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
 
   const roleBadge = isMentor
     ? { label: t('components.meeting.roleMentor'), className: 'bg-primary text-primary-foreground' }
-    : { label: t('components.meeting.roleMentee'), className: 'bg-amber-100 text-amber-800 border border-amber-300' };
+    : { label: t('components.meeting.roleMentee'), className: 'bg-muted text-muted-foreground border border-[var(--border)]' };
 
   return (
-    <div className="border border-gray-200 rounded-xl overflow-hidden">
+    <div className="border border-[var(--border)] rounded-xl overflow-hidden">
       <button
         type="button"
         onClick={() => setExpanded(e => !e)}
-        className="w-full text-left p-4 hover:bg-gray-50 transition-colors flex items-start gap-3"
+        className="w-full text-left p-4 hover:bg-muted transition-colors flex items-start gap-3"
       >
         <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-semibold flex-shrink-0">
           {counterpart?.name?.charAt(0)}
@@ -89,19 +90,19 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
             <span className="font-medium text-foreground">{session.title}</span>
             {hasDate ? (
               <>
-                <span className="text-xs text-gray-400">·</span>
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-muted-foreground">Â·</span>
+                <span className="text-xs text-muted-foreground">
                   {dateLabel}{timeLabel ? ` ${t('components.meeting.at')} ${timeLabel}` : ''}
                 </span>
               </>
             ) : (
               <>
-                <span className="text-xs text-gray-400">·</span>
-                <span className="text-xs text-gray-500 italic">{t('components.meeting.noDateProposed')}</span>
+                <span className="text-xs text-muted-foreground">Â·</span>
+                <span className="text-xs text-muted-foreground italic">{t('components.meeting.noDateProposed')}</span>
               </>
             )}
             {relative && (
-              <span className="text-[10px] uppercase tracking-wide bg-blue-50 text-primary border border-blue-200 rounded-full px-2 py-0.5">
+              <span className="text-[10px] uppercase tracking-wide bg-muted text-muted-foreground border border-[var(--border)] rounded-full px-2 py-0.5">
                 {relative}
               </span>
             )}
@@ -120,40 +121,40 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
             <span className={`text-[10px] uppercase tracking-wide rounded-full px-2 py-0.5 font-medium ${roleBadge.className}`}>
               {roleBadge.label}
             </span>
-            <span className="text-xs text-gray-600">
+            <span className="text-xs text-secondary-foreground">
               {t('components.meeting.with')}{' '}
               <Link to={`/profile/${counterpart?.id}`} className="text-primary hover:underline" onClick={e => e.stopPropagation()}>
                 {counterpart?.name}
               </Link>
-              <span className="text-gray-400"> · {counterpart?.department}</span>
+              <span className="text-muted-foreground"> Â· {counterpart?.department}</span>
             </span>
           </div>
           {visibleTopics.length > 0 && (
             <div className="flex flex-wrap gap-1.5 pt-0.5">
               {visibleTopics.map((t, i) => (
-                <span key={i} className="bg-blue-50 text-primary border border-blue-200 rounded-full px-2 py-0.5 text-[11px] font-medium">
+                <span key={i} className="bg-muted text-foreground border border-[var(--border)] rounded-full px-2 py-0.5 text-[11px] font-medium">
                   {t}
                 </span>
               ))}
               {extraTopics > 0 && (
-                <span className="text-[11px] text-gray-500 italic">{t('components.meeting.moreOne', { count: extraTopics })}</span>
+                <span className="text-[11px] text-muted-foreground italic">{t('components.meeting.moreOne', { count: extraTopics })}</span>
               )}
             </div>
           )}
         </div>
-        <span className="text-xs text-gray-400 flex-shrink-0 mt-1">{expanded ? '▴' : '▾'}</span>
+        <span className="text-xs text-muted-foreground flex-shrink-0 mt-1">{expanded ? 'â–´' : 'â–¾'}</span>
       </button>
 
       {expanded && (
-        <div className="px-4 pb-4 pt-1 text-sm space-y-3 border-t border-gray-100 bg-gray-50/50">
+        <div className="px-4 pb-4 pt-1 text-sm space-y-3 border-t border-[var(--border-subtle)] bg-muted/50">
           {topics.length > visibleTopics.length && (
             <div>
-              <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-1.5">
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium mb-1.5">
                 {mode === 'upcoming' ? t('components.meeting.topicsToCover') : t('components.meeting.topicsCovered')}
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {topics.map((t, i) => (
-                  <span key={i} className="bg-blue-50 text-primary border border-blue-200 rounded-full px-2.5 py-0.5 text-xs font-medium">
+                  <span key={i} className="bg-muted text-foreground border border-[var(--border)] rounded-full px-2.5 py-0.5 text-xs font-medium">
                     {t}
                   </span>
                 ))}
@@ -162,8 +163,8 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
           )}
           {session.pre_session_question && (
             <div>
-              <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-0.5">{t('components.meeting.focusQuestion')}</p>
-              <p className="text-gray-700 italic">“{session.pre_session_question}”</p>
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium mb-0.5">{t('components.meeting.focusQuestion')}</p>
+              <p className="text-foreground italic">â€œ{session.pre_session_question}â€</p>
             </div>
           )}
           {mode === 'past' && (() => {
@@ -195,8 +196,8 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
               return (
                 <div className="space-y-3">
                   <div>
-                    <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-0.5">{t('components.meeting.yourReflectionPrivate')}</p>
-                    <p className="text-xs text-gray-600 mb-1">{reflectionPrompt}</p>
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium mb-0.5">{t('components.meeting.yourReflectionPrivate')}</p>
+                    <p className="text-xs text-secondary-foreground mb-1">{reflectionPrompt}</p>
                     <textarea
                       className="input resize-none text-sm"
                       rows={3}
@@ -207,23 +208,24 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
                     />
                   </div>
                   <div>
-                    <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-0.5">{t('components.meeting.yourRatingPrivate')}</p>
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium mb-0.5">{t('components.meeting.yourRatingPrivate')}</p>
                     <RatingPicker value={ratingDraft} onChange={setRatingDraft} />
                   </div>
                   <div className="flex gap-2">
-                    <button
+                    <Button
                       onClick={saveReflection}
                       disabled={savingReflection || (!reflectionDraft.trim() && ratingDraft === null)}
-                      className="btn-primary text-sm"
+                      size="sm"
                     >
                       {savingReflection ? t('components.meeting.saving') : t('components.meeting.save')}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={() => { setEditingReflection(false); setReflectionDraft(''); setRatingDraft(null); }}
-                      className="btn-ghost text-sm"
+                      variant="ghost"
+                      size="sm"
                     >
                       {t('components.meeting.cancel')}
-                    </button>
+                    </Button>
                   </div>
                 </div>
               );
@@ -233,7 +235,7 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
               return (
                 <div className="space-y-2">
                   <div className="flex items-baseline justify-between gap-2 mb-0.5">
-                    <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium">{t('components.meeting.yourReflectionPrivate')}</p>
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium">{t('components.meeting.yourReflectionPrivate')}</p>
                     <button
                       onClick={() => { setReflectionDraft(myReflection || ''); setRatingDraft(myRating ?? null); setEditingReflection(true); }}
                       className="text-xs text-primary hover:text-foreground font-medium"
@@ -241,9 +243,9 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
                       {t('components.meeting.edit')}
                     </button>
                   </div>
-                  {myReflection && <p className="text-gray-700 whitespace-pre-wrap">{myReflection}</p>}
+                  {myReflection && <p className="text-foreground whitespace-pre-wrap">{myReflection}</p>}
                   {myRating && (
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-muted-foreground">
                       {t('components.meeting.yourRating')}<RatingPicker value={myRating} onChange={() => {}} disabled showHint={false} />
                     </div>
                   )}
@@ -253,34 +255,37 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
 
             return (
               <div>
-                <p className="text-gray-400 text-xs italic mb-2">
+                <p className="text-muted-foreground text-xs italic mb-2">
                   {t('components.meeting.noReflection', { name: partnerName })}
                 </p>
-                <button
+                <Button
                   onClick={() => { setReflectionDraft(''); setRatingDraft(null); setEditingReflection(true); }}
-                  className="btn-secondary text-xs"
+                  variant="outline"
+                  size="sm"
                 >
                   {t('components.meeting.addReflection')}
-                </button>
+                </Button>
               </div>
             );
           })()}
 
           {/* Follow-up: book another session with the same counterpart. */}
           {mode === 'past' && counterpart?.id && !counterpart?.deactivated_at && (
-            <div className="pt-1 border-t border-gray-100">
+            <div className="pt-1 border-t border-[var(--border-subtle)]">
               {followupDone ? (
                 <p className="text-xs text-emerald-700 font-medium pt-2">{t('components.meeting.followUpSent')}</p>
               ) : (
-                <button
+                <Button
                   onClick={openFollowup}
                   disabled={loadingFollowup}
-                  className="btn-secondary text-xs mt-2"
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
                 >
                   {loadingFollowup
                     ? t('components.meeting.followUpLoading')
                     : t('components.meeting.followUp', { name: counterpart?.name?.split(' ')[0] || '' })}
-                </button>
+                </Button>
               )}
             </div>
           )}
@@ -298,7 +303,7 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
   );
 }
 
-// Helpers — produce short, human-friendly relative time strings.
+// Helpers â€” produce short, human-friendly relative time strings.
 function pastRelative(date, t) {
   const ms = Date.now() - date.getTime();
   if (ms < 0) return null;

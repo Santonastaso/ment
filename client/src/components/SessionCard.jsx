@@ -1,19 +1,20 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ChevronRight, X } from 'lucide-react';
 import IcsDownloadButton from './IcsDownloadButton.jsx';
 import RatingPicker from './RatingPicker.jsx';
-import { Surface, SurfaceBody } from './Surface.jsx';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import { useModalA11y } from '../lib/useModalA11y.js';
 import api from '../api/index.js';
 import { useT } from '../i18n/index.jsx';
 
-// Softer status badges — slate borders, subtle backgrounds. Trust-palette
-// rather than the saturated yellow/blue/green of the previous version.
-const statusColors = {
-  pending:   'bg-amber-50 text-amber-800 border-amber-200',
-  scheduled: 'bg-primary/10 text-primary border-primary/20',
-  completed: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  cancelled: 'bg-muted text-muted-foreground border-border',
+// Status rendered as a small dot + word — semantic colour stays a dot,
+// per the app-wide design language.
+const statusDot = {
+  pending:   'bg-amber-500',
+  scheduled: 'bg-primary',
+  completed: 'bg-emerald-500',
+  cancelled: 'bg-zinc-400',
 };
 
 // Min datetime (HTML form attribute) — 1 hour from now
@@ -33,6 +34,7 @@ function isoToLocalInput(iso) {
 
 export default function SessionCard({ session, currentUserId, onUpdate }) {
   const { t } = useT();
+  const [open, setOpen] = useState(false);
   const [reflection, setReflection] = useState('');
   const [rating, setRating] = useState(null);
   const [showReflection, setShowReflection] = useState(false);
@@ -40,6 +42,15 @@ export default function SessionCard({ session, currentUserId, onUpdate }) {
   const [draftDate, setDraftDate] = useState(isoToLocalInput(session.scheduled_at));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const dialogRef = useModalA11y();
+
+  // Close on Escape while the popup is open.
+  useEffect(() => {
+    if (!open) return undefined;
+    function onKey(e) { if (e.key === 'Escape') setOpen(false); }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open]);
 
   const isMentor = session.mentor?.id === currentUserId;
   const isMentee = session.mentee?.id === currentUserId;
@@ -134,164 +145,206 @@ export default function SessionCard({ session, currentUserId, onUpdate }) {
     onUpdate?.(updated.data);
   }
 
-  const initials = (other?.name || '?').split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase();
-
   return (
-    <Surface className="transition-colors hover:border-primary/25">
-      <SurfaceBody>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <Avatar className="size-10">
-            <AvatarFallback className="bg-primary/10 text-sm font-semibold text-primary">{initials}</AvatarFallback>
-          </Avatar>
-          <div>
-            <div className="flex items-center gap-2">
-              <Link to={`/profile/${other?.id}`} className="font-semibold text-foreground hover:text-primary text-sm transition-colors">
-                {other?.name}
-              </Link>
-              <span className="text-xs text-muted-foreground">{otherRole}</span>
-            </div>
-            <p className="text-sm font-medium text-muted-foreground mt-0.5">{session.title}</p>
-            {session.scheduled_at ? (
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {new Date(session.scheduled_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
-              </p>
-            ) : isUndated ? (
-              <p className="text-xs text-muted-foreground italic mt-0.5">{t('components.session.noDateSet')}</p>
-            ) : null}
-            {session.topics?.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mt-1.5">
-                {session.topics.map((t, i) => (
-                  <span key={i} className="bg-primary/10 text-primary border border-primary/20 rounded-full px-2 py-0.5 text-[11px] font-medium">
-                    {t}
-                  </span>
-                ))}
-              </div>
+    <>
+      {/* Collapsed row — the only thing visible until clicked. */}
+      <div className="py-4 first:pt-1 last:pb-1">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-haspopup="dialog"
+          className="flex w-full items-center justify-between gap-3 text-left"
+        >
+          <span className="min-w-0 truncate text-sm">
+            <span className="font-medium text-foreground">{other?.name}</span>
+            <span className="text-muted-foreground"> · {otherRole}</span>
+          </span>
+          <span className="flex shrink-0 items-center gap-2.5 text-xs text-muted-foreground">
+            {session.scheduled_at && (
+              <span>
+                {new Date(session.scheduled_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+              </span>
             )}
-          </div>
-        </div>
-        <span className={`text-[10px] font-semibold uppercase tracking-label px-2 py-1 rounded-full border ${statusColors[session.status] || statusColors.pending}`}>
-          {statusLabel(session.status)}
-        </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className={`size-1.5 rounded-full ${statusDot[session.status] || statusDot.pending}`} aria-hidden="true" />
+              {statusLabel(session.status)}
+            </span>
+            <ChevronRight className="size-3.5" aria-hidden="true" />
+          </span>
+        </button>
       </div>
 
-      {/* Pre-session question */}
-      {session.pre_session_question && (
-        <div className="mt-4 bg-muted rounded-lg p-3 text-sm text-muted-foreground border border-border">
-          <span className="font-medium text-foreground">{t('components.session.focusQuestion')}</span>
-          <span className="italic">"{session.pre_session_question}"</span>
-        </div>
-      )}
-
-      {/* Your private reflection — visible only to the side that wrote it */}
-      {session.status === 'completed' && (
-        (isMentee && session.reflection) || (isMentor && session.mentor_reflection)
-      ) && (
-        <div className="mt-3 bg-emerald-50 rounded-lg p-3 text-sm text-muted-foreground border border-emerald-100">
-          <span className="font-medium text-emerald-700">{t('components.session.yourReflection')}</span>
-          <span className="italic">"{isMentor ? session.mentor_reflection : session.reflection}"</span>
-        </div>
-      )}
-
-      {/* Reflection input — shown when the user clicks Mark as completed */}
-      {showReflection && session.status !== 'completed' && (
-        <div className="mt-3 space-y-3">
-          <div>
-            <label className="label text-sm">{reflectionPrompt}</label>
-            <textarea
-              className="input resize-none text-sm"
-              rows={3}
-              value={reflection}
-              onChange={e => setReflection(e.target.value)}
-              placeholder={t('components.session.reflectionPlaceholder')}
-              autoFocus
-            />
-          </div>
-          <div>
-            <label className="label text-sm">{t('components.session.howUseful')}</label>
-            <RatingPicker value={rating} onChange={setRating} />
-          </div>
-          {error && (
-            <p className="text-sm text-red-600" role="alert">{error}</p>
-          )}
-        </div>
-      )}
-
-      {/* Reschedule input — inline datetime picker */}
-      {editingDate && (
-        <div className="mt-4 bg-muted rounded-lg p-3 border border-border space-y-2">
-          <label className="label">
-            {isMentor && session.status === 'pending'
-              ? t('components.session.dateLabelAccept')
-              : session.scheduled_at ? t('components.session.dateLabelReschedule') : t('components.session.dateLabelSet')}
-          </label>
-          <input
-            type="datetime-local"
-            className="input text-sm"
-            value={draftDate}
-            min={minDateTimeLocal()}
-            onChange={e => setDraftDate(e.target.value)}
-            autoFocus
-          />
-        </div>
-      )}
-
-      {/* Actions */}
-      <div className="mt-4 flex flex-wrap gap-2 items-center">
-        {showAcceptDecline && (
-          <>
-            <button onClick={handleAccept} className="btn-primary text-sm">{t('components.session.accept')}</button>
-            <button onClick={handleDecline} className="btn-ghost text-sm text-red-500 hover:bg-red-50">{t('components.session.decline')}</button>
-          </>
-        )}
-
-        {showMarkComplete && !editingDate && (
-          <button onClick={handleComplete} disabled={submitting} className="btn-primary text-sm">
-            {showReflection ? (submitting ? t('components.session.saving') : t('components.session.saveReflectionComplete')) : t('components.session.markCompleted')}
-          </button>
-        )}
-
-        {/* Reschedule controls — different states */}
-        {showReschedule && !editingDate && !showReflection && (
-          <button
-            onClick={() => { setDraftDate(isoToLocalInput(session.scheduled_at)); setEditingDate(true); }}
-            className="btn-secondary text-sm"
+      {/* Popup with the meeting details, reflection and actions. */}
+      {open && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setOpen(false); }}
+        >
+          <div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={`session-modal-title-${session.id}`}
+            className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl bg-white [box-shadow:var(--shadow-overlay)]"
           >
-            {isMentor && session.status === 'pending'
-              ? t('components.session.acceptSchedule')
-              : session.scheduled_at ? t('components.session.reschedule') : t('components.session.setDate')}
-          </button>
-        )}
-        {editingDate && (
-          <>
-            <button onClick={handleSaveDate} disabled={submitting || !draftDate} className="btn-primary text-sm">
-              {submitting ? t('components.session.saving') : t('components.session.save')}
-            </button>
-            <button onClick={() => { setEditingDate(false); setDraftDate(isoToLocalInput(session.scheduled_at)); }} className="btn-ghost text-sm">
-              {t('components.session.discard')}
-            </button>
-          </>
-        )}
+            {/* Header */}
+            <div className="flex items-start justify-between gap-3 border-b border-[var(--border-subtle)] p-5">
+              <div className="min-w-0">
+                <h2 id={`session-modal-title-${session.id}`} className="text-base font-medium leading-snug text-foreground">
+                  {session.title}
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {other?.name} · {otherRole}
+                  {session.scheduled_at
+                    ? <> · {new Date(session.scheduled_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</>
+                    : null}
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label={t('components.session.close')}
+                onClick={() => setOpen(false)}
+              >
+                <X />
+              </Button>
+            </div>
 
-        {/* Cancel — visible whenever the session can still be called off.
-            For pending-as-mentor we already have Decline, which is the same action;
-            don't double up. */}
-        {showCancel && !showAcceptDecline && !editingDate && !showReflection && (
-          <button onClick={handleCancelSession} className="btn-ghost text-sm text-red-500 hover:bg-red-50">
-            {t('components.session.cancel')}
-          </button>
-        )}
+            {/* Body */}
+            <div className="flex-1 space-y-4 overflow-y-auto p-5">
+              {!session.scheduled_at && isUndated && (
+                <p className="text-sm italic text-muted-foreground">{t('components.session.noDateSet')}</p>
+              )}
 
-        {/* ICS download — only for confirmed scheduled sessions with a date */}
-        {isFuture && <IcsDownloadButton sessionId={session.id} />}
+              {session.topics?.length > 0 && (
+                <p className="text-sm text-muted-foreground">{session.topics.join(' · ')}</p>
+              )}
 
-        {showReflection && !submitting && (
-          <button onClick={() => setShowReflection(false)} className="btn-ghost text-sm">
-            {t('components.session.discardReflection')}
-          </button>
-        )}
-      </div>
-      </SurfaceBody>
-    </Surface>
+              {session.pre_session_question && (
+                <p className="border-l-2 border-[var(--border)] pl-3 text-sm italic text-muted-foreground">
+                  “{session.pre_session_question}”
+                </p>
+              )}
+
+              {session.status === 'completed' &&
+                ((isMentee && session.reflection) || (isMentor && session.mentor_reflection)) && (
+                  <div>
+                    <p className="label-meta">{t('components.session.yourReflection')}</p>
+                    <p className="mt-1 text-sm italic text-muted-foreground">
+                      “{isMentor ? session.mentor_reflection : session.reflection}”
+                    </p>
+                  </div>
+                )}
+
+              {/* Reflection input — shown when the user clicks Mark as completed */}
+              {showReflection && session.status !== 'completed' && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="label">{reflectionPrompt}</label>
+                    <textarea
+                      className="input resize-none"
+                      rows={3}
+                      value={reflection}
+                      onChange={e => setReflection(e.target.value)}
+                      placeholder={t('components.session.reflectionPlaceholder')}
+                      autoFocus
+                    />
+                  </div>
+                  <div>
+                    <label className="label">{t('components.session.howUseful')}</label>
+                    <RatingPicker value={rating} onChange={setRating} />
+                  </div>
+                </div>
+              )}
+
+              {/* Reschedule input — inline datetime picker */}
+              {editingDate && (
+                <div className="space-y-1">
+                  <label className="label">
+                    {isMentor && session.status === 'pending'
+                      ? t('components.session.dateLabelAccept')
+                      : session.scheduled_at ? t('components.session.dateLabelReschedule') : t('components.session.dateLabelSet')}
+                  </label>
+                  <input
+                    type="datetime-local"
+                    className="input max-w-xs"
+                    value={draftDate}
+                    min={minDateTimeLocal()}
+                    onChange={e => setDraftDate(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+              )}
+
+              {error && (
+                <p className="text-sm text-red-600" role="alert">{error}</p>
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="flex flex-wrap items-center gap-2 border-t border-[var(--border-subtle)] p-4">
+              {showAcceptDecline && (
+                <>
+                  <Button type="button" size="sm" onClick={handleAccept}>{t('components.session.accept')}</Button>
+                  <Button type="button" variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={handleDecline}>
+                    {t('components.session.decline')}
+                  </Button>
+                </>
+              )}
+
+              {showMarkComplete && !editingDate && (
+                <Button type="button" size="sm" onClick={handleComplete} disabled={submitting}>
+                  {showReflection ? (submitting ? t('components.session.saving') : t('components.session.saveReflectionComplete')) : t('components.session.markCompleted')}
+                </Button>
+              )}
+
+              {showReschedule && !editingDate && !showReflection && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setDraftDate(isoToLocalInput(session.scheduled_at)); setEditingDate(true); }}
+                >
+                  {isMentor && session.status === 'pending'
+                    ? t('components.session.acceptSchedule')
+                    : session.scheduled_at ? t('components.session.reschedule') : t('components.session.setDate')}
+                </Button>
+              )}
+
+              {editingDate && (
+                <>
+                  <Button type="button" size="sm" onClick={handleSaveDate} disabled={submitting || !draftDate}>
+                    {submitting ? t('components.session.saving') : t('components.session.save')}
+                  </Button>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => { setEditingDate(false); setDraftDate(isoToLocalInput(session.scheduled_at)); }}>
+                    {t('components.session.discard')}
+                  </Button>
+                </>
+              )}
+
+              {/* Cancel — visible whenever the session can still be called off.
+                  For pending-as-mentor we already have Decline, which is the same action;
+                  don't double up. */}
+              {showCancel && !showAcceptDecline && !editingDate && !showReflection && (
+                <Button type="button" variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={handleCancelSession}>
+                  {t('components.session.cancel')}
+                </Button>
+              )}
+
+              {isFuture && <IcsDownloadButton sessionId={session.id} />}
+
+              <Link
+                to={`/profile/${other?.id}`}
+                className="ml-auto text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                onClick={() => setOpen(false)}
+              >
+                {t('components.session.viewProfile')}
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

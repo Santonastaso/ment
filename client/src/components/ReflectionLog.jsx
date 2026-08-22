@@ -1,6 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
+import { ChevronRight, X } from 'lucide-react';
 import api from '../api/index.js';
 import { useT } from '../i18n/index.jsx';
+import { Button } from './ui/button.jsx';
+import { useModalA11y } from '../lib/useModalA11y.js';
 
 // Reflection log: weekly two-question check-in. Answers are classified by an AI
 // (or heuristic fallback) into skill gaps and strengths, which the user can apply
@@ -61,7 +64,7 @@ export default function ReflectionLog({
 
   // In dashboard mode (hideHistory), surface only the freshly-submitted entry
   // (the one this dashboard panel just produced). Past reflections stay on
-  // the profile page — the dashboard panel is "current check-in" only.
+  // the profile page â€” the dashboard panel is "current check-in" only.
   const visibleEntries = hideHistory
     ? entries.filter((e) => e.id === latestEntryId)
     : entries;
@@ -164,36 +167,34 @@ export default function ReflectionLog({
   return (
     <div className="space-y-4">
       {toast && (
-        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm rounded-lg px-3 py-2">
+        <div className="border border-[var(--border)] text-foreground text-sm rounded-lg px-3 py-2 bg-muted/40">
           {toast}
         </div>
       )}
 
-      {/* Check-in prompt — suppressed in dashboard mode (the dashboard
+      {/* Check-in prompt â€” suppressed in dashboard mode (the dashboard
           already renders its own "Open check-in" alert above this panel). */}
       {!hideHistory && dueForCheckIn && !showForm && (
-        <div className="bg-gradient-to-r from-blue-50 to-amber-50 border border-blue-200 rounded-xl p-4 flex items-start justify-between gap-4">
+        <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-foreground font-semibold text-sm">{t('components.reflection.dueTitle')}</p>
-            <p className="text-xs text-gray-600 mt-0.5">
+            <p className="text-xs text-muted-foreground mt-0.5">
               {lastEntryDays === null
                 ? t('components.reflection.dueBodyFirst')
                 : t('components.reflection.dueBodyDays', { days: lastEntryDays })}
             </p>
           </div>
-          <button onClick={() => setShowForm(true)} className="btn-primary text-sm whitespace-nowrap">
+          <Button onClick={() => setShowForm(true)} size="sm" className="whitespace-nowrap">
             {t('components.reflection.startCheckIn')}
-          </button>
+          </Button>
         </div>
       )}
 
-      {/* New entry form */}
+      {/* New entry form â€” renders inline in the parent panel; no extra
+          card-in-card container, no repeated title (the parent panel is
+          already labelled "Weekly check-in"). */}
       {showForm && (
-        <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-foreground">{t('components.reflection.weeklyCheckIn')}</h3>
-            <button onClick={() => { setShowForm(false); setError(''); }} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
-          </div>
+        <div className="space-y-4 border-b border-[var(--border)] pb-5">
           {PROMPTS.map(p => (
             <div key={p.key}>
               <label className="label">{t(p.labelKey)}</label>
@@ -209,15 +210,15 @@ export default function ReflectionLog({
           ))}
           {error && <p className="text-rose-600 text-sm">{error}</p>}
           <div className="flex justify-end gap-2">
-            <button onClick={() => { setShowForm(false); setError(''); }} className="btn-ghost text-sm">{t('components.reflection.cancel')}</button>
-            <button onClick={handleSubmit} disabled={submitting} className="btn-primary text-sm">
+            <Button onClick={() => { setShowForm(false); setError(''); }} variant="ghost" size="sm">{t('components.reflection.cancel')}</Button>
+            <Button onClick={handleSubmit} disabled={submitting} size="sm">
               {submitting ? t('components.reflection.saving') : t('components.reflection.save')}
-            </button>
+            </Button>
           </div>
         </div>
       )}
 
-      {/* Add manually if not due — suppressed in dashboard mode so the
+      {/* Add manually if not due â€” suppressed in dashboard mode so the
           panel only renders the active check-in. */}
       {!hideHistory && !showForm && !dueForCheckIn && (
         <button onClick={() => setShowForm(true)} className="text-sm text-primary hover:text-primary/80 font-medium">
@@ -225,18 +226,18 @@ export default function ReflectionLog({
         </button>
       )}
 
-      {/* Entries — either the full history or just the freshly-submitted
+      {/* Entries â€” either the full history or just the freshly-submitted
           entry when running inside the dashboard panel. In dashboard mode we
           keep the rendered entry visible across `load()` refreshes so the
           just-submitted card doesn't flicker. */}
       {loading && !hideHistory ? (
-        <p className="text-sm text-gray-400">{t('components.reflection.loading')}</p>
+        <p className="text-sm text-muted-foreground">{t('components.reflection.loading')}</p>
       ) : visibleEntries.length === 0 ? (
         !hideHistory && !loading && !showForm && !dueForCheckIn && (
-          <p className="text-sm text-gray-500">{t('components.reflection.empty')}</p>
+          <p className="text-sm text-muted-foreground">{t('components.reflection.empty')}</p>
         )
       ) : (
-        <div className="space-y-3">
+        <div className="divide-y divide-[var(--border)]">
           {visibleEntries.map(entry => (
             <Entry
               key={entry.id}
@@ -253,48 +254,19 @@ export default function ReflectionLog({
   );
 }
 
-function classifierLabel(source, t) {
-  if (!source || source === 'unclassified') return t('components.reflection.classifierNoMatch');
-  if (source === 'claude-haiku-4-5+esco') return t('components.reflection.classifierClaudeEsco');
-  if (source === 'claude-haiku-4-5') return t('components.reflection.classifierClaude');
-  if (source === 'esco') return t('components.reflection.classifierEsco');
-  if (source === 'esco+heuristic') return t('components.reflection.classifierEscoHeuristic');
-  if (source === 'heuristic') return t('components.reflection.classifierHeuristic');
-  return source;
-}
-
-function ChipWithEsco({ skill, uri, tone, onDismiss }) {
+function SuggestionChip({ skill, onDismiss }) {
   const { t } = useT();
-  const colors = tone === 'gap'
-    ? 'bg-rose-50 text-rose-700 border-rose-300'
-    : 'bg-emerald-50 text-emerald-700 border-emerald-300';
-  const dismissColors = tone === 'gap'
-    ? 'text-rose-400 hover:text-rose-700 hover:bg-rose-100'
-    : 'text-emerald-400 hover:text-emerald-700 hover:bg-emerald-100';
   return (
-    <span className={`inline-flex items-center gap-1 border rounded-full pl-2.5 pr-1 py-0.5 text-xs ${colors}`}>
+    <span className="inline-flex items-center gap-1 rounded-full bg-muted pl-2.5 pr-1 py-0.5 text-xs text-foreground">
       <span>{skill}</span>
-      {uri && (
-        <a
-          href={uri}
-          target="_blank"
-          rel="noreferrer"
-          className="ml-0.5 inline-flex items-center justify-center px-1.5 py-0.5 rounded-full bg-white/70 text-[9px] font-semibold tracking-wider text-gray-700 hover:text-foreground"
-          title={t('components.reflection.escoOpenTitle', { uri })}
-          onClick={e => e.stopPropagation()}
-        >
-          ESCO
-        </a>
-      )}
       {onDismiss && (
         <button
           type="button"
           onClick={onDismiss}
           aria-label={t('components.reflection.dismissSkill', { skill })}
-          title={t('components.reflection.dismissSuggestion')}
-          className={`inline-flex items-center justify-center w-4 h-4 rounded-full text-[12px] leading-none transition-colors ${dismissColors}`}
+          className="inline-flex items-center justify-center w-4 h-4 rounded-full text-muted-foreground hover:text-foreground"
         >
-          ×
+          Ã—
         </button>
       )}
     </span>
@@ -307,6 +279,16 @@ function Entry({ entry, onApply, onDelete, onReclassify, timeAgo }) {
   const [dismissedGaps, setDismissedGaps] = useState(() => new Set());
   const [dismissedStrengths, setDismissedStrengths] = useState(() => new Set());
   const [reclassifying, setReclassifying] = useState(false);
+  const [open, setOpen] = useState(false);
+  const dialogRef = useModalA11y();
+
+  // Close the popup on Escape.
+  useEffect(() => {
+    if (!open) return undefined;
+    function onKey(e) { if (e.key === 'Escape') setOpen(false); }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open]);
 
   const allGaps = entry.extracted_gaps || [];
   const allStrengths = entry.extracted_strengths || [];
@@ -316,7 +298,6 @@ function Entry({ entry, onApply, onDelete, onReclassify, timeAgo }) {
   const totalAll = allGaps.length + allStrengths.length;
   const totalDismissed = totalAll - totalKept;
   const hasSuggestions = totalAll > 0;
-  const uris = entry.esco_uris || {};
   // "Unclassified" = the edge function never returned a real classifier
   // source, or returned the explicit "unclassified" sentinel because all
   // paths produced zero signals. Surface a manual retry so users aren't
@@ -345,123 +326,139 @@ function Entry({ entry, onApply, onDelete, onReclassify, timeAgo }) {
   }
 
   return (
-    <div className="border border-gray-200 rounded-xl overflow-hidden">
-      <div className="px-4 py-3 bg-gray-50 flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2 flex-wrap text-xs">
-          <span className="font-medium text-foreground">{timeAgo(entry.created_at)}</span>
-          <span className="text-gray-400">·</span>
-          <span className="text-gray-500">
-            {t('components.reflection.classifiedVia', { label: classifierLabel(entry.classifier_source, t) })}
+    <>
+      {/* Collapsed row — the only thing visible until clicked. */}
+      <div className="py-4 first:pt-1 last:pb-1">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-haspopup="dialog"
+          className="flex w-full items-center justify-between gap-3 text-left"
+        >
+          <span className="text-sm font-medium text-foreground">{timeAgo(entry.created_at)}</span>
+          <span className="flex shrink-0 items-center gap-2.5 text-xs text-muted-foreground">
+            {entry.applied && <span>{t('components.reflection.appliedToSkills')}</span>}
+            <ChevronRight className="size-3.5" aria-hidden="true" />
           </span>
-          {entry.applied && (
-            <span className="ml-1 inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 rounded-full px-2 py-0.5 text-[10px] font-medium">
-              {t('components.reflection.appliedToSkills')}
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {isUnclassified && onReclassify && (
-            <button
-              type="button"
-              onClick={handleReclassify}
-              disabled={reclassifying}
-              data-testid="reclassify-button"
-              className="text-xs font-medium text-primary hover:text-primary/80 underline-offset-2 hover:underline disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {reclassifying ? t('components.reflection.reclassifying') : t('components.reflection.reclassify')}
-            </button>
-          )}
-          <button onClick={() => onDelete(entry)} className="text-xs text-gray-400 hover:text-rose-500">{t('components.reflection.delete')}</button>
-        </div>
+        </button>
       </div>
 
-      <div className="p-4 space-y-3 text-sm">
-        {entry.support_needed && (
-          <div>
-            <p className="text-[11px] uppercase tracking-wide text-rose-500 font-medium mb-1">{t('components.reflection.neededSupport')}</p>
-            <p className="text-gray-700 whitespace-pre-wrap">{entry.support_needed}</p>
-          </div>
-        )}
-        {entry.managed_well && (
-          <div>
-            <p className="text-[11px] uppercase tracking-wide text-emerald-600 font-medium mb-1">{t('components.reflection.managedWellLabel')}</p>
-            <p className="text-gray-700 whitespace-pre-wrap">{entry.managed_well}</p>
-          </div>
-        )}
-
-        {hasSuggestions && (
-          <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-3 mt-2">
-            <div className="flex items-baseline justify-between mb-2 gap-2 flex-wrap">
-              <p className="text-[11px] uppercase tracking-wide text-foreground font-medium">
-                {t('components.reflection.skillSignals')}
-                <span className="text-gray-500 normal-case font-normal ml-1">{t('components.reflection.skillSignalsHint')}</span>
-              </p>
-              {totalDismissed > 0 && !entry.applied && (
-                <button
-                  onClick={restoreAll}
-                  className="text-[11px] text-primary hover:text-primary/80 underline-offset-2 hover:underline"
-                >
-                  {t('components.reflection.restoreDismissed', { count: totalDismissed })}
-                </button>
-              )}
-            </div>
-            <div className="space-y-2">
-              {keptGaps.length > 0 && (
-                <div>
-                  <p className="text-xs text-gray-600 mb-1">{t('components.reflection.couldAddPrefix')} <strong>{t('components.reflection.skillsGrowing')}</strong>:</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {keptGaps.map((s, i) => (
-                      <ChipWithEsco
-                        key={i}
-                        skill={s}
-                        uri={uris[s]}
-                        tone="gap"
-                        onDismiss={!entry.applied ? () => dismiss(dismissedGaps, setDismissedGaps, s) : undefined}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-              {keptStrengths.length > 0 && (
-                <div>
-                  <p className="text-xs text-gray-600 mb-1">{t('components.reflection.couldAddPrefix')} <strong>{t('components.reflection.skillsShare')}</strong>:</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {keptStrengths.map((s, i) => (
-                      <ChipWithEsco
-                        key={i}
-                        skill={s}
-                        uri={uris[s]}
-                        tone="strength"
-                        onDismiss={!entry.applied ? () => dismiss(dismissedStrengths, setDismissedStrengths, s) : undefined}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-              {totalKept === 0 && (
-                <p className="text-xs text-gray-400 italic">{t('components.reflection.allDismissed')}</p>
-              )}
-            </div>
-            {!entry.applied && (
-              <button
-                onClick={() => onApply(entry, keptGaps, keptStrengths)}
-                disabled={totalKept === 0}
-                className="mt-3 btn-secondary text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+      {/* Popup with the full entry: answers, skill signals, actions. */}
+      {open && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setOpen(false); }}
+        >
+          <div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={`reflection-modal-title-${entry.id}`}
+            className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl bg-white [box-shadow:var(--shadow-overlay)]"
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-[var(--border-subtle)] p-5">
+              <div>
+                <h2 id={`reflection-modal-title-${entry.id}`} className="text-base font-medium leading-snug text-foreground">
+                  {t('components.reflection.weeklyCheckIn')}
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">{timeAgo(entry.created_at)}</p>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label={t('components.session.close')}
+                onClick={() => setOpen(false)}
               >
-                {totalKept === 0
-                  ? t('components.reflection.applyNothingSelected')
-                  : t('components.reflection.applyToLandscape', { count: totalKept })}
-              </button>
-            )}
-          </div>
-        )}
+                <X />
+              </Button>
+            </div>
 
-        {!hasSuggestions && (
-          <p className="text-xs text-gray-400 italic">
-            {t('components.reflection.noSignals')}
-          </p>
-        )}
-      </div>
-    </div>
+            <div className="flex-1 space-y-4 overflow-y-auto p-5">
+              {entry.support_needed && (
+                <div>
+                  <p className="label-meta">{t('components.reflection.neededSupport')}</p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm text-foreground">{entry.support_needed}</p>
+                </div>
+              )}
+              {entry.managed_well && (
+                <div>
+                  <p className="label-meta">{t('components.reflection.managedWellLabel')}</p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm text-foreground">{entry.managed_well}</p>
+                </div>
+              )}
+
+              {(totalKept > 0 || totalDismissed > 0) && !entry.applied ? (
+                <div className="space-y-2">
+                  <div className="flex flex-wrap gap-1.5">
+                    {[...keptGaps, ...keptStrengths].map((s, i) => (
+                      <SuggestionChip
+                        key={`${s}-${i}`}
+                        skill={s}
+                        onDismiss={
+                          allGaps.includes(s)
+                            ? () => dismiss(dismissedGaps, setDismissedGaps, s)
+                            : () => dismiss(dismissedStrengths, setDismissedStrengths, s)
+                        }
+                      />
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {totalDismissed > 0 && (
+                      <button
+                        onClick={restoreAll}
+                        className="text-xs text-primary underline-offset-2 hover:underline"
+                      >
+                        {t('components.reflection.restoreDismissed', { count: totalDismissed })}
+                      </button>
+                    )}
+                    {totalKept > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="ml-auto"
+                        onClick={() => onApply(entry, keptGaps, keptStrengths)}
+                      >
+                        {t('components.reflection.applyToLandscape', { count: totalKept })}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                !hasSuggestions && (
+                  <p className="text-xs text-muted-foreground">{t('components.reflection.noSignals')}</p>
+                )
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 border-t border-[var(--border-subtle)] p-4">
+              {isUnclassified && onReclassify && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={reclassifying}
+                  data-testid="reclassify-button"
+                  onClick={handleReclassify}
+                >
+                  {reclassifying ? t('components.reflection.reclassifying') : t('components.reflection.reclassify')}
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => onDelete(entry)}
+              >
+                {t('components.reflection.delete')}
+              </Button>
+              <Button type="button" size="sm" className="ml-auto" onClick={() => setOpen(false)}>
+                {t('components.popup.done')}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

@@ -14,6 +14,7 @@ import {
 } from '../_shared/index.ts';
 
 const VALID_SENIORITIES = ['junior', 'mid', 'senior', 'lead'];
+const VALID_PERSONAS = ['student', 'alumnus'];
 const IMPORT_MODES = ['insert', 'update', 'upsert'];
 
 function normRow(row: Record<string, unknown>) {
@@ -62,6 +63,7 @@ Deno.serve(async (req) => {
   let updated = 0;
   let skipped = 0;
   const managerLinks: { userId: string; email: string }[] = [];
+  const touchedIds: string[] = [];
 
   for (const raw of rows) {
     const r = normRow(raw);
@@ -72,6 +74,9 @@ Deno.serve(async (req) => {
     const department = r.department || '';
     const job_title = r.current_role || r.role || r.job_title || '';
     const seniority = VALID_SENIORITIES.includes(r.seniority) ? r.seniority : 'junior';
+    const program = r.program || '';
+    const cohort_year = parseInt(r.cohort_year || '', 10) || null;
+    const persona = VALID_PERSONAS.includes(r.persona) ? r.persona : 'student';
     const tenure_years = parseInt(r.tenure_years || '0', 10) || 0;
     const location = r.location || '';
     const manager_email = (r.manager_email || r.manager || '').toLowerCase();
@@ -91,9 +96,11 @@ Deno.serve(async (req) => {
       if (!existingProfile || existingProfile.admin_scope !== 'none') { skipped++; continue; }
       if (!isPlatformAdmin && existingProfile.organization_id !== adminOrgId) { skipped++; continue; }
       await ctx.sb.from('profiles').update({
-        name, department, seniority, job_title, tenure_years, location,
+        name, department, seniority, job_title, program, cohort_year, role: persona,
+        tenure_years, location,
       }).eq('id', userId);
       updated++;
+      touchedIds.push(userId);
     } else {
       if (mode === 'update') { skipped++; continue; }
       const { data, error } = await ctx.sb.auth.admin.createUser({
@@ -113,11 +120,13 @@ Deno.serve(async (req) => {
       userId = data.user.id;
       // Trigger seeded basic columns; upsert the rest in case metadata path differs.
       await ctx.sb.from('profiles').update({
-        name, department, seniority, job_title, tenure_years, location,
+        name, department, seniority, job_title, program, cohort_year, role: persona,
+        tenure_years, location,
         onboarding_complete: true,
         organization_id: adminOrgId,
       }).eq('id', userId);
       imported++;
+      touchedIds.push(userId);
     }
 
     if (manager_email) managerLinks.push({ userId, email: manager_email });
@@ -149,7 +158,12 @@ Deno.serve(async (req) => {
     }
   }
 
-  await ctx.sb.rpc('recompute_all_matches');
+  // Debounced matching (0025): flag imported users stale, then synchronously
+  // process just those users so the admin sees fresh matches immediately.
+  if (touchedIds.length) {
+    await ctx.sb.from('profiles').update({ matches_stale: true }).in('id', touchedIds);
+    await ctx.sb.rpc('process_stale_matches', { p_batch: touchedIds.length });
+  }
   const { count: matchCount } = await ctx.sb.from('match_scores').select('*', { count: 'exact', head: true });
 
   await ctx.sb.from('audit_logs').insert({

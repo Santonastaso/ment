@@ -28,7 +28,7 @@ export default function MatchCard({ match, onDismiss }) {
 
   return (
     <>
-      <Surface className="transition-colors hover:border-primary/30">
+      <Surface className="transition-colors duration-150 hover:bg-muted/40">
         <SurfaceBody className="flex flex-col gap-3">
           <div className="flex items-start gap-3">
             <Avatar className="size-10">

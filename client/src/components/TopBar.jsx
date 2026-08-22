@@ -23,7 +23,7 @@ export default function TopBar({ mobileMenu }) {
       {mobileMenu}
       <div className="hidden flex-1 justify-center md:flex">
         <form onSubmit={submit} className="w-full max-w-md" role="search">
-          <div className="flex h-9 w-full items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--background)] px-4 text-sm focus-within:ring-2 focus-within:ring-primary/40">
+          <div className="flex h-9 w-full items-center gap-2 rounded-full border border-transparent bg-[var(--muted)] px-4 text-sm transition-colors duration-150 focus-within:border-[#c9c9ce] focus-within:bg-card focus-within:ring-[3px] focus-within:ring-black/[0.06]">
             <Search className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             <input
               type="search"

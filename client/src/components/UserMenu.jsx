@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronDown, LogOut, LifeBuoy } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -71,7 +71,7 @@ export default function UserMenu() {
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-full z-50 mt-1 w-56 rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-md"
+          className="absolute right-0 top-full z-50 mt-1 w-56 rounded-lg border border-border bg-popover p-1 text-popover-foreground [box-shadow:var(--shadow-card)]"
         >
           <div className="border-b border-border px-2.5 py-2">
             <p className="text-sm font-medium">{user?.name}</p>

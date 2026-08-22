@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useParams, useNavigate } from 'react-router-dom';
+﻿import React, { useState, useEffect } from 'react';
+import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import SkillTagInput from '../components/SkillTagInput.jsx';
 import TeachSkillsEditor from '../components/TeachSkillsEditor.jsx';
-import BadgeDisplay from '../components/BadgeDisplay.jsx';
 import SessionRequestModal from '../components/SessionRequestModal.jsx';
 import SkillLandscape from '../components/SkillLandscape.jsx';
 import PastMeetings from '../components/PastMeetings.jsx';
@@ -15,7 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MapPin, CalendarDays } from 'lucide-react';
+import { MapPin } from 'lucide-react';
 import api from '../api/index.js';
 import { useT } from '../i18n/index.jsx';
 
@@ -59,7 +58,7 @@ function groupCareerByCompany(entries) {
   return groups;
 }
 
-// Render a "Jun 2018 – Jul 2022" / "2018 – present" period label, handling
+// Render a "Jun 2018 â€“ Jul 2022" / "2018 â€“ present" period label, handling
 // year-only legacy data gracefully.
 function formatPeriod(startY, startM, endY, endM, presentLabel = 'present', months = MONTH_NAMES) {
   const fmt = (y, m) => {
@@ -71,7 +70,7 @@ function formatPeriod(startY, startM, endY, endM, presentLabel = 'present', mont
   const end = endY ? fmt(endY, endM) : presentLabel;
   if (!start && (!endY)) return '';
   if (!start) return end;
-  return `${start} – ${end}`;
+  return `${start} â€“ ${end}`;
 }
 
 export default function Profile() {
@@ -83,13 +82,26 @@ export default function Profile() {
   const isOwnProfile = !id || (currentUser?.id != null && id === currentUser.id);
   const targetId = isOwnProfile ? currentUser?.id : id;
 
+  // Subpage tabs â€” the profile is too dense for one long page. State lives
+  // in the URL (?tab=) so back/forward and deep links behave.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawTab = searchParams.get('tab') || 'overview';
+  const validTabs = isOwnProfile
+    ? ['overview', 'skills', 'availability', 'experience', 'meetings', 'reflections']
+    : ['overview', 'experience'];
+  const tab = validTabs.includes(rawTab) ? rawTab : 'overview';
+  function setTab(next) {
+    const params = new URLSearchParams(searchParams);
+    if (next === 'overview') params.delete('tab'); else params.set('tab', next);
+    setSearchParams(params);
+  }
+
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [toast, setToast] = useState('');
-  const [showSkillEditor, setShowSkillEditor] = useState(false);
 
   // Edit form state
   const [form, setForm] = useState({});
@@ -100,13 +112,12 @@ export default function Profile() {
   const [showAddCareer, setShowAddCareer] = useState(false);
   const [editingCareerId, setEditingCareerId] = useState(null);
   const [editCareerDraft, setEditCareerDraft] = useState(null);
-  const [editingShadow, setEditingShadow] = useState(false);
-  const [shadowDraft, setShadowDraft] = useState('');
-  // Availability (P3) — mentor pause + return-on date.
+
+  // Availability (P3) â€” mentor pause + return-on date.
   const [availabilitySaving, setAvailabilitySaving] = useState(false);
   const [returnDateDraft, setReturnDateDraft] = useState('');
   const [availabilityNoteDraft, setAvailabilityNoteDraft] = useState('');
-  // Multi-period OOO (P4) — list of [start, end] unavailability windows.
+  // Multi-period OOO (P4) â€” list of [start, end] unavailability windows.
   const [periods, setPeriods] = useState([]);
   const [periodStart, setPeriodStart] = useState('');
   const [periodEnd, setPeriodEnd] = useState('');
@@ -115,11 +126,9 @@ export default function Profile() {
 
   useEffect(() => {
     setEditing(false);
-    setShowSkillEditor(false);
     setShowAddCareer(false);
     setEditingCareerId(null);
     setEditCareerDraft(null);
-    setEditingShadow(false);
     setShowModal(false);
   }, [targetId]);
 
@@ -132,14 +141,14 @@ export default function Profile() {
         setProfile(res.data);
         if (isOwnProfile) {
           setForm({
-            name: res.data.name,
             department: res.data.department,
             current_role: res.data.current_role,
             location: res.data.location || '',
-            bio: res.data.bio || ''
+            bio: res.data.bio || '',
+            program: res.data.program || '',
+            cohort_year: res.data.cohort_year || ''
           });
           setWantsToLearn(res.data.skills?.filter(s => s.type === 'wants_to_learn').map(s => s.skill) || []);
-          setShadowDraft(res.data.shadow_role_response || '');
           setReturnDateDraft(res.data.mentorship_unavailable_until || '');
           setAvailabilityNoteDraft(res.data.mentorship_note || '');
           try {
@@ -236,14 +245,6 @@ export default function Profile() {
     }
     await refreshProfile();
     showToast(t('profile.toast.skillsUpdated'));
-  }
-
-  async function handleSaveShadow() {
-    // Send only the field being changed — the server now does partial updates.
-    await api.put('/users/me', { shadow_role_response: shadowDraft });
-    await refreshProfile();
-    setEditingShadow(false);
-    showToast(t('profile.toast.saved'));
   }
 
   async function setAvailability({ paused, until, note }) {
@@ -388,11 +389,33 @@ export default function Profile() {
     <PageShell>
       {/* Toast */}
       {toast && (
-        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-lg">
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-[0_4px_12px_rgba(0,0,0,0.12)]">
           {toast}
         </div>
       )}
 
+      {validTabs.length > 1 && (
+        <nav className="flex items-center gap-6 border-b border-[var(--border)]" aria-label={t('profile.tabs.label')}>
+          {validTabs.map(key => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setTab(key)}
+              data-testid={`profile-tab-${key}`}
+              className={`-mb-px border-b-2 px-0.5 pb-2.5 pt-1 text-sm font-medium transition-colors ${
+                tab === key
+                  ? 'border-[var(--foreground)] text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {t(`profile.tab.${key}`)}
+            </button>
+          ))}
+        </nav>
+      )}
+
+      {tab === 'overview' && (
+      <>
       <Surface>
         <SurfaceBody className="pt-6 space-y-4">
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -403,11 +426,7 @@ export default function Profile() {
                 </AvatarFallback>
               </Avatar>
               <div>
-                {editing ? (
-                  <input className="input mb-2 text-xl font-bold" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
-                ) : (
-                  <h1 className="text-2xl font-bold tracking-tight">{profile.name}</h1>
-                )}
+                <h1 className="text-2xl font-medium tracking-[-0.01em]">{profile.name}</h1>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   {editing ? (
                     <>
@@ -415,12 +434,18 @@ export default function Profile() {
                       <select className="input w-40 text-sm" value={form.department} onChange={e => setForm(f => ({ ...f, department: e.target.value }))}>
                         {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
                       </select>
+                      <input className="input w-44 text-sm" placeholder={t('profile.fields.program')} value={form.program} onChange={e => setForm(f => ({ ...f, program: e.target.value }))} />
+                      <input className="input w-28 text-sm" type="number" min="1900" max="2100" placeholder={t('profile.fields.cohortYear')} value={form.cohort_year} onChange={e => setForm(f => ({ ...f, cohort_year: e.target.value }))} />
                       <input className="input w-40 text-sm" placeholder={t('profile.placeholder.location')} value={form.location} onChange={e => setForm(f => ({ ...f, location: e.target.value }))} />
                     </>
                   ) : (
                     <>
-                      <Badge variant="secondary">{profile.current_role}</Badge>
+                      {profile.role && (
+                        <Badge variant="secondary">{t(`profile.persona.${profile.role}`, profile.role)}</Badge>
+                      )}
                       <Badge variant="outline">{profile.department}</Badge>
+                      {profile.program && <Badge variant="outline">{profile.program}</Badge>}
+                      {profile.cohort_year && <Badge variant="outline">{t('profile.fields.classOf', { year: profile.cohort_year })}</Badge>}
                       {profile.location && (
                         <Badge variant="outline" className="gap-1 font-normal">
                           <MapPin className="size-3" />
@@ -436,18 +461,18 @@ export default function Profile() {
               {isOwnProfile ? (
                 editing ? (
                   <>
-                    <Button variant="ghost" size="sm" onClick={() => setEditing(false)}>{t('profile.btn.cancel')}</Button>
-                    <Button size="sm" onClick={handleSaveProfile} disabled={saving}>{saving ? t('profile.btn.saving') : t('profile.btn.save')}</Button>
+                    <Button variant="ghost" onClick={() => setEditing(false)}>{t('profile.btn.cancel')}</Button>
+                    <Button onClick={handleSaveProfile} disabled={saving}>{saving ? t('profile.btn.saving') : t('profile.btn.save')}</Button>
                   </>
                 ) : (
-                  <Button variant="outline" size="sm" onClick={() => setEditing(true)}>{t('profile.btn.editProfile')}</Button>
+                  <Button variant="outline" onClick={() => setEditing(true)}>{t('profile.btn.editProfile')}</Button>
                 )
               ) : profile.mentorship_available === false ? (
-                <Button size="sm" variant="outline" disabled>
+                <Button variant="outline" className="h-11 px-6 text-base" disabled>
                   {t('profile.btn.currentlyUnavailable')}
                 </Button>
               ) : (
-                <Button size="sm" onClick={() => setShowModal(true)}>{t('profile.btn.requestSession')}</Button>
+                <Button data-testid="request-session" onClick={() => setShowModal(true)}>{t('profile.btn.requestSession')}</Button>
               )}
             </div>
           </div>
@@ -470,13 +495,6 @@ export default function Profile() {
         <SurfaceHeader
           title={skillTitle}
           description={skillDescription}
-          action={
-            isOwnProfile ? (
-              <Button variant="outline" size="sm" onClick={() => setShowSkillEditor(s => !s)}>
-                {showSkillEditor ? t('profile.btn.doneEditing') : t('profile.btn.editSkills')}
-              </Button>
-            ) : null
-          }
         />
         <SurfaceBody className="space-y-5 pt-5">
         <SkillLandscape
@@ -489,7 +507,7 @@ export default function Profile() {
         {/* Expertise signature */}
         {profile.expertiseSignature?.length > 0 && (
           <div className="rounded-lg border border-border bg-muted/60 p-4">
-            <h3 className="mb-2 text-sm font-semibold">{isOwnProfile ? t('profile.expertise.titleOwn') : t('profile.expertise.titleOther', { name: firstName })}</h3>
+            <h3 className="mb-2 text-sm font-medium">{isOwnProfile ? t('profile.expertise.titleOwn') : t('profile.expertise.titleOther', { name: firstName })}</h3>
             <div className="flex flex-wrap gap-2">
               {profile.expertiseSignature.map(skill => (
                 <Badge key={skill}>{skill}</Badge>
@@ -499,14 +517,15 @@ export default function Profile() {
         )}
         </SurfaceBody>
       </Surface>
+      </>
+      )}
 
-      {/* Skill editors — own profile, on demand */}
-      {isOwnProfile && showSkillEditor && (
+      {isOwnProfile && tab === 'skills' && (
         <Surface>
-          <SurfaceHeader title={t('profile.manageSkills.title')} />
+          <SurfaceHeader title={t('profile.manageSkills.title')} description={t('profile.manageSkills.desc')} />
           <SurfaceBody className="space-y-5 pt-5">
           <div>
-            <h3 className="mb-2 text-sm font-semibold text-foreground">{t('profile.manageSkills.canTeach')}</h3>
+            <h3 className="mb-2 text-sm font-medium text-foreground">{t('profile.manageSkills.canTeach')}</h3>
             <TeachSkillsEditor
               value={teachEditorValue}
               onChange={handleTeachSkillsChange}
@@ -516,7 +535,7 @@ export default function Profile() {
           </div>
 
           <div>
-            <h3 className="mb-2 text-sm font-semibold text-foreground">{t('profile.manageSkills.wantsToLearn')}</h3>
+            <h3 className="mb-2 text-sm font-medium text-foreground">{t('profile.manageSkills.wantsToLearn')}</h3>
             <SkillTagInput
               value={wantsToLearn}
               onChange={async (v) => {
@@ -531,31 +550,11 @@ export default function Profile() {
         </Surface>
       )}
 
-      {isOwnProfile && (
+      {isOwnProfile && tab === 'availability' && (
         <Surface>
           <SurfaceHeader
-            title={
-              <span className="inline-flex items-center gap-2">
-                <CalendarDays className="h-4 w-4 text-primary" aria-hidden="true" />
-                {t('profile.availability.title')}
-              </span>
-            }
-            description={t('profile.availability.desc')}
-          />
-          <SurfaceBody className="pt-5 space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 p-4">
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-foreground">
-                  {profile.mentorship_paused
-                    ? t('profile.availability.paused')
-                    : profile.mentorship_unavailable_until && new Date(profile.mentorship_unavailable_until) > new Date()
-                      ? t('profile.availability.backOn', { date: profile.mentorship_unavailable_until })
-                      : t('profile.availability.available')}
-                </p>
-                {profile.mentorship_note && (
-                  <p className="mt-1 text-xs text-muted-foreground">{profile.mentorship_note}</p>
-                )}
-              </div>
+            title={t('profile.availability.title')}
+            action={
               <Button
                 type="button"
                 size="sm"
@@ -566,27 +565,40 @@ export default function Profile() {
               >
                 {profile.mentorship_paused ? t('profile.availability.resume') : t('profile.availability.pause')}
               </Button>
-            </div>
+            }
+          />
+          <SurfaceBody className="pt-5">
+            <p className="flex items-center gap-2 text-sm font-medium" data-testid="availability-status">
+              <span className={`size-1.5 rounded-full ${profile.mentorship_paused ? 'bg-zinc-400' : 'bg-emerald-500'}`} aria-hidden="true" />
+              {profile.mentorship_paused
+                ? t('profile.availability.paused')
+                : profile.mentorship_unavailable_until && new Date(profile.mentorship_unavailable_until) > new Date()
+                  ? t('profile.availability.backOn', { date: profile.mentorship_unavailable_until })
+                  : t('profile.availability.available')}
+            </p>
+            {profile.mentorship_note && (
+              <p className="mt-0.5 text-xs text-muted-foreground">{profile.mentorship_note}</p>
+            )}
 
-            <div className="grid gap-3 sm:grid-cols-[2fr_3fr]">
-              <div>
+            <div className="mt-4 flex flex-wrap items-end gap-x-4 gap-y-3">
+              <div className="w-44">
                 <label className="label">{t('profile.availability.returnOn')}</label>
                 <input
                   type="date"
-                  className="input text-sm"
+                  className="input w-full text-sm"
+                  title={t('profile.availability.returnHint')}
                   data-testid="availability-return-date"
                   value={returnDateDraft}
                   min={new Date().toISOString().slice(0, 10)}
                   onChange={(e) => setReturnDateDraft(e.target.value)}
                   disabled={availabilitySaving}
                 />
-                <p className="mt-1 text-[11px] text-muted-foreground">{t('profile.availability.returnHint')}</p>
               </div>
-              <div>
+              <div className="w-64 max-w-full">
                 <label className="label">{t('profile.availability.note')}</label>
                 <input
                   type="text"
-                  className="input text-sm"
+                  className="input w-full text-sm"
                   maxLength={120}
                   placeholder={t('profile.availability.notePlaceholder')}
                   data-testid="availability-note"
@@ -595,44 +607,39 @@ export default function Profile() {
                   disabled={availabilitySaving}
                 />
               </div>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={() => {
-                  setReturnDateDraft(profile.mentorship_unavailable_until || '');
-                  setAvailabilityNoteDraft(profile.mentorship_note || '');
-                }}
-                disabled={availabilitySaving}
-              >
-                {t('profile.availability.reset')}
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                data-testid="save-availability"
-                onClick={() => setAvailability({ until: returnDateDraft, note: availabilityNoteDraft })}
-                disabled={availabilitySaving}
-              >
-                {availabilitySaving ? t('profile.btn.saving') : t('profile.btn.save')}
-              </Button>
+              <div className="ml-auto flex gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setReturnDateDraft(profile.mentorship_unavailable_until || '');
+                    setAvailabilityNoteDraft(profile.mentorship_note || '');
+                  }}
+                  disabled={availabilitySaving}
+                >
+                  {t('profile.availability.reset')}
+                </Button>
+                <Button
+                  type="button"
+                  data-testid="save-availability"
+                  onClick={() => setAvailability({ until: returnDateDraft, note: availabilityNoteDraft })}
+                  disabled={availabilitySaving}
+                >
+                  {availabilitySaving ? t('profile.btn.saving') : t('profile.btn.save')}
+                </Button>
+              </div>
             </div>
 
             {/* Multi-period out-of-office windows (P4) */}
-            <div className="rounded-lg border border-border bg-muted/40 p-4 space-y-3">
-              <div>
-                <p className="text-sm font-medium text-foreground">{t('profile.availability.periodsTitle')}</p>
-                <p className="text-xs text-muted-foreground">{t('profile.availability.periodsDesc')}</p>
-              </div>
+            <div className="mt-6 border-t border-[var(--border)] pt-5">
+              <p className="label-meta">{t('profile.availability.periodsTitle')}</p>
 
               {periods.length > 0 ? (
-                <ul className="space-y-2" data-testid="unavailable-periods">
+                <ul className="mt-2 divide-y divide-[var(--border)]" data-testid="unavailable-periods">
                   {periods.map((p) => (
-                    <li key={p.id} className="flex items-center justify-between gap-3 rounded-md border border-border bg-card px-3 py-2 text-sm">
+                    <li key={p.id} className="flex items-center justify-between gap-3 py-2 text-sm">
                       <span className="min-w-0">
-                        <span className="font-medium text-foreground">{p.start_date} → {p.end_date}</span>
+                        <span className="font-medium text-foreground">{p.start_date} â†’ {p.end_date}</span>
                         {p.note && <span className="ml-2 text-xs text-muted-foreground">{p.note}</span>}
                       </span>
                       <button
@@ -642,21 +649,21 @@ export default function Profile() {
                         aria-label={t('profile.availability.periodRemove')}
                         className="text-muted-foreground hover:text-red-500 text-sm leading-none"
                       >
-                        ×
+                        Ã—
                       </button>
                     </li>
                   ))}
                 </ul>
               ) : (
-                <p className="text-xs text-muted-foreground italic">{t('profile.availability.periodsEmpty')}</p>
+                <p className="mt-2 text-xs text-muted-foreground italic">{t('profile.availability.periodsEmpty')}</p>
               )}
 
-              <div className="grid gap-2 sm:grid-cols-[1fr_1fr_2fr_auto] sm:items-end">
+              <div className="mt-3 grid gap-3 sm:grid-cols-[150px_150px_minmax(200px,300px)_auto] sm:items-end">
                 <div>
                   <label className="label">{t('profile.availability.periodStart')}</label>
                   <input
                     type="date"
-                    className="input text-sm"
+                    className="input w-full text-sm"
                     value={periodStart}
                     min={new Date().toISOString().slice(0, 10)}
                     onChange={(e) => setPeriodStart(e.target.value)}
@@ -667,7 +674,7 @@ export default function Profile() {
                   <label className="label">{t('profile.availability.periodEnd')}</label>
                   <input
                     type="date"
-                    className="input text-sm"
+                    className="input w-full text-sm"
                     value={periodEnd}
                     min={periodStart || new Date().toISOString().slice(0, 10)}
                     onChange={(e) => setPeriodEnd(e.target.value)}
@@ -678,7 +685,7 @@ export default function Profile() {
                   <label className="label">{t('profile.availability.note')}</label>
                   <input
                     type="text"
-                    className="input text-sm"
+                    className="input w-full text-sm"
                     maxLength={120}
                     placeholder={t('profile.availability.periodNotePlaceholder')}
                     value={periodNote}
@@ -698,52 +705,49 @@ export default function Profile() {
               </div>
             </div>
 
-            <div className="rounded-lg border border-border bg-muted/40 p-4 space-y-2">
-              <p className="text-sm font-medium text-foreground">{t('profile.goal.title')}</p>
-              <p className="text-xs text-muted-foreground">
-                {t('profile.goal.desc')}
-              </p>
-              <div className="flex flex-wrap items-center gap-2">
-                <input
-                  type="number"
-                  min="0"
-                  max="30"
-                  step="1"
-                  className="input w-24 text-sm"
-                  value={profile.monthly_session_goal ?? 0}
-                  data-testid="monthly-goal-input"
-                  onChange={(e) => {
-                    const val = Math.max(0, Math.min(30, Number(e.target.value) || 0));
-                    setProfile(p => ({ ...p, monthly_session_goal: val }));
-                  }}
-                  disabled={availabilitySaving}
-                />
-                <span className="text-sm text-muted-foreground">{t('profile.goal.perMonth')}</span>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  data-testid="save-goal"
-                  disabled={availabilitySaving}
-                  onClick={async () => {
-                    setAvailabilitySaving(true);
-                    try {
-                      await api.put('/users/me', { monthly_session_goal: profile.monthly_session_goal ?? 0 });
-                      await refreshProfile();
-                      showToast(t('profile.toast.goalSaved'));
-                    } finally {
-                      setAvailabilitySaving(false);
-                    }
-                  }}
-                >
-                  {t('profile.goal.save')}
-                </Button>
-              </div>
+            <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-[var(--border)] pt-5">
+              <span className="label-meta mb-0">{t('profile.goal.title')}</span>
+              <input
+                type="number"
+                min="0"
+                max="30"
+                step="1"
+                className="input h-8 w-16 text-sm"
+                value={profile.monthly_session_goal ?? 0}
+                data-testid="monthly-goal-input"
+                onChange={(e) => {
+                  const val = Math.max(0, Math.min(30, Number(e.target.value) || 0));
+                  setProfile(p => ({ ...p, monthly_session_goal: val }));
+                }}
+                disabled={availabilitySaving}
+              />
+              <span className="text-sm text-muted-foreground">{t('profile.goal.perMonth')}</span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="ml-auto"
+                data-testid="save-goal"
+                disabled={availabilitySaving}
+                onClick={async () => {
+                  setAvailabilitySaving(true);
+                  try {
+                    await api.put('/users/me', { monthly_session_goal: profile.monthly_session_goal ?? 0 });
+                    await refreshProfile();
+                    showToast(t('profile.toast.goalSaved'));
+                  } finally {
+                    setAvailabilitySaving(false);
+                  }
+                }}
+              >
+                {t('profile.goal.save')}
+              </Button>
             </div>
           </SurfaceBody>
         </Surface>
       )}
 
+      {tab === 'experience' && (
       <Surface>
         <SurfaceHeader
           title={t('profile.career.title')}
@@ -758,8 +762,8 @@ export default function Profile() {
         <SurfaceBody className="pt-5">
 
         {isOwnProfile && showAddCareer && (
-          <div className="mb-4 space-y-3 rounded-lg border border-[var(--border)] bg-muted/40 p-4">
-            <div className="grid grid-cols-2 gap-3">
+          <div className="mb-5 space-y-3 border-b border-[var(--border)] pb-5">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <input className="input text-sm" placeholder={t('profile.career.roleTitle')} value={newCareer.role} onChange={e => setNewCareer(c => ({...c, role: e.target.value}))} />
               <select className="input text-sm" value={newCareer.department} onChange={e => setNewCareer(c => ({...c, department: e.target.value}))}>
                 <option value="">{t('profile.career.department')}</option>
@@ -804,8 +808,8 @@ export default function Profile() {
                 <div className={group.entries.length > 1 ? 'space-y-3 border-l border-border pl-4' : 'space-y-3'}>
             {group.entries.map(entry => (
               editingCareerId === entry.id && editCareerDraft ? (
-                <div key={entry.id} className="space-y-3 rounded-lg border border-[var(--border)] bg-muted/40 p-4">
-                  <div className="grid grid-cols-2 gap-3">
+                <div key={entry.id} className="space-y-3 rounded-md border border-[var(--border)] p-4">
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     <input
                       className="input text-sm"
                       placeholder={t('profile.career.roleTitle')}
@@ -862,11 +866,11 @@ export default function Profile() {
                       {entry.department}
                       {/* Hide the company name on individual rows when it's
                           already shown as the group header above. */}
-                      {entry.company && group.entries.length === 1 && ` · ${entry.company}`}
-                      {(entry.start_year || entry.end_year) && ` · ${formatPeriod(entry.start_year, entry.start_month, entry.end_year, entry.end_month, t('profile.career.present'), t('profile.career.monthsShort').split(','))}`}
+                      {entry.company && group.entries.length === 1 && ` Â· ${entry.company}`}
+                      {(entry.start_year || entry.end_year) && ` Â· ${formatPeriod(entry.start_year, entry.start_month, entry.end_year, entry.end_month, t('profile.career.present'), t('profile.career.monthsShort').split(','))}`}
                     </p>
                     {entry.description && (
-                      <p className="text-xs text-gray-600 mt-1">{entry.description}</p>
+                      <p className="text-xs text-secondary-foreground mt-1">{entry.description}</p>
                     )}
                   </div>
                   {isOwnProfile && (
@@ -889,8 +893,9 @@ export default function Profile() {
         )}
         </SurfaceBody>
       </Surface>
+      )}
 
-      {isOwnProfile && (
+      {isOwnProfile && tab === 'meetings' && (
         <Surface>
           <SurfaceHeader
             title={t('profile.pastMeetings.title')}
@@ -907,7 +912,7 @@ export default function Profile() {
         </Surface>
       )}
 
-      {isOwnProfile && (
+      {isOwnProfile && tab === 'reflections' && (
         <Surface className="scroll-mt-8" id="reflection-log">
           <SurfaceHeader
             title={t('profile.reflection.title')}
@@ -921,52 +926,6 @@ export default function Profile() {
           />
           <SurfaceBody className="pt-5">
             <ReflectionLog onSkillsApplied={refreshProfile} />
-          </SurfaceBody>
-        </Surface>
-      )}
-
-      {isOwnProfile && (
-        <Surface>
-          <SurfaceHeader
-            title={t('profile.shadow.title')}
-            description={t('profile.shadow.desc')}
-            action={
-              !editingShadow ? (
-                <Button variant="outline" size="sm" onClick={() => setEditingShadow(true)}>
-                  {profile.shadow_role_response ? t('profile.shadow.edit') : t('profile.shadow.add')}
-                </Button>
-              ) : null
-            }
-          />
-          <SurfaceBody className="pt-5">
-          {editingShadow ? (
-            <div className="space-y-2">
-              <textarea
-                className="input resize-none text-sm"
-                rows={3}
-                value={shadowDraft}
-                onChange={e => setShadowDraft(e.target.value)}
-                placeholder={t('profile.shadow.placeholder')}
-              />
-              <div className="flex gap-2">
-                <Button size="sm" onClick={handleSaveShadow}>{t('profile.btn.save')}</Button>
-                <Button size="sm" variant="ghost" onClick={() => { setEditingShadow(false); setShadowDraft(profile.shadow_role_response || ''); }}>{t('profile.btn.cancel')}</Button>
-              </div>
-            </div>
-          ) : profile.shadow_role_response ? (
-            <p className="whitespace-pre-wrap text-sm text-foreground">{profile.shadow_role_response}</p>
-          ) : (
-            <p className="text-sm italic text-muted-foreground">{t('profile.shadow.empty')}</p>
-          )}
-          </SurfaceBody>
-        </Surface>
-      )}
-
-      {profile.badges?.length > 0 && (
-        <Surface>
-          <SurfaceHeader title={t('profile.recognition.title')} />
-          <SurfaceBody className="pt-5">
-            <BadgeDisplay badges={profile.badges} />
           </SurfaceBody>
         </Surface>
       )}

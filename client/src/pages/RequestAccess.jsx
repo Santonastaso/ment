@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api/index.js';
 import { useT } from '../i18n/index.jsx';
@@ -70,7 +70,7 @@ export default function RequestAccess() {
 
       <Card className="w-full max-w-[520px] rounded-xl border-[var(--border)] shadow-none">
         <CardHeader>
-          <CardTitle className="text-lg font-semibold">{t('auth.requestAccess.title')}</CardTitle>
+          <CardTitle className="text-lg font-medium">{t('auth.requestAccess.title')}</CardTitle>
           <CardDescription>{t('auth.requestAccess.description')}</CardDescription>
         </CardHeader>
         <CardContent>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Compass, User, Users, Shield, Share2 } from 'lucide-react';
+import { LayoutDashboard, Compass, User, Shield, Share2, Server } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useT } from '../i18n/index.jsx';
 import { cn } from '@/lib/utils';
@@ -14,9 +14,9 @@ export default function Sidebar({ onNavigate }) {
     { to: '/', label: t('nav.home'), icon: LayoutDashboard },
     { to: '/explorer', label: t('nav.explorer'), icon: Compass },
     { to: '/profile', label: t('nav.myProfile'), icon: User, match: (p, uid) => p === '/profile' || p === `/profile/${uid}` },
-    ...(['team_lead', 'manager'].includes(user?.role) ? [{ to: '/team', label: t('nav.teamInsights'), icon: Users }] : []),
     ...(user?.is_admin ? [{ to: '/admin/graph', label: t('nav.knowledgeGraph'), icon: Share2, testid: 'nav-knowledge-graph' }] : []),
     ...(user?.is_admin ? [{ to: '/admin', label: t('nav.admin'), icon: Shield }] : []),
+    ...(user?.is_admin && user?.admin_scope === 'platform' ? [{ to: '/admin/ops', label: t('nav.platformOps'), icon: Server, testid: 'nav-platform-ops' }] : []),
   ];
 
   return (
@@ -42,13 +42,13 @@ export default function Sidebar({ onNavigate }) {
               onClick={onNavigate}
               data-testid={item.testid}
               className={cn(
-                'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150',
                 active
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                  ? 'bg-[var(--muted)] text-foreground'
+                  : 'text-muted-foreground hover:bg-[var(--muted)]/60 hover:text-foreground'
               )}
             >
-              <Icon className={cn('size-[18px] shrink-0', active && 'text-primary')} strokeWidth={1.75} />
+              <Icon className="size-[18px] shrink-0" strokeWidth={1.75} />
               <span className="flex-1">{item.label}</span>
               {showBadge && (
                 <span

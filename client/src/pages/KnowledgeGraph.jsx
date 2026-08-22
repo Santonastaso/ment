@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import ForceGraph2D from 'react-force-graph-2d';
-import { Share2, ShieldAlert, RefreshCw, Building2, Languages, Info } from 'lucide-react';
+import { Share2, ShieldAlert, RefreshCw, Building2, Languages, GraduationCap, Info } from 'lucide-react';
 import api from '../api/index.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useT } from '../i18n/index.jsx';
@@ -28,7 +28,12 @@ const DEPT_COLORS = {
 const EDGE_COLORS = {
   can_teach: '#22c55e',
   wants_to_learn: '#f59e0b',
+  session: '#3b82f6',
+  connection: '#a855f7',
 };
+
+// Person->person edges backed by actual interactions (0026).
+const REAL_LINK_TYPES = new Set(['session', 'connection']);
 
 const LANG_LABELS = { en: 'English', it: 'Italiano', fr: 'Français', de: 'Deutsch', es: 'Español', pt: 'Português' };
 
@@ -60,6 +65,9 @@ export default function KnowledgeGraph() {
   // 'bipartite' = people <-> skills; 'people' = people connected via shared
   // skills (skills become invisible connectors).
   const [view, setView] = useState('bipartite');
+  // "Real connections" overlay: completed sessions + accepted connections.
+  const [showReal, setShowReal] = useState(true);
+  const [program, setProgram] = useState('');
   const [graphWidth, setGraphWidth] = useState(900);
 
   const reqId = useRef(0);
@@ -104,17 +112,42 @@ export default function KnowledgeGraph() {
   const nodes = graph?.nodes || [];
   const edges = graph?.edges || [];
 
+  // Program filter (client-side): person nodes carry `program` (0026); an
+  // edge survives only if both endpoints stay in scope.
+  const visibleNodes = useMemo(
+    () => (program ? nodes.filter((n) => n.kind !== 'person' || n.program === program) : nodes),
+    [nodes, program]
+  );
+  const visibleEdges = useMemo(() => {
+    const keep = new Set(visibleNodes.map((n) => n.id));
+    return edges.filter((e) => keep.has(e.source) && keep.has(e.target));
+  }, [edges, visibleNodes]);
+
+  const programs = useMemo(() => {
+    const set = new Set();
+    for (const n of nodes) if (n.kind === 'person' && n.program) set.add(n.program);
+    return [...set].sort();
+  }, [nodes]);
+
   const kindById = useMemo(() => new Map(nodes.map((n) => [n.id, n.kind])), [nodes]);
 
   // Build the force-graph dataset for the active view. New object identities are
   // produced only when the underlying data or the view changes, so the
   // simulation isn't reheated on every render.
   const graphData = useMemo(() => {
+    // Real-connection overlay (0026): completed sessions + accepted
+    // connections between people, thickness = interaction count.
+    const realLinks = showReal
+      ? visibleEdges
+          .filter((e) => REAL_LINK_TYPES.has(e.type))
+          .map((e) => ({ source: e.source, target: e.target, value: e.weight || 1, type: e.type }))
+      : [];
     if (view === 'people') {
-      const people = nodes.filter((n) => n.kind === 'person');
+      const people = visibleNodes.filter((n) => n.kind === 'person');
       // skill id -> people who touch it (teach or learn)
       const bySkill = new Map();
-      for (const e of edges) {
+      for (const e of visibleEdges) {
+        if (REAL_LINK_TYPES.has(e.type)) continue;
         const personId = kindById.get(e.source) === 'person' ? e.source : e.target;
         const skillId = personId === e.source ? e.target : e.source;
         if (!bySkill.has(skillId)) bySkill.set(skillId, []);
@@ -134,13 +167,18 @@ export default function KnowledgeGraph() {
         const [source, target] = key.split('|');
         return { source, target, value, type: 'peer' };
       });
-      return { nodes: people.map((n) => ({ ...n })), links };
+      return { nodes: people.map((n) => ({ ...n })), links: [...links, ...realLinks] };
     }
     return {
-      nodes: nodes.map((n) => ({ ...n })),
-      links: edges.map((e) => ({ source: e.source, target: e.target, type: e.type, value: 1 })),
+      nodes: visibleNodes.map((n) => ({ ...n })),
+      links: [
+        ...visibleEdges
+          .filter((e) => !REAL_LINK_TYPES.has(e.type))
+          .map((e) => ({ source: e.source, target: e.target, type: e.type, value: 1 })),
+        ...realLinks,
+      ],
     };
-  }, [nodes, edges, view, kindById]);
+  }, [visibleNodes, visibleEdges, view, kindById, showReal]);
 
   // Degree (within the active view) drives node size.
   const degree = useMemo(() => {
@@ -167,8 +205,9 @@ export default function KnowledgeGraph() {
     return set;
   }, [hovered, graphData]);
 
-  const peopleCount = nodes.filter((n) => n.kind === 'person').length;
-  const skillCount = nodes.filter((n) => n.kind === 'skill').length;
+  const peopleCount = visibleNodes.filter((n) => n.kind === 'person').length;
+  const skillCount = visibleNodes.filter((n) => n.kind === 'skill').length;
+  const realLinkCount = visibleEdges.filter((e) => REAL_LINK_TYPES.has(e.type)).length;
   const inter = orgType === 'inter';
 
   // Measure the container so the canvas fills available width.
@@ -198,9 +237,9 @@ export default function KnowledgeGraph() {
 
   const departments = useMemo(() => {
     const set = new Set();
-    for (const n of nodes) if (n.kind === 'person' && n.department) set.add(n.department);
+    for (const n of visibleNodes) if (n.kind === 'person' && n.department) set.add(n.department);
     return [...set].sort();
-  }, [nodes]);
+  }, [visibleNodes]);
 
   async function switchMode(next) {
     if (!isPlatform || savingMode || next === orgType) return;
@@ -266,6 +305,27 @@ export default function KnowledgeGraph() {
             <option value="">{t('graph.filter.allLanguages')}</option>
             {languages.map((l) => (
               <option key={l} value={l}>{langLabel(l)}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="kg-program" className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+            <GraduationCap className="size-3.5" /> {t('graph.filter.program')}
+          </label>
+          <select
+            id="kg-program"
+            data-testid="kg-filter-program"
+            value={program}
+            onChange={(e) => setProgram(e.target.value)}
+            className={cn(
+              'h-9 min-w-[12rem] rounded-lg border border-border bg-background px-3 text-sm',
+              'focus-visible:border-ring focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50'
+            )}
+          >
+            <option value="">{t('graph.filter.allPrograms')}</option>
+            {programs.map((p) => (
+              <option key={p} value={p}>{p}</option>
             ))}
           </select>
         </div>
@@ -374,12 +434,28 @@ export default function KnowledgeGraph() {
             </button>
           </div>
 
+          <label className="inline-flex w-fit cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted">
+            <input
+              type="checkbox"
+              className="accent-primary"
+              data-testid="kg-toggle-real"
+              checked={showReal}
+              onChange={(e) => setShowReal(e.target.checked)}
+            />
+            {t('graph.view.realLinks')}
+          </label>
+
           {/* Counts + legend */}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2" data-testid="kg-node-count">
               <Badge variant="secondary">{t('graph.count.people', { count: peopleCount })}</Badge>
               {view === 'bipartite' && <Badge variant="secondary">{t('graph.count.skills', { count: skillCount })}</Badge>}
               <Badge variant="secondary">{t('graph.count.links', { count: graphData.links.length })}</Badge>
+              {showReal && realLinkCount > 0 && (
+                <Badge variant="secondary" data-testid="kg-real-count">
+                  {t('graph.count.realLinks', { count: realLinkCount })}
+                </Badge>
+              )}
             </div>
             <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
               {view === 'bipartite' ? (
@@ -396,6 +472,16 @@ export default function KnowledgeGraph() {
                 </>
               ) : (
                 <span className="flex items-center gap-1.5">{t('graph.legend.peerLink')}</span>
+              )}
+              {showReal && (
+                <>
+                  <span className="flex items-center gap-1.5">
+                    <span className="inline-block h-0.5 w-5 rounded" style={{ background: EDGE_COLORS.session }} /> {t('graph.legend.session')}
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="inline-block h-0.5 w-5 rounded" style={{ background: EDGE_COLORS.connection }} /> {t('graph.legend.connection')}
+                  </span>
+                </>
               )}
             </div>
           </div>
@@ -428,7 +514,7 @@ export default function KnowledgeGraph() {
               nodeRelSize={5}
               nodeVal={(n) => 1 + Math.min(degree.get(n.id) || 0, 10)}
               nodeLabel={(n) => (n.kind === 'person'
-                ? `${n.label}${n.department ? ` · ${n.department}` : ''}`
+                ? `${n.label}${n.department ? ` · ${n.department}` : ''}${n.program ? ` · ${n.program}` : ''}`
                 : n.label)}
               onNodeHover={(n) => setHovered(n ? n.id : null)}
               onNodeDragEnd={(n) => { n.fx = n.x; n.fy = n.y; }}

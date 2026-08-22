@@ -170,10 +170,13 @@ Seed/test users are managed in Supabase Auth. Admin-created users receive a one-
 
 | Column           | Required | Notes                                |
 |------------------|----------|--------------------------------------|
-| `name`           | Yes      | Full name                            |
+| `name`           | Yes      | Full name (immutable after import)   |
 | `email`          | Yes      | Becomes the auth.users login         |
 | `department`     | No       | Engineering, Finance, Marketing, …   |
 | `current_role`   | No       | Job title (stored as `job_title`)    |
+| `program`        | No       | Study program (e.g. MSc Management)  |
+| `cohort_year`    | No       | Class of / enrollment year (integer) |
+| `persona`        | No       | `student` (default) or `alumnus`     |
 | `seniority`      | No       | `junior`, `mid`, `senior`, `lead`    |
 | `tenure_years`   | No       | Integer                              |
 | `location`       | No       | Free text                            |
@@ -197,10 +200,13 @@ Stored as a Postgres function (`public.recompute_matches_for(uuid)`). Matching i
 
 Only pairs scoring >= 30 are stored. Viewer-specific adjustments (accept/decline volumes and rating averages per department) are layered on at read time inside `public.get_matches_for(...)`. Explorer can request `includeDirectory=1` to fill with same-org directory candidates when scored matches are sparse.
 
-Recompute fires:
-- On profile/skill/career changes (via the SQL function the client calls after writes).
-- Nightly at 03:15 UTC via `pg_cron` (`mt-nightly-rematch`).
-- On admin "Re-run matching".
+Recompute is **debounced** (0025): writes set a `profiles.matches_stale` flag instead of recomputing inline. Fires:
+- On profile/skill/career/onboarding/reflection changes — `mark_matches_stale()` flag only.
+- Every 5 minutes via `pg_cron` (`mt-stale-matches`) — processes flagged users in batches.
+- Nightly at 03:15 UTC via `pg_cron` (`mt-nightly-rematch`, full rebuild).
+- Immediately on session completion (both participants).
+- On admin "Re-run matching" (org-scoped, per-user batched).
+- After CSV imports (`admin-create-user` flags + processes just the imported users).
 
 Client signup is intentionally deferred. Public `/request-access` submissions are stored as leads only; platform admins still provision new client organizations manually through the Admin Organizations tab and assign imported users to that `organization_id`.
 
@@ -211,7 +217,8 @@ Client signup is intentionally deferred. Public `/request-access` submissions ar
 | Job                  | Schedule        | What                                                |
 |----------------------|-----------------|-----------------------------------------------------|
 | `mt-weekly-checkin`  | `0 9 * * MON`   | Sets `pending_checkin = true` on all active users.  |
-| `mt-nightly-rematch` | `15 3 * * *`    | Calls `recompute_all_matches()` for the whole org.  |
+| `mt-stale-matches`   | `*/5 * * * *`   | Recomputes matches for flagged users in batches.    |
+| `mt-nightly-rematch` | `15 3 * * *`    | Calls `recompute_all_matches()` for all orgs.       |
 
 ---
 

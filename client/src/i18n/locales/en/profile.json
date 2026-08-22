@@ -1,4 +1,12 @@
 {
+  "profile.tabs.label": "Profile sections",
+  "profile.tab.overview": "Overview",
+  "profile.tab.skills": "Skills",
+  "profile.tab.availability": "Availability",
+  "profile.tab.experience": "Experience",
+  "profile.tab.meetings": "Meetings",
+  "profile.tab.reflections": "Reflections",
+  "profile.manageSkills.desc": "What you can help others with, and what you're trying to grow.",
   "profile.toast.profileUpdated": "Profile updated",
   "profile.toast.skillRemoved": "Removed “{skill}”",
   "profile.toast.skillRemoveError": "Could not remove that skill — try again.",
@@ -89,5 +97,10 @@
   "profile.shadow.add": "+ Add",
   "profile.shadow.placeholder": "If you could spend a day shadowing someone in a completely different role, what would that role look like?",
   "profile.shadow.empty": "No answer yet — even a sentence helps.",
-  "profile.recognition.title": "Recognition"
+  "profile.recognition.title": "Recognition",
+  "profile.fields.program": "Program",
+  "profile.fields.cohortYear": "Class of",
+  "profile.fields.classOf": "Class of {year}",
+  "profile.persona.student": "Student",
+  "profile.persona.alumnus": "Alumnus"
 }

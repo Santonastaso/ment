@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useT } from '../i18n/index.jsx';
 import { supabase } from '../lib/supabase.js';
@@ -40,7 +40,7 @@ export default function ForcePasswordChange() {
     <div className="flex min-h-screen items-center justify-center bg-background p-6">
       <Card className="w-full max-w-[400px] rounded-xl border-[var(--border)] shadow-none">
         <CardHeader>
-          <CardTitle className="text-lg font-semibold">{t('auth.forcePassword.title')}</CardTitle>
+          <CardTitle className="text-lg font-medium">{t('auth.forcePassword.title')}</CardTitle>
           <CardDescription>
             {session?.user?.email && <>{t('auth.forcePassword.account', { email: session.user.email })}</>}
             {t('auth.forcePassword.description')}

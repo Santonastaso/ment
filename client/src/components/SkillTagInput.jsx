@@ -1,14 +1,21 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { ChevronRight, X } from 'lucide-react';
 import EscoSuggestInput from './EscoSuggestInput.jsx';
+import { Button } from './ui/button.jsx';
+import { useModalA11y } from '../lib/useModalA11y.js';
 import { useT } from '../i18n/index.jsx';
 
 // Tagged-input for plain skill strings. Each entry is just a string in the
 // `value` array. ESCO autocomplete is suggestive: the user can still confirm
 // a custom skill by pressing Enter without picking a suggestion.
+// Visual language: hairline row list; clicking a row opens a popup where the
+// skill can be removed.
 export default function SkillTagInput({ value = [], onChange, placeholder, lang, ariaLabel }) {
   const { t } = useT();
   const [input, setInput] = useState('');
+  const [openIdx, setOpenIdx] = useState(null);
   const inputRef = useRef(null);
+  const dialogRef = useModalA11y();
   const effectivePlaceholder = placeholder || t('components.skillTag.placeholder');
 
   function addSkill(raw) {
@@ -20,33 +27,37 @@ export default function SkillTagInput({ value = [], onChange, placeholder, lang,
 
   function removeSkill(idx) {
     onChange(value.filter((_, i) => i !== idx));
+    setOpenIdx(null);
   }
 
+  // Close the popup on Escape.
+  useEffect(() => {
+    if (openIdx === null) return undefined;
+    function onKey(e) { if (e.key === 'Escape') setOpenIdx(null); }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [openIdx]);
+
   return (
-    <div className="border border-gray-300 rounded-lg px-3 py-2 focus-within:ring-2 focus-within:ring-primary/40 focus-within:border-transparent bg-white min-h-[44px]">
-      <div className="flex flex-wrap gap-2 items-center">
-        {value.map((skill, i) => (
-          <span key={i} className="flex items-center gap-1 bg-blue-50 text-primary border border-blue-200 rounded-full px-3 py-0.5 text-sm font-medium">
-            {skill}
+    <div>
+      {value.length > 0 && (
+        <div className="divide-y divide-[var(--border-subtle)] border-b border-[var(--border-subtle)]">
+          {value.map((skill, i) => (
             <button
+              key={i}
               type="button"
-              onClick={() => removeSkill(i)}
-              aria-label={t('components.skillTag.remove', { skill })}
-              className="text-blue-400 hover:text-primary ml-0.5 leading-none"
+              onClick={() => setOpenIdx(i)}
+              aria-haspopup="dialog"
+              className="flex w-full items-center justify-between gap-3 py-2.5 text-left first:pt-0"
             >
-              ×
+              <span className="min-w-0 truncate text-sm font-medium text-foreground">{skill}</span>
+              <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
             </button>
-          </span>
-        ))}
-        <button
-          type="button"
-          onClick={() => inputRef.current?.focus()}
-          aria-label={ariaLabel || t('components.skillTag.ariaAdd')}
-          title={t('components.skillTag.ariaAdd')}
-          className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary hover:bg-primary/20 text-base leading-none flex-shrink-0"
-        >
-          +
-        </button>
+          ))}
+        </div>
+      )}
+
+      <div className={value.length > 0 ? 'pt-1' : undefined}>
         <EscoSuggestInput
           value={input}
           onChange={setInput}
@@ -55,11 +66,57 @@ export default function SkillTagInput({ value = [], onChange, placeholder, lang,
           onCommitCustom={(text) => addSkill(text)}
           onBackspaceEmpty={() => value.length > 0 && onChange(value.slice(0, -1))}
           placeholder={value.length === 0 ? effectivePlaceholder : ''}
-          inputClassName="w-full outline-none text-sm py-0.5 bg-transparent"
+          inputClassName="w-full outline-none text-sm py-2 bg-transparent"
           lang={lang}
           ariaLabel={ariaLabel || t('components.skillTag.ariaAdd')}
         />
       </div>
+
+      {/* Popup — remove the skill. */}
+      {openIdx !== null && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setOpenIdx(null); }}
+        >
+          <div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={`skill-tag-title-${openIdx}`}
+            className="w-full max-w-md rounded-2xl bg-white [box-shadow:var(--shadow-overlay)]"
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-[var(--border-subtle)] p-5">
+              <h2 id={`skill-tag-title-${openIdx}`} className="text-base font-medium leading-snug text-foreground">
+                {value[openIdx]}
+              </h2>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label={t('components.session.close')}
+                onClick={() => setOpenIdx(null)}
+              >
+                <X />
+              </Button>
+            </div>
+
+            <div className="flex items-center gap-2 border-t border-[var(--border-subtle)] p-4">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="text-destructive hover:text-destructive"
+                onClick={() => removeSkill(openIdx)}
+              >
+                {t('components.skillTag.remove', { skill: value[openIdx] })}
+              </Button>
+              <Button type="button" size="sm" className="ml-auto" onClick={() => setOpenIdx(null)}>
+                {t('components.popup.done')}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

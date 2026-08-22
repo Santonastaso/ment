@@ -49,5 +49,12 @@
   "onboarding.nav.skip": "Skip — enter manually",
   "onboarding.nav.continue": "Continue",
   "onboarding.nav.finish": "Finish & see my matches",
-  "onboarding.nav.saving": "Saving…"
+  "onboarding.nav.saving": "Saving…",
+  "onboarding.fields.nameLocked": "Your name is set by your school and can't be changed.",
+  "onboarding.persona.title": "I am a…",
+  "onboarding.persona.student": "Student",
+  "onboarding.persona.alumnus": "Alumnus",
+  "onboarding.fields.program": "Program",
+  "onboarding.fields.programPlaceholder": "e.g. MSc Management",
+  "onboarding.fields.cohortYear": "Class of (year)"
 }

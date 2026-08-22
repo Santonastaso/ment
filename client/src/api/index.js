@@ -364,6 +364,32 @@ async function listMatches({ limit, role, includeDirectory = false } = {}) {
 }
 
 // ============================================================
+// Directory browse (Wave 6): paginated, redacted, no scores.
+// Powers both Explorer modes — keyword search (chat-style) and
+// faceted browsing (directory-style).
+// ============================================================
+
+async function listDirectory(params = {}) {
+  const rpcArgs = {
+    p_limit: Math.min(Math.max(Number(params.limit) || 12, 1), 50),
+    p_offset: Math.max(Number(params.offset) || 0, 0),
+    p_persona: params.persona || null,
+    p_program: params.program || null,
+    p_cohort_year: params.cohortYear ? Number(params.cohortYear) : null,
+    p_location: params.location || null,
+    p_working_language: params.language || null,
+    p_query: params.q && params.q.trim() ? params.q.trim() : null,
+  };
+  const { data, error } = await supabase.rpc('directory_browse', rpcArgs);
+  if (error) throw new ApiError(error.message);
+  return {
+    total: data?.total ?? 0,
+    people: data?.people || [],
+    facets: data?.facets || { programs: [], locations: [], languages: [], cohortYears: [] },
+  };
+}
+
+// ============================================================
 // Storage helpers (file uploads)
 // ============================================================
 
@@ -410,6 +436,20 @@ async function get(url) {
       limit: params.get('limit'),
       role: params.get('role'),
       includeDirectory: params.get('includeDirectory') === '1',
+    }));
+  }
+
+  if (url.startsWith('/directory')) {
+    const params = new URLSearchParams(url.split('?')[1] || '');
+    return ok(await listDirectory({
+      limit: params.get('limit'),
+      offset: params.get('offset'),
+      persona: params.get('persona'),
+      program: params.get('program'),
+      cohortYear: params.get('cohort'),
+      location: params.get('location'),
+      language: params.get('language'),
+      q: params.get('q'),
     }));
   }
 
@@ -469,12 +509,6 @@ async function get(url) {
       pendingFromAdmin,
       lastEntryDays: lastDays,
     });
-  }
-
-  if (url === '/team/skill-gaps') {
-    const { data, error } = await supabase.rpc('team_skill_gaps', { p_manager_id: viewer.id });
-    if (error) throw new ApiError(error.message);
-    return ok(data);
   }
 
   if (url === '/admin/stats') {
@@ -562,9 +596,9 @@ async function get(url) {
   }
   if (url === '/admin/template') {
     const csv =
-      'name,email,department,current_role,tenure_years,location,manager_email,can_teach,wants_to_learn\n' +
-      'Jane Smith,jane.smith@company.com,Engineering,Software Engineer,3,London,sarah.lead@company.com,"React,TypeScript","system design,leadership"\n' +
-      'John Doe,john.doe@company.com,Finance,Financial Analyst,1,New York,frank.wu@company.com,"Excel","financial modeling,Python"\n';
+      'name,email,department,current_role,program,cohort_year,persona,tenure_years,location,manager_email,can_teach,wants_to_learn\n' +
+      'Jane Smith,jane.smith@university.edu,MSc Management,Research Assistant,MSc Management,2024,student,3,London,sarah.lead@university.edu,"React,TypeScript","system design,leadership"\n' +
+      'John Doe,john.doe@university.edu,MBA,Consultant,MBA,2019,alumnus,1,New York,frank.wu@university.edu,"Excel","financial modeling,Python"\n';
     return ok(new Blob([csv], { type: 'text/csv' }));
   }
 
@@ -613,7 +647,7 @@ async function post(url, body = {}, opts = {}) {
       .select()
       .single();
     if (error) throw new ApiError(error.message);
-    await supabase.rpc('recompute_matches_for', { p_user_id: viewer.id });
+    await supabase.rpc('mark_matches_stale', { p_user_id: viewer.id });
     return ok(data, 201);
   }
 
@@ -648,7 +682,7 @@ async function post(url, body = {}, opts = {}) {
     };
     const { data, error } = await supabase.from('career_history').insert(payload).select().single();
     if (error) throw new ApiError(error.message);
-    await supabase.rpc('recompute_matches_for', { p_user_id: viewer.id });
+    await supabase.rpc('mark_matches_stale', { p_user_id: viewer.id });
     return ok({ ...data, role: data.role_title }, 201);
   }
 
@@ -674,6 +708,9 @@ async function post(url, body = {}, opts = {}) {
       })),
       p_can_teach: (body.can_teach || []).map((s) => (typeof s === 'string' ? s : s.skill)),
       p_wants_to_learn: body.wants_to_learn || [],
+      p_program: body.program || '',
+      p_cohort_year: body.cohort_year ? parseInt(body.cohort_year, 10) : null,
+      p_persona: body.persona || null,
     });
     if (error) throw new ApiError(error.message);
     return ok(await loadProfile(viewer.id, viewer.id));
@@ -842,8 +879,12 @@ async function put(url, body = {}) {
 
   if (url === '/users/me') {
     const allowed = [
-      'name', 'department', 'seniority', 'bio', 'shadow_role_response',
+      // `name` is deliberately absent — users cannot change their own name
+      // (enforced DB-side by guard_profile_writes since 0024).
+      'department', 'seniority', 'bio', 'shadow_role_response',
       'tenure_years', 'location',
+      // School fields — program + "class of" year.
+      'program', 'cohort_year',
       // Personal availability — drives whether the user shows up as a
       // mentor candidate.
       'mentorship_paused', 'mentorship_unavailable_until', 'mentorship_note',
@@ -889,7 +930,7 @@ async function put(url, body = {}) {
       .select()
       .single();
     if (error) throw new ApiError(error.message);
-    await supabase.rpc('recompute_matches_for', { p_user_id: viewer.id });
+    await supabase.rpc('mark_matches_stale', { p_user_id: viewer.id });
     return ok({ ...data, role: data.role_title });
   }
 
@@ -1023,14 +1064,14 @@ async function del(url) {
     const id = Number(url.split('/')[4]);
     const { error } = await supabase.from('skills').delete().eq('id', id).eq('user_id', viewer.id);
     if (error) throw new ApiError(error.message);
-    await supabase.rpc('recompute_matches_for', { p_user_id: viewer.id });
+    await supabase.rpc('mark_matches_stale', { p_user_id: viewer.id });
     return ok({ ok: true });
   }
   if (/^\/users\/me\/career\/\d+$/.test(url)) {
     const id = Number(url.split('/')[4]);
     const { error } = await supabase.from('career_history').delete().eq('id', id).eq('user_id', viewer.id);
     if (error) throw new ApiError(error.message);
-    await supabase.rpc('recompute_matches_for', { p_user_id: viewer.id });
+    await supabase.rpc('mark_matches_stale', { p_user_id: viewer.id });
     return ok({ ok: true });
   }
   if (/^\/reflections\/\d+$/.test(url)) {

@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { Link } from 'react-router-dom';
 import { useT } from '../i18n/index.jsx';
 import { Button } from '@/components/ui/button';
@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 
 // Public landing page shown to non-authenticated visitors.
 //
-// Content is intentionally a clean skeleton — Fra + Pit will swap in finalised
+// Content is intentionally a clean skeleton â€” Fra + Pit will swap in finalised
 // marketing copy once the slides are ready. Strings live in i18n catalogs
 // (locales/<lang>/landing.json) so translation stays in lockstep.
 function NavBar({ t }) {
@@ -32,12 +32,12 @@ function NavBar({ t }) {
 
 function Hero({ t }) {
   return (
-    <section className="border-b border-[var(--border)] bg-gradient-to-b from-background to-muted/40">
-      <div className="mx-auto max-w-6xl px-4 py-20 text-center">
+    <section className="border-b border-[var(--border)] bg-background">
+      <div className="mx-auto max-w-[1160px] px-6 py-20 text-center">
         <p className="mb-4 inline-block rounded-full border border-[var(--border)] bg-background px-3 py-1 text-xs font-medium tracking-wide text-muted-foreground">
           {t('landing.hero.eyebrow')}
         </p>
-        <h1 className="mx-auto max-w-3xl text-4xl font-bold tracking-tight sm:text-5xl">
+        <h1 className="mx-auto max-w-3xl text-4xl font-medium leading-[1.08] tracking-[-0.025em] sm:text-5xl">
           {t('landing.hero.title')}
         </h1>
         <p className="mx-auto mt-5 max-w-2xl text-lg text-muted-foreground">
@@ -60,7 +60,7 @@ function FeatureCard({ title, description }) {
   return (
     <Card className="rounded-xl border-[var(--border)] shadow-none">
       <CardHeader>
-        <CardTitle className="text-base font-semibold">{title}</CardTitle>
+        <CardTitle className="text-base font-medium">{title}</CardTitle>
         <CardDescription className="text-sm leading-relaxed">{description}</CardDescription>
       </CardHeader>
     </Card>
@@ -70,35 +70,22 @@ function FeatureCard({ title, description }) {
 function Products({ t }) {
   return (
     <section className="border-b border-[var(--border)] bg-background">
-      <div className="mx-auto max-w-6xl px-4 py-16">
+      <div className="mx-auto max-w-[1160px] px-6 py-16">
         <div className="mb-10 text-center">
-          <h2 className="text-2xl font-semibold tracking-tight">{t('landing.products.title')}</h2>
+          <h2 className="text-2xl font-medium tracking-[-0.01em]">{t('landing.products.title')}</h2>
           <p className="mt-2 text-muted-foreground">{t('landing.products.subtitle')}</p>
         </div>
-        <div className="grid gap-5 md:grid-cols-2">
-          <Card className="rounded-xl border-[var(--border)] shadow-none">
-            <CardHeader>
-              <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-primary">
-                {t('landing.products.intraEyebrow')}
-              </p>
-              <CardTitle className="text-xl">{t('landing.products.intraTitle')}</CardTitle>
-              <CardDescription className="text-sm leading-relaxed">
-                {t('landing.products.intraDescription')}
-              </CardDescription>
-            </CardHeader>
-          </Card>
-          <Card className="rounded-xl border-[var(--border)] shadow-none">
-            <CardHeader>
-              <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-primary">
-                {t('landing.products.interEyebrow')}
-              </p>
-              <CardTitle className="text-xl">{t('landing.products.interTitle')}</CardTitle>
-              <CardDescription className="text-sm leading-relaxed">
-                {t('landing.products.interDescription')}
-              </CardDescription>
-            </CardHeader>
-          </Card>
-        </div>
+        <Card className="mx-auto max-w-3xl rounded-xl border-[var(--border)] shadow-none">
+          <CardHeader>
+            <p className="mb-1 text-xs font-medium uppercase tracking-wider text-primary">
+              {t('landing.products.universityEyebrow')}
+            </p>
+            <CardTitle className="text-xl">{t('landing.products.universityTitle')}</CardTitle>
+            <CardDescription className="text-sm leading-relaxed">
+              {t('landing.products.universityDescription')}
+            </CardDescription>
+          </CardHeader>
+        </Card>
       </div>
     </section>
   );
@@ -111,10 +98,10 @@ function HowItWorks({ t }) {
     { title: t('landing.how.step3Title'), description: t('landing.how.step3Description') },
   ];
   return (
-    <section className="border-b border-[var(--border)] bg-muted/30">
-      <div className="mx-auto max-w-6xl px-4 py-16">
+    <section className="border-b border-[var(--border)] bg-muted">
+      <div className="mx-auto max-w-[1160px] px-6 py-16">
         <div className="mb-10 text-center">
-          <h2 className="text-2xl font-semibold tracking-tight">{t('landing.how.title')}</h2>
+          <h2 className="text-2xl font-medium tracking-[-0.01em]">{t('landing.how.title')}</h2>
         </div>
         <div className="grid gap-5 md:grid-cols-3">
           {steps.map((step, idx) => (
@@ -122,7 +109,7 @@ function HowItWorks({ t }) {
               <div className="flex size-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
                 {idx + 1}
               </div>
-              <h3 className="text-base font-semibold">{step.title}</h3>
+              <h3 className="text-base font-medium">{step.title}</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">{step.description}</p>
             </div>
           ))}
@@ -141,10 +128,10 @@ function Trust({ t }) {
   ];
   return (
     <section className="border-b border-[var(--border)] bg-background">
-      <div className="mx-auto max-w-6xl px-4 py-16">
+      <div className="mx-auto max-w-[1160px] px-6 py-16">
         <div className="grid gap-10 md:grid-cols-2 md:items-center">
           <div>
-            <h2 className="text-2xl font-semibold tracking-tight">{t('landing.trust.title')}</h2>
+            <h2 className="text-2xl font-medium tracking-[-0.01em]">{t('landing.trust.title')}</h2>
             <p className="mt-2 text-muted-foreground">{t('landing.trust.subtitle')}</p>
           </div>
           <ul className="space-y-3">
@@ -165,7 +152,7 @@ function FinalCta({ t }) {
   return (
     <section className="bg-background">
       <div className="mx-auto max-w-3xl px-4 py-20 text-center">
-        <h2 className="text-3xl font-semibold tracking-tight">{t('landing.finalCta.title')}</h2>
+        <h2 className="text-3xl font-medium tracking-[-0.01em]">{t('landing.finalCta.title')}</h2>
         <p className="mx-auto mt-3 max-w-xl text-muted-foreground">{t('landing.finalCta.subtitle')}</p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <Link to="/request-access">
