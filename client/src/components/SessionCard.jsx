@@ -147,7 +147,7 @@ export default function SessionCard({ session, currentUserId, onUpdate }) {
 
   return (
     <>
-      {/* Collapsed row — the only thing visible until clicked. */}
+      {/* Collapsed row — person + date, nothing else. */}
       <div className="py-4 first:pt-1 last:pb-1">
         <button
           type="button"
@@ -155,20 +155,13 @@ export default function SessionCard({ session, currentUserId, onUpdate }) {
           aria-haspopup="dialog"
           className="flex w-full items-center justify-between gap-3 text-left"
         >
-          <span className="min-w-0 truncate text-sm">
-            <span className="font-medium text-foreground">{other?.name}</span>
-            <span className="text-muted-foreground"> · {otherRole}</span>
-          </span>
+          <span className="min-w-0 truncate text-sm font-medium text-foreground">{other?.name}</span>
           <span className="flex shrink-0 items-center gap-2.5 text-xs text-muted-foreground">
             {session.scheduled_at && (
               <span>
                 {new Date(session.scheduled_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
               </span>
             )}
-            <span className="inline-flex items-center gap-1.5">
-              <span className={`size-1.5 rounded-full ${statusDot[session.status] || statusDot.pending}`} aria-hidden="true" />
-              {statusLabel(session.status)}
-            </span>
             <ChevronRight className="size-3.5" aria-hidden="true" />
           </span>
         </button>
@@ -193,11 +186,15 @@ export default function SessionCard({ session, currentUserId, onUpdate }) {
                 <h2 id={`session-modal-title-${session.id}`} className="text-base font-medium leading-snug text-foreground">
                   {session.title}
                 </h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {other?.name} · {otherRole}
-                  {session.scheduled_at
-                    ? <> · {new Date(session.scheduled_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</>
-                    : null}
+                <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-sm text-muted-foreground">
+                  <span>{other?.name} · {otherRole}</span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className={`size-1.5 rounded-full ${statusDot[session.status] || statusDot.pending}`} aria-hidden="true" />
+                    {statusLabel(session.status)}
+                  </span>
+                  {session.scheduled_at && (
+                    <span>· {new Date(session.scheduled_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                  )}
                 </p>
               </div>
               <Button

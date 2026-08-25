@@ -7,8 +7,10 @@
 // empty string so a human can later fill them in (still exits 1 to flag).
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.resolve(HERE, '..');
 const LOCALES_DIR = path.join(ROOT, 'client/src/i18n/locales');
 const LOCALES = ['en', 'it'];
 const FIX_EMPTY = process.argv.includes('--fix-empty');
@@ -16,7 +18,7 @@ const FIX_EMPTY = process.argv.includes('--fix-empty');
 function loadLocaleNamespace(locale, ns) {
   const file = path.join(LOCALES_DIR, locale, `${ns}.json`);
   if (!fs.existsSync(file)) return {};
-  return JSON.parse(fs.readFileSync(file, 'utf8'));
+  return JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
 }
 
 function listNamespaces() {
@@ -77,9 +79,44 @@ for (const ns of namespaces) {
 
 if (totalGaps === 0) {
   console.log('All i18n catalogs match — no missing keys.');
-  process.exit(0);
 } else {
   console.log(`\n${totalGaps} missing key${totalGaps === 1 ? '' : 's'}. ` +
               (FIX_EMPTY ? 'Empty placeholders inserted — fill them in.' : 'Re-run with --fix-empty to scaffold placeholders.'));
-  process.exit(1);
 }
+
+// ---- Second pass: keys referenced via t('...') in source must exist in BOTH
+// locales. Catches keys missing from every catalog (parity alone can't).
+function collectUsedKeys(dir, out = new Set()) {
+  for (const f of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, f.name);
+    if (f.isDirectory()) collectUsedKeys(p, out);
+    else if (/\.(jsx?|tsx?)$/.test(f.name)) {
+      const src = fs.readFileSync(p, 'utf8');
+      for (const m of src.matchAll(/\bt\(\s*['"]([^'"]+)['"]/g)) out.add(m[1]);
+    }
+  }
+  return out;
+}
+
+const allKeys = new Set();
+for (const ns of namespaces) {
+  const en = loadLocaleNamespace('en', ns);
+  for (const k of Object.keys(en)) allKeys.add(k);
+}
+const usedKeys = collectUsedKeys(path.join(ROOT, 'client/src'));
+// Dynamic keys (template literals like `tier${x}`) aren't captured by the regex;
+// ignore anything that doesn't literally exist as a t('...') string.
+const dangling = [...usedKeys].filter(k => !allKeys.has(k)).sort();
+
+let usageGaps = 0;
+if (dangling.length) {
+  console.log(`\nKeys used in source but missing from ALL en catalogs (${dangling.length}):`);
+  for (const k of dangling) console.log(`  - ${k}`);
+  usageGaps = dangling.length;
+}
+
+if (totalGaps === 0 && usageGaps === 0) {
+  process.exit(0);
+}
+process.exit(1);
+

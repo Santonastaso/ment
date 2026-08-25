@@ -332,7 +332,6 @@ export default function KnowledgeGraph() {
 
         <Button
           variant="outline"
-          size="lg"
           onClick={() => loadGraph(company, language)}
           data-testid="kg-refresh"
         >

@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import SkillTagInput from '../components/SkillTagInput.jsx';
 import TeachSkillsEditor from '../components/TeachSkillsEditor.jsx';
 import SessionRequestModal from '../components/SessionRequestModal.jsx';
-import SkillLandscape from '../components/SkillLandscape.jsx';
+
 import PastMeetings from '../components/PastMeetings.jsx';
 import MonthYearPicker from '../components/MonthYearPicker.jsx';
 import ReflectionLog from '../components/ReflectionLog.jsx';
@@ -497,12 +497,40 @@ export default function Profile() {
           description={skillDescription}
         />
         <SurfaceBody className="space-y-5 pt-5">
-        <SkillLandscape
-          skillProgress={profile.skillProgress || []}
-          isOwnProfile={isOwnProfile}
-          firstName={profile.name?.split(' ')[0] || 'they'}
-          onDeleteSkill={isOwnProfile ? handleDeleteSkillFromBubble : undefined}
-        />
+        {(() => {
+          const progress = profile.skillProgress || [];
+          const teachAll = progress.filter(s => s.type === 'can_teach');
+          const learnAll = progress.filter(s => s.type === 'wants_to_learn');
+          if (teachAll.length === 0 && learnAll.length === 0) return null;
+          const activeTeaching = teachAll.filter(s => (s.session_count || 0) > 0).length;
+          const startedLearning = learnAll.filter(s => (s.session_count || 0) > 0).length;
+          const teachLabel = isOwnProfile
+            ? t('components.skillLandscape.summaryTeachingOwn')
+            : t('components.skillLandscape.summaryTeachingOther', { name: firstName });
+          const learnLabel = isOwnProfile
+            ? t('components.skillLandscape.summaryLearningOwn')
+            : t('components.skillLandscape.summaryLearningOther', { name: firstName });
+          return (
+            <div className="grid grid-cols-2 gap-3 sm:max-w-md">
+              {teachAll.length > 0 && (
+                <div className="rounded-xl border border-[var(--border)] bg-card px-4 py-3" data-testid="overview-teach-count">
+                  <div className="text-2xl font-medium leading-none tabular-nums text-foreground">
+                    {activeTeaching}<span className="text-lg text-muted-foreground">/{teachAll.length}</span>
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">{teachLabel}</div>
+                </div>
+              )}
+              {learnAll.length > 0 && (
+                <div className="rounded-xl border border-[var(--border)] bg-card px-4 py-3" data-testid="overview-learn-count">
+                  <div className="text-2xl font-medium leading-none tabular-nums text-foreground">
+                    {startedLearning}<span className="text-lg text-muted-foreground">/{learnAll.length}</span>
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">{learnLabel}</div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Expertise signature */}
         {profile.expertiseSignature?.length > 0 && (

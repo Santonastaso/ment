@@ -1,4 +1,4 @@
-﻿{
+{
   "components.match.unknown": "Unknown",
   "components.match.hideDetails": "Hide details",
   "components.match.whyMatch": "Why this match?",
@@ -38,6 +38,7 @@
   "components.session.discard": "Discard",
   "components.session.cancel": "Cancel",
   "components.session.close": "Close",
+  "components.popup.done": "Done",
   "components.session.viewProfile": "View profile",
   "components.session.discardReflection": "Discard reflection",
 

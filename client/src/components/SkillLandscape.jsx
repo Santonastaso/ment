@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useState } from 'react';
-import { ChevronDown, ChevronRight, X } from 'lucide-react';
+import { ChevronRight, X } from 'lucide-react';
 import { Button } from './ui/button.jsx';
 import { useModalA11y } from '../lib/useModalA11y.js';
 import { useT } from '../i18n/index.jsx';
@@ -137,8 +137,7 @@ function SkillRow({ entry, kind, tierFn, order, isOwnProfile, onDelete }) {
 }
 
 // ---------- Section ----------
-function Section({ title, items, kind, tierFn, order, firstName, isOwnProfile, onDelete, defaultCollapsed = false }) {
-  const [collapsed, setCollapsed] = useState(defaultCollapsed);
+function Section({ title, items, kind, tierFn, order, firstName, isOwnProfile, onDelete }) {
   if (items.length === 0) return null;
 
   // Sort: teach by tier desc (best first); learn by tier asc (gaps first to draw the eye)
@@ -147,37 +146,24 @@ function Section({ title, items, kind, tierFn, order, firstName, isOwnProfile, o
 
   return (
     <section>
-      <header className="mb-1">
-        <button
-          type="button"
-          onClick={() => setCollapsed(c => !c)}
-          aria-expanded={!collapsed}
-          className="group flex items-center gap-1.5 text-left"
-        >
-          <h3 className="text-base font-medium text-foreground">{title}</h3>
-          <span className="text-xs text-muted-foreground tabular-nums">({items.length})</span>
-          <ChevronDown
-            className={`size-3.5 text-muted-foreground transition-transform duration-150 ${collapsed ? '' : 'rotate-180'}`}
-            aria-hidden="true"
-          />
-        </button>
+      <header className="mb-1 flex items-center gap-1.5">
+        <h3 className="text-base font-medium text-foreground">{title}</h3>
+        <span className="text-xs text-muted-foreground tabular-nums">({items.length})</span>
       </header>
 
-      {!collapsed && (
-        <div className="divide-y divide-[var(--border-subtle)]">
-          {sorted.map((entry, i) => (
-            <SkillRow
-              key={entry.id ?? `${entry.skill}-${i}`}
-              entry={entry}
-              kind={kind}
-              tierFn={tierFn}
-              order={order}
-              isOwnProfile={isOwnProfile}
-              onDelete={onDelete}
-            />
-          ))}
-        </div>
-      )}
+      <div className="divide-y divide-[var(--border-subtle)]">
+        {sorted.map((entry, i) => (
+          <SkillRow
+            key={entry.id ?? `${entry.skill}-${i}`}
+            entry={entry}
+            kind={kind}
+            tierFn={tierFn}
+            order={order}
+            isOwnProfile={isOwnProfile}
+            onDelete={onDelete}
+          />
+        ))}
+      </div>
     </section>
   );
 }
@@ -239,7 +225,6 @@ export default function SkillLandscape({ skillProgress = [], isOwnProfile, first
         firstName={firstName}
         isOwnProfile={isOwnProfile}
         onDelete={onDeleteSkill}
-        defaultCollapsed={isOwnProfile}
       />
 
       {/* Skills you're growing */}
