@@ -13,18 +13,8 @@ async function loadProfile(userId) {
     if (error || !data) return null;
     if (data.id !== userId) return null;
 
-    // direct_reports drives Team-Skills nav visibility. Best-effort: a
-    // failure here must not block the whole AuthContext from finishing.
-    let directReports = 0;
-    try {
-      const { data: count } = await supabase.rpc('direct_report_count', { p_manager_id: userId });
-      directReports = count ?? 0;
-    } catch {
-      /* swallow */
-    }
-
     // Alias job_title -> current_role for legacy components.
-    return { ...data, current_role: data.job_title, direct_reports: directReports };
+    return { ...data, current_role: data.job_title };
   } catch {
     return null;
   }
@@ -64,7 +54,10 @@ export function AuthProvider({ children }) {
     }
 
     supabase.auth.getSession().then(({ data: { session: s } }) => hydrate(s));
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => hydrate(s));
+    // Keep the auth callback synchronous. Supabase invokes it while holding
+    // its auth lock; profile hydration uses the same client and must run after
+    // the callback returns.
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => { void hydrate(s); });
 
     return () => {
       mounted = false;

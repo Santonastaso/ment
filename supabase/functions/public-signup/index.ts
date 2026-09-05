@@ -126,7 +126,7 @@ Deno.serve(async (req) => {
   // marked as an org admin. The trigger should have done this from metadata,
   // but we update explicitly so the row is consistent regardless of the
   // metadata defaults applied by handle_new_user.
-  await sb
+  const { error: profileError } = await sb
     .from('profiles')
     .update({
       organization_id: org.id,
@@ -136,6 +136,11 @@ Deno.serve(async (req) => {
       must_change_password: false,
     })
     .eq('id', created.user.id);
+  if (profileError) {
+    await sb.auth.admin.deleteUser(created.user.id);
+    await sb.from('organizations').delete().eq('id', org.id);
+    return jsonError(`profile_create_failed: ${profileError.message}`, 500);
+  }
 
   return jsonOk({
     organization: org,

@@ -5,6 +5,8 @@ import { Button } from './ui/button.jsx';
 import { useModalA11y } from '../lib/useModalA11y.js';
 import { useT } from '../i18n/index.jsx';
 
+const EXAMPLE_LIMIT = 80;
+
 // Edits an array of { skill, example_project } pairs. Used for "what you can
 // teach" where the spec calls for an optional example project per skill.
 // ESCO autocomplete is suggestive: confirm a custom string with Enter to skip.
@@ -15,7 +17,7 @@ export default function TeachSkillsEditor({ value = [], onChange, placeholder, l
   const [skillInput, setSkillInput] = useState('');
   const [editingIdx, setEditingIdx] = useState(null);
   const inputRef = useRef(null);
-  const dialogRef = useModalA11y();
+  const dialogRef = useModalA11y(editingIdx !== null);
   const effectivePlaceholder = placeholder || t('components.teachSkills.placeholder');
 
   function addSkill(raw) {
@@ -26,7 +28,7 @@ export default function TeachSkillsEditor({ value = [], onChange, placeholder, l
   }
 
   function updateExample(idx, example) {
-    onChange(value.map((v, i) => i === idx ? { ...v, example_project: example } : v));
+    onChange(value.map((v, i) => i === idx ? { ...v, example_project: example.slice(0, EXAMPLE_LIMIT) } : v));
   }
 
   function removeSkill(idx) {
@@ -115,15 +117,20 @@ export default function TeachSkillsEditor({ value = [], onChange, placeholder, l
               <label className="label-meta" htmlFor={`teach-example-${editingIdx}`}>
                 {t('components.teachSkills.exampleFor', { skill: editing.skill })}
               </label>
+              <p className="text-xs text-muted-foreground">{t('components.teachSkills.exampleHelp')}</p>
               <input
                 id={`teach-example-${editingIdx}`}
                 autoFocus
                 type="text"
                 value={editing.example_project}
                 onChange={e => updateExample(editingIdx, e.target.value)}
+                maxLength={EXAMPLE_LIMIT}
                 placeholder={t('components.teachSkills.examplePlaceholder')}
                 className="input"
               />
+              <p className="text-right text-[11px] text-muted-foreground tabular-nums">
+                {(editing.example_project || '').length}/{EXAMPLE_LIMIT}
+              </p>
             </div>
 
             <div className="flex items-center gap-2 border-t border-[var(--border-subtle)] p-4">

@@ -153,7 +153,17 @@ async function claudeExtractProfile(rawText: string) {
     const text: string = data?.content?.[0]?.text ?? '';
     const match = text.match(/\{[\s\S]*\}/);
     if (!match) return null;
-    return JSON.parse(match[0]);
+    const parsed = JSON.parse(match[0]);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+    const textFields = ['job_title', 'department', 'location', 'bio'];
+    for (const key of textFields) if (parsed[key] != null && typeof parsed[key] !== 'string') parsed[key] = '';
+    for (const key of ['strengths', 'growth_areas', 'career_history']) {
+      if (!Array.isArray(parsed[key])) parsed[key] = [];
+    }
+    parsed.strengths = parsed.strengths.filter((x: unknown) => typeof x === 'string').slice(0, 8);
+    parsed.growth_areas = parsed.growth_areas.filter((x: unknown) => typeof x === 'string').slice(0, 8);
+    parsed.career_history = parsed.career_history.filter((x: unknown) => x && typeof x === 'object').slice(0, 8);
+    return parsed;
   } catch {
     return null;
   }
@@ -197,6 +207,7 @@ Deno.serve(async (req) => {
   // when missing or unknown.
   const lang = normalizeLang(body.lang);
   if (!storagePath) return jsonError('storage_path_required');
+  if (!storagePath.startsWith(`${ctx.user.id}/`)) return jsonError('forbidden', 403);
 
   // Storage path is expected to be `<auth.uid()>/<filename>` so RLS allows the user to read.
   // We use the service-role client to download (avoiding any token-pass plumbing).

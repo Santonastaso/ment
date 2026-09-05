@@ -30,7 +30,7 @@ const LEARN_ORDER = ['missing', 'started', 'growing', 'steady'];
 function SkillRow({ entry, kind, tierFn, order, isOwnProfile, onDelete }) {
   const { t } = useT();
   const [open, setOpen] = useState(false);
-  const dialogRef = useModalA11y();
+  const dialogRef = useModalA11y(open);
   const count = entry.session_count || 0;
   const tier = tierFn(count);
   const tierLabel = t(`components.skillLandscape.tier${tier.charAt(0).toUpperCase()}${tier.slice(1)}`);
@@ -182,39 +182,8 @@ export default function SkillLandscape({ skillProgress = [], isOwnProfile, first
     );
   }
 
-  const totalLearning = learn.length;
-  const totalGrowing = learn.filter(s => (s.session_count || 0) > 0).length;
-  const totalTeaching = teach.length;
-  const totalActiveTeaching = teach.filter(s => (s.session_count || 0) > 0).length;
-
   return (
     <div className="space-y-7">
-      {/* Headline summary */}
-      {(totalLearning > 0 || totalTeaching > 0) && (
-        <div className="grid grid-cols-2 gap-3">
-          {totalTeaching > 0 && (
-            <div className="rounded-xl border border-[var(--border)] bg-card px-4 py-3">
-              <div className="text-2xl font-medium leading-none tabular-nums text-foreground">
-                {totalActiveTeaching}<span className="text-muted-foreground text-lg">/{totalTeaching}</span>
-              </div>
-              <div className="mt-1 text-xs text-muted-foreground">
-                {isOwnProfile ? t('components.skillLandscape.summaryTeachingOwn') : t('components.skillLandscape.summaryTeachingOther', { name: firstName })}
-              </div>
-            </div>
-          )}
-          {totalLearning > 0 && (
-            <div className="rounded-xl border border-[var(--border)] bg-card px-4 py-3">
-              <div className="text-2xl font-medium leading-none tabular-nums text-foreground">
-                {totalGrowing}<span className="text-muted-foreground text-lg">/{totalLearning}</span>
-              </div>
-              <div className="mt-1 text-xs text-muted-foreground">
-                {isOwnProfile ? t('components.skillLandscape.summaryLearningOwn') : t('components.skillLandscape.summaryLearningOther', { name: firstName })}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Your strengths */}
       <Section
         title={isOwnProfile ? t('components.skillLandscape.shareTitleOwn') : t('components.skillLandscape.shareTitleOther', { name: firstName })}

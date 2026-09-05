@@ -14,8 +14,8 @@
   "nav.home": "Home",
   "nav.explorer": "Esplora",
   "nav.myProfile": "Il mio profilo",
-  "nav.teamInsights": "Analisi del team",
   "nav.admin": "Amministrazione",
   "nav.knowledgeGraph": "Grafo delle competenze",
-  "nav.platformOps": "Operazioni piattaforma"
+  "nav.platformOps": "Operazioni piattaforma",
+  "nav.groups": "Groups"
 }

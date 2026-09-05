@@ -69,7 +69,7 @@ async function downloadBlob(apiPath, filename) {
 }
 
 function formatDate(value) {
-  if (!value) return 'â€”';
+  if (!value) return '—';
   return new Date(value).toLocaleString(undefined, {
     year: 'numeric',
     month: 'short',
@@ -91,11 +91,6 @@ export default function AdminDashboard() {
   const [savingOrgPrivacy, setSavingOrgPrivacy] = useState(false);
   const [privacyStatus, setPrivacyStatus] = useState(null);
   const [privacyLoading, setPrivacyLoading] = useState(false);
-  const [tierRequestOpen, setTierRequestOpen] = useState(false);
-  const [tierRequestTarget, setTierRequestTarget] = useState('intra');
-  const [tierRequestNote, setTierRequestNote] = useState('');
-  const [tierRequestSubmitting, setTierRequestSubmitting] = useState(false);
-  const [tierRequestResult, setTierRequestResult] = useState('');
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [rematching, setRematching] = useState(false);
@@ -213,24 +208,6 @@ export default function AdminDashboard() {
     }
   }
 
-  async function submitTierChangeRequest() {
-    setTierRequestSubmitting(true);
-    setTierRequestResult('');
-    try {
-      await api.put('/admin/org-privacy/request', {
-        type: tierRequestTarget,
-        note: tierRequestNote,
-      });
-      setTierRequestResult('ok');
-      setTierRequestNote('');
-      // Auto-close on success after a brief confirmation pulse.
-      setTimeout(() => { setTierRequestOpen(false); setTierRequestResult(''); }, 1400);
-    } catch (e) {
-      setTierRequestResult(e?.message || 'error');
-    } finally {
-      setTierRequestSubmitting(false);
-    }
-  }
 
   async function loadPrivacyStatus() {
     setPrivacyLoading(true);
@@ -271,7 +248,6 @@ export default function AdminDashboard() {
     setNotice(null);
     try {
       const res = await api.post('/admin/rematch');
-      setStats(prev => prev ? { ...prev, totalMatches: res.data.matchesGenerated } : prev);
       setNotice({ variant: 'default', title: t('admin.notice.matchingCompleteTitle'), message: res.data.message });
     } catch (e) {
       setNotice({
@@ -416,14 +392,14 @@ export default function AdminDashboard() {
         ))}
         {isPlatformAdmin && (
           <Link to="/admin/ops" data-testid="nav-platform-ops" className="-mb-px border-b-2 border-transparent px-0.5 pb-2.5 pt-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
-            {t('admin.ops.link')} â†’
+            {t('admin.ops.link')} →
           </Link>
         )}
       </nav>
 
       {tab === 'overview' && (
         <>
-          {/* Weekly reflection broadcast â€” demo trigger */}
+          {/* Weekly reflection broadcast — demo trigger */}
           <SurfacePanel
             title={t('admin.broadcast.title')}
             description={t('admin.broadcast.description')}
@@ -435,7 +411,7 @@ export default function AdminDashboard() {
           >
             {broadcastResult && (
               <p className="inline-flex flex-wrap items-center gap-2 rounded-lg border border-[var(--border)] px-3 py-2 text-sm text-muted-foreground">
-                <span>âœ“</span>
+                <span>✓“</span>
                 <span>{broadcastResult.message}</span>
                 <span>{t('admin.broadcast.resultHint')}</span>
               </p>
@@ -507,37 +483,7 @@ export default function AdminDashboard() {
                           </p>
                         )}
                       </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        {isPlatformAdmin ? (
-                          <>
-                            <Button
-                              type="button" size="sm"
-                              variant={privacyStatus.orgType === 'intra' ? 'default' : 'outline'}
-                              onClick={() => updateOrgPrivacy({ type: 'intra' })}
-                              disabled={savingOrgPrivacy}
-                              data-testid="org-mode-intra"
-                            >{t('admin.privacy.intra')}</Button>
-                            <Button
-                              type="button" size="sm"
-                              variant={privacyStatus.orgType === 'inter' ? 'default' : 'outline'}
-                              onClick={() => updateOrgPrivacy({ type: 'inter' })}
-                              disabled={savingOrgPrivacy}
-                              data-testid="org-mode-inter"
-                            >{t('admin.privacy.inter')}</Button>
-                          </>
-                        ) : (
-                          <Button
-                            type="button" size="sm" variant="outline"
-                            data-testid="org-mode-request-change"
-                            onClick={() => {
-                              setTierRequestTarget(privacyStatus.orgType === 'intra' ? 'inter' : 'intra');
-                              setTierRequestNote('');
-                              setTierRequestResult('');
-                              setTierRequestOpen(true);
-                            }}
-                          >{t('admin.privacy.requestTierChange')}</Button>
-                        )}
-                      </div>
+                      <p className="text-xs text-muted-foreground">Privacy is managed by the platform team for this university.</p>
                       <div className="flex flex-wrap items-center gap-2">
                         <label className="text-xs text-muted-foreground">{t('admin.privacy.minReports')}</label>
                         <input
@@ -742,12 +688,12 @@ export default function AdminDashboard() {
               <div className="mt-4 rounded-lg border border-[var(--border)] p-4 text-sm">
                 <p className="mb-1 font-medium">{t('admin.import.complete')}</p>
                 <ul className="space-y-0.5 text-muted-foreground">
-                  <li>âœ“ {uploadResult.updated
+                  <li>✓“ {uploadResult.updated
                     ? t('admin.import.importedUpdatedLine', { imported: uploadResult.imported, updated: uploadResult.updated, skipped: uploadResult.skipped })
                     : t('admin.import.importedLine', { imported: uploadResult.imported, skipped: uploadResult.skipped })}</li>
-                  <li>âœ“ {t('admin.import.matchesLine', { matches: uploadResult.matchesGenerated })}</li>
+                  <li>✓“ {t('admin.import.matchesLine', { matches: uploadResult.matchesGenerated })}</li>
                   {uploadResult.imported > 0 && (
-                    <li>âœ“ {t('admin.import.tempPassword')} <code className="rounded bg-muted px-1 font-mono text-foreground">{uploadResult.tempPassword}</code></li>
+                    <li>✓“ {t('admin.import.tempPassword')} <code className="rounded bg-muted px-1 font-mono text-foreground">{uploadResult.tempPassword}</code></li>
                   )}
                 </ul>
               </div>
@@ -798,13 +744,23 @@ export default function AdminDashboard() {
             ) : (
               <>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <StatCard label={t('admin.kpis.studentActivation')} value={`${kpis.studentActivationRate ?? 0}%`} />
+                  <StatCard label={t('admin.kpis.alumniActivation')} value={`${kpis.alumniActivationRate ?? 0}%`} />
+                  <StatCard label={t('admin.kpis.alumniEngagement')} value={`${kpis.alumniEngagementRate ?? 0}%`} />
+                  <StatCard label={t('admin.kpis.meaningfulConnections')} value={kpis.meaningfulConnections ?? 0} />
+                  <StatCard label={t('admin.kpis.connectionCoverage')} value={`${kpis.connectionCoverageRate ?? 0}%`} />
+                  <StatCard label={t('admin.kpis.acceptanceRate')} value={`${kpis.acceptanceRate ?? 0}%`} />
+                  <StatCard label={t('admin.kpis.replyRate')} value={kpis.replyRate == null ? '—' : `${kpis.replyRate}%`} />
+                  <StatCard label={t('admin.kpis.mentorshipsFormed')} value={kpis.mentorshipsFormed ?? 0} />
+                  <StatCard label={t('admin.kpis.careerConversations')} value={kpis.careerConversations ?? 0} />
+                  <StatCard label={t('admin.kpis.intentToContinue')} value={`${kpis.intentToContinueRate ?? 0}%`} />
                   <StatCard label={t('admin.kpis.activeMentors')} value={kpis.activeMentors} sub={t('admin.kpis.ofPotential', { n: kpis.potentialMentors })} />
                   <StatCard label={t('admin.kpis.inactiveMentors')} value={kpis.inactiveMentors} />
                   <StatCard label={t('admin.kpis.pausedMentors')} value={kpis.pausedMentors} />
                   <StatCard label={t('admin.kpis.participation')} value={`${kpis.participationRate}%`} />
-                  <StatCard label={t('admin.kpis.avgRating')} value={kpis.avgRating || 'â€”'} />
+                  <StatCard label={t('admin.kpis.avgRating')} value={kpis.avgRating || '—'} />
                   <StatCard label={t('admin.kpis.repeatRate')} value={`${kpis.repeatRate}%`} />
-                  <StatCard label={t('admin.kpis.avgResponse')} value={kpis.avgResponseHours ? `${kpis.avgResponseHours}h` : 'â€”'} />
+                  <StatCard label={t('admin.kpis.avgResponse')} value={kpis.avgResponseHours ? `${kpis.avgResponseHours}h` : '—'} />
                   <StatCard label={t('admin.kpis.isolated')} value={kpis.isolatedEmployees} />
                 </div>
 
@@ -880,7 +836,7 @@ export default function AdminDashboard() {
                           </select>
                         )}
                       </td>
-                      <td className="py-2 pr-4 text-secondary-foreground">{u.manager_email || <span className="text-gray-300">â€”</span>}</td>
+                      <td className="py-2 pr-4 text-secondary-foreground">{u.manager_email || <span className="text-gray-300">—</span>}</td>
                       <td className="py-2 space-x-2 whitespace-nowrap">
                         {!u.deactivated_at && (
                           <>
@@ -944,15 +900,15 @@ export default function AdminDashboard() {
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2 text-xs">
                           <span className="font-medium uppercase tracking-wide text-foreground">{item.category}</span>
-                          <span className="text-muted-foreground">Â·</span>
+                          <span className="text-muted-foreground">·</span>
                           <span className="text-muted-foreground">{item.user?.name || t('admin.feedback.unknownUser')}</span>
                           {item.user?.department && (
                             <>
-                              <span className="text-muted-foreground">Â·</span>
+                              <span className="text-muted-foreground">·</span>
                               <span className="text-muted-foreground">{item.user.department}</span>
                             </>
                           )}
-                          <span className="text-muted-foreground">Â·</span>
+                          <span className="text-muted-foreground">·</span>
                           <span className="text-muted-foreground">{formatDate(item.created_at)}</span>
                         </div>
                         <p className="mt-2 whitespace-pre-wrap text-sm text-foreground">{item.message}</p>
@@ -1044,52 +1000,6 @@ export default function AdminDashboard() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={tierRequestOpen} onOpenChange={open => { if (!open) { setTierRequestOpen(false); setTierRequestResult(''); } }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t('admin.privacy.requestTierChange')}</DialogTitle>
-            <DialogDescription>
-              {t('admin.privacy.requestTierChangeDescription', {
-                from: privacyStatus?.orgType === 'inter' ? t('admin.privacy.modeInter') : t('admin.privacy.modeIntra'),
-                to: tierRequestTarget === 'inter' ? t('admin.privacy.modeInter') : t('admin.privacy.modeIntra'),
-              })}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <Label htmlFor="tier-request-note">{t('admin.privacy.requestTierChangeNoteLabel')}</Label>
-              <textarea
-                id="tier-request-note"
-                rows={3}
-                value={tierRequestNote}
-                onChange={e => setTierRequestNote(e.target.value)}
-                className="input min-h-[80px] w-full resize-y text-sm"
-                placeholder={t('admin.privacy.requestTierChangeNotePlaceholder')}
-                data-testid="tier-request-note"
-              />
-              <p className="text-xs text-muted-foreground">{t('admin.privacy.requestTierChangeNoteHint')}</p>
-            </div>
-            {tierRequestResult === 'ok' && (
-              <Alert>
-                <AlertDescription>{t('admin.privacy.requestTierChangeSent')}</AlertDescription>
-              </Alert>
-            )}
-            {tierRequestResult && tierRequestResult !== 'ok' && (
-              <Alert variant="destructive">
-                <AlertDescription>{t('admin.privacy.requestTierChangeError')}</AlertDescription>
-              </Alert>
-            )}
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setTierRequestOpen(false)} disabled={tierRequestSubmitting}>
-              {t('admin.common.cancel')}
-            </Button>
-            <Button type="button" onClick={submitTierChangeRequest} disabled={tierRequestSubmitting} data-testid="tier-request-submit">
-              {tierRequestSubmitting ? t('admin.common.saving') : t('admin.privacy.requestTierChangeSubmit')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </PageShell>
   );
 }
@@ -1117,7 +1027,7 @@ function AuditRow({ entry }) {
              : entry.action.startsWith('auth.') ? 'bg-muted text-muted-foreground'
              : 'bg-muted text-muted-foreground';
   const meta = entry.metadata && Object.keys(entry.metadata).length > 0
-    ? Object.entries(entry.metadata).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' Â· ')
+    ? Object.entries(entry.metadata).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' · ')
     : '';
   return (
     <div className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-muted/50">
@@ -1132,7 +1042,7 @@ function AuditRow({ entry }) {
           </>
         ) : <span className="text-muted-foreground">{t('admin.audit.system')}</span>}
         {entry.target_type && (
-          <span className="text-muted-foreground ml-2">â†’ {entry.target_type}{entry.target_id ? `#${entry.target_id}` : ''}</span>
+          <span className="text-muted-foreground ml-2">→ {entry.target_type}{entry.target_id ? `#${entry.target_id}` : ''}</span>
         )}
         {meta && <span className="text-muted-foreground ml-2 text-xs">[{meta}]</span>}
       </span>

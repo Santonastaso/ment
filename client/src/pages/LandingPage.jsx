@@ -2,11 +2,10 @@
 import { Link } from 'react-router-dom';
 import { useT } from '../i18n/index.jsx';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 // Public landing page shown to non-authenticated visitors.
 //
-// Content is intentionally a clean skeleton â€” Fra + Pit will swap in finalised
+// Content is intentionally a clean skeleton — Fra + Pit will swap in finalised
 // marketing copy once the slides are ready. Strings live in i18n catalogs
 // (locales/<lang>/landing.json) so translation stays in lockstep.
 function NavBar({ t }) {
@@ -51,41 +50,6 @@ function Hero({ t }) {
             <Button size="lg" variant="outline">{t('landing.hero.ctaSecondary')}</Button>
           </Link>
         </div>
-      </div>
-    </section>
-  );
-}
-
-function FeatureCard({ title, description }) {
-  return (
-    <Card className="rounded-xl border-[var(--border)] shadow-none">
-      <CardHeader>
-        <CardTitle className="text-base font-medium">{title}</CardTitle>
-        <CardDescription className="text-sm leading-relaxed">{description}</CardDescription>
-      </CardHeader>
-    </Card>
-  );
-}
-
-function Products({ t }) {
-  return (
-    <section className="border-b border-[var(--border)] bg-background">
-      <div className="mx-auto max-w-[1160px] px-6 py-16">
-        <div className="mb-10 text-center">
-          <h2 className="text-2xl font-medium tracking-[-0.01em]">{t('landing.products.title')}</h2>
-          <p className="mt-2 text-muted-foreground">{t('landing.products.subtitle')}</p>
-        </div>
-        <Card className="mx-auto max-w-3xl rounded-xl border-[var(--border)] shadow-none">
-          <CardHeader>
-            <p className="mb-1 text-xs font-medium uppercase tracking-wider text-primary">
-              {t('landing.products.universityEyebrow')}
-            </p>
-            <CardTitle className="text-xl">{t('landing.products.universityTitle')}</CardTitle>
-            <CardDescription className="text-sm leading-relaxed">
-              {t('landing.products.universityDescription')}
-            </CardDescription>
-          </CardHeader>
-        </Card>
       </div>
     </section>
   );
@@ -191,7 +155,6 @@ export default function LandingPage() {
       <NavBar t={t} />
       <main>
         <Hero t={t} />
-        <Products t={t} />
         <HowItWorks t={t} />
         <Trust t={t} />
         <FinalCta t={t} />

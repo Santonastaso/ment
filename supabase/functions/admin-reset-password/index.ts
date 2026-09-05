@@ -35,7 +35,8 @@ Deno.serve(async (req) => {
   });
   if (updErr) return jsonError(updErr.message, 500);
 
-  await ctx.sb.from('profiles').update({ must_change_password: true }).eq('id', userId);
+  const { error: profileError } = await ctx.sb.from('profiles').update({ must_change_password: true }).eq('id', userId);
+  if (profileError) return jsonError(profileError.message, 500);
 
   return jsonOk({
     email: authUser.user.email,

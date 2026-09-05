@@ -10,6 +10,8 @@
   "onboarding.import.reading": "Reading document…",
   "onboarding.import.drop": "Drop a file or click to browse",
   "onboarding.import.hint": ".docx, .pdf, .txt — max 10MB",
+  "onboarding.import.consent": "I agree to have this file processed to draft my profile. AI processing is optional and disclosed.",
+  "onboarding.import.consentRequired": "Please confirm file processing first.",
   "onboarding.import.error": "Could not read that file. Try another format or skip to enter manually.",
   "onboarding.background.title": "Your background",
   "onboarding.background.desc": "Tell us about your current role and experience. This helps us find relevant matches.",

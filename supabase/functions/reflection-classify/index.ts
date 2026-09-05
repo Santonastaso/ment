@@ -128,8 +128,8 @@ async function claudeExtractCandidates(supportNeeded: string, managedWell: strin
     if (!match) return null;
     const parsed = JSON.parse(match[0]);
     return {
-      gaps: Array.isArray(parsed.gaps) ? parsed.gaps.filter(Boolean).slice(0, 5) : [],
-      strengths: Array.isArray(parsed.strengths) ? parsed.strengths.filter(Boolean).slice(0, 5) : [],
+      gaps: Array.isArray(parsed?.gaps) ? parsed.gaps.filter((x: unknown) => typeof x === 'string').slice(0, 5) : [],
+      strengths: Array.isArray(parsed?.strengths) ? parsed.strengths.filter((x: unknown) => typeof x === 'string').slice(0, 5) : [],
     };
   } catch {
     return null;

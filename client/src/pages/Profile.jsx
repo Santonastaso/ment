@@ -3,6 +3,7 @@ import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx';
 import SkillTagInput from '../components/SkillTagInput.jsx';
 import TeachSkillsEditor from '../components/TeachSkillsEditor.jsx';
+import SkillLandscape from '../components/SkillLandscape.jsx';
 import SessionRequestModal from '../components/SessionRequestModal.jsx';
 
 import PastMeetings from '../components/PastMeetings.jsx';
@@ -58,7 +59,7 @@ function groupCareerByCompany(entries) {
   return groups;
 }
 
-// Render a "Jun 2018 â€“ Jul 2022" / "2018 â€“ present" period label, handling
+// Render a "Jun 2018 – Jul 2022" / "2018 – present" period label, handling
 // year-only legacy data gracefully.
 function formatPeriod(startY, startM, endY, endM, presentLabel = 'present', months = MONTH_NAMES) {
   const fmt = (y, m) => {
@@ -70,7 +71,7 @@ function formatPeriod(startY, startM, endY, endM, presentLabel = 'present', mont
   const end = endY ? fmt(endY, endM) : presentLabel;
   if (!start && (!endY)) return '';
   if (!start) return end;
-  return `${start} â€“ ${end}`;
+  return `${start} – ${end}`;
 }
 
 export default function Profile() {
@@ -82,7 +83,7 @@ export default function Profile() {
   const isOwnProfile = !id || (currentUser?.id != null && id === currentUser.id);
   const targetId = isOwnProfile ? currentUser?.id : id;
 
-  // Subpage tabs â€” the profile is too dense for one long page. State lives
+  // Subpage tabs — the profile is too dense for one long page. State lives
   // in the URL (?tab=) so back/forward and deep links behave.
   const [searchParams, setSearchParams] = useSearchParams();
   const rawTab = searchParams.get('tab') || 'overview';
@@ -113,11 +114,11 @@ export default function Profile() {
   const [editingCareerId, setEditingCareerId] = useState(null);
   const [editCareerDraft, setEditCareerDraft] = useState(null);
 
-  // Availability (P3) â€” mentor pause + return-on date.
+  // Availability (P3) — mentor pause + return-on date.
   const [availabilitySaving, setAvailabilitySaving] = useState(false);
   const [returnDateDraft, setReturnDateDraft] = useState('');
   const [availabilityNoteDraft, setAvailabilityNoteDraft] = useState('');
-  // Multi-period OOO (P4) â€” list of [start, end] unavailability windows.
+  // Multi-period OOO (P4) — list of [start, end] unavailability windows.
   const [periods, setPeriods] = useState([]);
   const [periodStart, setPeriodStart] = useState('');
   const [periodEnd, setPeriodEnd] = useState('');
@@ -257,6 +258,17 @@ export default function Profile() {
       await api.put('/users/me', payload);
       await refreshProfile();
       showToast(t('profile.toast.availabilityUpdated'));
+    } finally {
+      setAvailabilitySaving(false);
+    }
+  }
+
+  async function setReminderPreference(value) {
+    setAvailabilitySaving(true);
+    try {
+      await api.put('/users/me', { reflection_email_reminders: value });
+      await refreshProfile();
+      showToast(t('profile.toast.remindersUpdated'));
     } finally {
       setAvailabilitySaving(false);
     }
@@ -497,40 +509,12 @@ export default function Profile() {
           description={skillDescription}
         />
         <SurfaceBody className="space-y-5 pt-5">
-        {(() => {
-          const progress = profile.skillProgress || [];
-          const teachAll = progress.filter(s => s.type === 'can_teach');
-          const learnAll = progress.filter(s => s.type === 'wants_to_learn');
-          if (teachAll.length === 0 && learnAll.length === 0) return null;
-          const activeTeaching = teachAll.filter(s => (s.session_count || 0) > 0).length;
-          const startedLearning = learnAll.filter(s => (s.session_count || 0) > 0).length;
-          const teachLabel = isOwnProfile
-            ? t('components.skillLandscape.summaryTeachingOwn')
-            : t('components.skillLandscape.summaryTeachingOther', { name: firstName });
-          const learnLabel = isOwnProfile
-            ? t('components.skillLandscape.summaryLearningOwn')
-            : t('components.skillLandscape.summaryLearningOther', { name: firstName });
-          return (
-            <div className="grid grid-cols-2 gap-3 sm:max-w-md">
-              {teachAll.length > 0 && (
-                <div className="rounded-xl border border-[var(--border)] bg-card px-4 py-3" data-testid="overview-teach-count">
-                  <div className="text-2xl font-medium leading-none tabular-nums text-foreground">
-                    {activeTeaching}<span className="text-lg text-muted-foreground">/{teachAll.length}</span>
-                  </div>
-                  <div className="mt-1 text-xs text-muted-foreground">{teachLabel}</div>
-                </div>
-              )}
-              {learnAll.length > 0 && (
-                <div className="rounded-xl border border-[var(--border)] bg-card px-4 py-3" data-testid="overview-learn-count">
-                  <div className="text-2xl font-medium leading-none tabular-nums text-foreground">
-                    {startedLearning}<span className="text-lg text-muted-foreground">/{learnAll.length}</span>
-                  </div>
-                  <div className="mt-1 text-xs text-muted-foreground">{learnLabel}</div>
-                </div>
-              )}
-            </div>
-          );
-        })()}
+          <SkillLandscape
+            skillProgress={profile.skillProgress || []}
+            isOwnProfile={isOwnProfile}
+            firstName={firstName}
+            onDeleteSkill={isOwnProfile ? handleDeleteSkillFromBubble : undefined}
+          />
 
         {/* Expertise signature */}
         {profile.expertiseSignature?.length > 0 && (
@@ -545,6 +529,27 @@ export default function Profile() {
         )}
         </SurfaceBody>
       </Surface>
+
+      {isOwnProfile && (
+        <Surface>
+          <SurfaceHeader
+            title={t('profile.reflection.quickTitle')}
+            description={t('profile.reflection.quickDesc')}
+            action={
+              <Button variant="outline" size="sm" onClick={() => setTab('reflections')}>
+                {t('profile.reflection.viewHistory')}
+              </Button>
+            }
+          />
+          <SurfaceBody className="pt-5">
+            <ReflectionLog
+              hideHistory
+              showManualAdd
+              onSkillsApplied={refreshProfile}
+            />
+          </SurfaceBody>
+        </Surface>
+      )}
       </>
       )}
 
@@ -608,6 +613,15 @@ export default function Profile() {
               <p className="mt-0.5 text-xs text-muted-foreground">{profile.mentorship_note}</p>
             )}
 
+            <label className="mt-5 flex items-start gap-3 text-sm text-foreground">
+              <input type="checkbox" checked={profile.reflection_email_reminders !== false} disabled={availabilitySaving}
+                onChange={(e) => setReminderPreference(e.target.checked)} className="mt-0.5 size-4 accent-[var(--primary)]" />
+              <span>
+                <span className="block font-medium">{t('profile.availability.emailReminders')}</span>
+                <span className="block text-xs text-muted-foreground">{t('profile.availability.emailRemindersDesc')}</span>
+              </span>
+            </label>
+
             <div className="mt-4 flex flex-wrap items-end gap-x-4 gap-y-3">
               <div className="w-44">
                 <label className="label">{t('profile.availability.returnOn')}</label>
@@ -667,7 +681,7 @@ export default function Profile() {
                   {periods.map((p) => (
                     <li key={p.id} className="flex items-center justify-between gap-3 py-2 text-sm">
                       <span className="min-w-0">
-                        <span className="font-medium text-foreground">{p.start_date} â†’ {p.end_date}</span>
+                        <span className="font-medium text-foreground">{p.start_date} → {p.end_date}</span>
                         {p.note && <span className="ml-2 text-xs text-muted-foreground">{p.note}</span>}
                       </span>
                       <button
@@ -677,7 +691,7 @@ export default function Profile() {
                         aria-label={t('profile.availability.periodRemove')}
                         className="text-muted-foreground hover:text-red-500 text-sm leading-none"
                       >
-                        Ã—
+                        ×
                       </button>
                     </li>
                   ))}
@@ -733,44 +747,6 @@ export default function Profile() {
               </div>
             </div>
 
-            <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-[var(--border)] pt-5">
-              <span className="label-meta mb-0">{t('profile.goal.title')}</span>
-              <input
-                type="number"
-                min="0"
-                max="30"
-                step="1"
-                className="input h-8 w-16 text-sm"
-                value={profile.monthly_session_goal ?? 0}
-                data-testid="monthly-goal-input"
-                onChange={(e) => {
-                  const val = Math.max(0, Math.min(30, Number(e.target.value) || 0));
-                  setProfile(p => ({ ...p, monthly_session_goal: val }));
-                }}
-                disabled={availabilitySaving}
-              />
-              <span className="text-sm text-muted-foreground">{t('profile.goal.perMonth')}</span>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="ml-auto"
-                data-testid="save-goal"
-                disabled={availabilitySaving}
-                onClick={async () => {
-                  setAvailabilitySaving(true);
-                  try {
-                    await api.put('/users/me', { monthly_session_goal: profile.monthly_session_goal ?? 0 });
-                    await refreshProfile();
-                    showToast(t('profile.toast.goalSaved'));
-                  } finally {
-                    setAvailabilitySaving(false);
-                  }
-                }}
-              >
-                {t('profile.goal.save')}
-              </Button>
-            </div>
           </SurfaceBody>
         </Surface>
       )}
@@ -894,8 +870,8 @@ export default function Profile() {
                       {entry.department}
                       {/* Hide the company name on individual rows when it's
                           already shown as the group header above. */}
-                      {entry.company && group.entries.length === 1 && ` Â· ${entry.company}`}
-                      {(entry.start_year || entry.end_year) && ` Â· ${formatPeriod(entry.start_year, entry.start_month, entry.end_year, entry.end_month, t('profile.career.present'), t('profile.career.monthsShort').split(','))}`}
+                      {entry.company && group.entries.length === 1 && ` · ${entry.company}`}
+                      {(entry.start_year || entry.end_year) && ` · ${formatPeriod(entry.start_year, entry.start_month, entry.end_year, entry.end_month, t('profile.career.present'), t('profile.career.monthsShort').split(','))}`}
                     </p>
                     {entry.description && (
                       <p className="text-xs text-secondary-foreground mt-1">{entry.description}</p>

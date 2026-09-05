@@ -40,6 +40,7 @@ Deno.serve(async (req) => {
   const storagePath = (body.storage_path || '').toString();
   const mode = IMPORT_MODES.includes(body.mode) ? body.mode : 'insert';
   if (!storagePath) return jsonError('storage_path_required');
+  if (!storagePath.startsWith(`${ctx.user.id}/`)) return jsonError('forbidden', 403);
 
   const { data: file, error: dlErr } = await ctx.sb.storage
     .from('imports')
@@ -62,10 +63,23 @@ Deno.serve(async (req) => {
   let imported = 0;
   let updated = 0;
   let skipped = 0;
-  const managerLinks: { userId: string; email: string }[] = [];
+  const managerLinks: { userId: string; email: string; row: number }[] = [];
   const touchedIds: string[] = [];
+  const failures: { row: number; email: string; error: string }[] = [];
 
-  for (const raw of rows) {
+  // The GoTrue admin API only paginates; it has no email filter despite older
+  // callers passing one. Build the lookup once so updates work past page one.
+  const authUsers: { id: string; email?: string }[] = [];
+  for (let page = 1; page <= 100; page++) {
+    const { data: usersPage, error: usersError } = await ctx.sb.auth.admin.listUsers({ page, perPage: 1000 });
+    if (usersError) return jsonError(`user_list_failed: ${usersError.message}`, 500);
+    const users = usersPage?.users || [];
+    authUsers.push(...users);
+    if (users.length < 1000) break;
+  }
+  const usersByEmail = new Map(authUsers.map((u) => [(u.email || '').toLowerCase(), u]));
+
+  for (const [rowIndex, raw] of rows.entries()) {
     const r = normRow(raw);
     const email = (r.email || '').toLowerCase();
     const name = r.name || r.full_name || '';
@@ -83,8 +97,7 @@ Deno.serve(async (req) => {
     const can_teach = parseSkillList(r.can_teach);
     const wants_to_learn = parseSkillList(r.wants_to_learn);
 
-    const { data: existingUsers } = await ctx.sb.auth.admin.listUsers({ page: 1, perPage: 1, email });
-    let userId = existingUsers?.users?.find((u) => u.email?.toLowerCase() === email)?.id;
+    let userId = usersByEmail.get(email)?.id;
 
     if (userId) {
       if (mode === 'insert') { skipped++; continue; }
@@ -95,10 +108,15 @@ Deno.serve(async (req) => {
         .single();
       if (!existingProfile || existingProfile.admin_scope !== 'none') { skipped++; continue; }
       if (!isPlatformAdmin && existingProfile.organization_id !== adminOrgId) { skipped++; continue; }
-      await ctx.sb.from('profiles').update({
+      const { error: profileError } = await ctx.sb.from('profiles').update({
         name, department, seniority, job_title, program, cohort_year, role: persona,
         tenure_years, location,
       }).eq('id', userId);
+      if (profileError) {
+        failures.push({ row: rowIndex + 2, email, error: profileError.message });
+        skipped++;
+        continue;
+      }
       updated++;
       touchedIds.push(userId);
     } else {
@@ -115,37 +133,51 @@ Deno.serve(async (req) => {
       if (error || !data.user) {
         console.warn('createUser failed', email, error?.message);
         skipped++;
+        failures.push({ row: rowIndex + 2, email, error: error?.message || 'user_create_failed' });
         continue;
       }
       userId = data.user.id;
       // Trigger seeded basic columns; upsert the rest in case metadata path differs.
-      await ctx.sb.from('profiles').update({
+      const { error: profileError } = await ctx.sb.from('profiles').update({
         name, department, seniority, job_title, program, cohort_year, role: persona,
         tenure_years, location,
         onboarding_complete: true,
         organization_id: adminOrgId,
       }).eq('id', userId);
+      if (profileError) {
+        failures.push({ row: rowIndex + 2, email, error: profileError.message });
+        skipped++;
+        continue;
+      }
       imported++;
       touchedIds.push(userId);
+      usersByEmail.set(email, { id: userId, email });
     }
 
-    if (manager_email) managerLinks.push({ userId, email: manager_email });
+    if (manager_email) managerLinks.push({ userId, email: manager_email, row: rowIndex + 2 });
 
     if (can_teach.length || wants_to_learn.length) {
-      await ctx.sb.from('skills').delete().eq('user_id', userId);
+      const { error: deleteSkillsError } = await ctx.sb.from('skills').delete().eq('user_id', userId);
+      if (deleteSkillsError) {
+        failures.push({ row: rowIndex + 2, email, error: deleteSkillsError.message });
+        continue;
+      }
       const skillRows = [
         ...can_teach.map((skill) => ({ user_id: userId!, skill, type: 'can_teach' })),
         ...wants_to_learn.map((skill) => ({ user_id: userId!, skill, type: 'wants_to_learn' })),
       ];
       if (skillRows.length) {
-        await ctx.sb.from('skills').insert(skillRows);
+        const { error: insertSkillsError } = await ctx.sb.from('skills').insert(skillRows);
+        if (insertSkillsError) {
+          failures.push({ row: rowIndex + 2, email, error: insertSkillsError.message });
+          continue;
+        }
       }
     }
   }
 
   for (const link of managerLinks) {
-    const { data: page } = await ctx.sb.auth.admin.listUsers({ page: 1, perPage: 1, email: link.email });
-    const mgr = page?.users?.find((u) => u.email?.toLowerCase() === link.email);
+    const mgr = usersByEmail.get(link.email);
     if (mgr) {
       const { data: mgrProfile } = await ctx.sb
         .from('profiles')
@@ -153,7 +185,8 @@ Deno.serve(async (req) => {
         .eq('id', mgr.id)
         .single();
       if (mgrProfile?.organization_id === adminOrgId || isPlatformAdmin) {
-        await ctx.sb.from('profiles').update({ manager_id: mgr.id }).eq('id', link.userId);
+        const { error: managerError } = await ctx.sb.from('profiles').update({ manager_id: mgr.id }).eq('id', link.userId);
+        if (managerError) failures.push({ row: link.row, email: link.email, error: managerError.message });
       }
     }
   }
@@ -161,22 +194,27 @@ Deno.serve(async (req) => {
   // Debounced matching (0025): flag imported users stale, then synchronously
   // process just those users so the admin sees fresh matches immediately.
   if (touchedIds.length) {
-    await ctx.sb.from('profiles').update({ matches_stale: true }).in('id', touchedIds);
-    await ctx.sb.rpc('process_stale_matches', { p_batch: touchedIds.length });
+    const { error: staleError } = await ctx.sb.from('profiles').update({ matches_stale: true }).in('id', touchedIds);
+    if (staleError) return jsonError(`match_queue_failed: ${staleError.message}`, 500);
+    const { error: matchError } = await ctx.sb.rpc('process_stale_matches', { p_batch: touchedIds.length });
+    if (matchError) return jsonError(`match_recompute_failed: ${matchError.message}`, 500);
   }
-  const { count: matchCount } = await ctx.sb.from('match_scores').select('*', { count: 'exact', head: true });
+  const { count: matchCount, error: countError } = await ctx.sb.from('match_scores').select('*', { count: 'exact', head: true });
+  if (countError) return jsonError(`match_count_failed: ${countError.message}`, 500);
 
-  await ctx.sb.from('audit_logs').insert({
+  const { error: auditError } = await ctx.sb.from('audit_logs').insert({
     actor_id: ctx.user.id,
     action: 'admin.upload',
     target_type: 'csv',
     metadata: { rows: rows.length, imported, updated, skipped, mode, organization_id: adminOrgId },
   });
+  if (auditError) return jsonError(`audit_log_failed: ${auditError.message}`, 500);
 
   return jsonOk({
     imported, updated, skipped,
     total: rows.length,
     matchesGenerated: matchCount ?? 0,
     tempPassword: imported > 0 ? tempPassword : null,
+    failures,
   });
 });

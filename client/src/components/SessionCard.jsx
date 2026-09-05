@@ -42,7 +42,7 @@ export default function SessionCard({ session, currentUserId, onUpdate }) {
   const [draftDate, setDraftDate] = useState(isoToLocalInput(session.scheduled_at));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const dialogRef = useModalA11y();
+  const dialogRef = useModalA11y(open);
 
   // Close on Escape while the popup is open.
   useEffect(() => {

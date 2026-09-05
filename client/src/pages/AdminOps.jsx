@@ -23,11 +23,11 @@ function csvEscape(value) {
 }
 
 function shortId(value) {
-  return value ? `${String(value).slice(0, 8)}â€¦` : 'â€”';
+  return value ? `${String(value).slice(0, 8)}…` : '—';
 }
 
 function formatDate(value) {
-  if (!value) return 'â€”';
+  if (!value) return '—';
   return new Date(value).toLocaleString(undefined, {
     year: 'numeric',
     month: 'short',
@@ -277,10 +277,10 @@ export default function AdminOps() {
                       </td>
                       <td className="py-2 pr-4">
                         <p className="font-medium">{request.company}</p>
-                        <p className="text-xs text-muted-foreground">{request.companySize} Â· {request.role}</p>
+                        <p className="text-xs text-muted-foreground">{request.companySize} · {request.role}</p>
                       </td>
                       <td className="max-w-sm py-2 pr-4 text-muted-foreground">
-                        <p className="line-clamp-3 whitespace-pre-wrap">{request.note || 'â€”'}</p>
+                        <p className="line-clamp-3 whitespace-pre-wrap">{request.note || '—'}</p>
                       </td>
                       <td className="py-2">
                         <select

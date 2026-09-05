@@ -3,7 +3,7 @@ import api from '../api/index.js';
 import { useT } from '../i18n/index.jsx';
 import { Button } from './ui/button.jsx';
 
-const TOTAL_STEPS = 3;
+const TOTAL_STEPS = 4;
 
 export default function SessionRequestModal({ mentor, onClose, onSuccess }) {
   const { t } = useT();
@@ -49,7 +49,7 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess }) {
     try {
       await api.post('/sessions', {
         mentor_id: mentor.id,
-        title: `Mentoring with ${mentor.name}`,
+        title: `Session with ${mentor.name}`,
         scheduled_at: scheduledAt || null,
         pre_session_question: question.trim(),
         duration_minutes: 60,
@@ -82,7 +82,7 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess }) {
             ))}
           </div>
 
-          {/* STEP 1 â€” Topics */}
+          {/* STEP 1 — Topics */}
           {step === 1 && (
             <div>
               <label className="label mb-1">
@@ -110,7 +110,7 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess }) {
                             : 'bg-card text-foreground border-border hover:bg-muted'
                         }`}
                       >
-                        {active && <span className="mr-1.5">âœ“</span>}
+                        {active && <span className="mr-1.5">✓“</span>}
                         {skill}
                       </button>
                     );
@@ -127,7 +127,7 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess }) {
             </div>
           )}
 
-          {/* STEP 2 â€” Focus question */}
+          {/* STEP 2 — Focus question */}
           {step === 2 && (
             <div>
               <label className="label">
@@ -158,7 +158,7 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess }) {
             </div>
           )}
 
-          {/* STEP 3 â€” Date/time */}
+          {/* STEP 3 — Date/time */}
           {step === 3 && (
             <div>
               <label className="label">{t('components.sessionRequest.step3Label')} <span className="text-muted-foreground font-normal">{t('components.sessionRequest.step3Optional')}</span></label>
@@ -169,22 +169,16 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess }) {
                 min={minDateTime}
                 onChange={e => setScheduledAt(e.target.value)}
               />
-              <div className="mt-4 bg-muted rounded-lg p-3 text-sm text-secondary-foreground space-y-2">
-                <div>
-                  <span className="font-medium text-foreground">{t('components.sessionRequest.step3YourQuestion')}</span>
-                  <p className="mt-1 italic">"{question}"</p>
-                </div>
-                {selectedTopics.length > 0 && (
-                  <div>
-                    <span className="font-medium text-foreground">{t('components.sessionRequest.step3Topics')}</span>
-                    <div className="flex flex-wrap gap-1.5 mt-1">
-                      {selectedTopics.map(t => (
-                        <span key={t} className="bg-white text-foreground border border-[var(--border)] rounded-full px-2.5 py-0.5 text-xs">{t}</span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
+            </div>
+          )}
+
+          {step === 4 && (
+            <div className="space-y-4 rounded-lg border border-border bg-muted/40 p-4 text-sm">
+              <p className="font-medium text-foreground">{t('components.sessionRequest.reviewTitle')}</p>
+              <div><span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('components.sessionRequest.reviewQuestion')}</span><p className="mt-1 text-foreground">{question}</p></div>
+              {selectedTopics.length > 0 && <div><span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('components.sessionRequest.reviewTopics')}</span><p className="mt-1 text-foreground">{selectedTopics.join(', ')}</p></div>}
+              <div><span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('components.sessionRequest.reviewWhen')}</span><p className="mt-1 text-foreground">{scheduledAt ? new Date(scheduledAt).toLocaleString() : t('components.sessionRequest.reviewNoTime')}</p></div>
+              <p className="text-xs text-muted-foreground">{t('components.sessionRequest.reviewNotice')}</p>
             </div>
           )}
 
@@ -213,9 +207,13 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess }) {
           {step === 3 && (
             <>
               <Button onClick={() => { setStep(2); setError(''); }} variant="outline">{t('components.sessionRequest.back')}</Button>
-              <Button onClick={handleSubmit} disabled={submitting}>
-                {submitting ? t('components.sessionRequest.sending') : t('components.sessionRequest.send')}
-              </Button>
+              <Button onClick={() => setStep(4)}>{t('components.sessionRequest.review')}</Button>
+            </>
+          )}
+          {step === 4 && (
+            <>
+              <Button onClick={() => { setStep(3); setError(''); }} variant="outline">{t('components.sessionRequest.back')}</Button>
+              <Button onClick={handleSubmit} disabled={submitting}>{submitting ? t('components.sessionRequest.sending') : t('components.sessionRequest.confirm')}</Button>
             </>
           )}
         </div>

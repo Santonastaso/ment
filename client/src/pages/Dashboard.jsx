@@ -1,24 +1,22 @@
 ﻿import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import MatchCard from '../components/MatchCard.jsx';
 import SessionCard from '../components/SessionCard.jsx';
 import ReflectionLog from '../components/ReflectionLog.jsx';
 import AcceptanceModal from '../components/AcceptanceModal.jsx';
+import SessionRequestModal from '../components/SessionRequestModal.jsx';
 import { PageShell, PageSection } from '../components/PageShell.jsx';
 import { Surface, SurfaceBody } from '../components/Surface.jsx';
 import api from '../api/index.js';
-import { buttonVariants } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useT } from '../i18n/index.jsx';
+import { Search } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 const POLL_INTERVAL_MS = 30000;
-
-function numberWord(n, t) {
-  if (n >= 0 && n <= 9) return t(`dashboard.num${n}`);
-  return String(n);
-}
 
 function notificationsSupported() {
   return typeof window !== 'undefined' && 'Notification' in window;
@@ -48,11 +46,11 @@ export default function Dashboard() {
   const { user, refreshPendingAcceptances } = useAuth();
   const [pendingAcceptances, setPendingAcceptances] = useState([]);
   const [acceptanceModalDismissed, setAcceptanceModalDismissed] = useState(false);
-  const [monthlyCompleted, setMonthlyCompleted] = useState(null);
-  const [matches, setMatches] = useState([]);
-  const [totalMatches, setTotalMatches] = useState(0);
   const [sessions, setSessions] = useState([]);
-  const [loadingMatches, setLoadingMatches] = useState(true);
+  const [question, setQuestion] = useState('');
+  const [questionResults, setQuestionResults] = useState(null);
+  const [questionLoading, setQuestionLoading] = useState(false);
+  const [requestingPerson, setRequestingPerson] = useState(null);
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [checkinDue, setCheckinDue] = useState(false);
   const [pendingFromAdmin, setPendingFromAdmin] = useState(false);
@@ -64,19 +62,6 @@ export default function Dashboard() {
   const checkinSectionRef = useRef(null);
   const upcomingRef = useRef(null);
   const needsActionRef = useRef(null);
-
-  const loadMatches = useCallback(async () => {
-    setLoadingMatches(true);
-    try {
-      // Dashboard suggestions are mentor-leaning only â€” the viewer should
-      // always be the one reaching out to a potential mentor.
-      const res = await api.get('/matches?limit=3&role=mentor');
-      setMatches(res.data.matches || []);
-      setTotalMatches(res.data.total || 0);
-    } finally {
-      setLoadingMatches(false);
-    }
-  }, []);
 
   const loadCheckinStatus = useCallback(async ({ notify = false } = {}) => {
     const res = await api.get('/reflections');
@@ -151,28 +136,41 @@ export default function Dashboard() {
     } catch { /* noop */ }
   }, [refreshPendingAcceptances]);
 
-  const loadMonthlyCount = useCallback(async () => {
-    try {
-      const res = await api.get('/users/me/monthly-count');
-      setMonthlyCompleted(res?.data?.completed ?? 0);
-    } catch {
-      setMonthlyCompleted(null);
-    }
-  }, []);
-
   useEffect(() => {
-    loadMatches();
     loadSessions();
     loadPendingAcceptances();
-    loadMonthlyCount();
-  }, [loadMatches, loadSessions, loadPendingAcceptances, loadMonthlyCount]);
+  }, [loadSessions, loadPendingAcceptances]);
 
   function handleSessionUpdate(updated) {
     setSessions(prev => prev.map(s => s.id === updated.id ? updated : s));
   }
 
-  function handleDismissMatch(userId) {
-    setMatches(prev => prev.filter(m => m.user.id !== userId));
+  async function searchFromHome(event) {
+    event.preventDefault();
+    const q = question.trim();
+    if (!q) return;
+    setQuestionLoading(true);
+    try {
+      const [directoryResult, matchesResult] = await Promise.allSettled([
+        api.get(`/directory?q=${encodeURIComponent(q)}&limit=12`),
+        api.get('/matches?limit=20'),
+      ]);
+      if (directoryResult.status !== 'fulfilled') throw directoryResult.reason;
+      const directoryRes = directoryResult.value;
+      const matchesRes = matchesResult.status === 'fulfilled' ? matchesResult.value : { data: {} };
+      const people = directoryRes.data?.people || [];
+      const byId = new Map(people.map(person => [person.id, person]));
+      const scored = (matchesRes.data?.matches || [])
+        .filter(match => byId.has(match.user?.id))
+        .sort((a, b) => (b.score || 0) - (a.score || 0))
+        .slice(0, 3)
+        .map(match => ({ ...byId.get(match.user.id), score: match.score, reasons: match.reasons }));
+      setQuestionResults(scored.length ? scored : people.slice(0, 3));
+    } catch {
+      setQuestionResults([]);
+    } finally {
+      setQuestionLoading(false);
+    }
   }
 
   // Snapshot strip taps: jump to the matching section below the fold.
@@ -192,14 +190,14 @@ export default function Dashboard() {
   }
 
   // Split active sessions into two visual groups:
-  //   "Needs your attention" â€” pending you (the mentor) need to accept, or
+  //   "Needs your attention" — pending you (the mentor) need to accept, or
   //                             scheduled meetings whose time has already passed
   //                             (the mentee needs to mark them complete).
-  //   "Upcoming"             â€” everything else that isn't completed/cancelled.
+  //   "Upcoming"             — everything else that isn't completed/cancelled.
   const now = Date.now();
   const needsAction = sessions.filter(s => {
     // Once the viewer has marked their side complete, the session belongs in
-    // Past meetings â€” not in their active queue, even if the counterpart
+    // Past meetings — not in their active queue, even if the counterpart
     // hasn't completed yet (status stays 'scheduled').
     if (s.viewer_completed) return false;
     if (s.status === 'pending' && s.mentor?.id === user?.id) return true;
@@ -221,7 +219,7 @@ export default function Dashboard() {
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
 
-  // Greeting keys off conversation count (PM's option 2 â€” no new state):
+  // Greeting keys off conversation count (PM's option 2 — no new state):
   // newcomers get an open prompt, returning users get a progress line.
   const completedCount = sessions.filter(s => s.status === 'completed').length;
 
@@ -258,13 +256,6 @@ export default function Dashboard() {
         />
       )}
 
-      {(user?.monthly_session_goal ?? 0) > 0 && monthlyCompleted !== null && (
-        <GoalNudge
-          goal={user.monthly_session_goal}
-          completed={monthlyCompleted}
-        />
-      )}
-
       {showDashboardCheckin && (
         <div ref={checkinSectionRef} id="checkin" className="scroll-mt-8">
           <Surface>
@@ -291,49 +282,20 @@ export default function Dashboard() {
         </div>
       )}
 
-      <PageSection
-        title={t('dashboard.mentors.title')}
-        description={
-          loadingMatches
-            ? t('dashboard.mentors.descLoading')
-            : matches.length === 0
-              ? t('dashboard.mentors.descEmpty')
-              : matches.length === 1
-                ? t('dashboard.mentors.descOne')
-                : t('dashboard.mentors.descMany', { count: numberWord(matches.length, t) })
-        }
-        action={
-          totalMatches > matches.length ? (
-            <Link to="/explorer" className="text-sm font-medium text-primary hover:underline">
-              {t('dashboard.mentors.browseMore', { count: totalMatches - matches.length })}
-            </Link>
-          ) : null
-        }
-      >
-        {loadingMatches ? (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {[1, 2, 3].map(i => <Skeleton key={i} className="h-48 rounded-xl" />)}
-          </div>
-        ) : matches.length === 0 ? (
-          <Surface>
-            <SurfaceBody className="py-10 text-center">
-              <p className="font-medium mb-1">{t('dashboard.mentors.emptyTitle')}</p>
-              <p className="text-sm text-muted-foreground mb-4">{t('dashboard.mentors.emptyBody')}</p>
-              <Link to="/profile" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>{t('dashboard.mentors.completeProfile')}</Link>
-            </SurfaceBody>
-          </Surface>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {matches.map(match => (
-              <MatchCard
-                key={match.matchId || match.user.id}
-                match={match}
-                onDismiss={handleDismissMatch}
-              />
-            ))}
-          </div>
-        )}
-      </PageSection>
+      <HomeQuestion
+        question={question}
+        setQuestion={setQuestion}
+        results={questionResults}
+        loading={questionLoading}
+        onSubmit={searchFromHome}
+        onRequest={person => setRequestingPerson(person)}
+      />
+
+      {requestingPerson && <SessionRequestModal
+        mentor={requestingPerson}
+        onClose={() => setRequestingPerson(null)}
+        onSuccess={() => { setRequestingPerson(null); loadSessions(); }}
+      />}
 
       <PageSection
         title={t('dashboard.sessions.title')}
@@ -400,8 +362,43 @@ export default function Dashboard() {
     </PageShell>
   );
 }
+function HomeQuestion({ question, setQuestion, results, loading, onSubmit, onRequest }) {
+  const { t } = useT();
+  return (
+    <Surface>
+      <SurfaceBody className="space-y-4 py-6">
+        <div>
+          <p className="text-base font-medium text-foreground">{t('dashboard.connect.title')}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{t('dashboard.connect.body')}</p>
+        </div>
+        <form onSubmit={onSubmit} className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input value={question} onChange={e => setQuestion(e.target.value)} className="pl-9" placeholder={t('dashboard.connect.placeholder')} />
+          </div>
+          <Button type="submit" disabled={loading || !question.trim()}>{loading ? t('dashboard.connect.searching') : t('dashboard.connect.cta')}</Button>
+        </form>
+        {results && (results.length ? (
+          <div className="grid gap-3 md:grid-cols-3">
+            {results.map(person => <HomePerson key={person.id} person={person} onRequest={() => onRequest(person)} />)}
+          </div>
+        ) : <p className="text-sm text-muted-foreground">{t('dashboard.connect.empty')}</p>)}
+      </SurfaceBody>
+    </Surface>
+  );
+}
 
-// Tappable counters under the hero â€” "X upcoming Â· Y needs attention Â·
+function HomePerson({ person, onRequest }) {
+  const { t } = useT();
+  const initials = (person.name || '?').split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase();
+  return <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 p-3">
+    <Avatar className="size-9"><AvatarFallback className="bg-muted text-xs">{initials}</AvatarFallback></Avatar>
+    <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{person.name}</p><p className="truncate text-xs text-muted-foreground">{person.reasons?.[0] || [person.program, person.location].filter(Boolean).join(' · ')}</p></div>
+    <Button size="xs" variant="outline" onClick={onRequest}>{t('dashboard.connect.request')}</Button>
+  </div>;
+}
+
+// Tappable counters under the hero — "X upcoming · Y needs attention ·
 // Z new requests". Tap scrolls to the matching section below the fold;
 // zero-count tiles render as quiet placeholders.
 function SnapshotStrip({ upcomingCount, attentionCount, requestCount, onJump }) {
@@ -430,33 +427,6 @@ function SnapshotStrip({ upcomingCount, attentionCount, requestCount, onJump }) 
           <span className="block text-xs text-muted-foreground">{item.label}</span>
         </button>
       ))}
-    </div>
-  );
-}
-
-// Soft goal nudge â€” non-blocking, no rigid targets. Uses copy that scales
-// with how close the user is to their monthly_session_goal.
-function GoalNudge({ goal, completed }) {
-  const { t } = useT();
-  const ratio = goal > 0 ? completed / goal : 0;
-  let dot = 'bg-zinc-400';
-  let msg;
-  if (completed >= goal) {
-    dot = 'bg-emerald-500';
-    msg = t('dashboard.goal.hit', { completed, goal });
-  } else if (goal - completed === 1) {
-    dot = 'bg-amber-500';
-    msg = t('dashboard.goal.one', { goal });
-  } else if (ratio >= 0.5) {
-    dot = 'bg-amber-500';
-    msg = t('dashboard.goal.half', { completed, goal });
-  } else {
-    msg = t('dashboard.goal.default', { completed, goal });
-  }
-  return (
-    <div data-testid="goal-nudge" className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-card px-4 py-3 text-sm text-muted-foreground">
-      <span className={`size-1.5 shrink-0 rounded-full ${dot}`} aria-hidden="true" />
-      <span>{msg}</span>
     </div>
   );
 }

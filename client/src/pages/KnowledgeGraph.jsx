@@ -1,14 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
 import ForceGraph2D from 'react-force-graph-2d';
-import { Share2, ShieldAlert, RefreshCw, Building2, Languages, GraduationCap, Info } from 'lucide-react';
+import { Share2, RefreshCw, Building2, Languages, GraduationCap, Info } from 'lucide-react';
 import api from '../api/index.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useT } from '../i18n/index.jsx';
 import { PageShell } from '../components/PageShell.jsx';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
@@ -59,8 +58,6 @@ export default function KnowledgeGraph() {
   const [error, setError] = useState('');
   const [company, setCompany] = useState('');
   const [language, setLanguage] = useState('');
-  const [orgType, setOrgType] = useState(null);
-  const [savingMode, setSavingMode] = useState(false);
   const [hovered, setHovered] = useState(null);
   // 'bipartite' = people <-> skills; 'people' = people connected via shared
   // skills (skills become invisible connectors).
@@ -73,15 +70,6 @@ export default function KnowledgeGraph() {
   const reqId = useRef(0);
   const fgRef = useRef(null);
   const containerRef = useRef(null);
-
-  const loadPrivacy = useCallback(async () => {
-    try {
-      const res = await api.get('/admin/privacy-status');
-      setOrgType(res.data?.orgType || 'intra');
-    } catch {
-      /* non-fatal: the banner just won't show the mode */
-    }
-  }, []);
 
   const loadGraph = useCallback(async (org, lang) => {
     const id = ++reqId.current;
@@ -103,7 +91,6 @@ export default function KnowledgeGraph() {
     }
   }, [t]);
 
-  useEffect(() => { loadPrivacy(); }, [loadPrivacy]);
   useEffect(() => { loadGraph(company, language); }, [company, language, loadGraph]);
 
   const organizations = graph?.meta?.organizations || [];
@@ -208,8 +195,6 @@ export default function KnowledgeGraph() {
   const peopleCount = visibleNodes.filter((n) => n.kind === 'person').length;
   const skillCount = visibleNodes.filter((n) => n.kind === 'skill').length;
   const realLinkCount = visibleEdges.filter((e) => REAL_LINK_TYPES.has(e.type)).length;
-  const inter = orgType === 'inter';
-
   // Measure the container so the canvas fills available width.
   useEffect(() => {
     const el = containerRef.current;
@@ -240,20 +225,6 @@ export default function KnowledgeGraph() {
     for (const n of visibleNodes) if (n.kind === 'person' && n.department) set.add(n.department);
     return [...set].sort();
   }, [visibleNodes]);
-
-  async function switchMode(next) {
-    if (!isPlatform || savingMode || next === orgType) return;
-    setSavingMode(true);
-    try {
-      const res = await api.put('/admin/org-privacy', { type: next });
-      setOrgType(res.data?.type || next);
-      await loadGraph(company, language);
-    } catch (e) {
-      setError(e.response?.data?.error || t('graph.error.modeChangeFailed'));
-    } finally {
-      setSavingMode(false);
-    }
-  }
 
   return (
     <PageShell
@@ -337,59 +308,6 @@ export default function KnowledgeGraph() {
         >
           <RefreshCw className="size-4" /> {t('graph.refresh')}
         </Button>
-      </div>
-
-      {/* Privacy / two-product affordance — reuses the org privacy toggle. */}
-      <div
-        className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-muted/40 px-4 py-3"
-        data-testid="kg-privacy-affordance"
-      >
-        <div className="flex items-start gap-2.5">
-          <ShieldAlert className={cn('mt-0.5 size-4 shrink-0', inter ? 'text-amber-500' : 'text-muted-foreground')} />
-          <div className="text-sm">
-            <span className="font-medium text-foreground">{t('graph.privacy.label')} </span>
-            <span data-testid="kg-org-mode">{inter ? t('graph.privacy.inter') : t('graph.privacy.intra')}</span>
-            <p className="mt-0.5 text-[12px] text-muted-foreground">
-              {inter
-                ? t('graph.privacy.interDesc')
-                : t('graph.privacy.intraDesc')}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {isPlatform ? (
-            <div className="inline-flex overflow-hidden rounded-lg border border-border">
-              <button
-                type="button"
-                data-testid="kg-mode-intra"
-                disabled={savingMode}
-                onClick={() => switchMode('intra')}
-                className={cn(
-                  'px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50',
-                  !inter ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'
-                )}
-              >
-                {t('graph.privacy.intraBtn')}
-              </button>
-              <button
-                type="button"
-                data-testid="kg-mode-inter"
-                disabled={savingMode}
-                onClick={() => switchMode('inter')}
-                className={cn(
-                  'px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50',
-                  inter ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'
-                )}
-              >
-                {t('graph.privacy.interBtn')}
-              </button>
-            </div>
-          ) : (
-            <Link to="/admin" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-              {t('graph.privacy.manageInAdmin')}
-            </Link>
-          )}
-        </div>
       </div>
 
       {error && (

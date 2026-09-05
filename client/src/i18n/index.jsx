@@ -3,13 +3,14 @@ import React, { createContext, useContext, useEffect, useMemo, useState, useCall
 // Lightweight in-repo i18n.
 //
 // Catalogs are split into per-namespace JSON files under locales/en and
-// locales/it (e.g. nav.json, dashboard.json). They are auto-merged via Vite's
+// locales/it/fr (e.g. nav.json, dashboard.json). They are auto-merged via Vite's
 // import.meta.glob so adding a new namespace file requires no change here.
 // Each file holds FLAT dotted keys (e.g. {"nav.home": "Home"}); namespaces
 // keep prefixes distinct so Object.assign merge never collides.
 
 const enModules = import.meta.glob('./locales/en/*.json', { eager: true });
 const itModules = import.meta.glob('./locales/it/*.json', { eager: true });
+const frModules = import.meta.glob('./locales/fr/*.json', { eager: true });
 
 function mergeCatalog(modules) {
   const out = {};
@@ -23,9 +24,10 @@ function mergeCatalog(modules) {
 const CATALOG = {
   en: mergeCatalog(enModules),
   it: mergeCatalog(itModules),
+  fr: mergeCatalog(frModules),
 };
 
-const SUPPORTED = ['en', 'it'];
+const SUPPORTED = ['en', 'it', 'fr'];
 const STORAGE_KEY = 'ment.lang';
 
 export function getLang() {

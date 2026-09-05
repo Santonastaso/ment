@@ -23,6 +23,7 @@ export default function ReflectionLog({
   // entry. The history list and "no entries yet" empty state are suppressed
   // so the dashboard panel stays focused on the current check-in.
   hideHistory = false,
+  showManualAdd = false,
 }) {
   const { t } = useT();
   const [entries, setEntries] = useState([]);
@@ -64,7 +65,7 @@ export default function ReflectionLog({
 
   // In dashboard mode (hideHistory), surface only the freshly-submitted entry
   // (the one this dashboard panel just produced). Past reflections stay on
-  // the profile page â€” the dashboard panel is "current check-in" only.
+  // the profile page — the dashboard panel is "current check-in" only.
   const visibleEntries = hideHistory
     ? entries.filter((e) => e.id === latestEntryId)
     : entries;
@@ -172,7 +173,7 @@ export default function ReflectionLog({
         </div>
       )}
 
-      {/* Check-in prompt â€” suppressed in dashboard mode (the dashboard
+      {/* Check-in prompt — suppressed in dashboard mode (the dashboard
           already renders its own "Open check-in" alert above this panel). */}
       {!hideHistory && dueForCheckIn && !showForm && (
         <div className="flex items-start justify-between gap-4">
@@ -190,7 +191,7 @@ export default function ReflectionLog({
         </div>
       )}
 
-      {/* New entry form â€” renders inline in the parent panel; no extra
+      {/* New entry form — renders inline in the parent panel; no extra
           card-in-card container, no repeated title (the parent panel is
           already labelled "Weekly check-in"). */}
       {showForm && (
@@ -218,15 +219,15 @@ export default function ReflectionLog({
         </div>
       )}
 
-      {/* Add manually if not due â€” suppressed in dashboard mode so the
+      {/* Add manually if not due — suppressed in dashboard mode so the
           panel only renders the active check-in. */}
-      {!hideHistory && !showForm && !dueForCheckIn && (
+      {(!hideHistory || showManualAdd) && !showForm && !dueForCheckIn && (
         <button onClick={() => setShowForm(true)} className="text-sm text-primary hover:text-primary/80 font-medium">
           {t('components.reflection.addNow')}
         </button>
       )}
 
-      {/* Entries â€” either the full history or just the freshly-submitted
+      {/* Entries — either the full history or just the freshly-submitted
           entry when running inside the dashboard panel. In dashboard mode we
           keep the rendered entry visible across `load()` refreshes so the
           just-submitted card doesn't flicker. */}
@@ -266,7 +267,7 @@ function SuggestionChip({ skill, onDismiss }) {
           aria-label={t('components.reflection.dismissSkill', { skill })}
           className="inline-flex items-center justify-center w-4 h-4 rounded-full text-muted-foreground hover:text-foreground"
         >
-          Ã—
+          ×
         </button>
       )}
     </span>
@@ -280,7 +281,7 @@ function Entry({ entry, onApply, onDelete, onReclassify, timeAgo }) {
   const [dismissedStrengths, setDismissedStrengths] = useState(() => new Set());
   const [reclassifying, setReclassifying] = useState(false);
   const [open, setOpen] = useState(false);
-  const dialogRef = useModalA11y();
+  const dialogRef = useModalA11y(open);
 
   // Close the popup on Escape.
   useEffect(() => {

@@ -6,7 +6,7 @@ import { useT } from '../i18n/index.jsx';
 // suggestions dropdown. Behaviour matches the plan:
 //   * debounce 250 ms, min 2 chars, abort previous fetch
 //   * Arrow Up / Down / Enter / Escape keyboard navigation
-//   * Suggestive only â€” pressing Enter without a highlighted suggestion
+//   * Suggestive only — pressing Enter without a highlighted suggestion
 //     still confirms the user's raw text (`onCommitCustom`).
 //
 // Props:
@@ -244,7 +244,7 @@ export default function EscoSuggestInput({
               >
                 <span className="truncate">{item.label}</span>
                 <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">
-                  ESCO{item.language && item.language !== 'en' ? ` Â· ${item.language}` : ''}
+                  ESCO{item.language && item.language !== 'en' ? ` · ${item.language}` : ''}
                 </span>
               </li>
             );

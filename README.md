@@ -13,7 +13,7 @@ The app is **server-less**: a React client talks directly to **Supabase** (Auth 
 ├── client/                       React + Vite (the only app process)
 │   └── src/
 │       ├── pages/                Login, Onboarding, Dashboard, Profile, …
-│       ├── components/           MatchCard, SessionCard, IcsDownloadButton, …
+│       ├── components/           SessionCard, IcsDownloadButton, …
 │       ├── context/AuthContext   Wraps supabase.auth + profile fetch
 │       ├── api/index.js          Backwards-compatible shim that routes
 │       │                         legacy api.get/post/put/delete to supabase-js
@@ -22,7 +22,7 @@ The app is **server-less**: a React client talks directly to **Supabase** (Auth 
 │           └── ics.js            In-browser .ics calendar generator
 ├── supabase/
 │   ├── migrations/0001_init.sql       Tables, indexes
-│   ├── migrations/0002_functions.sql  Triggers, RPCs (matching, badges,
+│   ├── migrations/0002_functions.sql  Triggers, RPCs (matching,
 │   │                                   skill progress, team gaps, session
 │   │                                   lifecycle, audit log)
 │   ├── migrations/0003_rls.sql        RLS policies + grants
@@ -39,7 +39,9 @@ The app is **server-less**: a React client talks directly to **Supabase** (Auth 
 │   │   ├── admin-create-user/         CSV/XLSX bulk import
 │   │   ├── admin-reset-password/      Generates a fresh temp password
 │   │   ├── profile-ingest/            PDF/DOCX → heuristic/ESCO profile draft
-│   │   └── reflection-classify/       Heuristic/ESCO skill extraction
+│   │   ├── reflection-classify/       Heuristic/ESCO skill extraction
+│   │   ├── public-signup/             Organization self-signup
+│   │   └── send-notification-outbox/ Email reminder worker
 │   └── config.toml
 ```
 
@@ -147,7 +149,7 @@ Seed/test users are managed in Supabase Auth. Admin-created users receive a one-
 
 ### Employee experience
 - **Dashboard**: top mentor suggestions, active sessions split into "needs your attention" and "upcoming", weekly reflection check-in nudge.
-- **Profile**: edit skills, career history, view earned badges, expertise signature ("what colleagues seek you out for").
+- **Profile**: edit skills, career history, and expertise signature ("what colleagues seek you out for").
 - **Match cards**: request a session or dismiss with one click. Dismissals re-rank future matches.
 - **Session flow**: focus question → propose a time → mentor accepts → calendar `.ics` generated in-browser → mark complete with private reflection + 1–5 rating.
 - **Reflection log**: weekly two-question check-in. Curated keyword matching + ESCO extract skills you can apply to your landscape; Anthropic is opt-in.
@@ -222,29 +224,16 @@ Client signup is intentionally deferred. Public `/request-access` submissions ar
 
 ---
 
-## Recognition badges
-
-| Badge | Condition |
-|-------|-----------|
-| First Step | Completed first session |
-| Connector | Sessions with people from 3+ departments |
-| Deep Expert | Requested as mentor 5+ times |
-| Explorer | Completed session with someone from a different department |
-
-Computed on-demand by `public.badges_for(uuid)`.
-
----
-
 ## Current backlog notes
 
 These are the useful V1 notes that still apply after the Supabase migration:
 
-- **Notifications**: in-app prompts depend on the browser being open. Service Worker + Push API or email delivery are still future work.
+- **Notifications**: weekly email reminders now enqueue to `notification_outbox`; deploy the mailer with `RESEND_API_KEY` and invoke it on a schedule.
 - **Calendar**: `.ics` download is the only calendar integration. Google/Microsoft OAuth, availability, and two-way sync are not implemented.
 - **AI classification**: Anthropic is opt-in and the default heuristic/ESCO path is the production-safe baseline. Prompt calibration, few-shot examples, and shorter display aliases for long ESCO labels remain V1 polish.
 - **Matching**: feedback is still coarse-grained around departments. Per-skill feedback and incremental match recompute would matter at larger scale.
 - **Privacy and admin ops**: audit export exists, but retention policy, GDPR export/delete workflows, org-level settings, 2FA/SSO, and legal consent screens are not built.
-- **Accessibility/i18n/PWA**: UI strings are English only, no PWA install/offline mode exists, and touch/keyboard accessibility should get a dedicated audit before broad rollout.
+- **Accessibility/i18n/PWA**: English, Italian, and French catalogs are wired; French copy is still being completed. No PWA install/offline mode exists, and touch/keyboard accessibility should get a dedicated audit before broad rollout.
 - **Analytics**: owner/org CSV export exists, but deeper anonymized HR analytics and funnel/cohort reporting are not yet productized.
 
 ---
@@ -252,7 +241,7 @@ These are the useful V1 notes that still apply after the Supabase migration:
 ## Operating notes
 
 - **Auth**: `auth.users` owns identities. `public.profiles.id = auth.users.id`. A trigger creates the profile on signup. `must_change_password` blocks the user at the route level (App.jsx) and is cleared by the `complete_password_change` RPC after `auth.updateUser({ password })`.
-- **Organizations**: one Supabase project hosts multiple organizations. `profiles.organization_id` scopes matching, sessions, team insights, admin lists, imports, audit views, and broadcasts. `admin_scope` is `none`, `org`, or `platform`; `is_admin` remains as a compatibility flag.
+- **Organizations**: one Supabase project hosts multiple organizations. `profiles.organization_id` scopes matching, sessions, groups, admin lists, imports, audit views, and broadcasts. `admin_scope` is `none`, `org`, or `platform`; `is_admin` remains as a compatibility flag.
 - **Authorization**: RLS is enabled on every public table. Raw profile, skill, and career rows are self-only. Peer/directory data is served through redacted RPCs. Writes are scoped to `user_id = auth.uid()` or are gated through `security definer` RPCs (sessions, connections, admin actions, broadcast).
 - **Default profile privacy**: other colleagues see first name + last initial, role, department, location, bio, and teachable skills. Company names, career details, wants-to-learn, shadow-role answers, reflections, and ratings are private by default.
 - **Audit log**: written exclusively by triggers and the admin RPCs, never by app code. Sensitive content is never recorded — only actions and counts.

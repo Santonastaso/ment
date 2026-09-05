@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // Audits the i18n catalogs and reports any key present in one locale but
-// missing in the other. Exit code 1 if gaps are found (suitable for CI).
+// missing in another. Exit code 1 if gaps are found (suitable for CI).
 //
 // Usage: node scripts/check-i18n-coverage.mjs [--fix-empty]
-// With --fix-empty, missing keys are inserted into the target locale with an
-// empty string so a human can later fill them in (still exits 1 to flag).
+// With --fix-empty, missing keys are inserted into the target locale as empty
+// strings so a human can later fill them in (still exits 1 to flag).
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,7 +12,11 @@ import { fileURLToPath } from 'node:url';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
 const LOCALES_DIR = path.join(ROOT, 'client/src/i18n/locales');
-const LOCALES = ['en', 'it'];
+const REFERENCE_LOCALE = 'en';
+const LOCALES = fs.readdirSync(LOCALES_DIR, { withFileTypes: true })
+  .filter((d) => d.isDirectory())
+  .map((d) => d.name)
+  .sort((a, b) => (a === REFERENCE_LOCALE ? -1 : b === REFERENCE_LOCALE ? 1 : a.localeCompare(b)));
 const FIX_EMPTY = process.argv.includes('--fix-empty');
 
 function loadLocaleNamespace(locale, ns) {
@@ -34,13 +38,15 @@ function listNamespaces() {
 }
 
 function diffNamespace(ns) {
-  const en = loadLocaleNamespace('en', ns);
-  const it = loadLocaleNamespace('it', ns);
-  const enKeys = new Set(Object.keys(en));
-  const itKeys = new Set(Object.keys(it));
-  const onlyEn = [...enKeys].filter(k => !itKeys.has(k));
-  const onlyIt = [...itKeys].filter(k => !enKeys.has(k));
-  return { en, it, onlyEn, onlyIt };
+  const catalogs = Object.fromEntries(LOCALES.map((locale) => [locale, loadLocaleNamespace(locale, ns)]));
+  const allKeys = new Set(Object.values(catalogs).flatMap((catalog) => Object.keys(catalog)));
+  const missing = Object.fromEntries(
+    LOCALES.map((locale) => [
+      locale,
+      [...allKeys].filter((key) => !(key in catalogs[locale])),
+    ])
+  );
+  return { catalogs, missing };
 }
 
 function writeFixed(locale, ns, obj) {
@@ -51,30 +57,21 @@ function writeFixed(locale, ns, obj) {
 let totalGaps = 0;
 const namespaces = listNamespaces();
 for (const ns of namespaces) {
-  const { en, it, onlyEn, onlyIt } = diffNamespace(ns);
-  if (onlyEn.length === 0 && onlyIt.length === 0) continue;
+  const { catalogs, missing } = diffNamespace(ns);
+  const missingLocales = LOCALES.filter((locale) => missing[locale].length > 0);
+  if (missingLocales.length === 0) continue;
   console.log(`\n[${ns}.json]`);
-  if (onlyEn.length) {
-    console.log(`  Missing in it/ (${onlyEn.length}):`);
-    for (const k of onlyEn) console.log(`    - ${k} = ${JSON.stringify(en[k])}`);
+  for (const locale of missingLocales) {
+    console.log(`  Missing in ${locale}/ (${missing[locale].length}):`);
+    for (const k of missing[locale]) console.log(`    - ${k} = ${JSON.stringify(catalogs[REFERENCE_LOCALE]?.[k] ?? '')}`);
     if (FIX_EMPTY) {
-      const merged = { ...it };
-      for (const k of onlyEn) merged[k] = '';
-      writeFixed('it', ns, merged);
-      console.log('    -> inserted empty placeholders in it/' + ns + '.json');
+      const merged = { ...catalogs[locale] };
+      for (const k of missing[locale]) merged[k] = '';
+      writeFixed(locale, ns, merged);
+      console.log(`    -> inserted empty placeholders in ${locale}/${ns}.json`);
     }
   }
-  if (onlyIt.length) {
-    console.log(`  Missing in en/ (${onlyIt.length}):`);
-    for (const k of onlyIt) console.log(`    - ${k}`);
-    if (FIX_EMPTY) {
-      const merged = { ...en };
-      for (const k of onlyIt) merged[k] = it[k];
-      writeFixed('en', ns, merged);
-      console.log('    -> copied IT value as placeholder into en/' + ns + '.json');
-    }
-  }
-  totalGaps += onlyEn.length + onlyIt.length;
+  totalGaps += missingLocales.reduce((sum, locale) => sum + missing[locale].length, 0);
 }
 
 if (totalGaps === 0) {
@@ -100,8 +97,8 @@ function collectUsedKeys(dir, out = new Set()) {
 
 const allKeys = new Set();
 for (const ns of namespaces) {
-  const en = loadLocaleNamespace('en', ns);
-  for (const k of Object.keys(en)) allKeys.add(k);
+  const reference = loadLocaleNamespace(REFERENCE_LOCALE, ns);
+  for (const k of Object.keys(reference)) allKeys.add(k);
 }
 const usedKeys = collectUsedKeys(path.join(ROOT, 'client/src'));
 // Dynamic keys (template literals like `tier${x}`) aren't captured by the regex;

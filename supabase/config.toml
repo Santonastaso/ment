@@ -11,3 +11,9 @@ verify_jwt = true
 
 [functions.reflection-classify]
 verify_jwt = true
+
+[functions.public-signup]
+verify_jwt = false
+
+[functions.send-notification-outbox]
+verify_jwt = true

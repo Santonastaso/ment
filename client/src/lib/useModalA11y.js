@@ -10,11 +10,13 @@ import { useEffect, useRef } from 'react';
 // Escape handling and backdrop clicks stay with the caller so each modal can
 // decide whether dismissal is allowed (e.g. blocked while a request is in
 // flight).
-export function useModalA11y() {
+export function useModalA11y(enabled = true) {
   const containerRef = useRef(null);
 
   useEffect(() => {
+    if (!enabled) return undefined;
     const node = containerRef.current;
+    if (!node) return undefined;
     const previouslyFocused = typeof document !== 'undefined' ? document.activeElement : null;
 
     const FOCUSABLE = [
@@ -70,7 +72,7 @@ export function useModalA11y() {
         previouslyFocused.focus();
       }
     };
-  }, []);
+  }, [enabled]);
 
   return containerRef;
 }

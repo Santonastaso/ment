@@ -50,7 +50,6 @@ function shapeProfile(row, viewerId) {
   return {
     ...row,
     current_role: row.job_title, // legacy alias
-    direct_reports: row.direct_reports ?? 0,
     must_change_password: isSelf ? row.must_change_password : undefined,
     deactivated_at: isSelf ? row.deactivated_at : row.deactivated_at,
   };
@@ -205,13 +204,11 @@ async function loadProfile(userId, viewerId) {
   if (error) throw new ApiError(error.message);
   if (!row) throw new ApiError('User not found', 404);
 
-  const [skillsRes, careerRes, progressRes, badgesRes, expertiseRes, reportsCountRes] = await Promise.all([
+  const [skillsRes, careerRes, progressRes, expertiseRes] = await Promise.all([
     supabase.from('skills').select('id, user_id, skill, type, example_project').eq('user_id', userId),
     supabase.from('career_history').select('*').eq('user_id', userId).order('start_year', { ascending: false }),
     supabase.rpc('skill_progress_for', { p_user_id: userId }),
-    supabase.rpc('badges_for', { p_user_id: userId }),
     supabase.rpc('expertise_signature_for', { p_user_id: userId }),
-    supabase.rpc('direct_report_count', { p_manager_id: userId }),
   ]);
 
   const allSkills = (skillsRes.data || []).map((s) => ({ ...s }));
@@ -220,9 +217,7 @@ async function loadProfile(userId, viewerId) {
   const skillProgress = isSelf ? allProgress : allProgress.filter((s) => s.type !== 'wants_to_learn');
 
   const career = shapeCareer(careerRes.data);
-  const badges = badgesRes.data || [];
   const expertiseSignature = (expertiseRes.data || []).map((r) => r.skill);
-  const direct_reports = reportsCountRes.data ?? 0;
 
   const email = await fetchAuthEmail(userId);
 
@@ -232,10 +227,8 @@ async function loadProfile(userId, viewerId) {
       email,
       skills,
       career,
-      badges,
       skillProgress,
       expertiseSignature,
-      direct_reports,
     },
     viewerId
   );
@@ -254,19 +247,26 @@ async function loadProfile(userId, viewerId) {
 // Sessions
 // ============================================================
 
+const sessionUserCache = new Map();
+
 async function fetchSessionUser(userId, viewerId) {
-  if (userId !== viewerId) {
-    const { data } = await supabase.rpc('peer_profile', { p_user_id: userId });
-    return data ? shapeUser(data) : null;
-  }
-  const { data } = await supabase
-    .from('profiles')
-    .select('id, name, department, seniority, job_title, deactivated_at')
-    .eq('id', userId)
-    .single();
-  if (!data) return null;
-  // attach email when this user is the viewer (otherwise not exposed)
-  return shapeUser(data);
+  const cacheKey = `${viewerId}:${userId}`;
+  if (sessionUserCache.has(cacheKey)) return sessionUserCache.get(cacheKey);
+  const request = (async () => {
+    if (userId !== viewerId) {
+      const { data } = await supabase.rpc('peer_profile', { p_user_id: userId });
+      return data ? shapeUser(data) : null;
+    }
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, name, department, seniority, job_title, deactivated_at')
+      .eq('id', userId)
+      .single();
+    if (!data) return null;
+    return shapeUser(data);
+  })();
+  sessionUserCache.set(cacheKey, request);
+  return request;
 }
 
 async function enrichSession(session, viewerId) {
@@ -451,6 +451,12 @@ async function get(url) {
       language: params.get('language'),
       q: params.get('q'),
     }));
+  }
+
+  if (url === '/groups') {
+    const { data, error } = await supabase.rpc('my_groups');
+    if (error) throw new ApiError(error.message);
+    return ok(Array.isArray(data) ? data : []);
   }
 
   if (url === '/sessions') {
@@ -693,7 +699,6 @@ async function post(url, body = {}, opts = {}) {
       p_seniority: body.seniority,
       p_job_title: body.current_role || body.job_title || '',
       p_bio: body.bio || '',
-      p_shadow_role_response: body.shadow_role_response || '',
       p_tenure_years: parseInt(body.tenure_years || 0, 10),
       p_location: body.location || '',
       p_career: (body.career || []).map((c) => ({
@@ -713,6 +718,16 @@ async function post(url, body = {}, opts = {}) {
       p_persona: body.persona || null,
     });
     if (error) throw new ApiError(error.message);
+    for (const item of body.can_teach || []) {
+      if (typeof item !== 'object' || !item.example_project?.trim()) continue;
+      const { error: skillError } = await supabase
+        .from('skills')
+        .update({ example_project: item.example_project.trim().slice(0, 80) })
+        .eq('user_id', viewer.id)
+        .eq('type', 'can_teach')
+        .eq('skill', item.skill);
+      if (skillError) throw new ApiError(skillError.message);
+    }
     return ok(await loadProfile(viewer.id, viewer.id));
   }
 
@@ -743,6 +758,22 @@ async function post(url, body = {}, opts = {}) {
     });
     if (error) throw new ApiError(error.message);
     return ok(data, 201);
+  }
+
+  if (url === '/groups') {
+    const { data, error } = await supabase.rpc('create_group', {
+      p_name: body.name || '',
+      p_description: body.description || '',
+    });
+    if (error) throw new ApiError(error.message);
+    return ok(data, 201);
+  }
+
+  if (/^\/groups\/\d+\/join$/.test(url)) {
+    const id = Number(url.split('/')[2]);
+    const { error } = await supabase.rpc('join_group', { p_group_id: id });
+    if (error) throw new ApiError(error.message);
+    return ok({ ok: true });
   }
 
   if (url === '/feedback') {
@@ -841,9 +872,9 @@ async function post(url, body = {}, opts = {}) {
   }
 
   if (url === '/admin/rematch') {
-    const { data, error } = await supabase.rpc('admin_recompute_matches');
+    const { data, error } = await supabase.rpc('admin_start_rematch');
     if (error) throw new ApiError(error.message);
-    return ok({ matchesGenerated: data ?? 0, message: `Matching complete. ${data ?? 0} match pairs stored.` });
+    return ok({ matchesGenerated: 0, queued: data ?? 0, message: `Matching queued for ${data ?? 0} profiles.` });
   }
 
   if (url === '/admin/broadcast-checkin') {
@@ -881,10 +912,11 @@ async function put(url, body = {}) {
     const allowed = [
       // `name` is deliberately absent — users cannot change their own name
       // (enforced DB-side by guard_profile_writes since 0024).
-      'department', 'seniority', 'bio', 'shadow_role_response',
+      'department', 'seniority', 'bio',
       'tenure_years', 'location',
       // School fields — program + "class of" year.
       'program', 'cohort_year',
+      'reflection_email_reminders',
       // Personal availability — drives whether the user shows up as a
       // mentor candidate.
       'mentorship_paused', 'mentorship_unavailable_until', 'mentorship_note',
@@ -892,10 +924,18 @@ async function put(url, body = {}) {
       'monthly_session_goal',
     ];
     const update = {};
-    for (const k of allowed) if (Object.prototype.hasOwnProperty.call(body, k)) update[k] = body[k];
+    for (const k of allowed) if (Object.prototype.hasOwnProperty.call(body, k)) {
+      if (k === 'cohort_year') {
+        update[k] = body[k] === '' || body[k] == null ? null : Number(body[k]);
+        if (update[k] !== null && !Number.isInteger(update[k])) throw new ApiError('invalid_cohort_year', 400);
+      } else update[k] = body[k];
+    }
     if (Object.prototype.hasOwnProperty.call(body, 'current_role')) update.job_title = body.current_role;
     const { error } = await supabase.from('profiles').update(update).eq('id', viewer.id);
     if (error) throw new ApiError(error.message);
+    if (['department', 'seniority', 'program', 'cohort_year', 'current_role'].some((k) => Object.prototype.hasOwnProperty.call(body, k))) {
+      await supabase.rpc('mark_matches_stale', { p_user_id: viewer.id });
+    }
     return ok(await loadProfile(viewer.id, viewer.id));
   }
 
@@ -1083,6 +1123,12 @@ async function del(url) {
   if (/^\/users\/me\/unavailable-periods\/\d+$/.test(url)) {
     const id = Number(url.split('/')[4]);
     const { error } = await supabase.from('mentorship_unavailable_periods').delete().eq('id', id).eq('user_id', viewer.id);
+    if (error) throw new ApiError(error.message);
+    return ok({ ok: true });
+  }
+  if (/^\/groups\/\d+\/membership$/.test(url)) {
+    const id = Number(url.split('/')[2]);
+    const { error } = await supabase.rpc('leave_group', { p_group_id: id });
     if (error) throw new ApiError(error.message);
     return ok({ ok: true });
   }

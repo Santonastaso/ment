@@ -11,7 +11,7 @@ export default function AppLayout() {
 
   return (
     <div className="flex h-screen min-h-screen overflow-hidden bg-[var(--background)]">
-      <aside className="flex h-full w-60 shrink-0 flex-col border-r border-[var(--border)] bg-[var(--sidebar)] max-md:hidden">
+      <aside className="flex h-full w-[224px] shrink-0 flex-col border-r border-[var(--sidebar-border)] bg-[var(--sidebar)] max-md:hidden">
         <Sidebar />
       </aside>
 
@@ -34,8 +34,8 @@ export default function AppLayout() {
             </Sheet>
           }
         />
-        <main className="flex-1 overflow-auto px-6 py-8 lg:px-10">
-          <div className="mx-auto w-full max-w-[1160px]">
+        <main className="flex-1 overflow-auto bg-[var(--background)] px-4 py-6 sm:px-8">
+          <div className="mx-auto w-full max-w-[1180px]">
             <Outlet />
           </div>
         </main>

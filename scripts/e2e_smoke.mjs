@@ -83,7 +83,7 @@ async function run() {
     await ctx.close();
   }
 
-  // ---------- Manager (positive team-insights case) ----------
+  // ---------- User (current school experience) ----------
   {
     const ctx = await browser.newContext({ locale: 'en-US' });
     const page = await ctx.newPage();
@@ -91,11 +91,11 @@ async function run() {
     capture(page, errs);
     await login(page, MANAGER, 'manager');
     await page.waitForTimeout(500);
-    const teamNav = await page.locator('a[href="/team"]').count().catch(() => 0);
-    log('manager.hasTeamNav', teamNav > 0, `${teamNav} team nav links`);
+    const groupsNav = await page.locator('a[href="/groups"]').count().catch(() => 0);
+    log('user.hasGroupsNav', groupsNav > 0, `${groupsNav} groups nav links`);
     await page.goto(BASE + '/team', { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(1500);
-    log('manager.teamAllowed', new URL(page.url()).pathname === '/team', `at ${new URL(page.url()).pathname}`);
+    log('user.teamRemoved', new URL(page.url()).pathname !== '/team', `at ${new URL(page.url()).pathname}`);
 
     // Profile: availability multi-period UI on own profile
     await page.goto(BASE + '/profile', { waitUntil: 'domcontentloaded' });
@@ -103,7 +103,7 @@ async function run() {
     const periodsOk = await page.getByText('Out-of-office periods', { exact: false }).first().isVisible().catch(() => false);
     log('profile.oooPeriods', periodsOk);
     log('profile.addPeriodBtn', addPeriodBtn);
-    log('manager.noPageErrors', errs.length === 0, errs.slice(0, 5).join(' | '));
+    log('user.noPageErrors', errs.length === 0, errs.slice(0, 5).join(' | '));
     await ctx.close();
   }
 
@@ -115,8 +115,8 @@ async function run() {
     capture(page, errs);
     const landed = await login(page, EMP, 'emp');
     log('emp.login', landed === '/', `landed at ${landed}`);
-    const teamNav = await page.locator('a[href="/team"]').count().catch(() => 0);
-    log('emp.noTeamNav', teamNav === 0, `${teamNav} team nav links`);
+    const groupsNav = await page.locator('a[href="/groups"]').count().catch(() => 0);
+    log('emp.hasGroupsNav', groupsNav > 0, `${groupsNav} groups nav links`);
     await page.goto(BASE + '/team', { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(1500);
     log('emp.teamGating', new URL(page.url()).pathname !== '/team', `redirected to ${new URL(page.url()).pathname}`);

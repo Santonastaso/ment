@@ -27,10 +27,11 @@ export default function Onboarding() {
   const [error, setError] = useState('');
   const [draftId, setDraftId] = useState(null);
   const [classifierSource, setClassifierSource] = useState('');
+  const [aiConsent, setAiConsent] = useState(false);
   const [suggested, setSuggested] = useState(() => new Set());
 
-  // Step 1 â€” Background
-  const [name] = useState(user?.name || ''); // read-only â€” users cannot change their name
+  // Step 1 — Background
+  const [name] = useState(user?.name || ''); // read-only — users cannot change their name
   const [persona, setPersona] = useState('student');
   const [program, setProgram] = useState('');
   const [cohortYear, setCohortYear] = useState('');
@@ -41,10 +42,10 @@ export default function Onboarding() {
   // start_date / end_date are "YYYY-MM" strings (native <input type="month"> format)
   const [career, setCareer] = useState([{ role: '', department: '', company: '', start_date: '', end_date: '' }]);
 
-  // Step 2 â€” Can teach: array of { skill, example_project }
+  // Step 2 — Can teach: array of { skill, example_project }
   const [canTeach, setCanTeach] = useState([]);
 
-  // Step 3 â€” Wants to learn
+  // Step 3 — Wants to learn
   const [wantsToLearn, setWantsToLearn] = useState([]);
 
   function addCareerRow() {
@@ -73,12 +74,15 @@ export default function Onboarding() {
   function applyProposed(proposed, source) {
     const next = new Set();
     if (proposed.department) { setDepartment(proposed.department); next.add('department'); }
-    if (proposed.current_role) { setCurrentRole(proposed.current_role); next.add('current_role'); }
+    if (proposed.job_title || proposed.current_role) {
+      setCurrentRole(proposed.job_title || proposed.current_role);
+      next.add('current_role');
+    }
     if (proposed.location) { setLocation(proposed.location); next.add('location'); }
     if (proposed.bio) { setBio(proposed.bio); next.add('bio'); }
     if (Array.isArray(proposed.career_history) && proposed.career_history.length) {
       setCareer(proposed.career_history.map(ch => ({
-        role: ch.role || '',
+        role: ch.role || ch.role_title || '',
         department: ch.department || '',
         company: ch.company || '',
         start_date: monthYearToPicker(ch.start_year, ch.start_month),
@@ -100,6 +104,10 @@ export default function Onboarding() {
 
   async function handleUpload(file) {
     if (!file) return;
+    if (!aiConsent) {
+      setError(t('onboarding.import.consentRequired'));
+      return;
+    }
     setUploading(true);
     setError('');
     const form = new FormData();
@@ -182,7 +190,7 @@ export default function Onboarding() {
             <React.Fragment key={s}>
               <div className={`flex items-center gap-1 shrink-0 ${step >= s ? 'text-foreground' : 'text-muted-foreground'}`}>
                 <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold border-2 ${step > s ? 'bg-primary border-primary text-white' : step === s ? 'border-primary text-foreground' : 'border-[var(--input)] text-muted-foreground'}`}>
-                  {step > s ? 'âœ“' : s + 1}
+                  {step > s ? '✓“' : s + 1}
                 </div>
                 <span className="text-xs font-medium hidden md:block">
                   {s === 0 ? t('onboarding.steps.import') : s === 1 ? t('onboarding.steps.background') : s === 2 ? t('onboarding.steps.teach') : t('onboarding.steps.learn')}
@@ -216,6 +224,10 @@ export default function Onboarding() {
                     <p className="text-xs text-muted-foreground mt-1">{t('onboarding.import.hint')}</p>
                   </>
                 )}
+              </label>
+              <label className="flex items-start gap-2 text-xs text-muted-foreground">
+                <input type="checkbox" checked={aiConsent} onChange={e => setAiConsent(e.target.checked)} className="mt-0.5" />
+                <span>{t('onboarding.import.consent')}</span>
               </label>
             </>
           )}
@@ -272,7 +284,7 @@ export default function Onboarding() {
                   <label className="label">{t('onboarding.fields.location')}{suggested.has('location') && <SuggestedPill source={classifierSource} />} <span className="font-normal text-muted-foreground">{t('onboarding.fields.locationHint')}</span></label>
                   <input className="input" value={location} onChange={e => setLocation(e.target.value)} placeholder={t('onboarding.fields.locationPlaceholder')} list="ment-location-suggestions" />
                   <datalist id="ment-location-suggestions">
-                    {['New York','San Francisco','Toronto','Mexico City','London','Berlin','Paris','Madrid','Amsterdam','Stockholm','Dublin','Milan','Tokyo','Singapore','Sydney','Mumbai','Bangalore','Seoul','SÃ£o Paulo','Dubai','Remote'].map(l => <option key={l} value={l} />)}
+                    {['New York','San Francisco','Toronto','Mexico City','London','Berlin','Paris','Madrid','Amsterdam','Stockholm','Dublin','Milan','Tokyo','Singapore','Sydney','Mumbai','Bangalore','Seoul','São Paulo','Dubai','Remote'].map(l => <option key={l} value={l} />)}
                   </datalist>
                 </div>
                 <div className="sm:col-span-2">

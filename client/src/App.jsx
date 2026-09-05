@@ -1,20 +1,26 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext.jsx';
-import LandingPage from './pages/LandingPage.jsx';
-import Login from './pages/Login.jsx';
-import RequestAccess from './pages/RequestAccess.jsx';
-import SignUp from './pages/SignUp.jsx';
-import ForcePasswordChange from './pages/ForcePasswordChange.jsx';
-import Onboarding from './pages/Onboarding.jsx';
-import Dashboard from './pages/Dashboard.jsx';
-import Explorer from './pages/Explorer.jsx';
-import Profile from './pages/Profile.jsx';
-import AdminDashboard from './pages/AdminDashboard.jsx';
-import AdminOps from './pages/AdminOps.jsx';
-import KnowledgeGraph from './pages/KnowledgeGraph.jsx';
-import AppLayout from './components/AppLayout.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
+
+const LandingPage = lazy(() => import('./pages/LandingPage.jsx'));
+const Login = lazy(() => import('./pages/Login.jsx'));
+const RequestAccess = lazy(() => import('./pages/RequestAccess.jsx'));
+const SignUp = lazy(() => import('./pages/SignUp.jsx'));
+const ForcePasswordChange = lazy(() => import('./pages/ForcePasswordChange.jsx'));
+const Onboarding = lazy(() => import('./pages/Onboarding.jsx'));
+const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
+const Explorer = lazy(() => import('./pages/Explorer.jsx'));
+const Groups = lazy(() => import('./pages/Groups.jsx'));
+const Profile = lazy(() => import('./pages/Profile.jsx'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard.jsx'));
+const AdminOps = lazy(() => import('./pages/AdminOps.jsx'));
+const KnowledgeGraph = lazy(() => import('./pages/KnowledgeGraph.jsx'));
+const AppLayout = lazy(() => import('./components/AppLayout.jsx'));
+
+function page(node) {
+  return <Suspense fallback={<LoadingScreen />}>{node}</Suspense>;
+}
 
 function LoadingScreen() {
   return (
@@ -38,7 +44,7 @@ function LoginRoute() {
     if (user.is_admin) return <Navigate to="/admin" replace />;
     return <Navigate to="/" replace />;
   }
-  return <Login />;
+  return page(<Login />);
 }
 
 function ProtectedRoute() {
@@ -47,9 +53,7 @@ function ProtectedRoute() {
   if (!user) return <Navigate to="/welcome" replace />;
   if (user.must_change_password) return <Navigate to="/change-password" replace />;
   if (!user.onboarding_complete && !user.is_admin) return <Navigate to="/onboarding" replace />;
-  return (
-    <AppLayout />
-  );
+  return page(<AppLayout />);
 }
 
 function ChangePasswordRoute() {
@@ -61,7 +65,7 @@ function ChangePasswordRoute() {
     if (!user.onboarding_complete) return <Navigate to="/onboarding" replace />;
     return <Navigate to="/" replace />;
   }
-  return <ForcePasswordChange />;
+  return page(<ForcePasswordChange />);
 }
 
 function OnboardingRoute() {
@@ -70,7 +74,7 @@ function OnboardingRoute() {
   if (!user) return <Navigate to="/login" replace />;
   if (user.must_change_password) return <Navigate to="/change-password" replace />;
   if (user.onboarding_complete) return <Navigate to="/" replace />;
-  return (
+  return page(
     <div className="min-h-screen bg-background">
       <main className="mx-auto max-w-2xl px-4 py-10">
         <Onboarding />
@@ -92,23 +96,30 @@ function PlatformAdminRoute({ children }) {
   return children;
 }
 
+function UserRoute({ children }) {
+  const { user } = useAuth();
+  if (user?.is_admin) return <Navigate to="/admin" replace />;
+  return children;
+}
+
 export default function App() {
   return (
     <Routes>
-      <Route path="/welcome" element={<LandingPage />} />
+      <Route path="/welcome" element={page(<LandingPage />)} />
       <Route path="/login" element={<LoginRoute />} />
-      <Route path="/sign-up" element={<SignUp />} />
-      <Route path="/request-access" element={<RequestAccess />} />
+      <Route path="/sign-up" element={page(<SignUp />)} />
+      <Route path="/request-access" element={page(<RequestAccess />)} />
       <Route path="/change-password" element={<ChangePasswordRoute />} />
       <Route path="/onboarding" element={<OnboardingRoute />} />
       <Route element={<ProtectedRoute />}>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/explorer" element={<Explorer />} />
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/profile/:id" element={<Profile />} />
-        <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
-        <Route path="/admin/ops" element={<PlatformAdminRoute><AdminOps /></PlatformAdminRoute>} />
-        <Route path="/admin/graph" element={<AdminRoute><KnowledgeGraph /></AdminRoute>} />
+        <Route path="/" element={<UserRoute>{page(<Dashboard />)}</UserRoute>} />
+        <Route path="/explorer" element={<UserRoute>{page(<Explorer />)}</UserRoute>} />
+        <Route path="/groups" element={<UserRoute>{page(<Groups />)}</UserRoute>} />
+        <Route path="/profile" element={<UserRoute>{page(<Profile />)}</UserRoute>} />
+        <Route path="/profile/:id" element={<UserRoute>{page(<Profile />)}</UserRoute>} />
+        <Route path="/admin" element={<AdminRoute>{page(<AdminDashboard />)}</AdminRoute>} />
+        <Route path="/admin/ops" element={<PlatformAdminRoute>{page(<AdminOps />)}</PlatformAdminRoute>} />
+        <Route path="/admin/graph" element={<AdminRoute>{page(<KnowledgeGraph />)}</AdminRoute>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

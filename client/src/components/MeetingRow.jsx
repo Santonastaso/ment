@@ -90,14 +90,14 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
             <span className="font-medium text-foreground">{session.title}</span>
             {hasDate ? (
               <>
-                <span className="text-xs text-muted-foreground">Â·</span>
+                <span className="text-xs text-muted-foreground">·</span>
                 <span className="text-xs text-muted-foreground">
                   {dateLabel}{timeLabel ? ` ${t('components.meeting.at')} ${timeLabel}` : ''}
                 </span>
               </>
             ) : (
               <>
-                <span className="text-xs text-muted-foreground">Â·</span>
+                <span className="text-xs text-muted-foreground">·</span>
                 <span className="text-xs text-muted-foreground italic">{t('components.meeting.noDateProposed')}</span>
               </>
             )}
@@ -126,7 +126,7 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
               <Link to={`/profile/${counterpart?.id}`} className="text-primary hover:underline" onClick={e => e.stopPropagation()}>
                 {counterpart?.name}
               </Link>
-              <span className="text-muted-foreground"> Â· {counterpart?.department}</span>
+              <span className="text-muted-foreground"> · {counterpart?.department}</span>
             </span>
           </div>
           {visibleTopics.length > 0 && (
@@ -142,7 +142,7 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
             </div>
           )}
         </div>
-        <span className="text-xs text-muted-foreground flex-shrink-0 mt-1">{expanded ? 'â–´' : 'â–¾'}</span>
+        <span className="text-xs text-muted-foreground flex-shrink-0 mt-1">{expanded ? '▴' : '▾'}</span>
       </button>
 
       {expanded && (
@@ -164,7 +164,7 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
           {session.pre_session_question && (
             <div>
               <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium mb-0.5">{t('components.meeting.focusQuestion')}</p>
-              <p className="text-foreground italic">â€œ{session.pre_session_question}â€</p>
+              <p className="text-foreground italic">“{session.pre_session_question}”</p>
             </div>
           )}
           {mode === 'past' && (() => {
@@ -303,7 +303,7 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
   );
 }
 
-// Helpers â€” produce short, human-friendly relative time strings.
+// Helpers — produce short, human-friendly relative time strings.
 function pastRelative(date, t) {
   const ms = Date.now() - date.getTime();
   if (ms < 0) return null;

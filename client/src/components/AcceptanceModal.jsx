@@ -41,7 +41,7 @@ export default function AcceptanceModal({ sessions, onAcknowledged, onClose }) {
   const [draftDate, setDraftDate] = useState('');
   const [localSessions, setLocalSessions] = useState(sessions);
   const [error, setError] = useState('');
-  const dialogRef = useModalA11y();
+  const dialogRef = useModalA11y(true);
 
   // Keep local state in sync if the parent reloads the prop (e.g. after a
   // partial dismissAll retry).
@@ -65,7 +65,7 @@ export default function AcceptanceModal({ sessions, onAcknowledged, onClose }) {
     const acknowledgedIds = new Set();
     try {
       for (const s of localSessions) {
-        // Acknowledge each row â€” the RPC is idempotent and only writes when
+        // Acknowledge each row — the RPC is idempotent and only writes when
         // the row was previously unacknowledged.
         // eslint-disable-next-line no-await-in-loop
         await api.post(`/sessions/${s.id}/acknowledge`, {});

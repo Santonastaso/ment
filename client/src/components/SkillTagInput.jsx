@@ -15,7 +15,7 @@ export default function SkillTagInput({ value = [], onChange, placeholder, lang,
   const [input, setInput] = useState('');
   const [openIdx, setOpenIdx] = useState(null);
   const inputRef = useRef(null);
-  const dialogRef = useModalA11y();
+  const dialogRef = useModalA11y(openIdx !== null);
   const effectivePlaceholder = placeholder || t('components.skillTag.placeholder');
 
   function addSkill(raw) {

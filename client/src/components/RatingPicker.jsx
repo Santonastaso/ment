@@ -7,10 +7,10 @@ import { useT } from '../i18n/index.jsx';
 // clicking the currently-selected star a second time.
 //
 // Props:
-//   value       â€” current rating (1-5) or null
-//   onChange    â€” (newValue) => void
-//   disabled    â€” read-only display
-//   showHint    â€” optional small label below the row
+//   value       — current rating (1-5) or null
+//   onChange    — (newValue) => void
+//   disabled    — read-only display
+//   showHint    — optional small label below the row
 const HINT_KEYS = {
   1: 'components.rating.hint1',
   2: 'components.rating.hint2',

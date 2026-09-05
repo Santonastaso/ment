@@ -13,7 +13,7 @@ const CATEGORIES = [
 
 // Small dialog opened from the profile dropdown. Lets any signed-in user
 // send a short note to the team. Submissions land in `feedback_messages`
-// and are reviewable by org/platform admins under Admin â†’ Feedback.
+// and are reviewable by org/platform admins under Admin → Feedback.
 export default function HelpFeedbackModal({ onClose }) {
   const { t } = useT();
   const [category, setCategory] = useState('general');
@@ -21,7 +21,7 @@ export default function HelpFeedbackModal({ onClose }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [sentAt, setSentAt] = useState(null);
-  const dialogRef = useModalA11y();
+  const dialogRef = useModalA11y(true);
   const inFlight = useRef(false);
 
   useEffect(() => {

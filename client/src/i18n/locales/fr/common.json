@@ -1,0 +1,21 @@
+{
+  "common.save": "Enregistrer",
+  "common.cancel": "Annuler",
+  "common.close": "Fermer",
+  "common.edit": "Modifier",
+  "common.remove": "Retirer",
+  "common.delete": "Supprimer",
+  "common.loading": "Chargement…",
+  "common.refresh": "Actualiser",
+  "common.search": "Rechercher",
+  "common.signOut": "Se deconnecter",
+  "common.helpFeedback": "Aide et commentaires",
+  "topbar.searchPlaceholder": "Rechercher des personnes et competences",
+  "nav.home": "Accueil",
+  "nav.explorer": "Explorer",
+  "nav.groups": "Groupes",
+  "nav.myProfile": "Mon profil",
+  "nav.admin": "Administration",
+  "nav.knowledgeGraph": "Graphe des competences",
+  "nav.platformOps": "Operations plateforme"
+}

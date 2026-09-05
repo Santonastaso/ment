@@ -18,7 +18,7 @@ export default function Explorer() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   // All view state lives in the URL so the top-bar search (?q=) and
-  // back/forward behave. No mode chosen yet â†’ entry prompt.
+  // back/forward behave. No mode chosen yet → entry prompt.
   const modeParam = searchParams.get('mode');
   const query = searchParams.get('q') || '';
   const persona = ['student', 'alumnus'].includes(searchParams.get('persona')) ? searchParams.get('persona') : '';
@@ -27,7 +27,7 @@ export default function Explorer() {
   const location = searchParams.get('location') || '';
   const language = searchParams.get('language') || '';
   const page = Math.max(Number(searchParams.get('page')) || 1, 1);
-  const mode = modeParam === 'directory' ? 'directory' : (modeParam === 'chat' || query ? 'chat' : null);
+  const mode = modeParam === 'directory' ? 'directory' : 'chat';
 
   const [inputValue, setInputValue] = useState(query);
   const [chatResults, setChatResults] = useState(null);
@@ -52,7 +52,7 @@ export default function Explorer() {
   // Keep the input in sync when ?q= changes externally (top-bar search).
   useEffect(() => { setInputValue(query); }, [query]);
 
-  // Chat-style: keyword search â†’ top 3.
+  // Chat-style: keyword search → top 3.
   useEffect(() => {
     if (mode !== 'chat') return;
     let cancelled = false;
@@ -111,30 +111,7 @@ export default function Explorer() {
   return (
     <PageShell title={t('explorer.title')} className="gap-4">
 
-      {mode === null && (
-        <div className="pb-10">
-          <p className="text-sm font-medium text-foreground">{t('explorer.entryTitle')}</p>
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <Button type="button" data-testid="entry-student" onClick={() => updateParams(n => { n.set('mode', 'chat'); n.set('persona', 'student'); })}>
-              {t('explorer.entryStudent')}
-            </Button>
-            <Button type="button" variant="outline" data-testid="entry-alumnus" onClick={() => updateParams(n => { n.set('mode', 'chat'); n.set('persona', 'alumnus'); })}>
-              {t('explorer.entryAlumnus')}
-            </Button>
-            <span className="mx-1 h-4 w-px bg-[var(--border)]" aria-hidden="true" />
-            <Link
-              to="/explorer?mode=directory"
-              data-testid="entry-directory"
-              className="text-sm font-medium text-muted-foreground hover:text-foreground"
-            >
-              {t('explorer.browseDirectory')}
-            </Link>
-          </div>
-        </div>
-      )}
-
-      {mode !== null && (
-        <>
+      <>
           <div className="flex flex-wrap items-center gap-2">
             <Button
               type="button"
@@ -272,8 +249,7 @@ export default function Explorer() {
               )}
             </>
           )}
-        </>
-      )}
+      </>
 
       {requestingMentor && (
         <SessionRequestModal
@@ -311,7 +287,7 @@ function PersonCard({ person, onRequest }) {
                 person.cohort_year ? t('explorer.classOf', { year: person.cohort_year }) : null,
                 person.current_role,
                 person.location,
-              ].filter(Boolean).join(' Â· ')}
+              ].filter(Boolean).join(' · ')}
             </p>
             <span className="mt-1 inline-flex items-center rounded-full border border-[var(--border)] px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
               {isAlumnus ? t('explorer.personaAlumnusSingular') : t('explorer.personaStudentSingular')}

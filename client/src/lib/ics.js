@@ -13,24 +13,19 @@ function escapeIcsText(str) {
 }
 
 function foldLine(line) {
-  const bytes = new TextEncoder().encode(line);
-  if (bytes.length <= 75) return line;
-  const decoder = new TextDecoder('utf-8');
+  const encoder = new TextEncoder();
   const parts = [];
-  let offset = 0;
-  let first = true;
-  while (offset < bytes.length) {
-    const limit = first ? 75 : 74;
-    parts.push(decoder.decode(bytes.slice(offset, offset + limit)));
-    offset += limit;
-    first = false;
+  let current = '';
+  for (const char of line) {
+    const limit = parts.length === 0 ? 75 : 74;
+    if (current && encoder.encode(current + char).length > limit) {
+      parts.push(current);
+      current = '';
+    }
+    current += char;
   }
+  if (current || parts.length === 0) parts.push(current);
   return parts.join('\r\n ');
-}
-
-function uid() {
-  if (typeof crypto?.randomUUID === 'function') return crypto.randomUUID();
-  return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
 export function buildSessionIcs(session, mentor, mentee) {
@@ -53,7 +48,7 @@ export function buildSessionIcs(session, mentor, mentee) {
     'CALSCALE:GREGORIAN',
     'METHOD:REQUEST',
     'BEGIN:VEVENT',
-    `UID:session-${session.id}-${uid()}@ment`,
+    `UID:session-${session.id}@ment`,
     `DTSTAMP:${now}`,
     `DTSTART:${start}`,
     `DTEND:${end}`,

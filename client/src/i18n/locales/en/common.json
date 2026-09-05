@@ -13,8 +13,8 @@
   "topbar.searchPlaceholder": "Search people and skills",
   "nav.home": "Home",
   "nav.explorer": "Explorer",
+  "nav.groups": "Groups",
   "nav.myProfile": "My profile",
-  "nav.teamInsights": "Team insights",
   "nav.admin": "Admin",
   "nav.knowledgeGraph": "Knowledge graph",
   "nav.platformOps": "Platform ops"
