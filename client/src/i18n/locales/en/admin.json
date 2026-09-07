@@ -242,4 +242,10 @@
   "admin.pm.delivery.queued": "Delivery queued",
   "admin.pm.delivery.sent": "Delivered",
   "admin.pm.delivery.failed": "Delivery failed"
+  ,"admin.pm.externalTargetEmail": "Invitee email",
+  "admin.pm.externalTargetPersona": "Invitee type",
+  "admin.pm.externalTargetCohort": "Cohort / term",
+  "admin.pm.addExternalTarget": "Add invited target",
+  "admin.pm.externalTargetRecordedHelp": "The email-only invitee is now included in activation reporting.",
+  "admin.pm.feedbackInbox": "This is the school's feedback inbox. Messages are retained here for the power user; external email delivery is not configured in this demo."
 }

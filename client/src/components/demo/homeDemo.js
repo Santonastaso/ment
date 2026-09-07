@@ -30,11 +30,13 @@ export function suggestPeople({ question, scenario, people, userId }) {
     .filter(p => scenario !== 'mentorship' || p.role === 'alumnus')
     .map(person => {
       const attributes = [...(person.skills || []).filter(s => s.type === 'can_teach').map(s => s.skill), person.job_title, person.program].filter(Boolean);
-      const evidence = attributes.filter(a => terms.some(term => contains(normalize(a), term)));
-      return { person, evidence };
+      const directEvidence = attributes.filter(a => terms.some(term => contains(normalize(a), term)));
+      const rankedEvidence = (person.match_reasons || []).slice(0, 2);
+      const evidence = [...new Set([...directEvidence, ...rankedEvidence])];
+      return { person, evidence, relevance: directEvidence.length * 100 + Number(person.match_score || 0) };
     })
     .filter(result => result.evidence.length)
-    .sort((a, b) => String(a.person.id).localeCompare(String(b.person.id)))
+    .sort((a, b) => b.relevance - a.relevance || String(a.person.id).localeCompare(String(b.person.id)))
     .slice(0, 3);
 }
 export async function loadDirectory(api) {
@@ -45,6 +47,20 @@ export async function loadDirectory(api) {
     people.push(...data.people);
     if (data.people.length < 50 || people.length >= data.total) return people;
   }
+}
+
+// The chat presents Ment's existing ranked matches conversationally. We keep
+// demo copy deterministic, but eligibility and base ranking come from the API.
+export async function loadConversationCandidates(api) {
+  const { data } = await api.get('/matches?role=mentor&limit=50&includeDirectory=1');
+  return (data?.matches || []).map((match) => ({
+    ...match.user,
+    match_score: match.score || 0,
+    match_reasons: match.reasons || [],
+    // `role=mentor` enforces current availability in the security-definer RPC.
+    mentorship_available: true,
+    request_eligible: true,
+  }));
 }
 export function discoveryReply({ question, previousQuestion = '', people = [], userId, intent = 'one_off' }) {
   const combined = [previousQuestion, question].filter(Boolean).join('\n');

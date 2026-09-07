@@ -241,5 +241,11 @@
   "admin.pm.delivery.demo": "Invio demo in coda",
   "admin.pm.delivery.queued": "Invio in coda",
   "admin.pm.delivery.sent": "Consegnato",
-  "admin.pm.delivery.failed": "Invio non riuscito"
+  "admin.pm.delivery.failed": "Invio non riuscito",
+  "admin.pm.externalTargetEmail": "Email dell'invitato",
+  "admin.pm.externalTargetPersona": "Tipo di invitato",
+  "admin.pm.externalTargetCohort": "Coorte / semestre",
+  "admin.pm.addExternalTarget": "Aggiungi invitato",
+  "admin.pm.externalTargetRecordedHelp": "L'invitato con sola email è ora incluso nel report di attivazione.",
+  "admin.pm.feedbackInbox": "Questa è la casella feedback della scuola. I messaggi restano qui per il power user; in questa demo non è configurato l'invio email esterno."
 }

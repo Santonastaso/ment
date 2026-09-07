@@ -288,6 +288,7 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
               <p className="mt-0.5 text-xs text-secondary-foreground">{t('components.meeting.outcomesHelp')}</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {[
+                  ['human_reply', 'components.meeting.outcomeReply'],
                   ['meeting', 'components.meeting.outcomeMeeting'],
                   ['career_conversation', 'components.meeting.outcomeCareer'],
                   ['referral', 'components.meeting.outcomeReferral'],

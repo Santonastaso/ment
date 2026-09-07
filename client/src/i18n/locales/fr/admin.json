@@ -241,5 +241,11 @@
   "admin.pm.delivery.demo": "Envoi démo en attente",
   "admin.pm.delivery.queued": "Envoi en attente",
   "admin.pm.delivery.sent": "Envoyé",
-  "admin.pm.delivery.failed": "Échec de l'envoi"
+  "admin.pm.delivery.failed": "Échec de l'envoi",
+  "admin.pm.externalTargetEmail": "E-mail de l'invité",
+  "admin.pm.externalTargetPersona": "Type d'invité",
+  "admin.pm.externalTargetCohort": "Cohorte / période",
+  "admin.pm.addExternalTarget": "Ajouter un invité",
+  "admin.pm.externalTargetRecordedHelp": "L'invité identifié uniquement par e-mail est désormais inclus dans le rapport d'activation.",
+  "admin.pm.feedbackInbox": "Ceci est la boîte de réception des retours de l'école. Les messages restent ici pour le power user ; aucun envoi e-mail externe n'est configuré dans cette démonstration."
 }

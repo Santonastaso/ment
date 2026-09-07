@@ -5,7 +5,7 @@ import { supabase } from '../../lib/supabase.js';
 import { useT } from '../../i18n/index.jsx';
 import { Button } from '../ui/button.jsx';
 import { Surface, SurfaceBody } from '../Surface.jsx';
-import { classifyNeed, discoveryReply, loadDirectory, suggestPeople } from './homeDemo.js';
+import { classifyNeed, discoveryReply, loadConversationCandidates, suggestPeople } from './homeDemo.js';
 import { homeCopy } from './homeCopy.js';
 import { threadStore } from './homeThreads.js';
 
@@ -35,7 +35,7 @@ export default function HomeConversation({ userId, sessions, onRequest }) {
       setThreads(rows); setThread(rows[0] || null); setIntent(rows[0]?.intent || 'one_off');
       if (rows.length) {
         try {
-          const directory = await loadDirectory(api);
+          const directory = await loadConversationCandidates(api);
           if (generation.current === token) setPeople(directory);
         } catch { if (generation.current === token) setError('error'); }
       }
@@ -62,7 +62,7 @@ export default function HomeConversation({ userId, sessions, onRequest }) {
     try {
       const question = input.trim();
       const previousQuestion = (thread?.turns || []).filter(t => t.role === 'user').map(t => t.text).join('\n');
-      const directory = classifyNeed(question) || classifyNeed(previousQuestion) ? await loadDirectory(api) : [];
+      const directory = classifyNeed(question) || classifyNeed(previousQuestion) ? await loadConversationCandidates(api) : [];
       if (generation.current !== token) return;
       setPeople(directory);
       const reply = discoveryReply({ question, previousQuestion, people: directory, userId, intent });
@@ -109,7 +109,9 @@ export default function HomeConversation({ userId, sessions, onRequest }) {
         <p className="whitespace-pre-wrap break-words">{turn.role === 'user' ? turn.text : copy[turn.kind] || copy.clarify}</p>
         {turn.kind === 'results' && suggestPeople({ question, scenario: turn.scenario, people, userId }).filter(s => turn.person_ids?.includes(s.person.id)).map(({ person, evidence }) => {
           const existing = relationships.find(r => r.person.id === person.id);
-          return <div key={person.id} className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t pt-3"><div className="min-w-0"><p className="font-medium">{person.name}</p><p className="break-words text-xs text-muted-foreground">{copy.evidence}: {evidence.join(', ')}</p></div>{existing ? <a className="text-primary underline" href={`#home-session-${existing.session.id}`}>{copy.resume}</a> : <Button size="sm" variant="outline" disabled={busy || !!unsaved} onClick={() => selectPerson(person)}>{copy.request}</Button>}</div>;
+          const role = [person.job_title || person.current_role, person.department].filter(Boolean).join(' · ');
+          const availability = person.mentorship_available === false ? copy.unavailable : copy.available;
+          return <div key={person.id} className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t pt-3"><div className="min-w-0 space-y-1"><p className="font-medium">{person.name}</p>{role && <p className="text-xs text-muted-foreground">{role}</p>}<p className="break-words text-xs text-muted-foreground">{copy.evidence}: {evidence.join(', ')}</p><p className="text-xs font-medium text-emerald-700">{availability}</p></div>{existing ? <a className="text-primary underline" href={`#home-session-${existing.session.id}`}>{copy.resume}</a> : <Button size="sm" variant="outline" disabled={busy || !!unsaved} onClick={() => selectPerson(person)}>{copy.request}</Button>}</div>;
         })}
       </div>)}
     </div>

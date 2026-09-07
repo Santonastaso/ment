@@ -124,6 +124,8 @@ export default function AdminDashboard() {
   const [kpis, setKpis] = useState(null);
   const [kpisLoading, setKpisLoading] = useState(false);
   const [outreachSavingId, setOutreachSavingId] = useState(null);
+  const [outreachTarget, setOutreachTarget] = useState({ email: '', persona: 'alumnus', cohort_term: 'All' });
+  const [outreachTargetSaving, setOutreachTargetSaving] = useState(false);
   const fileRef = useRef(null);
 
   async function loadKpis() {
@@ -259,6 +261,27 @@ export default function AdminDashboard() {
       setNotice({ variant: 'destructive', title: t('admin.notice.actionFailedTitle'), message: e.response?.data?.error || t('admin.common.tryAgain') });
     } finally {
       setOutreachSavingId(null);
+    }
+  }
+
+  async function addExternalOutreachTarget(event) {
+    event.preventDefault();
+    if (!outreachTarget.email.trim()) return;
+    setOutreachTargetSaving(true);
+    try {
+      await api.post('/admin/outreach-targets', {
+        profile_id: null,
+        email: outreachTarget.email.trim(),
+        persona: outreachTarget.persona,
+        cohort_term: outreachTarget.cohort_term.trim() || 'All',
+      });
+      setOutreachTarget({ email: '', persona: outreachTarget.persona, cohort_term: outreachTarget.cohort_term || 'All' });
+      setNotice({ variant: 'default', title: t('admin.pm.targetRecorded'), message: t('admin.pm.externalTargetRecordedHelp') });
+      loadKpis();
+    } catch (e) {
+      setNotice({ variant: 'destructive', title: t('admin.notice.actionFailedTitle'), message: e.response?.data?.error || t('admin.common.tryAgain') });
+    } finally {
+      setOutreachTargetSaving(false);
     }
   }
 
@@ -809,6 +832,24 @@ export default function AdminDashboard() {
         <Surface>
           <SurfaceHeader title={t('admin.users.title')} />
           <SurfaceBody className="pt-5">
+          <form onSubmit={addExternalOutreachTarget} className="mb-5 flex flex-wrap items-end gap-3 rounded-lg border border-border bg-muted/30 p-3">
+            <div className="min-w-56 flex-1">
+              <Label htmlFor="outreach-email">{t('admin.pm.externalTargetEmail')}</Label>
+              <Input id="outreach-email" type="email" required value={outreachTarget.email} onChange={(e) => setOutreachTarget((current) => ({ ...current, email: e.target.value }))} placeholder="alumni@example.edu" className="mt-1" />
+            </div>
+            <label className="grid gap-1 text-sm font-medium">
+              {t('admin.pm.externalTargetPersona')}
+              <select className="input h-10" value={outreachTarget.persona} onChange={(e) => setOutreachTarget((current) => ({ ...current, persona: e.target.value }))}>
+                <option value="alumnus">{t('admin.users.role.alumnus')}</option>
+                <option value="student">{t('admin.users.role.student')}</option>
+              </select>
+            </label>
+            <div>
+              <Label htmlFor="outreach-cohort">{t('admin.pm.externalTargetCohort')}</Label>
+              <Input id="outreach-cohort" value={outreachTarget.cohort_term} onChange={(e) => setOutreachTarget((current) => ({ ...current, cohort_term: e.target.value }))} className="mt-1 w-28" />
+            </div>
+            <Button type="submit" disabled={outreachTargetSaving}>{outreachTargetSaving ? t('admin.common.saving') : t('admin.pm.addExternalTarget')}</Button>
+          </form>
           {usersLoading ? <p className="text-sm text-muted-foreground">{t('admin.common.loading')}</p> : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -894,6 +935,7 @@ export default function AdminDashboard() {
             }
           />
           <SurfaceBody className="pt-5">
+            <p className="mb-4 rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">{t('admin.pm.feedbackInbox')}</p>
             {feedbackLoading ? (
               <p className="text-sm text-muted-foreground">{t('admin.common.loading')}</p>
             ) : feedback.length ? (

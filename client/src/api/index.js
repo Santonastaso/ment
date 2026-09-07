@@ -780,6 +780,13 @@ async function post(url, body = {}, opts = {}) {
       p_follow_up_intent: body.follow_up_intent || 'one_off',
     });
     if (error) throw new ApiError(error.message);
+    if (body.message?.trim()) {
+      const { error: messageError } = await supabase.rpc('pm_set_outbound_message', {
+        p_session_id: data.id,
+        p_message: body.message.trim(),
+      });
+      if (messageError) throw new ApiError(messageError.message);
+    }
     return ok(await enrichSession(data, viewer.id), 201);
   }
 
