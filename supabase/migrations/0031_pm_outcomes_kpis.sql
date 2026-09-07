@@ -136,7 +136,7 @@ begin
     select least(e.actor_id,e.recipient_id), greatest(e.actor_id,e.recipient_id) from public.outcome_events e where e.organization_id=org and not e.is_demo and e.kind in ('meeting','career_conversation','referral') and e.recipient_id is not null
     union
     select least(e.actor_id,e.recipient_id), greatest(e.actor_id,e.recipient_id) from public.outcome_events e where e.organization_id=org and not e.is_demo and e.kind='human_reply' and e.recipient_id is not null group by least(e.actor_id,e.recipient_id),greatest(e.actor_id,e.recipient_id) having count(distinct e.actor_id)=2
-  ) select count(*), count(distinct x.user_id) filter(where x.role='student') into meaningful,connected_students from pairs join lateral (values(a),(b)) q(id) on true join public.profiles x on x.id=q.id;
+  ) select count(*), count(distinct x.id) filter(where x.role='student') into meaningful,connected_students from pairs join lateral (values(a),(b)) q(id) on true join public.profiles x on x.id=q.id;
   select count(*), count(*) filter(where accepted_at is not null or status in ('scheduled','completed')) into requests_sent,accepted from public.sessions s join public.profiles p on p.id=s.mentor_id where p.organization_id=org;
   select count(distinct e.session_id) into replied from public.outcome_events e where e.organization_id=org and e.kind='human_reply' and not e.is_demo;
   with confirmed as (select least(actor_id,recipient_id) a,greatest(actor_id,recipient_id) b from public.outcome_events where organization_id=org and kind='mentorship_confirmed' and not is_demo and recipient_id is not null group by 1,2 having count(distinct actor_id)=2) select count(*) into mentorships from confirmed;

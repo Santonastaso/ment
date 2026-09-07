@@ -83,17 +83,9 @@ jobs:
           fi
           # The project reference is maintained by Supabase and avoids a
           # stale direct connection URL breaking CI after a password rotation.
-          set +e
           if [ -n "$SUPABASE_PROJECT_REF" ]; then
             supabase link --project-ref "$SUPABASE_PROJECT_REF"
-            supabase db lint --linked --fail-on error 2>&1 | tee /tmp/supabase-db-lint.log
-            lint_status=${PIPESTATUS[0]}
+            supabase db lint --linked --fail-on error
           else
-            supabase db lint --db-url "$SUPABASE_DB_URL" --fail-on error 2>&1 | tee /tmp/supabase-db-lint.log
-            lint_status=${PIPESTATUS[0]}
-          fi
-          if [ "$lint_status" -ne 0 ]; then
-            detail=$(tail -n 30 /tmp/supabase-db-lint.log | tr '\n' ' ' | sed 's/%/%25/g; s/\r/%0D/g')
-            echo "::error title=Supabase DB lint::$detail"
-            exit "$lint_status"
+            supabase db lint --db-url "$SUPABASE_DB_URL" --fail-on error
           fi
