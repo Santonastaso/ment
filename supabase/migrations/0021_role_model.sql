@@ -14,7 +14,17 @@ alter table public.profiles
 
 -- Backfill from existing admin_scope + reporting lines.
 update public.profiles p set role = 'admin'
-  where p.admin_scope in ('org', 'platform') and p.role <> 'admin';
+  where p.admin_scope in ('org', 'platform') and p.role <> 'admin'
+    -- Supabase Preview can replay historical migrations against a branch
+    -- snapshot that already has the later student/alumnus role constraint.
+    -- On a fresh history this constraint includes `admin`; on a snapshot we
+    -- leave the later role pivot to normalize all rows safely.
+    and exists (
+      select 1 from pg_constraint c
+      where c.conrelid = 'public.profiles'::regclass
+        and c.conname = 'profiles_role_check'
+        and pg_get_constraintdef(c.oid) like '%admin%'
+    );
 
 update public.profiles p set role = 'manager'
   where p.admin_scope = 'none'
