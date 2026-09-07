@@ -109,5 +109,10 @@
   "profile.fields.classOf": "Class of {year}",
   "profile.persona.student": "Student",
   "profile.persona.alumnus": "Alumnus",
-  "profile.toast.skillSaveError": ""
+  "profile.toast.skillSaveError": "",
+  "profile.reflection.continueTitle": "Continuerez-vous à utiliser Ment le prochain trimestre ?",
+  "profile.reflection.continueHelp": "Votre réponse reste privée et contribue uniquement aux données agrégées du programme.",
+  "profile.reflection.continue.yes": "Oui",
+  "profile.reflection.continue.unsure": "Je ne sais pas",
+  "profile.reflection.continue.no": "Non"
 }

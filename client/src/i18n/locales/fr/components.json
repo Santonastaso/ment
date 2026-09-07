@@ -300,5 +300,12 @@
   "components.reflection.demo.label": "",
   "components.reflection.demo.notice": "",
   "components.reflection.demo.suggestions": "",
-  "components.skillLandscape.showAll": ""
+  "components.skillLandscape.showAll": "",
+  "components.meeting.outcomesTitle": "Consigner le résultat",
+  "components.meeting.outcomesHelp": "Ces preuves anonymes améliorent le suivi du programme.",
+  "components.meeting.outcomeMeeting": "Réunion tenue",
+  "components.meeting.outcomeCareer": "Échange carrière",
+  "components.meeting.outcomeReferral": "Mise en relation effectuée",
+  "components.meeting.outcomeMentorship": "Mentorat confirmé",
+  "components.skillLandscape.showLess": "Afficher moins"
 }

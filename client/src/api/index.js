@@ -554,6 +554,13 @@ async function get(url) {
     if (error) throw new ApiError(error.message);
     return ok(data);
   }
+  if (url === '/admin/request-settings') {
+    const { data, error } = await supabase.rpc('pm_request_settings', {
+      p_weekly: null, p_pending: null, p_cooldown: null,
+    });
+    if (error) throw new ApiError(error.message);
+    return ok(data);
+  }
   if (url === '/admin/most-active-users' || url.startsWith('/admin/most-active-users?')) {
     const params = new URLSearchParams(url.split('?')[1] || '');
     const limit = Number(params.get('limit') || 10);
@@ -594,7 +601,12 @@ async function get(url) {
     const status = params.get('status') || null;
     const { data, error } = await supabase.rpc('list_feedback', { p_status: status });
     if (error) throw new ApiError(error.message);
-    return ok(data);
+    const ids = (data || []).map((item) => item.id);
+    const { data: deliveries } = ids.length
+      ? await supabase.from('feedback_delivery').select('feedback_id,status,created_at,sent_at,last_error').in('feedback_id', ids)
+      : { data: [] };
+    const byFeedback = new Map((deliveries || []).map((item) => [item.feedback_id, item]));
+    return ok((data || []).map((item) => ({ ...item, delivery: byFeedback.get(item.id) || { status: 'demo' } })));
   }
   if (url.startsWith('/admin/users')) {
     const params = new URLSearchParams(url.split('?')[1] || '');
@@ -911,6 +923,39 @@ async function post(url, body = {}, opts = {}) {
     return ok({ matchesGenerated: 0, queued: data ?? 0, message: `Matching queued for ${data ?? 0} profiles.` });
   }
 
+  if (/^\/sessions\/\d+\/outcomes$/.test(url)) {
+    const sessionId = Number(url.split('/')[2]);
+    const idempotencyKey = body.idempotency_key || crypto.randomUUID();
+    const { data, error } = await supabase.rpc('pm_record_outcome', {
+      p_session_id: sessionId,
+      p_kind: body.kind,
+      p_idempotency_key: idempotencyKey,
+      p_occurred_at: null,
+    });
+    if (error) throw new ApiError(error.message);
+    return ok(data, 201);
+  }
+
+  if (url === '/continuation-intent') {
+    const { data, error } = await supabase.rpc('pm_record_continuation_intent', {
+      p_cohort_term: body.cohort_term || 'Next term',
+      p_answer: body.answer,
+    });
+    if (error) throw new ApiError(error.message);
+    return ok(data, 201);
+  }
+
+  if (url === '/admin/outreach-targets') {
+    const { data, error } = await supabase.rpc('pm_upsert_outreach_target', {
+      p_profile_id: body.profile_id,
+      p_email: body.email || '',
+      p_persona: body.persona,
+      p_cohort_term: body.cohort_term || 'All',
+    });
+    if (error) throw new ApiError(error.message);
+    return ok(data, 201);
+  }
+
   if (url === '/admin/broadcast-checkin') {
     const { data, error } = await supabase.rpc('admin_broadcast_checkin');
     if (error) throw new ApiError(error.message);
@@ -1081,6 +1126,16 @@ async function put(url, body = {}) {
       p_min_team_dashboard_size: body.min_team_dashboard_size ?? null,
     };
     const { data, error } = await supabase.rpc('set_org_privacy', payload);
+    if (error) throw new ApiError(error.message);
+    return ok(data);
+  }
+
+  if (url === '/admin/request-settings') {
+    const { data, error } = await supabase.rpc('pm_request_settings', {
+      p_weekly: body.weekly ?? null,
+      p_pending: body.pending ?? null,
+      p_cooldown: body.cooldown ?? null,
+    });
     if (error) throw new ApiError(error.message);
     return ok(data);
   }

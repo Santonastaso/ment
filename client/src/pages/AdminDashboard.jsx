@@ -87,6 +87,8 @@ export default function AdminDashboard() {
   const [savingOrgPrivacy, setSavingOrgPrivacy] = useState(false);
   const [privacyStatus, setPrivacyStatus] = useState(null);
   const [privacyLoading, setPrivacyLoading] = useState(false);
+  const [requestSettings, setRequestSettings] = useState(null);
+  const [savingRequestSettings, setSavingRequestSettings] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [rematching, setRematching] = useState(false);
@@ -121,6 +123,7 @@ export default function AdminDashboard() {
   const [managerEmailDraft, setManagerEmailDraft] = useState('');
   const [kpis, setKpis] = useState(null);
   const [kpisLoading, setKpisLoading] = useState(false);
+  const [outreachSavingId, setOutreachSavingId] = useState(null);
   const fileRef = useRef(null);
 
   async function loadKpis() {
@@ -214,6 +217,51 @@ export default function AdminDashboard() {
     }
   }
 
+  async function loadRequestSettings() {
+    try {
+      const res = await api.get('/admin/request-settings');
+      setRequestSettings(res.data);
+    } catch {
+      setRequestSettings(null);
+    }
+  }
+
+  async function saveRequestSettings() {
+    if (!requestSettings) return;
+    setSavingRequestSettings(true);
+    try {
+      const res = await api.put('/admin/request-settings', {
+        weekly: Math.max(1, Number(requestSettings.weekly) || 1),
+        pending: Math.max(1, Number(requestSettings.pending) || 1),
+        cooldown: Math.max(0, Number(requestSettings.cooldown) || 0),
+      });
+      setRequestSettings(res.data);
+      setNotice({ variant: 'default', title: t('admin.pm.capacitySaved'), message: t('admin.pm.capacitySavedHelp') });
+    } catch (e) {
+      setNotice({ variant: 'destructive', title: t('admin.notice.actionFailedTitle'), message: e.response?.data?.error || t('admin.common.tryAgain') });
+    } finally {
+      setSavingRequestSettings(false);
+    }
+  }
+
+  async function markOutreachTarget(userRecord) {
+    setOutreachSavingId(userRecord.id);
+    try {
+      await api.post('/admin/outreach-targets', {
+        profile_id: userRecord.id,
+        email: userRecord.email,
+        persona: userRecord.role || 'student',
+        cohort_term: 'All',
+      });
+      setNotice({ variant: 'default', title: t('admin.pm.targetRecorded'), message: t('admin.pm.targetRecordedHelp', { name: userRecord.name }) });
+      loadKpis();
+    } catch (e) {
+      setNotice({ variant: 'destructive', title: t('admin.notice.actionFailedTitle'), message: e.response?.data?.error || t('admin.common.tryAgain') });
+    } finally {
+      setOutreachSavingId(null);
+    }
+  }
+
 
   async function loadPrivacyStatus() {
     setPrivacyLoading(true);
@@ -227,11 +275,12 @@ export default function AdminDashboard() {
     }
   }
 
-  useEffect(() => { loadStats(); loadMostActiveUsers(); loadPrivacyStatus(); }, []);
+  useEffect(() => { loadStats(); loadMostActiveUsers(); loadPrivacyStatus(); loadRequestSettings(); }, []);
   useEffect(() => {
     if (tab === 'kpis') loadKpis();
     if (tab === 'people') loadUsers();
     if (tab === 'privacy' || tab === 'audit') loadAudit();
+    if (tab === 'privacy') loadRequestSettings();
     if (tab === 'feedback') loadFeedback();
   }, [tab]);
 
@@ -488,6 +537,35 @@ export default function AdminDashboard() {
                           }}
                         />
                       </div>
+                    </div>
+                    <div className="sm:col-span-2 rounded-lg border border-border bg-muted/30 p-3">
+                      <h3 className="text-sm font-semibold">{t('admin.pm.capacityTitle')}</h3>
+                      <p className="mt-1 text-xs text-muted-foreground">{t('admin.pm.capacityHelp')}</p>
+                      {requestSettings && (
+                        <div className="mt-3 flex flex-wrap items-end gap-3">
+                          {[
+                            ['weekly', 'admin.pm.weeklyLimit', 1, 100],
+                            ['pending', 'admin.pm.pendingLimit', 1, 50],
+                            ['cooldown', 'admin.pm.cooldownDays', 0, 365],
+                          ].map(([field, label, min, max]) => (
+                            <label key={field} className="grid gap-1 text-xs text-muted-foreground">
+                              {t(label)}
+                              <input
+                                type="number"
+                                min={min}
+                                max={max}
+                                value={requestSettings[field] ?? ''}
+                                disabled={savingRequestSettings}
+                                onChange={(e) => setRequestSettings((current) => ({ ...current, [field]: e.target.value }))}
+                                className="input h-9 w-24 text-sm"
+                              />
+                            </label>
+                          ))}
+                          <Button type="button" size="sm" onClick={saveRequestSettings} disabled={savingRequestSettings}>
+                            {savingRequestSettings ? t('admin.common.saving') : t('admin.pm.saveCapacity')}
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -770,6 +848,7 @@ export default function AdminDashboard() {
                         {!u.deactivated_at && (
                           <>
                             <Button type="button" variant="link" size="sm" className="h-auto px-0 text-xs" onClick={() => openSetManager(u)}>{t('admin.users.setManager')}</Button>
+                            <Button type="button" variant="link" size="sm" className="h-auto px-0 text-xs" disabled={outreachSavingId === u.id} onClick={() => markOutreachTarget(u)}>{outreachSavingId === u.id ? t('admin.common.saving') : t('admin.pm.markInvited')}</Button>
                             <Button type="button" variant="link" size="sm" className="h-auto px-0 text-xs" onClick={() => openResetPasswordConfirm(u)}>{t('admin.users.resetPassword')}</Button>
                             <Button type="button" variant="link" size="sm" className="h-auto px-0 text-xs text-destructive" onClick={() => openDeactivateConfirm(u)}>{t('admin.users.deactivate')}</Button>
                           </>
@@ -839,6 +918,7 @@ export default function AdminDashboard() {
                           )}
                           <span className="text-muted-foreground">·</span>
                           <span className="text-muted-foreground">{formatDate(item.created_at)}</span>
+                          <span className="rounded-full bg-muted px-2 py-0.5 font-medium text-muted-foreground">{t(`admin.pm.delivery.${item.delivery?.status || 'demo'}`)}</span>
                         </div>
                         <p className="mt-2 whitespace-pre-wrap text-sm text-foreground">{item.message}</p>
                       </div>

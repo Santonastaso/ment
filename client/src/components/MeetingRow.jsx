@@ -27,6 +27,8 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
   const [followupMentor, setFollowupMentor] = useState(null);
   const [loadingFollowup, setLoadingFollowup] = useState(false);
   const [followupDone, setFollowupDone] = useState(false);
+  const [outcomeSaving, setOutcomeSaving] = useState('');
+  const [recordedOutcomes, setRecordedOutcomes] = useState([]);
 
   const isMentor = session.mentor?.id === currentUserId;
   const counterpart = isMentor ? session.mentee : session.mentor;
@@ -45,6 +47,17 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
       setFollowupMentor({ id: counterpart.id, name: counterpart.name, department: counterpart.department, skills: [] });
     } finally {
       setLoadingFollowup(false);
+    }
+  }
+
+  async function recordOutcome(kind) {
+    setOutcomeSaving(kind);
+    try {
+      await api.post(`/sessions/${session.id}/outcomes`, { kind });
+      setRecordedOutcomes((current) => [...new Set([...current, kind])]);
+      onUpdate?.();
+    } finally {
+      setOutcomeSaving('');
     }
   }
   const hasDate = !!session.scheduled_at;
@@ -268,6 +281,32 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
               </div>
             );
           })()}
+
+          {mode === 'past' && (
+            <div className="border-t border-[var(--border-subtle)] pt-3">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{t('components.meeting.outcomesTitle')}</p>
+              <p className="mt-0.5 text-xs text-secondary-foreground">{t('components.meeting.outcomesHelp')}</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {[
+                  ['meeting', 'components.meeting.outcomeMeeting'],
+                  ['career_conversation', 'components.meeting.outcomeCareer'],
+                  ['referral', 'components.meeting.outcomeReferral'],
+                  ['mentorship_confirmed', 'components.meeting.outcomeMentorship'],
+                ].map(([kind, label]) => (
+                  <Button
+                    key={kind}
+                    type="button"
+                    size="sm"
+                    variant={recordedOutcomes.includes(kind) ? 'secondary' : 'outline'}
+                    disabled={Boolean(outcomeSaving) || recordedOutcomes.includes(kind)}
+                    onClick={() => recordOutcome(kind)}
+                  >
+                    {outcomeSaving === kind ? t('components.meeting.saving') : t(label)}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Follow-up: book another session with the same counterpart. */}
           {mode === 'past' && counterpart?.id && !counterpart?.deactivated_at && (

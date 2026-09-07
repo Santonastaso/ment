@@ -97,7 +97,45 @@ export default function ProfileReflection({ history = false, draft, onDraftChang
       {entries.map(entry => (
         <ReflectionReview key={entry.id} entry={entry} busy={busy} onApply={apply} lang={lang} />
       ))}
+      {!history && <ContinuationIntent />}
     </div>
+  );
+}
+
+function ContinuationIntent() {
+  const { t } = useT();
+  const [saving, setSaving] = useState(false);
+  const [answer, setAnswer] = useState('');
+
+  async function save(nextAnswer) {
+    setSaving(true);
+    try {
+      await api.post('/continuation-intent', { cohort_term: 'Next term', answer: nextAnswer });
+      setAnswer(nextAnswer);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className="border-t border-border pt-3">
+      <p className="text-sm font-medium">{t('profile.reflection.continueTitle')}</p>
+      <p className="mt-0.5 text-xs text-muted-foreground">{t('profile.reflection.continueHelp')}</p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {['yes', 'unsure', 'no'].map((value) => (
+          <Button
+            key={value}
+            type="button"
+            size="sm"
+            variant={answer === value ? 'secondary' : 'outline'}
+            disabled={saving}
+            onClick={() => save(value)}
+          >
+            {t(`profile.reflection.continue.${value}`)}
+          </Button>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -138,4 +176,3 @@ function ReflectionReview({ entry, busy, onApply, lang }) {
     </article>
   );
 }
-

@@ -226,5 +226,20 @@
   "admin.pm.period": "",
   "admin.pm.privacyHelp": "",
   "admin.pm.responseRate": "",
-  "admin.pm.schoolControls": ""
+  "admin.pm.schoolControls": "",
+  "admin.pm.capacityTitle": "Capacità richieste alumni",
+  "admin.pm.capacityHelp": "Definisci quante richieste può ricevere un alumnus e l'intervallo tra i follow-up.",
+  "admin.pm.weeklyLimit": "Richieste a settimana",
+  "admin.pm.pendingLimit": "Richieste in attesa",
+  "admin.pm.cooldownDays": "Pausa follow-up (giorni)",
+  "admin.pm.saveCapacity": "Salva capacità",
+  "admin.pm.capacitySaved": "Capacità salvata",
+  "admin.pm.capacitySavedHelp": "Le nuove richieste seguono ora questi limiti.",
+  "admin.pm.markInvited": "Segna come invitato",
+  "admin.pm.targetRecorded": "Target di contatto registrato",
+  "admin.pm.targetRecordedHelp": "{name} è ora incluso nel denominatore di attivazione.",
+  "admin.pm.delivery.demo": "Invio demo in coda",
+  "admin.pm.delivery.queued": "Invio in coda",
+  "admin.pm.delivery.sent": "Consegnato",
+  "admin.pm.delivery.failed": "Invio non riuscito"
 }

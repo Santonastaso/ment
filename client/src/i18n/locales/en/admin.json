@@ -226,5 +226,20 @@
   "admin.pm.period": "Reporting period",
   "admin.pm.privacyHelp": "School reporting uses aggregate activity and never private conversation content.",
   "admin.pm.responseRate": "Survey response rate",
-  "admin.pm.schoolControls": "School reporting controls"
+  "admin.pm.schoolControls": "School reporting controls",
+  "admin.pm.capacityTitle": "Alumni request capacity",
+  "admin.pm.capacityHelp": "Set how many incoming requests an alumnus can receive and how quickly a follow-up can be requested.",
+  "admin.pm.weeklyLimit": "Requests per week",
+  "admin.pm.pendingLimit": "Pending requests",
+  "admin.pm.cooldownDays": "Follow-up cooldown (days)",
+  "admin.pm.saveCapacity": "Save capacity",
+  "admin.pm.capacitySaved": "Capacity saved",
+  "admin.pm.capacitySavedHelp": "New requests now follow these limits.",
+  "admin.pm.markInvited": "Mark invited",
+  "admin.pm.targetRecorded": "Outreach target recorded",
+  "admin.pm.targetRecordedHelp": "{name} is now included in the activation denominator.",
+  "admin.pm.delivery.demo": "Demo delivery queued",
+  "admin.pm.delivery.queued": "Delivery queued",
+  "admin.pm.delivery.sent": "Delivered",
+  "admin.pm.delivery.failed": "Delivery failed"
 }
