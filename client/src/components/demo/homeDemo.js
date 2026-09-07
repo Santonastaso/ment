@@ -1,4 +1,4 @@
-// Pure provider interface: no model calls, invented profiles, or profile writes.
+// Pure provider interface: no model calls or profile writes.
 export const normalize = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 const scenarios = {
   internship: ['internship', 'intern', 'placement', 'stage', 'tirocinio'],
@@ -39,18 +39,7 @@ export function suggestPeople({ question, scenario, people, userId }) {
     .sort((a, b) => b.relevance - a.relevance || String(a.person.id).localeCompare(String(b.person.id)))
     .slice(0, 3);
 }
-export async function loadDirectory(api) {
-  const people = [];
-  for (let offset = 0; ; offset += 50) {
-    const { data } = await api.get(`/directory?limit=50&offset=${offset}`);
-    if (!Array.isArray(data?.people)) throw new Error('Invalid directory response');
-    people.push(...data.people);
-    if (data.people.length < 50 || people.length >= data.total) return people;
-  }
-}
-
-// The chat presents Ment's existing ranked matches conversationally. We keep
-// demo copy deterministic, but eligibility and base ranking come from the API.
+// The chat presents Ment's existing ranked matches conversationally.
 export async function loadConversationCandidates(api) {
   const { data } = await api.get('/matches?role=mentor&limit=50&includeDirectory=1');
   return (data?.matches || []).map((match) => ({

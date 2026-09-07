@@ -14,7 +14,7 @@ function downloadTextFile(text, filename, type = 'text/csv') {
   a.href = url;
   a.download = filename;
   a.click();
-  URL.revokeObjectURL(url);
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function csvEscape(value) {
@@ -115,8 +115,13 @@ export default function AdminOps() {
   }
 
   async function copyOrgId(org) {
-    await navigator.clipboard?.writeText(org.organizationId || '');
-    setNotice({ variant: 'default', title: t('admin.notice.orgIdCopied'), message: org.organizationName });
+    try {
+      if (!navigator.clipboard) throw new Error('clipboard_unavailable');
+      await navigator.clipboard.writeText(org.organizationId || '');
+      setNotice({ variant: 'default', title: t('admin.notice.orgIdCopied'), message: org.organizationName });
+    } catch {
+      setNotice({ variant: 'destructive', title: t('admin.common.tryAgain'), message: t('admin.common.tryAgain') });
+    }
   }
 
   async function updateAccessRequestStatus(request, status) {

@@ -62,7 +62,7 @@ export default function HelpFeedbackModal({ onClose }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="help-modal-title"
-        className="bg-white rounded-2xl [box-shadow:var(--shadow-overlay)] w-full max-w-md flex flex-col"
+        className="card w-full max-w-md flex flex-col [box-shadow:var(--shadow-overlay)]"
       >
         <div className="p-6 border-b border-[var(--border-subtle)]">
           <div className="flex items-center justify-between gap-3">
@@ -129,7 +129,7 @@ export default function HelpFeedbackModal({ onClose }) {
               disabled={busy}
               placeholder={t('components.help.placeholder')}
               data-testid="help-message-input"
-              className="w-full rounded-lg border border-[var(--input)] bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+              className="input"
             />
             <p className="mt-1 text-[11px] text-muted-foreground">{message.length}/2000</p>
           </div>

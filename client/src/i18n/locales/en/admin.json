@@ -247,5 +247,5 @@
   "admin.pm.externalTargetCohort": "Cohort / term",
   "admin.pm.addExternalTarget": "Add invited target",
   "admin.pm.externalTargetRecordedHelp": "The email-only invitee is now included in activation reporting.",
-  "admin.pm.feedbackInbox": "This is the school's feedback inbox. Messages are retained here for the power user; external email delivery is not configured in this demo."
+  "admin.pm.feedbackInbox": "This is the school's feedback inbox. Messages are retained here for the power user to review."
 }

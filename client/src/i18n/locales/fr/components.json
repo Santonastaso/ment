@@ -102,7 +102,7 @@
   "components.reflection.save": "Save reflection",
   "components.reflection.addNow": "+ Add a reflection now",
   "components.reflection.loading": "Loading your log…",
-  "components.reflection.empty": "No entries yet. Your check-ins will live here, with the AI-extracted skill signals from each one.",
+  "components.reflection.empty": "No entries yet. Your check-ins will live here, with skill signals from each one.",
   "components.reflection.dismissSkill": "Dismiss {skill}",
   "components.reflection.appliedToSkills": "✓“ Applied to skills",
   "components.reflection.reclassifying": "Re-classifying…",

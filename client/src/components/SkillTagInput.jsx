@@ -32,10 +32,18 @@ export default function SkillTagInput({ value = [], onChange, placeholder, lang,
   const dialogRef = useModalA11y(openIdx !== null);
   const effectivePlaceholder = placeholder || t('components.skillTag.placeholder');
 
+  // Keep common labels from fragmenting one person's skill landscape.
+  const canonicalSkill = (raw) => {
+    const normalized = raw.trim().toLowerCase();
+    if (['communication', 'effective communication', 'communicating'].includes(normalized)) return 'communication';
+    if (['mentoring', 'mentorship'].includes(normalized)) return 'mentoring';
+    return normalized;
+  };
+
   async function addSkill(raw) {
     const skill = (raw || '').trim();
     if (!skill) return;
-    if (value.map((v) => v.toLowerCase()).includes(skill.toLowerCase())) return;
+    if (value.some((v) => canonicalSkill(v) === canonicalSkill(skill))) return;
     if (await commit([...value, skill])) setInput('');
   }
 

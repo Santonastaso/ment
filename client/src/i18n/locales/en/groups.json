@@ -2,7 +2,7 @@
   "groups.pageTitle": "Groups",
   "groups.pageDescription": "Create lightweight student groups for cohorts, interests, and campus clubs.",
   "groups.create.title": "Create a group",
-  "groups.create.description": "Groups are manual and cost-free: no AI matching runs when people join.",
+  "groups.create.description": "Bring people together around a shared cohort, interest, or campus activity.",
   "groups.create.name": "Group name",
   "groups.create.namePlaceholder": "e.g. MSc Finance 2027",
   "groups.create.descriptionLabel": "Description",
