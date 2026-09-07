@@ -81,9 +81,11 @@ jobs:
             echo "Skipping Supabase DB lint: set SUPABASE_DB_URL or SUPABASE_PROJECT_REF."
             exit 0
           fi
-          if [ -n "$SUPABASE_DB_URL" ]; then
-            supabase db lint --db-url "$SUPABASE_DB_URL" --fail-on error
-          else
+          # The project reference is maintained by Supabase and avoids a
+          # stale direct connection URL breaking CI after a password rotation.
+          if [ -n "$SUPABASE_PROJECT_REF" ]; then
             supabase link --project-ref "$SUPABASE_PROJECT_REF"
             supabase db lint --linked --fail-on error
+          else
+            supabase db lint --db-url "$SUPABASE_DB_URL" --fail-on error
           fi
