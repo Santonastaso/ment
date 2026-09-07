@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { ChevronRight, X } from 'lucide-react';
 import EscoSuggestInput from './EscoSuggestInput.jsx';
 import { Button } from './ui/button.jsx';
@@ -15,18 +15,32 @@ export default function SkillTagInput({ value = [], onChange, placeholder, lang,
   const [input, setInput] = useState('');
   const [openIdx, setOpenIdx] = useState(null);
   const inputRef = useRef(null);
+  const inputId = useId();
+  const busyRef = useRef(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  async function commit(next) {
+    if (busyRef.current) return false;
+    busyRef.current = true;
+    setBusy(true);
+    setError('');
+    try { await onChange(next); return true; }
+    catch { setError(t('profile.toast.skillSaveError')); return false; }
+    finally { busyRef.current = false; setBusy(false); }
+  }
   const dialogRef = useModalA11y(openIdx !== null);
   const effectivePlaceholder = placeholder || t('components.skillTag.placeholder');
 
-  function addSkill(raw) {
+  async function addSkill(raw) {
     const skill = (raw || '').trim();
     if (!skill) return;
     if (value.map((v) => v.toLowerCase()).includes(skill.toLowerCase())) return;
-    onChange([...value, skill]);
+    if (await commit([...value, skill])) setInput('');
   }
 
-  function removeSkill(idx) {
-    onChange(value.filter((_, i) => i !== idx));
+  async function removeSkill(idx) {
+    if (!await commit(value.filter((_, i) => i !== idx))) return;
     setOpenIdx(null);
   }
 
@@ -40,6 +54,8 @@ export default function SkillTagInput({ value = [], onChange, placeholder, lang,
 
   return (
     <div>
+      {error && <p role="alert" className="mb-2 text-sm text-destructive">{error}</p>}
+      <fieldset disabled={busy} className="min-w-0">
       {value.length > 0 && (
         <div className="divide-y divide-[var(--border-subtle)] border-b border-[var(--border-subtle)]">
           {value.map((skill, i) => (
@@ -57,20 +73,23 @@ export default function SkillTagInput({ value = [], onChange, placeholder, lang,
         </div>
       )}
 
-      <div className={value.length > 0 ? 'pt-1' : undefined}>
+      <label htmlFor={inputId} className="mt-3 mb-2 block text-sm font-semibold">{ariaLabel || t('components.skillTag.ariaAdd')}</label>
+      <div className="flex items-start gap-2">
         <EscoSuggestInput
           value={input}
           onChange={setInput}
           inputRef={inputRef}
+          inputId={inputId}
           onCommitEsco={(item) => addSkill(item.label)}
           onCommitCustom={(text) => addSkill(text)}
-          onBackspaceEmpty={() => value.length > 0 && onChange(value.slice(0, -1))}
-          placeholder={value.length === 0 ? effectivePlaceholder : ''}
-          inputClassName="w-full outline-none text-sm py-2 bg-transparent"
+          placeholder={effectivePlaceholder}
+          inputClassName="input w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-ring"
           lang={lang}
           ariaLabel={ariaLabel || t('components.skillTag.ariaAdd')}
         />
+        <Button type="button" variant="outline" disabled={!input.trim() || busy} onMouseDown={e => e.preventDefault()} onClick={() => addSkill(input)}>{t('components.skillTag.add')}</Button>
       </div>
+      </fieldset>
 
       {/* Popup — remove the skill. */}
       {openIdx !== null && (

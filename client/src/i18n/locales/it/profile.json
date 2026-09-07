@@ -108,5 +108,6 @@
   "profile.fields.cohortYear": "Anno di immatricolazione",
   "profile.fields.classOf": "Coorte {year}",
   "profile.persona.student": "Studente",
-  "profile.persona.alumnus": "Alumni"
+  "profile.persona.alumnus": "Alumni",
+  "profile.toast.skillSaveError": ""
 }

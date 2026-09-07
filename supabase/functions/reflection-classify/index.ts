@@ -1,191 +1,6 @@
-// Reflection classifier (Deno port of server/utils/reflectionClassifier.js).
-// Body: { reflection_log_id: number }
-// Reads the log, runs the same Claude+ESCO+heuristic pipeline, writes
-// extracted_gaps/extracted_strengths/esco_uris back. Returns the same shape
-// the legacy classifier returned.
-
-import {
-  corsHeaders,
-  jsonError,
-  jsonOk,
-  requireUser,
-} from '../_shared/index.ts';
-import {
-  escoExtract,
-  escoRelevantToInput,
-  isAcceptableCanonicalization,
-  isSubstantive,
-  meetsEscoSimilarity,
-  normalizeLang,
-} from '../_shared/esco.ts';
-
-const CURATED = [
-  'leadership','mentoring','communication','presentation skills','time management','public speaking',
-  'data analysis','strategic thinking','negotiation','project management','program management','Power BI',
-  'React','TypeScript','JavaScript','Python','SQL','system design','code review','testing strategy',
-  'API design','observability','DevOps','Docker','Kubernetes',
-  'budgeting','forecasting','financial modeling','financial analysis','Excel','compliance','risk management',
-  'SEO','content strategy','copywriting','analytics','growth marketing','social media','brand storytelling',
-  'process optimization','vendor management','supply chain','procurement','operations analytics','change management',
-  'product strategy','user research','UX research','roadmapping','prioritization','PRD writing','stakeholder management',
-  'design systems','prototyping','usability testing','accessibility',
-  'recruiting','interviewing','people management','coaching','performance management','onboarding','DEI',
-  'contract drafting','privacy','legal research',
-  'discovery calls','pipeline management','enterprise sales','SaaS sales','solution selling',
-  'customer health','renewal strategy','expansion','escalation management',
-];
-
-const ALIASES: { phrase: string; canonical: string }[] = [
-  { phrase: 'project management', canonical: 'project management' },
-  { phrase: 'project manager', canonical: 'project management' },
-  { phrase: 'project planning', canonical: 'project management' },
-  { phrase: 'program management', canonical: 'program management' },
-  { phrase: 'stakeholder management', canonical: 'stakeholder management' },
-  { phrase: 'stakeholder communication', canonical: 'stakeholder management' },
-  { phrase: 'stakeholder comms', canonical: 'stakeholder management' },
-  { phrase: 'data analysis', canonical: 'data analysis' },
-  { phrase: 'data analytics', canonical: 'data analysis' },
-  { phrase: 'power bi', canonical: 'Power BI' },
-  { phrase: 'powerbi', canonical: 'Power BI' },
-  { phrase: 'communication', canonical: 'communication' },
-  { phrase: 'leadership', canonical: 'leadership' },
-  { phrase: 'financial modeling', canonical: 'financial modeling' },
-  { phrase: 'financial modelling', canonical: 'financial modeling' },
-  { phrase: 'change management', canonical: 'change management' },
-];
-
-function escapeRe(s: string) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function heuristicMatch(text: string): string[] {
-  if (!text || !text.trim()) return [];
-  const candidates = [
-    ...CURATED.map((skill) => ({ phrase: skill, canonical: skill })),
-    ...ALIASES,
-  ];
-  const sorted = candidates.sort((a, b) => b.phrase.length - a.phrase.length);
-  const lc = text.toLowerCase();
-  const consumed = Array.from(lc, () => false);
-  const out: string[] = [];
-  const seen = new Set<string>();
-  for (const { phrase, canonical } of sorted) {
-    if (seen.has(canonical.toLowerCase())) continue;
-    const pattern = phrase.toLowerCase().split(/\s+/).map(escapeRe).join('\\s+');
-    const re = new RegExp(`\\b${pattern}\\b`, 'g');
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(lc)) !== null) {
-      const overlaps = consumed.slice(m.index, m.index + m[0].length).some(Boolean);
-      if (!overlaps) {
-        out.push(canonical);
-        seen.add(canonical.toLowerCase());
-        for (let i = m.index; i < m.index + m[0].length; i++) consumed[i] = true;
-        break;
-      }
-    }
-  }
-  return out.slice(0, 6);
-}
-
-async function claudeExtractCandidates(supportNeeded: string, managedWell: string) {
-  if (Deno.env.get('AI_CLASSIFICATION_ENABLED') !== 'true') return null;
-  const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
-  if (!apiKey) return null;
-
-  const systemPrompt =
-    'You read short employee weekly check-ins and extract skill phrases.\n' +
-    'Output ONLY a JSON object with two arrays:\n' +
-    '  {"gaps": string[], "strengths": string[]}\n' +
-    'gaps = skills the person felt they needed support on this week (max 5).\n' +
-    'strengths = skills they felt they handled well this week (max 5).\n' +
-    'Each entry should be a short, standardized professional skill phrase ' +
-    '(e.g. "stakeholder management", "React", "financial modeling"). Return [] if nothing relevant.';
-
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5',
-        max_tokens: 300,
-        system: systemPrompt,
-        messages: [{
-          role: 'user',
-          content: 'Support needed:\n' + (supportNeeded || '(none)') +
-                   '\n\nManaged well:\n' + (managedWell || '(none)'),
-        }],
-      }),
-      signal: AbortSignal.timeout(15000),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const text: string = data?.content?.[0]?.text ?? '';
-    const match = text.match(/\{[\s\S]*\}/);
-    if (!match) return null;
-    const parsed = JSON.parse(match[0]);
-    return {
-      gaps: Array.isArray(parsed?.gaps) ? parsed.gaps.filter((x: unknown) => typeof x === 'string').slice(0, 5) : [],
-      strengths: Array.isArray(parsed?.strengths) ? parsed.strengths.filter((x: unknown) => typeof x === 'string').slice(0, 5) : [],
-    };
-  } catch {
-    return null;
-  }
-}
-
-async function canonicalizeViaEsco(phrase: string, contextText: string, lang: string) {
-  const r = await escoExtract(phrase, lang);
-  for (const candidate of r ?? []) {
-    if (isAcceptableCanonicalization(phrase, candidate.label) &&
-        escoRelevantToInput(candidate.label, contextText + ' ' + phrase) &&
-        meetsEscoSimilarity(phrase, candidate.label)) {
-      return candidate;
-    }
-  }
-  return { label: phrase, uri: '' };
-}
-
-async function classifyOneText(text: string, lang: string) {
-  const heuristicHits = heuristicMatch(text);
-
-  if (heuristicHits.length > 0) {
-    const enriched = await Promise.all(
-      heuristicHits.map(async (phrase) => {
-        const r = await escoExtract(phrase, lang);
-        for (const candidate of r ?? []) {
-          if (isAcceptableCanonicalization(phrase, candidate.label) &&
-              meetsEscoSimilarity(phrase, candidate.label)) return candidate;
-        }
-        return { label: phrase, uri: '' };
-      }),
-    );
-    return { pairs: enriched.slice(0, 5), usedEsco: enriched.some((p) => p.uri), usedHeuristic: true };
-  }
-
-  if (!isSubstantive(text)) return { pairs: [] as { label: string; uri: string }[], usedEsco: false, usedHeuristic: false };
-
-  const escoHits = await escoExtract(text, lang);
-  if (Array.isArray(escoHits) && escoHits.length > 0) {
-    const relevant = escoHits.filter((h) => escoRelevantToInput(h.label, text));
-    if (relevant.length > 0) return { pairs: relevant.slice(0, 5), usedEsco: true, usedHeuristic: false };
-  }
-  return { pairs: [], usedEsco: false, usedHeuristic: false };
-}
-
-function dedupe(pairs: { label: string; uri: string }[]) {
-  const seen = new Set<string>();
-  const out: { label: string; uri: string }[] = [];
-  for (const p of pairs) {
-    const key = (p.label || '').toLowerCase().trim();
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    out.push(p);
-  }
-  return out;
-}
+// Persist deterministic demo suggestions; applying them remains a user action.
+import { corsHeaders, jsonError, jsonOk, requireUser } from '../_shared/index.ts';
+import { demoReflection } from '../_shared/demo.ts';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -196,10 +11,9 @@ Deno.serve(async (req) => {
 
   const body = await req.json().catch(() => ({}));
   const reflectionId = Number(body.reflection_log_id);
-  if (!Number.isFinite(reflectionId)) return jsonError('reflection_log_id_required');
-  // Caller may pass `lang` to request multi-language ESCO lookups. Anything
-  // unrecognised falls back to English via the shared allow-list.
-  const lang = normalizeLang(body.lang);
+  if (!Number.isSafeInteger(reflectionId) || reflectionId <= 0) {
+    return jsonError('reflection_log_id_required');
+  }
 
   const { data: log, error } = await ctx.sb
     .from('reflection_logs')
@@ -207,58 +21,23 @@ Deno.serve(async (req) => {
     .eq('id', reflectionId)
     .eq('user_id', ctx.user.id)
     .single();
-  if (error || !log) return jsonError('not_found', 404);
-
-  const supportNeeded = log.support_needed ?? '';
-  const managedWell = log.managed_well ?? '';
-
-  // Path A: Claude + ESCO
-  const claude = await claudeExtractCandidates(supportNeeded, managedWell);
-  let gapPairs: { label: string; uri: string }[];
-  let strengthPairs: { label: string; uri: string }[];
-  let source: string;
-
-  if (claude) {
-    gapPairs = await Promise.all(claude.gaps.map((p) => canonicalizeViaEsco(p, supportNeeded, lang)));
-    strengthPairs = await Promise.all(claude.strengths.map((p) => canonicalizeViaEsco(p, managedWell, lang)));
-    // Align with Path B: when Claude found nothing actionable, surface the
-    // "unclassified" sentinel so the retry loop and Re-run UI can react.
-    source = (gapPairs.length + strengthPairs.length) > 0
-      ? 'claude-haiku-4-5+esco'
-      : 'unclassified';
-  } else {
-    // Path B: heuristic / ESCO direct per text
-    const [g, s] = await Promise.all([classifyOneText(supportNeeded, lang), classifyOneText(managedWell, lang)]);
-    gapPairs = g.pairs;
-    strengthPairs = s.pairs;
-    const usedEsco = g.usedEsco || s.usedEsco;
-    const usedHeuristic = g.usedHeuristic || s.usedHeuristic;
-    source = usedEsco && usedHeuristic ? 'esco+heuristic'
-           : usedEsco ? 'esco'
-           : usedHeuristic ? 'heuristic'
-           : 'unclassified';
+  if (error) {
+    return error.code === 'PGRST116'
+      ? jsonError('not_found', 404)
+      : jsonError(`read_failed: ${error.message}`, 500);
   }
+  if (!log) return jsonError('not_found', 404);
 
-  const gaps = dedupe(gapPairs);
-  const strengths = dedupe(strengthPairs);
-  const uris: Record<string, string> = {};
-  for (const p of [...gaps, ...strengths]) if (p.uri) uris[p.label] = p.uri;
-
-  await ctx.sb
+  const result = demoReflection(log.support_needed ?? '', log.managed_well ?? '');
+  const { data: saved, error: updateError } = await ctx.sb
     .from('reflection_logs')
-    .update({
-      extracted_gaps: gaps.map((p) => p.label),
-      extracted_strengths: strengths.map((p) => p.label),
-      esco_uris: uris,
-      classifier_source: source,
-    })
-    .eq('id', reflectionId);
+    .update(result)
+    .eq('id', reflectionId)
+    .eq('user_id', ctx.user.id)
+    .select('id')
+    .single();
+  if (updateError) return jsonError(`update_failed: ${updateError.message}`, 500);
+  if (!saved) return jsonError('not_found', 404);
 
-  return jsonOk({
-    id: reflectionId,
-    extracted_gaps: gaps.map((p) => p.label),
-    extracted_strengths: strengths.map((p) => p.label),
-    esco_uris: uris,
-    classifier_source: source,
-  });
+  return jsonOk({ id: reflectionId, ...result });
 });

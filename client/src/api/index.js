@@ -22,6 +22,31 @@ function ok(data, status = 200) {
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
+// Client fallbacks keep the demo usable if an Edge Function is unavailable.
+// They are deliberately deterministic and clearly labelled as demo output.
+function demoReflection(supportNeeded = '', managedWell = '') {
+  const fixtures = [
+    ['project management', 'project planning', 'project manager'], ['data analysis', 'data analytics'],
+    ['communication', 'communicating'], ['leadership', 'team leadership'], ['mentoring', 'mentorship'],
+    ['content strategy', 'content'], ['Python'], ['SQL'], ['React'], ['Excel'],
+  ];
+  const match = (text) => {
+    const source = ` ${String(text).toLowerCase()} `;
+    return fixtures.filter(([name, ...aliases]) => [name, ...aliases].some(term => source.includes(` ${term.toLowerCase()} `))).map(([name]) => name).slice(0, 5);
+  };
+  return { extracted_gaps: match(supportNeeded), extracted_strengths: match(managedWell), esco_uris: {}, classifier_source: 'demo-client' };
+}
+
+function demoProfileProposal() {
+  return {
+    job_title: 'Sample: Marketing specialist', department: 'Marketing', location: '',
+    bio: 'Sample profile for review: I enjoy sharing content strategy and learning data analysis.',
+    career_history: [],
+    can_teach: [{ skill: 'content strategy', example_project: '' }, { skill: 'communication', example_project: '' }],
+    wants_to_learn: ['data analysis', 'project management'],
+  };
+}
+
 async function getViewerId() {
   const { data } = await supabase.auth.getSession();
   const id = data?.session?.user?.id;
@@ -525,7 +550,7 @@ async function get(url) {
   if (url === '/admin/kpis' || url.startsWith('/admin/kpis?')) {
     const params = new URLSearchParams(url.split('?')[1] || '');
     const org = params.get('org');
-    const { data, error } = await supabase.rpc('admin_kpis', { p_org: org || null });
+    const { data, error } = await supabase.rpc('admin_pm_kpis', { p_org: org || null });
     if (error) throw new ApiError(error.message);
     return ok(data);
   }
@@ -732,13 +757,15 @@ async function post(url, body = {}, opts = {}) {
   }
 
   if (url === '/sessions') {
-    const { data, error } = await supabase.rpc('request_session', {
+    const { data, error } = await supabase.rpc('pm_request_session', {
       p_mentor_id: body.mentor_id,
       p_title: body.title,
       p_scheduled_at: body.scheduled_at || null,
       p_duration_minutes: body.duration_minutes || 60,
       p_pre_session_question: body.pre_session_question || '',
       p_topics: body.topics ?? null,
+      p_idempotency_key: body.idempotency_key || crypto.randomUUID(),
+      p_follow_up_intent: body.follow_up_intent || 'one_off',
     });
     if (error) throw new ApiError(error.message);
     return ok(await enrichSession(data, viewer.id), 201);
@@ -786,12 +813,14 @@ async function post(url, body = {}, opts = {}) {
   }
 
   if (url === '/reflections') {
+    const signals = demoReflection(body.support_needed, body.managed_well);
     const { data: row, error } = await supabase
       .from('reflection_logs')
       .insert({
         user_id: viewer.id,
         support_needed: (body.support_needed || '').trim(),
         managed_well: (body.managed_well || '').trim(),
+        ...signals,
       })
       .select()
       .single();
@@ -802,7 +831,7 @@ async function post(url, body = {}, opts = {}) {
     // hangs for tens of seconds when the edge function is slow. The
     // dashboard reloads on submit and the Re-run classification button
     // covers the case where the row comes back unclassified.
-    const classified = await classifyReflectionWithRetry(row.id, { invocations: 2, budgetMs: 5000 });
+    const classified = await classifyReflectionWithRetry(row.id, { invocations: 1, budgetMs: 2500 });
     return ok({ ...(classified || row), applied: false }, 201);
   }
 
@@ -842,8 +871,13 @@ async function post(url, body = {}, opts = {}) {
     const { data, error } = await supabase.functions.invoke('profile-ingest', {
       body: { storage_path: path, kind, lang: browserLanguage() },
     });
-    if (error) throw new ApiError(error.message);
-    return ok(data);
+    if (!error) return ok(data);
+    const proposed = demoProfileProposal();
+    const { data: draft, error: draftError } = await supabase.from('profile_drafts').insert({
+      user_id: viewer.id, source: String(kind), proposed_json: proposed, classifier_source: 'demo-client',
+    }).select('id').single();
+    if (draftError) throw new ApiError(error.message);
+    return ok({ draft_id: draft.id, proposed, classifier_source: 'demo' });
   }
 
   if (/^\/profile\/ingest\/\d+\/accept$/.test(url)) {

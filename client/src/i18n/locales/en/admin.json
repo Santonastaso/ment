@@ -210,5 +210,21 @@
   "admin.privacy.requestTierChangeNoteHint": "Optional, but a short note speeds up review.",
   "admin.privacy.requestTierChangeSubmit": "Submit request",
   "admin.privacy.requestTierChangeSent": "Request sent — the platform owners will be in touch.",
-  "admin.privacy.requestTierChangeError": "Could not send the request. Please try again."
+  "admin.privacy.requestTierChangeError": "Could not send the request. Please try again.",
+  "admin.pm.asOf": "As of",
+  "admin.pm.auditFilter": "Filter loaded events by actor or action",
+  "admin.pm.auditHelp": "Each event records who acted and when. Export includes the full audit history.",
+  "admin.pm.cohort": "Cohort / term",
+  "admin.pm.consent": "Consent and data handling",
+  "admin.pm.consentHelp": "Private conversations and reflections are not used in school reporting.",
+  "admin.pm.definition": "Definition and evidence",
+  "admin.pm.denominator": "Denominator",
+  "admin.pm.export": "Export KPI definitions and values",
+  "admin.pm.loadFailed": "Could not load this data. Please retry.",
+  "admin.pm.noData": "No data",
+  "admin.pm.numerator": "Numerator",
+  "admin.pm.period": "Reporting period",
+  "admin.pm.privacyHelp": "School reporting uses aggregate activity and never private conversation content.",
+  "admin.pm.responseRate": "Survey response rate",
+  "admin.pm.schoolControls": "School reporting controls"
 }

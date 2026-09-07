@@ -285,5 +285,20 @@
   "components.monthYear.month12": "Dec",
   "components.monthYear.monthLabel": "Month",
   "components.monthYear.yearLabel": "Year",
-  "components.esco.searching": "Searching ESCO…"
+  "components.esco.searching": "Searching ESCO…",
+  "components.reflection.errorLoad": "",
+  "components.reflection.refreshError": "",
+  "components.reflection.reviewSuggestions": "",
+  "components.reflection.demoLabel": "",
+  "components.skillTag.add": "",
+  "components.teachSkills.giveExample": "",
+  "components.teachSkills.exampleInstruction": "",
+  "components.teachSkills.legacyExample": "",
+  "components.skillLandscape.emptyList": "",
+  "components.reflection.demo.errorDelete": "",
+  "components.reflection.demo.errorLoad": "",
+  "components.reflection.demo.label": "",
+  "components.reflection.demo.notice": "",
+  "components.reflection.demo.suggestions": "",
+  "components.skillLandscape.showAll": ""
 }

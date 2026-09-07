@@ -108,5 +108,6 @@
   "profile.fields.cohortYear": "Class of",
   "profile.fields.classOf": "Class of {year}",
   "profile.persona.student": "Student",
-  "profile.persona.alumnus": "Alumnus"
+  "profile.persona.alumnus": "Alumnus",
+  "profile.toast.skillSaveError": "Could not save your skills. Please try again."
 }

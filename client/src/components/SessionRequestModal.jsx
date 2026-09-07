@@ -1,21 +1,40 @@
 ﻿import React, { useMemo, useState } from 'react';
 import api from '../api/index.js';
+import { useRef } from 'react';
+import { createDraft } from './demo/homeDemo.js';
+import { homeCopy } from './demo/homeCopy.js';
 import { useT } from '../i18n/index.jsx';
 import { Button } from './ui/button.jsx';
 
 const TOTAL_STEPS = 4;
 
-export default function SessionRequestModal({ mentor, onClose, onSuccess }) {
-  const { t } = useT();
+export default function SessionRequestModal({ mentor, onClose, onSuccess, initialQuestion = '', initialIntent = 'one_off' }) {
+  const { t, lang } = useT();
+  const copy = homeCopy(lang);
   const [step, setStep] = useState(1);
   const [selectedTopics, setSelectedTopics] = useState([]);
-  const [question, setQuestion] = useState('');
+  const [question, setQuestion] = useState(initialQuestion);
+  const [intent, setIntent] = useState(initialIntent === 'ongoing' ? 'ongoing' : 'one_off');
+  const [draft, setDraft] = useState('');
+  const [draftEdited, setDraftEdited] = useState(false);
+  const [requestTitle, setRequestTitle] = useState(initialQuestion.slice(0, 80));
+  const idempotencyKey = useRef(crypto.randomUUID());
+  const submitLock = useRef(false);
+  const submittedPayload = useRef(null);
   const [scheduledAt, setScheduledAt] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
   // Min datetime: 1 hour from now
-  const minDateTime = new Date(Date.now() + 60 * 60 * 1000).toISOString().slice(0, 16);
+  const minDate = new Date(Date.now() + 60 * 60 * 1000);
+  const minDateTime = new Date(minDate.getTime() - minDate.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+
+  function reviewDraft() {
+    if (scheduledAt && new Date(scheduledAt).getTime() < Date.now() + 60 * 60 * 1000) { setError(t('components.sessionRequest.step3Label')); return; }
+    if (!draftEdited) setDraft(createDraft({ name: mentor.name, question, intent, when: scheduledAt ? new Date(scheduledAt).toLocaleString(lang) : '', copy }));
+    if (!requestTitle.trim()) setRequestTitle(question.trim().slice(0, 80));
+    setError(''); setStep(4);
+  }
 
   // Mentor's can_teach skills come through with the user payload from /matches
   // and from peer profile fetches. We dedupe and filter to can_teach.
@@ -39,25 +58,35 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess }) {
   }
 
   async function handleSubmit() {
+    if (step !== 4 || submitLock.current) return;
+    if (!draft.trim() || !requestTitle.trim()) { setError(copy.emptyDraft); return; }
     if (!question.trim()) {
       setError(t('components.sessionRequest.errorFocusQuestion'));
       setStep(2);
       return;
     }
+    submitLock.current = true;
     setSubmitting(true);
     setError('');
     try {
-      await api.post('/sessions', {
+      const payload = {
         mentor_id: mentor.id,
-        title: `Session with ${mentor.name}`,
-        scheduled_at: scheduledAt || null,
+        title: requestTitle.trim(),
+        scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
         pre_session_question: question.trim(),
+        message: draft.trim(),
+        follow_up_intent: intent,
+        idempotency_key: idempotencyKey.current,
         duration_minutes: 60,
         topics: selectedTopics,
-      });
+      };
+      submittedPayload.current ||= payload;
+      await api.post('/sessions', submittedPayload.current);
       onSuccess?.();
     } catch (e) {
       setError(e.response?.data?.error || t('components.sessionRequest.errorGeneric'));
+      if (e.response?.status >= 400 && e.response?.status < 500) submittedPayload.current = null;
+      submitLock.current = false;
     } finally {
       setSubmitting(false);
     }
@@ -69,7 +98,7 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess }) {
         <div className="p-6 border-b border-[var(--border-subtle)] flex-shrink-0">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-foreground">{t('components.sessionRequest.title')}</h2>
-            <button onClick={onClose} className="text-muted-foreground hover:text-secondary-foreground text-2xl leading-none">&times;</button>
+            <button disabled={submitting} aria-label={copy.close} onClick={onClose} className="text-muted-foreground hover:text-secondary-foreground text-2xl leading-none">&times;</button>
           </div>
           <p className="text-sm text-muted-foreground mt-1">{t('components.sessionRequest.subtitle', { name: mentor.name, department: mentor.department })}</p>
         </div>
@@ -110,7 +139,7 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess }) {
                             : 'bg-card text-foreground border-border hover:bg-muted'
                         }`}
                       >
-                        {active && <span className="mr-1.5">✓“</span>}
+                        {active && <span className="mr-1.5" aria-hidden="true">+</span>}
                         {skill}
                       </button>
                     );
@@ -136,13 +165,15 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess }) {
               <textarea
                 className="input resize-none"
                 rows={5}
-                maxLength={200}
+                maxLength={4000}
+                aria-label={t('components.sessionRequest.step2Label')}
                 value={question}
                 onChange={e => setQuestion(e.target.value)}
                 placeholder={t('components.sessionRequest.step2Placeholder')}
                 autoFocus
               />
-              <div className="text-right text-xs text-muted-foreground mt-1">{question.length}/200</div>
+              <div className="text-right text-xs text-muted-foreground mt-1">{question.length}/4000</div>
+              <label className="mt-3 block text-sm">{copy.intent}<select className="input mt-1" value={intent} onChange={e => setIntent(e.target.value)}><option value="one_off">{copy.oneOff}</option><option value="ongoing">{copy.ongoing}</option></select></label>
               {selectedTopics.length > 0 && (
                 <div className="mt-3 rounded-lg border border-[var(--border)] bg-muted/40 p-3">
                   <p className="text-[11px] uppercase tracking-wide text-foreground font-medium mb-1">{t('components.sessionRequest.step2TopicsPicked')}</p>
@@ -164,6 +195,7 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess }) {
               <label className="label">{t('components.sessionRequest.step3Label')} <span className="text-muted-foreground font-normal">{t('components.sessionRequest.step3Optional')}</span></label>
               <input
                 type="datetime-local"
+                aria-label={t('components.sessionRequest.step3Label')}
                 className="input"
                 value={scheduledAt}
                 min={minDateTime}
@@ -175,6 +207,11 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess }) {
           {step === 4 && (
             <div className="space-y-4 rounded-lg border border-border bg-muted/40 p-4 text-sm">
               <p className="font-medium text-foreground">{t('components.sessionRequest.reviewTitle')}</p>
+              <p><span className="font-medium">{copy.recipient}:</span> {mentor.name}</p>
+              <p className="text-xs text-muted-foreground">{copy.draft}</p>
+              <label className="block">{t('components.sessionRequest.title')}<input className="input mt-1" value={requestTitle} maxLength={120} disabled={submitting || !!submittedPayload.current} onChange={e => setRequestTitle(e.target.value)} /></label>
+              <label className="block">{copy.message}<textarea className="input mt-1 min-h-48" value={draft} maxLength={6000} disabled={submitting || !!submittedPayload.current} onChange={e => { setDraft(e.target.value); setDraftEdited(true); }} /></label>
+              <p>{intent === 'ongoing' ? copy.ongoing : copy.oneOff}</p>
               <div><span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('components.sessionRequest.reviewQuestion')}</span><p className="mt-1 text-foreground">{question}</p></div>
               {selectedTopics.length > 0 && <div><span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('components.sessionRequest.reviewTopics')}</span><p className="mt-1 text-foreground">{selectedTopics.join(', ')}</p></div>}
               <div><span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('components.sessionRequest.reviewWhen')}</span><p className="mt-1 text-foreground">{scheduledAt ? new Date(scheduledAt).toLocaleString() : t('components.sessionRequest.reviewNoTime')}</p></div>
@@ -182,7 +219,7 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess }) {
             </div>
           )}
 
-          {error && <p className="text-red-600 text-sm">{error}</p>}
+          {error && <div role="alert" className="text-red-600 text-sm">{error}<a className="mt-2 block underline" href="/explorer?mode=directory">{copy.browse}</a></div>}
         </div>
 
         <div className="px-6 pb-6 flex justify-between gap-3 flex-shrink-0">
@@ -207,12 +244,12 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess }) {
           {step === 3 && (
             <>
               <Button onClick={() => { setStep(2); setError(''); }} variant="outline">{t('components.sessionRequest.back')}</Button>
-              <Button onClick={() => setStep(4)}>{t('components.sessionRequest.review')}</Button>
+              <Button onClick={reviewDraft}>{t('components.sessionRequest.review')}</Button>
             </>
           )}
           {step === 4 && (
             <>
-              <Button onClick={() => { setStep(3); setError(''); }} variant="outline">{t('components.sessionRequest.back')}</Button>
+              <Button disabled={submitting || !!submittedPayload.current} onClick={() => { setStep(3); setError(''); }} variant="outline">{t('components.sessionRequest.back')}</Button>
               <Button onClick={handleSubmit} disabled={submitting}>{submitting ? t('components.sessionRequest.sending') : t('components.sessionRequest.confirm')}</Button>
             </>
           )}

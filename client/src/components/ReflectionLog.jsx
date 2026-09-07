@@ -5,9 +5,7 @@ import { useT } from '../i18n/index.jsx';
 import { Button } from './ui/button.jsx';
 import { useModalA11y } from '../lib/useModalA11y.js';
 
-// Reflection log: weekly two-question check-in. Answers are classified by an AI
-// (or heuristic fallback) into skill gaps and strengths, which the user can apply
-// to their profile so matching improves over time.
+// Demo synonym fixtures suggest skills; users explicitly apply them to their profile.
 
 const PROMPTS = [
   { key: 'support_needed', labelKey: 'components.reflection.promptSupportNeeded' },
@@ -58,6 +56,8 @@ export default function ReflectionLog({
       setEntries(res.data.entries || []);
       setDueForCheckIn(!!res.data.dueForCheckIn);
       setLastEntryDays(res.data.lastEntryDays);
+    } catch (e) {
+      setError(e.response?.data?.error || t('components.reflection.demo.errorLoad'));
     } finally {
       setLoading(false);
     }
@@ -112,16 +112,20 @@ export default function ReflectionLog({
       setTimeout(() => setToast(''), 3000);
       onSkillsApplied?.();
       await load();
-    } catch {
-      setError(t('components.reflection.errorApply'));
+    } catch (e) {
+      setError(e.response?.data?.error || t('components.reflection.errorApply'));
     }
   }
 
   async function handleDelete(entry) {
     if (!confirm(t('components.reflection.confirmDelete'))) return;
-    await api.delete(`/reflections/${entry.id}`);
-    if (latestEntryId === entry.id) setLatestEntryId(null);
-    await load();
+    try {
+      await api.delete(`/reflections/${entry.id}`);
+      if (latestEntryId === entry.id) setLatestEntryId(null);
+      await load();
+    } catch (e) {
+      setError(e.response?.data?.error || t('components.reflection.demo.errorDelete'));
+    }
   }
 
   async function handleReclassify(entry) {
@@ -167,6 +171,10 @@ export default function ReflectionLog({
 
   return (
     <div className="space-y-4">
+      <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="note">
+        {t('components.reflection.demo.notice')}
+      </p>
+      {error && <p role="alert" className="text-rose-600 text-sm">{error}</p>}
       {toast && (
         <div className="border border-[var(--border)] text-foreground text-sm rounded-lg px-3 py-2 bg-muted/40">
           {toast}
@@ -209,7 +217,6 @@ export default function ReflectionLog({
               />
             </div>
           ))}
-          {error && <p className="text-rose-600 text-sm">{error}</p>}
           <div className="flex justify-end gap-2">
             <Button onClick={() => { setShowForm(false); setError(''); }} variant="ghost" size="sm">{t('components.reflection.cancel')}</Button>
             <Button onClick={handleSubmit} disabled={submitting} size="sm">
@@ -338,6 +345,7 @@ function Entry({ entry, onApply, onDelete, onReclassify, timeAgo }) {
         >
           <span className="text-sm font-medium text-foreground">{timeAgo(entry.created_at)}</span>
           <span className="flex shrink-0 items-center gap-2.5 text-xs text-muted-foreground">
+            {rawSource === 'demo' && <span>{t('components.reflection.demo.label')}</span>}
             {entry.applied && <span>{t('components.reflection.appliedToSkills')}</span>}
             <ChevronRight className="size-3.5" aria-hidden="true" />
           </span>
@@ -376,6 +384,9 @@ function Entry({ entry, onApply, onDelete, onReclassify, timeAgo }) {
             </div>
 
             <div className="flex-1 space-y-4 overflow-y-auto p-5">
+              {rawSource === 'demo' && (
+                <p className="text-sm text-muted-foreground">{t('components.reflection.demo.suggestions')}</p>
+              )}
               {entry.support_needed && (
                 <div>
                   <p className="label-meta">{t('components.reflection.neededSupport')}</p>
@@ -391,19 +402,19 @@ function Entry({ entry, onApply, onDelete, onReclassify, timeAgo }) {
 
               {(totalKept > 0 || totalDismissed > 0) && !entry.applied ? (
                 <div className="space-y-2">
-                  <div className="flex flex-wrap gap-1.5">
-                    {[...keptGaps, ...keptStrengths].map((s, i) => (
-                      <SuggestionChip
-                        key={`${s}-${i}`}
-                        skill={s}
-                        onDismiss={
-                          allGaps.includes(s)
-                            ? () => dismiss(dismissedGaps, setDismissedGaps, s)
-                            : () => dismiss(dismissedStrengths, setDismissedStrengths, s)
-                        }
-                      />
-                    ))}
-                  </div>
+                  {[
+                    { label: 'onboarding.teach.title', skills: keptStrengths, dismissed: dismissedStrengths, setter: setDismissedStrengths },
+                    { label: 'onboarding.learn.title', skills: keptGaps, dismissed: dismissedGaps, setter: setDismissedGaps },
+                  ].map(group => group.skills.length > 0 && (
+                    <div key={group.label}>
+                      <p className="mb-1 text-sm font-semibold">{t(group.label)}</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {group.skills.map(skill => (
+                          <SuggestionChip key={skill} skill={skill} onDismiss={() => dismiss(group.dismissed, group.setter, skill)} />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                   <div className="flex items-center gap-3">
                     {totalDismissed > 0 && (
                       <button
@@ -427,7 +438,7 @@ function Entry({ entry, onApply, onDelete, onReclassify, timeAgo }) {
                 </div>
               ) : (
                 !hasSuggestions && (
-                  <p className="text-xs text-muted-foreground">{t('components.reflection.noSignals')}</p>
+                  <p className="text-xs text-muted-foreground">{t(rawSource === 'demo' ? 'components.reflection.demo.noSignals' : 'components.reflection.noSignals')}</p>
                 )
               )}
             </div>

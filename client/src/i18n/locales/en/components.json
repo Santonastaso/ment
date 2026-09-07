@@ -117,6 +117,15 @@
   "components.reflection.restoreDismissed": "Restore {count} dismissed",
   "components.reflection.applyToLandscape": "Add {count} to my skills",
   "components.reflection.noSignals": "No skill suggestions.",
+  "components.reflection.errorLoad": "Could not load your reflections.",
+  "components.reflection.refreshError": "Saved, but your profile could not refresh.",
+  "components.reflection.reviewSuggestions": "Review suggestions",
+  "components.reflection.demoLabel": "Demo suggestions based on your reflection.",
+  "components.reflection.demo.errorDelete": "Could not delete this reflection.",
+  "components.reflection.demo.errorLoad": "Could not load your reflections.",
+  "components.reflection.demo.label": "Demo suggestions",
+  "components.reflection.demo.notice": "Suggestions are editable before they affect your profile.",
+  "components.reflection.demo.suggestions": "Suggested skills",
 
   "components.pastMeetings.loading": "Loading past meetings…",
   "components.pastMeetings.empty": "No completed meetings yet. Once you finish a session and mark it complete, it'll show up here.",
@@ -224,6 +233,7 @@
   "components.skillTag.placeholder": "Type a skill and press Enter",
   "components.skillTag.remove": "Remove {skill}",
   "components.skillTag.ariaAdd": "Add skill",
+  "components.skillTag.add": "Add",
 
   "components.teachSkills.placeholder": "e.g. system design, financial modeling…",
   "components.teachSkills.addAnother": "Add another skill — Enter to confirm",
@@ -233,6 +243,9 @@
   "components.teachSkills.editExample": "Click to add or edit the example project",
   "components.teachSkills.remove": "Remove {skill}",
   "components.teachSkills.ariaAdd": "Add skill you can teach",
+  "components.teachSkills.giveExample": "Add an example",
+  "components.teachSkills.exampleInstruction": "Use a concrete result or project. Maximum 80 characters.",
+  "components.teachSkills.legacyExample": "Example",
 
   "components.skillLandscape.tierUntapped": "Untapped",
   "components.skillLandscape.tierActive": "Active",
@@ -264,6 +277,8 @@
   "components.skillLandscape.exampleLabel": "Example",
   "components.skillLandscape.emptyOwn": "Add some skills below to see your landscape.",
   "components.skillLandscape.emptyOther": "No skills listed yet.",
+  "components.skillLandscape.emptyList": "Nothing to show yet.",
+  "components.skillLandscape.showAll": "Show all",
   "components.skillLandscape.removeSkill": "Remove {skill}",
   "components.skillLandscape.removeThis": "Remove this skill",
 

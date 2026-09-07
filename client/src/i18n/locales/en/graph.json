@@ -37,4 +37,10 @@
   "graph.view.realLinks": "Real connections",
   "graph.svgAria": "Program knowledge graph",
   "graph.hoverHint": "Drag to pan, scroll to zoom, drag a node to reposition it. Hover to highlight connections. People are coloured by department; diamonds are skills."
+  ,"graph.filter.all": "All",
+  "graph.accessibleList": "Browse accessible node list",
+  "graph.details": "Node details",
+  "graph.fit": "Fit graph",
+  "graph.reset": "Reset filters and view",
+  "graph.search": "Find a person or skill"
 }

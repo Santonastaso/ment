@@ -58,5 +58,13 @@
   "onboarding.persona.alumnus": "Alumnus",
   "onboarding.fields.program": "Program",
   "onboarding.fields.programPlaceholder": "e.g. MSc Management",
-  "onboarding.fields.cohortYear": "Class of (year)"
+  "onboarding.fields.cohortYear": "Class of (year)",
+  "onboarding.demo.consent": "I understand this demo creates a sample profile, not an AI assessment.",
+  "onboarding.demo.consentRequired": "Please confirm the demo profile notice to continue.",
+  "onboarding.demo.description": "For this demo, we prepare editable example profile details from your file.",
+  "onboarding.demo.notice": "Demo mode: review every suggested detail before saving.",
+  "onboarding.demo.preparing": "Preparing your editable demo profile…",
+  "onboarding.demo.reviewConsent": "Review notice",
+  "onboarding.demo.reviewRequired": "Please review and confirm the sample profile notice.",
+  "onboarding.demo.sampleLabel": "Sample suggestion"
 }

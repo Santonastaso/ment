@@ -1,6 +1,5 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Search, LayoutGrid } from 'lucide-react';
 import SessionRequestModal from '../components/SessionRequestModal.jsx';
 import { PageShell } from '../components/PageShell.jsx';
 import { Surface, SurfaceBody } from '../components/Surface.jsx';
@@ -17,27 +16,25 @@ export default function Explorer() {
   const { t } = useT();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // All view state lives in the URL so the top-bar search (?q=) and
-  // back/forward behave. No mode chosen yet → entry prompt.
-  const modeParam = searchParams.get('mode');
+  // URL state supports direct links and browser navigation.
   const query = searchParams.get('q') || '';
   const persona = ['student', 'alumnus'].includes(searchParams.get('persona')) ? searchParams.get('persona') : '';
   const program = searchParams.get('program') || '';
   const cohort = searchParams.get('cohort') || '';
   const location = searchParams.get('location') || '';
   const language = searchParams.get('language') || '';
-  const page = Math.max(Number(searchParams.get('page')) || 1, 1);
-  const mode = modeParam === 'directory' ? 'directory' : 'chat';
+  const page = Number.isSafeInteger(Number(searchParams.get('page'))) && Number(searchParams.get('page')) > 0 ? Number(searchParams.get('page')) : 1;
 
   const [inputValue, setInputValue] = useState(query);
-  const [chatResults, setChatResults] = useState(null);
-  const [chatLoading, setChatLoading] = useState(false);
+  const [dirError, setDirError] = useState(false);
+  const [retry, setRetry] = useState(0);
   const [dirData, setDirData] = useState(null);
-  const [dirLoading, setDirLoading] = useState(false);
+  const [dirLoading, setDirLoading] = useState(true);
   const [requestingMentor, setRequestingMentor] = useState(null);
 
   function updateParams(mutate) {
     const next = new URLSearchParams(searchParams);
+    next.delete('mode');
     mutate(next);
     setSearchParams(next);
   }
@@ -52,51 +49,44 @@ export default function Explorer() {
   // Keep the input in sync when ?q= changes externally (top-bar search).
   useEffect(() => { setInputValue(query); }, [query]);
 
-  // Chat-style: keyword search → top 3.
-  useEffect(() => {
-    if (mode !== 'chat') return;
-    let cancelled = false;
-    setChatLoading(true);
-    const params = new URLSearchParams({ limit: '3' });
-    if (query) params.set('q', query);
-    if (persona) params.set('persona', persona);
-    api.get(`/directory?${params.toString()}`)
-      .then(res => { if (!cancelled) setChatResults(res.data); })
-      .catch(() => { if (!cancelled) setChatResults({ total: 0, people: [] }); })
-      .finally(() => { if (!cancelled) setChatLoading(false); });
-    return () => { cancelled = true; };
-  }, [mode, query, persona]);
-
   // Directory-style: filters + pagination, server-side.
   useEffect(() => {
-    if (mode !== 'directory') return;
     let cancelled = false;
     setDirLoading(true);
+    setDirError(false);
     const params = new URLSearchParams({
       limit: String(PAGE_SIZE),
       offset: String((page - 1) * PAGE_SIZE),
     });
+    if (query) params.set('q', query);
     if (persona) params.set('persona', persona);
     if (program) params.set('program', program);
     if (cohort) params.set('cohort', cohort);
     if (location) params.set('location', location);
     if (language) params.set('language', language);
     api.get(`/directory?${params.toString()}`)
-      .then(res => { if (!cancelled) setDirData(res.data); })
-      .catch(() => { if (!cancelled) setDirData({ total: 0, people: [], facets: {} }); })
+      .then(res => {
+        if (cancelled) return;
+        setDirData(res.data);
+        const lastPage = Math.max(1, Math.ceil(res.data.total / PAGE_SIZE));
+        if (page > lastPage) setSearchParams(previous => {
+          const next = new URLSearchParams(previous);
+          if (lastPage === 1) next.delete('page'); else next.set('page', String(lastPage));
+          return next;
+        }, { replace: true });
+      })
+      .catch(() => { if (!cancelled) setDirError(true); })
       .finally(() => { if (!cancelled) setDirLoading(false); });
     return () => { cancelled = true; };
-  }, [mode, persona, program, cohort, location, language, page]);
+  }, [query, persona, program, cohort, location, language, page, retry]);
 
-  function removeFromResults(personId) {
-    setChatResults(prev => prev ? { ...prev, people: prev.people.filter(p => p.id !== personId) } : prev);
-    setDirData(prev => prev ? { ...prev, people: prev.people.filter(p => p.id !== personId), total: Math.max(0, prev.total - 1) } : prev);
+  function removeFromResults() {
+    setRetry(n => n + 1);
   }
 
-  function submitChat(e) {
+  function submitSearch(e) {
     e?.preventDefault();
     updateParams(next => {
-      next.set('mode', 'chat');
       if (inputValue.trim()) next.set('q', inputValue.trim()); else next.delete('q');
       next.delete('page');
     });
@@ -111,85 +101,14 @@ export default function Explorer() {
   return (
     <PageShell title={t('explorer.title')} className="gap-4">
 
-      <>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant={mode === 'chat' ? 'default' : 'outline'}
-              data-testid="mode-chat"
-              onClick={() => updateParams(n => { n.set('mode', 'chat'); })}
-            >
-              <Search className="size-3.5" />{t('explorer.modeChat')}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={mode === 'directory' ? 'default' : 'outline'}
-              data-testid="mode-directory"
-              onClick={() => updateParams(n => { n.set('mode', 'directory'); })}
-            >
-              <LayoutGrid className="size-3.5" />{t('explorer.modeDirectory')}
-            </Button>
-          </div>
-
-          {mode === 'chat' && (
-            <>
               <Surface>
                 <SurfaceBody className="space-y-3">
-                  <form onSubmit={submitChat} className="flex gap-2">
-                    <Input
-                      autoFocus
-                      placeholder={t('explorer.askPlaceholder')}
-                      value={inputValue}
-                      onChange={e => setInputValue(e.target.value)}
-                    />
-                    <Button type="submit" disabled={chatLoading}>{t('explorer.searchButton')}</Button>
+                  <form onSubmit={submitSearch} className="flex gap-2">
+                    <Input aria-label={t('explorer.searchLabel')} placeholder={t('explorer.searchLabel')} value={inputValue} onChange={e => setInputValue(e.target.value)} />
+                    <Button type="submit">{t('explorer.searchButton')}</Button>
                   </form>
-                  <div className="flex flex-wrap gap-2">
-                    {[['', t('explorer.personaAny')], ['student', t('explorer.personaStudent')], ['alumnus', t('explorer.personaAlumnus')]].map(([value, label]) => (
-                      <Button
-                        key={value || 'any'}
-                        type="button"
-                        size="xs"
-                        variant={persona === value ? 'default' : 'outline'}
-                        onClick={() => setParam('persona', value)}
-                      >
-                        {label}
-                      </Button>
-                    ))}
-                  </div>
-                  <p className="text-xs text-muted-foreground">{t('explorer.chatHint')}</p>
+                  <Button type="button" size="sm" variant="ghost" onClick={() => { setInputValue(''); setSearchParams({}); }}>{t('explorer.clearFilters')}</Button>
                 </SurfaceBody>
-              </Surface>
-
-              {chatLoading ? (
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                  {[1, 2, 3].map(i => <Skeleton key={i} className="h-44 rounded-xl" />)}
-                </div>
-              ) : (chatResults?.people?.length ?? 0) === 0 ? (
-                <Surface>
-                  <SurfaceBody className="py-12 text-center">
-                    <p className="font-medium text-foreground">{t('explorer.emptyChatTitle')}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">{t('explorer.emptyChatBody')}</p>
-                  </SurfaceBody>
-                </Surface>
-              ) : (
-                <>
-                  <p className="text-sm font-medium text-muted-foreground">{t('explorer.topResultsTitle')}</p>
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                    {chatResults.people.map(person => (
-                      <PersonCard key={person.id} person={person} onRequest={() => setRequestingMentor(person)} />
-                    ))}
-                  </div>
-                </>
-              )}
-            </>
-          )}
-
-          {mode === 'directory' && (
-            <>
-              <Surface>
                 <SurfaceBody className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
                   <select className="input w-full" value={persona} onChange={e => setParam('persona', e.target.value)} aria-label={t('explorer.filterPersona')}>
                     <option value="">{t('explorer.personaAny')}</option>
@@ -215,7 +134,12 @@ export default function Explorer() {
                 </SurfaceBody>
               </Surface>
 
-              {dirLoading ? (
+              {dirError ? (
+                <Surface><SurfaceBody className="space-y-3" role="alert">
+                  <p role="alert">{t('explorer.directoryError')}</p>
+                  <Button onClick={() => setRetry(n => n + 1)}>{t('explorer.retry')}</Button>
+                </SurfaceBody></Surface>
+              ) : dirLoading ? (
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {[1, 2, 3, 4, 5, 6].map(i => <Skeleton key={i} className="h-44 rounded-xl" />)}
                 </div>
@@ -228,7 +152,7 @@ export default function Explorer() {
                 </Surface>
               ) : (
                 <>
-                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                  <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
                     <span>{t('explorer.showing', { from, to, total })}</span>
                     <div className="flex items-center gap-2">
                       <Button type="button" size="sm" variant="outline" disabled={page <= 1} onClick={() => setParam('page', String(page - 1))}>
@@ -247,9 +171,6 @@ export default function Explorer() {
                   </div>
                 </>
               )}
-            </>
-          )}
-      </>
 
       {requestingMentor && (
         <SessionRequestModal

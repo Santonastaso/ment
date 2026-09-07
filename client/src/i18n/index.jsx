@@ -56,7 +56,7 @@ function interpolate(str, vars) {
 export function translate(key, vars, lang) {
   const l = lang || getLang();
   const dict = CATALOG[l] || CATALOG.en;
-  const raw = (key in dict) ? dict[key] : (key in CATALOG.en) ? CATALOG.en[key] : key;
+  const raw = dict[key] || CATALOG.en[key] || key;
   return interpolate(raw, vars);
 }
 
@@ -76,9 +76,7 @@ export function LanguageProvider({ children }) {
 
   const t = useCallback((key, vars) => {
     const dict = CATALOG[lang] || CATALOG.en;
-    const raw = (key in dict) ? dict[key]
-      : (key in CATALOG.en) ? CATALOG.en[key]
-      : key;
+    const raw = dict[key] || CATALOG.en[key] || key;
     return interpolate(raw, vars);
   }, [lang]);
 

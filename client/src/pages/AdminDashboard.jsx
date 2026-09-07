@@ -17,6 +17,8 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { formatAdminDate, pmTranslate } from '../components/admin/adminPm.js';
+import AdminPmKpis from '../components/admin/AdminPmKpis.jsx';
 
 function StatCard({ label, value, sub }) {
   return (
@@ -69,19 +71,13 @@ async function downloadBlob(apiPath, filename) {
 }
 
 function formatDate(value) {
-  if (!value) return '—';
-  return new Date(value).toLocaleString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return formatAdminDate(value);
 }
 
 export default function AdminDashboard() {
   const { user } = useAuth();
-  const { t } = useT();
+  const { t: translate } = useT();
+  const t = (key, vars) => pmTranslate(translate, key, vars);
   const [stats, setStats] = useState(null);
   const [mostActiveUsers, setMostActiveUsers] = useState([]);
   const [feedback, setFeedback] = useState([]);
@@ -101,18 +97,19 @@ export default function AdminDashboard() {
   const [dragOver, setDragOver] = useState(false);
   const [auditEntries, setAuditEntries] = useState([]);
   const [auditTotal, setAuditTotal] = useState(0);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditFilter, setAuditFilter] = useState('');
+  const [loadErrors, setLoadErrors] = useState({});
+  const requestIds = useRef({});
   // Admin subpages live in the URL (?tab=) so deep links and back/forward work.
   const [searchParams, setSearchParams] = useSearchParams();
   const rawTab = searchParams.get('tab') || 'overview';
-  const validTabs = ['overview', 'kpis', 'people', 'privacy', 'feedback'];
+  const validTabs = ['overview', 'kpis', 'people', 'privacy', 'audit', 'feedback'];
   const tab = validTabs.includes(rawTab) ? rawTab : 'overview';
   function setTab(next) {
     const params = new URLSearchParams(searchParams);
     if (next === 'overview') params.delete('tab'); else params.set('tab', next);
     setSearchParams(params);
-    if (next === 'kpis') loadKpis();
-    if (next === 'people') loadUsers();
-    if (next === 'privacy') loadAudit();
   }
   const [importMode, setImportMode] = useState('insert');
   const [users, setUsers] = useState([]);
@@ -127,14 +124,16 @@ export default function AdminDashboard() {
   const fileRef = useRef(null);
 
   async function loadKpis() {
+    const id = requestIds.current.kpis = (requestIds.current.kpis || 0) + 1;
     setKpisLoading(true);
+    setLoadErrors(prev => ({ ...prev, kpis: false }));
     try {
       const res = await api.get('/admin/kpis');
-      setKpis(res.data);
+      if (id === requestIds.current.kpis) setKpis(res.data);
     } catch {
-      setKpis(null);
+      if (id === requestIds.current.kpis) { setKpis(null); setLoadErrors(prev => ({ ...prev, kpis: true })); }
     } finally {
-      setKpisLoading(false);
+      if (id === requestIds.current.kpis) setKpisLoading(false);
     }
   }
 
@@ -159,20 +158,27 @@ export default function AdminDashboard() {
 
   async function loadUsers() {
     setUsersLoading(true);
+    setLoadErrors(prev => ({ ...prev, people: false }));
     try {
       const res = await api.get('/admin/users?limit=200');
       setUsers(res.data.users || []);
+    } catch {
+      setLoadErrors(prev => ({ ...prev, people: true }));
     } finally {
       setUsersLoading(false);
     }
   }
 
   async function loadAudit() {
+    setAuditLoading(true);
+    setLoadErrors(prev => ({ ...prev, audit: false }));
     try {
       const res = await api.get('/admin/audit?limit=100');
       setAuditEntries(res.data.entries || []);
       setAuditTotal(res.data.total || 0);
-    } catch { /* ignore */ }
+    } catch {
+      setLoadErrors(prev => ({ ...prev, audit: true }));
+    } finally { setAuditLoading(false); }
   }
 
   async function loadFeedback(status = feedbackFilter) {
@@ -222,6 +228,12 @@ export default function AdminDashboard() {
   }
 
   useEffect(() => { loadStats(); loadMostActiveUsers(); loadPrivacyStatus(); }, []);
+  useEffect(() => {
+    if (tab === 'kpis') loadKpis();
+    if (tab === 'people') loadUsers();
+    if (tab === 'privacy' || tab === 'audit') loadAudit();
+    if (tab === 'feedback') loadFeedback();
+  }, [tab]);
 
   async function handleUpload(file) {
     if (!file) return;
@@ -381,6 +393,7 @@ export default function AdminDashboard() {
             type="button"
             onClick={() => setTab(key)}
             data-testid={`admin-tab-${key}`}
+            aria-current={tab === key ? 'page' : undefined}
             className={`-mb-px border-b-2 px-0.5 pb-2.5 pt-1 text-sm font-medium transition-colors ${
               tab === key
                 ? 'border-[var(--foreground)] text-foreground'
@@ -438,25 +451,9 @@ export default function AdminDashboard() {
               ) : privacyStatus ? (
                 <div className="grid gap-4 lg:grid-cols-2">
                   <div className="space-y-3 text-sm">
-                    <div>
-                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('admin.privacy.aiClassification')}</p>
-                      <p className="mt-1 font-medium text-foreground">{privacyStatus.aiClassification?.label || t('admin.privacy.offByDefault')}</p>
-                      <p className="text-xs text-muted-foreground">{privacyStatus.aiClassification?.source}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('admin.privacy.supabaseRegion')}</p>
-                      <p className="mt-1 font-medium text-foreground">{privacyStatus.supabaseRegion || 'eu-central-1'}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('admin.privacy.edgeFunctions')}</p>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {(privacyStatus.edgeFunctions || []).map(fn => (
-                          <span key={fn.name} className="rounded-full border border-[var(--border)] px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                            {fn.name}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
+                    <p>{t('admin.pm.privacyHelp')}</p>
+                    <h3 className="font-semibold">{t('admin.pm.consent')}</h3>
+                    <p className="text-muted-foreground">{t('admin.pm.consentHelp')}</p>
                   </div>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div>
@@ -472,21 +469,12 @@ export default function AdminDashboard() {
                       </ul>
                     </div>
                     <div className="sm:col-span-2 rounded-lg border border-border bg-muted/30 p-3 space-y-3">
-                      <div>
-                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('admin.privacy.orgMode')}</p>
-                        <p className="mt-1 text-sm text-foreground">
-                          {t('admin.privacy.currentMode', { mode: '' })}<span className="font-semibold">{privacyStatus.orgType === 'inter' ? t('admin.privacy.modeInter') : t('admin.privacy.modeIntra')}</span>
-                        </p>
-                        {Array.isArray(privacyStatus.interExtraRedactions) && privacyStatus.interExtraRedactions.length > 0 && (
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {t('admin.privacy.interHides', { fields: privacyStatus.interExtraRedactions.join(', ') })}
-                          </p>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground">Privacy is managed by the platform team for this university.</p>
+                      <h3 className="text-sm font-semibold">{t('admin.pm.schoolControls')}</h3>
                       <div className="flex flex-wrap items-center gap-2">
-                        <label className="text-xs text-muted-foreground">{t('admin.privacy.minReports')}</label>
+                        <label htmlFor="admin-min-reports" className="text-xs text-muted-foreground">{t('admin.privacy.minReports')}</label>
                         <input
+                          id="admin-min-reports"
+                          key={privacyStatus.minTeamDashboardSize}
                           type="number" min={1} max={100}
                           defaultValue={privacyStatus.minTeamDashboardSize ?? 3}
                           data-testid="min-team-size-input"
@@ -707,13 +695,13 @@ export default function AdminDashboard() {
           </>
       )}
 
-      {tab === 'privacy' && (
+      {(tab === 'privacy' || tab === 'audit') && (
         <Surface>
           <SurfaceHeader
             title={t('admin.audit.title')}
             description={
               <>
-                {t('admin.audit.description')}
+                {t('admin.pm.auditHelp')}
                 {auditTotal > 0 && <span className="ml-1 text-muted-foreground/80">{t('admin.audit.totalEvents', { count: auditTotal })}</span>}
               </>
             }
@@ -724,79 +712,20 @@ export default function AdminDashboard() {
             }
           />
           <SurfaceBody className="pt-5">
-            {auditEntries.length === 0 ? (
+            <Label htmlFor="admin-audit-filter">{t('admin.pm.auditFilter')}</Label>
+            <Input id="admin-audit-filter" type="search" value={auditFilter} onChange={e => setAuditFilter(e.target.value)} className="my-3" />
+            {auditLoading ? <p role="status">{t('admin.common.loading')}</p> : loadErrors.audit ? <p role="alert">{t('admin.pm.loadFailed')} <Button variant="link" onClick={loadAudit}>{t('admin.common.refresh')}</Button></p> : auditEntries.filter(entry => `${entry.action || ''} ${entry.actor?.name || ''} ${entry.actor?.email || ''}`.toLowerCase().includes(auditFilter.toLowerCase())).length === 0 ? (
               <p className="text-sm text-muted-foreground italic">{t('admin.audit.empty')}</p>
             ) : (
               <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
-                {auditEntries.map(entry => <AuditRow key={entry.id} entry={entry} />)}
+                {auditEntries.filter(entry => `${entry.action || ''} ${entry.actor?.name || ''} ${entry.actor?.email || ''}`.toLowerCase().includes(auditFilter.toLowerCase())).map(entry => <AuditRow key={entry.id} entry={entry} />)}
               </div>
             )}
           </SurfaceBody>
         </Surface>
       )}
 
-      {tab === 'kpis' && (
-        <Surface>
-          <SurfaceHeader title={t('admin.kpis.title')} description={t('admin.kpis.desc')} />
-          <SurfaceBody className="space-y-6 pt-5">
-            {kpisLoading || !kpis ? (
-              <p className="text-sm text-muted-foreground">{t('admin.common.loading')}</p>
-            ) : (
-              <>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  <StatCard label={t('admin.kpis.studentActivation')} value={`${kpis.studentActivationRate ?? 0}%`} />
-                  <StatCard label={t('admin.kpis.alumniActivation')} value={`${kpis.alumniActivationRate ?? 0}%`} />
-                  <StatCard label={t('admin.kpis.alumniEngagement')} value={`${kpis.alumniEngagementRate ?? 0}%`} />
-                  <StatCard label={t('admin.kpis.meaningfulConnections')} value={kpis.meaningfulConnections ?? 0} />
-                  <StatCard label={t('admin.kpis.connectionCoverage')} value={`${kpis.connectionCoverageRate ?? 0}%`} />
-                  <StatCard label={t('admin.kpis.acceptanceRate')} value={`${kpis.acceptanceRate ?? 0}%`} />
-                  <StatCard label={t('admin.kpis.replyRate')} value={kpis.replyRate == null ? '—' : `${kpis.replyRate}%`} />
-                  <StatCard label={t('admin.kpis.mentorshipsFormed')} value={kpis.mentorshipsFormed ?? 0} />
-                  <StatCard label={t('admin.kpis.careerConversations')} value={kpis.careerConversations ?? 0} />
-                  <StatCard label={t('admin.kpis.intentToContinue')} value={`${kpis.intentToContinueRate ?? 0}%`} />
-                  <StatCard label={t('admin.kpis.activeMentors')} value={kpis.activeMentors} sub={t('admin.kpis.ofPotential', { n: kpis.potentialMentors })} />
-                  <StatCard label={t('admin.kpis.inactiveMentors')} value={kpis.inactiveMentors} />
-                  <StatCard label={t('admin.kpis.pausedMentors')} value={kpis.pausedMentors} />
-                  <StatCard label={t('admin.kpis.participation')} value={`${kpis.participationRate}%`} />
-                  <StatCard label={t('admin.kpis.avgRating')} value={kpis.avgRating || '—'} />
-                  <StatCard label={t('admin.kpis.repeatRate')} value={`${kpis.repeatRate}%`} />
-                  <StatCard label={t('admin.kpis.avgResponse')} value={kpis.avgResponseHours ? `${kpis.avgResponseHours}h` : '—'} />
-                  <StatCard label={t('admin.kpis.isolated')} value={kpis.isolatedEmployees} />
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <StatCard label={t('admin.kpis.crossDept')} value={kpis.crossDeptSessions} sub={t('admin.kpis.sameDept', { n: kpis.sameDeptSessions })} />
-                  <StatCard label={t('admin.kpis.onboarded')} value={`${kpis.onboarded}/${kpis.totalUsers}`} />
-                </div>
-
-                <div className="grid gap-6 sm:grid-cols-2">
-                  <KpiBars title={t('admin.kpis.mostRequested')} items={kpis.mostRequested} emptyLabel={t('admin.kpis.none')} />
-                  <KpiBars title={t('admin.kpis.mostShared')} items={kpis.mostShared} emptyLabel={t('admin.kpis.none')} />
-                </div>
-
-                <div>
-                  <p className="mb-2 text-sm font-medium text-foreground">{t('admin.kpis.demandGaps')}</p>
-                  {kpis.demandSupplyGaps.length === 0 ? (
-                    <p className="text-xs text-muted-foreground italic">{t('admin.kpis.none')}</p>
-                  ) : (
-                    <div className="space-y-1.5">
-                      {kpis.demandSupplyGaps.map((g, i) => (
-                        <div key={i} className="flex items-center gap-2 text-xs">
-                          <span className="w-40 shrink-0 truncate text-foreground" title={g.skill}>{g.skill}</span>
-                          <span className="rounded-full border border-[var(--border)] px-2 py-0.5 text-muted-foreground">{t('admin.kpis.demand')}: {g.demand}</span>
-                          <span className="rounded-full border border-[var(--border)] px-2 py-0.5 text-muted-foreground">{t('admin.kpis.supply')}: {g.supply}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <KpiBars title={t('admin.kpis.growth')} items={kpis.growth} valueKey="sessions" labelKey="month" emptyLabel={t('admin.kpis.none')} />
-              </>
-            )}
-          </SurfaceBody>
-        </Surface>
-      )}
+      {tab === 'kpis' && <AdminPmKpis data={kpis} loading={kpisLoading} error={loadErrors.kpis} onRefresh={loadKpis} />}
 
       {tab === 'people' && (
         <Surface>
@@ -1019,18 +948,16 @@ function SessionBox({ count, label, tone }) {
 
 function AuditRow({ entry }) {
   const { t } = useT();
-  const when = new Date(entry.created_at + 'Z').toLocaleString(undefined, {
-    year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-  });
-  const tone = entry.action.startsWith('admin.') ? 'bg-muted text-foreground'
-             : entry.action.startsWith('auth.login_failed') ? 'bg-destructive/10 text-destructive'
-             : entry.action.startsWith('auth.') ? 'bg-muted text-muted-foreground'
+  const when = formatAdminDate(entry.created_at, pmTranslate(t, 'admin.pm.noData'));
+  const tone = entry.action?.startsWith('admin.') ? 'bg-muted text-foreground'
+             : entry.action?.startsWith('auth.login_failed') ? 'bg-destructive/10 text-destructive'
+             : entry.action?.startsWith('auth.') ? 'bg-muted text-muted-foreground'
              : 'bg-muted text-muted-foreground';
   const meta = entry.metadata && Object.keys(entry.metadata).length > 0
     ? Object.entries(entry.metadata).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' · ')
     : '';
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-muted/50">
+    <div className="flex flex-wrap items-center gap-3 px-4 py-2.5 text-sm hover:bg-muted/50">
       <span className={`text-[11px] font-mono rounded px-1.5 py-0.5 whitespace-nowrap ${tone}`}>
         {entry.action}
       </span>

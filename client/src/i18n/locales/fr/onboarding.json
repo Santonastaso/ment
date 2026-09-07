@@ -58,5 +58,13 @@
   "onboarding.persona.alumnus": "Alumnus",
   "onboarding.fields.program": "Program",
   "onboarding.fields.programPlaceholder": "e.g. MSc Management",
-  "onboarding.fields.cohortYear": "Class of (year)"
+  "onboarding.fields.cohortYear": "Class of (year)",
+  "onboarding.demo.consent": "",
+  "onboarding.demo.consentRequired": "",
+  "onboarding.demo.description": "",
+  "onboarding.demo.notice": "",
+  "onboarding.demo.preparing": "",
+  "onboarding.demo.reviewConsent": "",
+  "onboarding.demo.reviewRequired": "",
+  "onboarding.demo.sampleLabel": ""
 }

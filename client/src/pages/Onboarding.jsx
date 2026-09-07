@@ -5,11 +5,15 @@ import SkillTagInput from '../components/SkillTagInput.jsx';
 import TeachSkillsEditor from '../components/TeachSkillsEditor.jsx';
 import MonthYearPicker from '../components/MonthYearPicker.jsx';
 import api from '../api/index.js';
-import SuggestedPill from '../components/SuggestedPill.jsx';
 import { useT } from '../i18n/index.jsx';
 import { Button } from '../components/ui/button.jsx';
 
 const DEPARTMENTS = ['Engineering', 'Finance', 'Marketing', 'Operations', 'HR', 'Legal', 'Product', 'Design', 'Sales', 'Other'];
+
+function SuggestedPill() {
+  const { t } = useT();
+  return <span className="ml-2 text-xs font-medium text-amber-700">{t('onboarding.demo.sampleLabel')}</span>;
+}
 
 function monthYearToPicker(year, month) {
   if (!year) return '';
@@ -28,6 +32,7 @@ export default function Onboarding() {
   const [draftId, setDraftId] = useState(null);
   const [classifierSource, setClassifierSource] = useState('');
   const [aiConsent, setAiConsent] = useState(false);
+  const [sampleReviewed, setSampleReviewed] = useState(false);
   const [suggested, setSuggested] = useState(() => new Set());
 
   // Step 1 — Background
@@ -105,7 +110,7 @@ export default function Onboarding() {
   async function handleUpload(file) {
     if (!file) return;
     if (!aiConsent) {
-      setError(t('onboarding.import.consentRequired'));
+      setError(t('onboarding.demo.consentRequired'));
       return;
     }
     setUploading(true);
@@ -118,6 +123,7 @@ export default function Onboarding() {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       setDraftId(res.data.draft_id);
+      setSampleReviewed(false);
       applyProposed(res.data.proposed, res.data.classifier_source);
       setStep(1);
     } catch (e) {
@@ -128,6 +134,10 @@ export default function Onboarding() {
   }
 
   async function handleFinish() {
+    if (classifierSource === 'demo' && !sampleReviewed) {
+      setError(t('onboarding.demo.reviewRequired'));
+      return;
+    }
     setSaving(true);
     setError('');
     try {
@@ -202,12 +212,15 @@ export default function Onboarding() {
         </div>
 
         <div className="card p-6 space-y-6">
+          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="note">
+            {t('onboarding.demo.notice')}
+          </p>
           {step === 0 && (
             <>
               <div>
                 <h2 className="text-xl font-medium tracking-[-0.01em] text-foreground mb-1">{t('onboarding.import.title')}</h2>
                 <p className="text-muted-foreground text-sm">
-                  {t('onboarding.import.desc')}
+                  {t('onboarding.demo.description')}
                 </p>
               </div>
               <label className="block border-2 border-dashed border-[var(--input)] rounded-xl p-10 text-center cursor-pointer transition-colors duration-150 hover:border-foreground/30 hover:bg-muted">
@@ -218,7 +231,7 @@ export default function Onboarding() {
                   disabled={uploading}
                   onChange={e => { if (e.target.files[0]) handleUpload(e.target.files[0]); e.target.value = ''; }}
                 />
-                {uploading ? <p className="text-sm text-muted-foreground">{t('onboarding.import.reading')}</p> : (
+                {uploading ? <p className="text-sm text-muted-foreground">{t('onboarding.demo.preparing')}</p> : (
                   <>
                     <p className="text-sm font-medium text-secondary-foreground">{t('onboarding.import.drop')}</p>
                     <p className="text-xs text-muted-foreground mt-1">{t('onboarding.import.hint')}</p>
@@ -227,7 +240,7 @@ export default function Onboarding() {
               </label>
               <label className="flex items-start gap-2 text-xs text-muted-foreground">
                 <input type="checkbox" checked={aiConsent} onChange={e => setAiConsent(e.target.checked)} className="mt-0.5" />
-                <span>{t('onboarding.import.consent')}</span>
+                <span>{t('onboarding.demo.consent')}</span>
               </label>
             </>
           )}
@@ -361,6 +374,12 @@ export default function Onboarding() {
                 placeholder={t('onboarding.learn.placeholder')}
                 ariaLabel={t('onboarding.learn.aria')}
               />
+              {classifierSource === 'demo' && (
+                <label className="flex items-start gap-2 text-sm">
+                  <input type="checkbox" checked={sampleReviewed} onChange={e => setSampleReviewed(e.target.checked)} className="mt-1" />
+                  <span>{t('onboarding.demo.reviewConsent')}</span>
+                </label>
+              )}
             </>
           )}
 
@@ -378,7 +397,7 @@ export default function Onboarding() {
                 {t('onboarding.nav.continue')}
               </Button>
             ) : (
-              <Button onClick={handleFinish} disabled={saving}>
+              <Button onClick={handleFinish} disabled={saving || (classifierSource === 'demo' && !sampleReviewed)}>
                 {saving ? t('onboarding.nav.saving') : t('onboarding.nav.finish')}
               </Button>
             )}

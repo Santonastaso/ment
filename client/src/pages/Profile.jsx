@@ -8,7 +8,7 @@ import SessionRequestModal from '../components/SessionRequestModal.jsx';
 
 import PastMeetings from '../components/PastMeetings.jsx';
 import MonthYearPicker from '../components/MonthYearPicker.jsx';
-import ReflectionLog from '../components/ReflectionLog.jsx';
+import ProfileReflection from '../components/ProfileReflection.jsx';
 import { PageShell } from '../components/PageShell.jsx';
 import { Surface, SurfaceBody, SurfaceHeader } from '../components/Surface.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -103,6 +103,7 @@ export default function Profile() {
   const [saving, setSaving] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [toast, setToast] = useState('');
+  const [reflectionDraft, setReflectionDraft] = useState({ support_needed: '', managed_well: '' });
 
   // Edit form state
   const [form, setForm] = useState({});
@@ -126,6 +127,7 @@ export default function Profile() {
   const [periodSaving, setPeriodSaving] = useState(false);
 
   useEffect(() => {
+    setReflectionDraft({ support_needed: '', managed_well: '' });
     setEditing(false);
     setShowAddCareer(false);
     setEditingCareerId(null);
@@ -187,6 +189,7 @@ export default function Profile() {
   async function refreshProfile() {
     const res = await api.get('/users/me');
     setProfile(res.data);
+    setWantsToLearn(res.data.skills?.filter(s => s.type === 'wants_to_learn').map(s => s.skill) || []);
   }
 
   async function handleDeleteSkillFromBubble(entry) {
@@ -203,6 +206,12 @@ export default function Profile() {
 
   async function handleTeachSkillsChange(next) {
     const prev = (profile?.skills || []).filter(s => s.type === 'can_teach');
+
+    // Reject only new/changed evidence; preserve legacy examples until edited.
+    if (next.some(n => {
+      const old = prev.find(p => p.id === n.id);
+      return (!old || (old.example_project || '') !== (n.example_project || '')) && (n.example_project || '').length > 80;
+    })) throw new Error('evidence_too_long');
 
     // Removals: prev had id but next doesn't
     for (const p of prev) {
@@ -407,7 +416,7 @@ export default function Profile() {
       )}
 
       {validTabs.length > 1 && (
-        <nav className="flex items-center gap-6 border-b border-[var(--border)]" aria-label={t('profile.tabs.label')}>
+        <nav className="flex items-center gap-6 overflow-x-auto whitespace-nowrap border-b border-[var(--border)]" aria-label={t('profile.tabs.label')}>
           {validTabs.map(key => (
             <button
               key={key}
@@ -503,14 +512,15 @@ export default function Profile() {
         </SurfaceBody>
       </Surface>
 
-      <Surface>
+      <div className={isOwnProfile ? 'grid items-start gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]' : ''}>
+      <Surface className="min-w-0">
         <SurfaceHeader
           title={skillTitle}
           description={skillDescription}
         />
         <SurfaceBody className="space-y-5 pt-5">
           <SkillLandscape
-            skillProgress={profile.skillProgress || []}
+            skillProgress={profile.skillProgress || profile.skills || []}
             isOwnProfile={isOwnProfile}
             firstName={firstName}
             onDeleteSkill={isOwnProfile ? handleDeleteSkillFromBubble : undefined}
@@ -542,14 +552,11 @@ export default function Profile() {
             }
           />
           <SurfaceBody className="pt-5">
-            <ReflectionLog
-              hideHistory
-              showManualAdd
-              onSkillsApplied={refreshProfile}
-            />
+            <ProfileReflection draft={reflectionDraft} onDraftChange={setReflectionDraft} onSkillsApplied={refreshProfile} />
           </SurfaceBody>
         </Surface>
       )}
+      </div>
       </>
       )}
 
@@ -558,7 +565,7 @@ export default function Profile() {
           <SurfaceHeader title={t('profile.manageSkills.title')} description={t('profile.manageSkills.desc')} />
           <SurfaceBody className="space-y-5 pt-5">
           <div>
-            <h3 className="mb-2 text-sm font-medium text-foreground">{t('profile.manageSkills.canTeach')}</h3>
+            <h3 className="mb-3 text-base font-bold text-foreground">{t('profile.manageSkills.canTeach')}</h3>
             <TeachSkillsEditor
               value={teachEditorValue}
               onChange={handleTeachSkillsChange}
@@ -568,13 +575,10 @@ export default function Profile() {
           </div>
 
           <div>
-            <h3 className="mb-2 text-sm font-medium text-foreground">{t('profile.manageSkills.wantsToLearn')}</h3>
+            <h3 className="mb-3 text-base font-bold text-foreground">{t('profile.manageSkills.wantsToLearn')}</h3>
             <SkillTagInput
               value={wantsToLearn}
-              onChange={async (v) => {
-                setWantsToLearn(v);
-                await handleWantsToLearnChange(v);
-              }}
+              onChange={handleWantsToLearnChange}
               placeholder={t('profile.skillInput.placeholder')}
               ariaLabel={t('profile.skillInput.ariaLearn')}
             />
@@ -929,7 +933,7 @@ export default function Profile() {
             }
           />
           <SurfaceBody className="pt-5">
-            <ReflectionLog onSkillsApplied={refreshProfile} />
+            <ProfileReflection history draft={reflectionDraft} onDraftChange={setReflectionDraft} onSkillsApplied={refreshProfile} />
           </SurfaceBody>
         </Surface>
       )}

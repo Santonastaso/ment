@@ -210,5 +210,21 @@
   "admin.kpis.replyRate": "Reply rate",
   "admin.kpis.mentorshipsFormed": "Mentorships formed",
   "admin.kpis.careerConversations": "Career conversations",
-  "admin.kpis.intentToContinue": "Intent to continue"
+  "admin.kpis.intentToContinue": "Intent to continue",
+  "admin.pm.asOf": "",
+  "admin.pm.auditFilter": "",
+  "admin.pm.auditHelp": "",
+  "admin.pm.cohort": "",
+  "admin.pm.consent": "",
+  "admin.pm.consentHelp": "",
+  "admin.pm.definition": "",
+  "admin.pm.denominator": "",
+  "admin.pm.export": "",
+  "admin.pm.loadFailed": "",
+  "admin.pm.noData": "",
+  "admin.pm.numerator": "",
+  "admin.pm.period": "",
+  "admin.pm.privacyHelp": "",
+  "admin.pm.responseRate": "",
+  "admin.pm.schoolControls": ""
 }

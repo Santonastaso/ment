@@ -33,5 +33,9 @@
   "explorer.emptyChatBody": "Try a broader keyword, or switch who you're looking for.",
   "explorer.directoryEmptyTitle": "Nobody here yet",
   "explorer.directoryEmptyBody": "As classmates complete onboarding they'll appear in this directory.",
-  "explorer.requestSession": "Request a session"
+  "explorer.requestSession": "Request a session",
+  "explorer.clearFilters": "",
+  "explorer.directoryError": "",
+  "explorer.retry": "",
+  "explorer.searchLabel": ""
 }

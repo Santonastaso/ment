@@ -9,31 +9,12 @@ import { useT } from '../i18n/index.jsx';
 //   [{id, skill, type, example_project, session_count}]
 // Each row opens a popup with the skill's tier, progress and example.
 
-// ---------- Tier resolution ----------
-function teachTier(n) {
-  if (n >= 4) return 'expert';
-  if (n >= 2) return 'trusted';
-  if (n >= 1) return 'active';
-  return 'untapped';
-}
-function learnTier(n) {
-  if (n >= 3) return 'steady';
-  if (n >= 2) return 'growing';
-  if (n >= 1) return 'started';
-  return 'missing';
-}
-
-const TEACH_ORDER = ['expert', 'trusted', 'active', 'untapped'];
-const LEARN_ORDER = ['missing', 'started', 'growing', 'steady'];
-
 // ---------- Skill row ----------
-function SkillRow({ entry, kind, tierFn, order, isOwnProfile, onDelete }) {
+function SkillRow({ entry, kind, isOwnProfile, onDelete }) {
   const { t } = useT();
   const [open, setOpen] = useState(false);
   const dialogRef = useModalA11y(open);
   const count = entry.session_count || 0;
-  const tier = tierFn(count);
-  const tierLabel = t(`components.skillLandscape.tier${tier.charAt(0).toUpperCase()}${tier.slice(1)}`);
 
   // Close the popup on Escape.
   useEffect(() => {
@@ -67,7 +48,6 @@ function SkillRow({ entry, kind, tierFn, order, isOwnProfile, onDelete }) {
         <span className="min-w-0 truncate text-sm font-medium text-foreground">{entry.skill}</span>
         <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
           {count > 0 && <span className="tabular-nums">{count}</span>}
-          <span>{tierLabel}</span>
           <ChevronRight className="size-3.5" aria-hidden="true" />
         </span>
       </button>
@@ -101,10 +81,7 @@ function SkillRow({ entry, kind, tierFn, order, isOwnProfile, onDelete }) {
             </div>
 
             <div className="space-y-4 p-5">
-              <div>
-                <p className="label-meta">{tierLabel}</p>
-                <p className="mt-1 text-sm text-muted-foreground">{progressText}</p>
-              </div>
+              {count > 0 && <p className="text-sm text-muted-foreground">{progressText}</p>}
               {entry.example_project && (
                 <div>
                   <p className="label-meta">{t('components.skillLandscape.exampleLabel')}</p>
@@ -137,33 +114,31 @@ function SkillRow({ entry, kind, tierFn, order, isOwnProfile, onDelete }) {
 }
 
 // ---------- Section ----------
-function Section({ title, items, kind, tierFn, order, firstName, isOwnProfile, onDelete }) {
-  if (items.length === 0) return null;
-
-  // Sort: teach by tier desc (best first); learn by tier asc (gaps first to draw the eye)
-  const sortIndex = (e) => order.indexOf(tierFn(e.session_count || 0));
-  const sorted = [...items].sort((a, b) => sortIndex(a) - sortIndex(b));
+function Section({ title, items, kind, isOwnProfile, onDelete }) {
+  const { t } = useT();
+  const [expanded, setExpanded] = useState(false);
+  const visible = expanded ? items : items.slice(0, 3);
 
   return (
     <section>
       <header className="mb-1 flex items-center gap-1.5">
-        <h3 className="text-base font-medium text-foreground">{title}</h3>
+        <h3 className="text-base font-bold text-foreground">{title}</h3>
         <span className="text-xs text-muted-foreground tabular-nums">({items.length})</span>
       </header>
 
       <div className="divide-y divide-[var(--border-subtle)]">
-        {sorted.map((entry, i) => (
+        {visible.map((entry, i) => (
           <SkillRow
             key={entry.id ?? `${entry.skill}-${i}`}
             entry={entry}
             kind={kind}
-            tierFn={tierFn}
-            order={order}
             isOwnProfile={isOwnProfile}
             onDelete={onDelete}
           />
         ))}
       </div>
+      {items.length === 0 && <p className="text-sm text-muted-foreground">{t('components.skillLandscape.emptyList')}</p>}
+      {items.length > 3 && <Button type="button" size="sm" variant="ghost" aria-expanded={expanded} onClick={() => setExpanded(v => !v)}>{t(expanded ? 'components.skillLandscape.showLess' : 'components.skillLandscape.showAll', { count: items.length })}</Button>}
     </section>
   );
 }
@@ -174,23 +149,13 @@ export default function SkillLandscape({ skillProgress = [], isOwnProfile, first
   const teach = skillProgress.filter(s => s.type === 'can_teach');
   const learn = skillProgress.filter(s => s.type === 'wants_to_learn');
 
-  if (teach.length === 0 && learn.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground italic">
-        {isOwnProfile ? t('components.skillLandscape.emptyOwn') : t('components.skillLandscape.emptyOther')}
-      </p>
-    );
-  }
-
   return (
-    <div className="space-y-7">
+    <div className="grid min-w-0 gap-5 sm:grid-cols-2">
       {/* Your strengths */}
       <Section
         title={isOwnProfile ? t('components.skillLandscape.shareTitleOwn') : t('components.skillLandscape.shareTitleOther', { name: firstName })}
         items={teach}
         kind="teach"
-        tierFn={teachTier}
-        order={TEACH_ORDER}
         firstName={firstName}
         isOwnProfile={isOwnProfile}
         onDelete={onDeleteSkill}
@@ -201,8 +166,6 @@ export default function SkillLandscape({ skillProgress = [], isOwnProfile, first
         title={isOwnProfile ? t('components.skillLandscape.growTitleOwn') : t('components.skillLandscape.growTitleOther', { name: firstName })}
         items={learn}
         kind="learn"
-        tierFn={learnTier}
-        order={LEARN_ORDER}
         firstName={firstName}
         isOwnProfile={isOwnProfile}
         onDelete={onDeleteSkill}

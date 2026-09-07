@@ -5,7 +5,6 @@
   "components.match.requestSession": "Richiedi una sessione",
   "components.match.removeFromSuggestions": "Rimuovi dai suggerimenti",
   "components.match.dismiss": "Ignora",
-
   "components.session.status.pending": "In attesa di conferma",
   "components.session.status.scheduled": "Programmata",
   "components.session.status.completed": "Completata",
@@ -41,7 +40,6 @@
   "components.popup.done": "Fatto",
   "components.session.viewProfile": "Vedi profilo",
   "components.session.discardReflection": "Annulla riflessione",
-
   "components.sessionRequest.errorFocusQuestion": "Inserisci la tua domanda chiave.",
   "components.sessionRequest.errorGeneric": "Qualcosa è andato storto. Riprova.",
   "components.sessionRequest.title": "Richiedi una sessione",
@@ -73,7 +71,6 @@
   "components.sessionRequest.reviewNoTime": "Proporrò un orario più tardi",
   "components.sessionRequest.reviewNotice": "Non verrà inviato nulla finché non confermi qui sotto.",
   "components.sessionRequest.confirm": "Conferma e invia",
-
   "components.reflection.promptSupportNeeded": "Su cosa hai sentito di aver bisogno di supporto questa settimana?",
   "components.reflection.promptManagedWell": "Cosa ritieni di aver gestito bene questa settimana?",
   "components.reflection.errorAnswerOne": "Rispondi ad almeno una delle due domande.",
@@ -117,10 +114,8 @@
   "components.reflection.restoreDismissed": "Ripristina {count} ignorati",
   "components.reflection.applyToLandscape": "Aggiungi {count} alle mie competenze",
   "components.reflection.noSignals": "Nessun suggerimento di competenza.",
-
   "components.pastMeetings.loading": "Caricamento degli incontri passati…",
   "components.pastMeetings.empty": "Nessun incontro completato ancora. Quando concludi una sessione e la segni come completata, comparirà qui.",
-
   "components.meeting.statusAwaitingYours": "In attesa della tua conferma",
   "components.meeting.statusAwaitingTheirs": "In attesa della loro conferma",
   "components.meeting.statusConfirmedNoDate": "Confermata — data da definire",
@@ -183,7 +178,6 @@
   "components.matchReason.rating_excellent": "Le tue sessioni passate con colleghi di {dept} sono state costantemente eccellenti — peso extra significativo.",
   "components.matchReason.rating_positive": "Le tue valutazioni passate delle sessioni di {dept} sono positive — peso extra aggiunto.",
   "components.matchReason.past_dept_positive": "Il mentoring passato con colleghi di {dept} è andato bene — peso extra aggiunto.",
-
   "components.acceptance.titleOne": "Un mentore ha accettato la tua sessione",
   "components.acceptance.titleMany": "Alcuni mentori hanno accettato le tue sessioni",
   "components.acceptance.close": "Chiudi",
@@ -201,7 +195,6 @@
   "components.acceptance.errorDate": "Impossibile salvare la data. Riprova.",
   "components.acceptance.saving": "Salvataggio…",
   "components.acceptance.gotIt": "Ho capito",
-
   "components.help.categoryGeneral": "Commento generale",
   "components.help.categoryBug": "Bug o malfunzionamento",
   "components.help.categoryIdea": "Idea o suggerimento",
@@ -220,11 +213,9 @@
   "components.help.sending": "Invio…",
   "components.help.sendAnother": "Invia un altro",
   "components.help.send": "Invia messaggio",
-
   "components.skillTag.placeholder": "Digita una competenza e premi Invio",
   "components.skillTag.remove": "Rimuovi {skill}",
   "components.skillTag.ariaAdd": "Aggiungi competenza",
-
   "components.teachSkills.placeholder": "es. system design, modellazione finanziaria…",
   "components.teachSkills.addAnother": "Aggiungi un'altra competenza — premi Invio per confermare",
   "components.teachSkills.examplePlaceholder": "Progetto di esempio (facoltativo) — cosa dimostra che l'hai fatto?",
@@ -233,7 +224,6 @@
   "components.teachSkills.editExample": "Clicca per aggiungere o modificare il progetto di esempio",
   "components.teachSkills.remove": "Rimuovi {skill}",
   "components.teachSkills.ariaAdd": "Aggiungi una competenza che puoi insegnare",
-
   "components.skillLandscape.tierUntapped": "Inesplorata",
   "components.skillLandscape.tierActive": "Attiva",
   "components.skillLandscape.tierTrusted": "Affidabile",
@@ -266,7 +256,6 @@
   "components.skillLandscape.emptyOther": "Nessuna competenza indicata ancora.",
   "components.skillLandscape.removeSkill": "Rimuovi {skill}",
   "components.skillLandscape.removeThis": "Rimuovi questa competenza",
-
   "components.rating.hint1": "Non utile",
   "components.rating.hint2": "Sotto le aspettative",
   "components.rating.hint3": "Utile",
@@ -274,18 +263,14 @@
   "components.rating.hint5": "Eccezionale",
   "components.rating.aria": "Valutazione della sessione",
   "components.rating.tapToRate": "Tocca una stella per valutare (facoltativo, privato)",
-
   "components.ics.downloading": "Download…",
   "components.ics.addToCalendar": "Aggiungi al calendario",
-
   "components.suggested.heuristic": "Euristica",
-
   "components.affinity.strong": "Forte affinità",
   "components.affinity.promising": "Affinità promettente",
   "components.affinity.worth": "Vale un'occhiata",
   "components.affinity.aria": "Affinità: {dots} su 5 — {label}",
   "components.affinity.title": "Punteggio di affinità: {score}/100",
-
   "components.monthYear.month01": "Gen",
   "components.monthYear.month02": "Feb",
   "components.monthYear.month03": "Mar",
@@ -300,6 +285,20 @@
   "components.monthYear.month12": "Dic",
   "components.monthYear.monthLabel": "Mese",
   "components.monthYear.yearLabel": "Anno",
-
-  "components.esco.searching": "Ricerca in ESCO…"
+  "components.esco.searching": "Ricerca in ESCO…",
+  "components.reflection.errorLoad": "",
+  "components.reflection.refreshError": "",
+  "components.reflection.reviewSuggestions": "",
+  "components.reflection.demoLabel": "",
+  "components.skillTag.add": "",
+  "components.teachSkills.giveExample": "",
+  "components.teachSkills.exampleInstruction": "",
+  "components.teachSkills.legacyExample": "",
+  "components.skillLandscape.emptyList": "",
+  "components.reflection.demo.errorDelete": "",
+  "components.reflection.demo.errorLoad": "",
+  "components.reflection.demo.label": "",
+  "components.reflection.demo.notice": "",
+  "components.reflection.demo.suggestions": "",
+  "components.skillLandscape.showAll": ""
 }

@@ -5,15 +5,12 @@ import SessionCard from '../components/SessionCard.jsx';
 import ReflectionLog from '../components/ReflectionLog.jsx';
 import AcceptanceModal from '../components/AcceptanceModal.jsx';
 import SessionRequestModal from '../components/SessionRequestModal.jsx';
+import HomeConversation from '../components/demo/HomeConversation.jsx';
 import { PageShell, PageSection } from '../components/PageShell.jsx';
 import { Surface, SurfaceBody } from '../components/Surface.jsx';
 import api from '../api/index.js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useT } from '../i18n/index.jsx';
-import { Search } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 const POLL_INTERVAL_MS = 30000;
@@ -47,10 +44,8 @@ export default function Dashboard() {
   const [pendingAcceptances, setPendingAcceptances] = useState([]);
   const [acceptanceModalDismissed, setAcceptanceModalDismissed] = useState(false);
   const [sessions, setSessions] = useState([]);
-  const [question, setQuestion] = useState('');
-  const [questionResults, setQuestionResults] = useState(null);
-  const [questionLoading, setQuestionLoading] = useState(false);
   const [requestingPerson, setRequestingPerson] = useState(null);
+  const [requestContext, setRequestContext] = useState({});
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [checkinDue, setCheckinDue] = useState(false);
   const [pendingFromAdmin, setPendingFromAdmin] = useState(false);
@@ -145,33 +140,6 @@ export default function Dashboard() {
     setSessions(prev => prev.map(s => s.id === updated.id ? updated : s));
   }
 
-  async function searchFromHome(event) {
-    event.preventDefault();
-    const q = question.trim();
-    if (!q) return;
-    setQuestionLoading(true);
-    try {
-      const [directoryResult, matchesResult] = await Promise.allSettled([
-        api.get(`/directory?q=${encodeURIComponent(q)}&limit=12`),
-        api.get('/matches?limit=20'),
-      ]);
-      if (directoryResult.status !== 'fulfilled') throw directoryResult.reason;
-      const directoryRes = directoryResult.value;
-      const matchesRes = matchesResult.status === 'fulfilled' ? matchesResult.value : { data: {} };
-      const people = directoryRes.data?.people || [];
-      const byId = new Map(people.map(person => [person.id, person]));
-      const scored = (matchesRes.data?.matches || [])
-        .filter(match => byId.has(match.user?.id))
-        .sort((a, b) => (b.score || 0) - (a.score || 0))
-        .slice(0, 3)
-        .map(match => ({ ...byId.get(match.user.id), score: match.score, reasons: match.reasons }));
-      setQuestionResults(scored.length ? scored : people.slice(0, 3));
-    } catch {
-      setQuestionResults([]);
-    } finally {
-      setQuestionLoading(false);
-    }
-  }
 
   // Snapshot strip taps: jump to the matching section below the fold.
   // "New requests" reopens the acceptance modal if it was dismissed.
@@ -282,20 +250,22 @@ export default function Dashboard() {
         </div>
       )}
 
-      <HomeQuestion
-        question={question}
-        setQuestion={setQuestion}
-        results={questionResults}
-        loading={questionLoading}
-        onSubmit={searchFromHome}
-        onRequest={person => setRequestingPerson(person)}
+      <HomeConversation
+        key={user?.id}
+        userId={user?.id}
+        sessions={sessions}
+        onRequest={(person, context) => { setRequestingPerson(person); setRequestContext(context); }}
       />
 
       {requestingPerson && <SessionRequestModal
         mentor={requestingPerson}
+        initialQuestion={requestContext.question}
+        initialIntent={requestContext.intent}
         onClose={() => setRequestingPerson(null)}
         onSuccess={() => { setRequestingPerson(null); loadSessions(); }}
       />}
+
+      {sessions.filter(s => s.status === 'completed' || s.viewer_completed).map(session => <div id={`home-session-${session.id}`} key={session.id} className="scroll-mt-8"><SessionCard session={session} currentUserId={user?.id} onUpdate={handleSessionUpdate} /></div>)}
 
       <PageSection
         title={t('dashboard.sessions.title')}
@@ -326,12 +296,12 @@ export default function Dashboard() {
                 </div>
                 <div className="divide-y divide-[var(--border)]">
                   {needsAction.map(session => (
-                    <SessionCard
+                    <div key={session.id} id={`home-session-${session.id}`} className="scroll-mt-8"><SessionCard
                       key={session.id}
                       session={session}
                       currentUserId={user?.id}
                       onUpdate={handleSessionUpdate}
-                    />
+                    /></div>
                   ))}
                 </div>
               </div>
@@ -346,12 +316,12 @@ export default function Dashboard() {
                 </div>
                 <div className="divide-y divide-[var(--border)]">
                   {upcoming.map(session => (
-                    <SessionCard
+                    <div key={session.id} id={`home-session-${session.id}`} className="scroll-mt-8"><SessionCard
                       key={session.id}
                       session={session}
                       currentUserId={user?.id}
                       onUpdate={handleSessionUpdate}
-                    />
+                    /></div>
                   ))}
                 </div>
               </div>
@@ -361,41 +331,6 @@ export default function Dashboard() {
       </PageSection>
     </PageShell>
   );
-}
-function HomeQuestion({ question, setQuestion, results, loading, onSubmit, onRequest }) {
-  const { t } = useT();
-  return (
-    <Surface>
-      <SurfaceBody className="space-y-4 py-6">
-        <div>
-          <p className="text-base font-medium text-foreground">{t('dashboard.connect.title')}</p>
-          <p className="mt-1 text-sm text-muted-foreground">{t('dashboard.connect.body')}</p>
-        </div>
-        <form onSubmit={onSubmit} className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input value={question} onChange={e => setQuestion(e.target.value)} className="pl-9" placeholder={t('dashboard.connect.placeholder')} />
-          </div>
-          <Button type="submit" disabled={loading || !question.trim()}>{loading ? t('dashboard.connect.searching') : t('dashboard.connect.cta')}</Button>
-        </form>
-        {results && (results.length ? (
-          <div className="grid gap-3 md:grid-cols-3">
-            {results.map(person => <HomePerson key={person.id} person={person} onRequest={() => onRequest(person)} />)}
-          </div>
-        ) : <p className="text-sm text-muted-foreground">{t('dashboard.connect.empty')}</p>)}
-      </SurfaceBody>
-    </Surface>
-  );
-}
-
-function HomePerson({ person, onRequest }) {
-  const { t } = useT();
-  const initials = (person.name || '?').split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase();
-  return <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 p-3">
-    <Avatar className="size-9"><AvatarFallback className="bg-muted text-xs">{initials}</AvatarFallback></Avatar>
-    <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{person.name}</p><p className="truncate text-xs text-muted-foreground">{person.reasons?.[0] || [person.program, person.location].filter(Boolean).join(' · ')}</p></div>
-    <Button size="xs" variant="outline" onClick={onRequest}>{t('dashboard.connect.request')}</Button>
-  </div>;
 }
 
 // Tappable counters under the hero — "X upcoming · Y needs attention ·
