@@ -31,7 +31,7 @@ function NavBar({ t }) {
 
 function Hero({ t }) {
   return (
-    <section className="border-b border-[var(--border)] bg-background">
+    <section className="marketing-hero border-b border-[var(--border)] bg-background">
       <div className="mx-auto max-w-[1160px] px-6 py-20 text-center">
         <p className="mb-4 inline-block rounded-full border border-[var(--border)] bg-background px-3 py-1 text-xs font-medium tracking-wide text-muted-foreground">
           {t('landing.hero.eyebrow')}

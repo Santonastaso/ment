@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ArrowUp, Check, Pencil, RefreshCw, Send, Sparkles } from 'lucide-react';
 import api from '../../api/index.js';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { useT } from '../../i18n/index.jsx';
 import { createDiscoveryDraft, getDiscoveryMatches, loadConversationCandidates } from '../demo/homeDemo.js';
 
 const COPY = {
@@ -19,7 +20,7 @@ const COPY = {
     addContext: 'Aggiungi contesto', directory: 'Directory', finding: 'Cerco persone che possono aiutarti', chooseLead: 'Tre persone si distinguono per questa richiesta. Scegli chi contattare.', chooseBold: 'Preparerò un messaggio per te.',
     why: 'Perché questa persona', available: 'Disponibile', choose: 'Scegli', selected: 'Scelto', different: 'Mostra altre persone', browse: 'sfoglia la directory', notRight: 'Non è quello che cercavi?',
     to: 'A', intro: 'Ecco un messaggio proposto. Modifica tutto quello che vuoi, poi invialo quando ti sembra giusto.', suggested: 'Messaggio proposto', send: 'Invia richiesta', regenerate: 'Rigenera', edit: 'Modifica', remaining: '{count} richieste rimaste questo mese',
-    sent: 'Richiesta inviata a {name}.', sentSubline: 'Ti avviseremo non appena riceverai una risposta.', again: 'Chiedi qualcos altro', retry: 'Riprova', error: 'Non siamo riusciti a completare la richiesta. Riprova.', noMatches: 'Non ci sono ancora corrispondenze disponibili. Prova un altro approccio o sfoglia la directory.',
+    sent: 'Richiesta inviata a {name}.', sentSubline: 'Ti avviseremo non appena riceverai una risposta.', again: "Chiedi qualcos'altro", retry: 'Riprova', error: 'Non siamo riusciti a completare la richiesta. Riprova.', noMatches: 'Non ci sono ancora corrispondenze disponibili. Prova un altro approccio o sfoglia la directory.',
   },
   fr: {
     greeting: 'Sur quoi travaillez-vous, {name} ?', subline: 'Decrivez-le en une phrase. Ment trouve les bonnes personnes pour vous.',
@@ -52,7 +53,7 @@ function MatchCard({ match, index, selected, onSelect, copy }) {
 
 export default function DiscoveryFlow() {
   const { user } = useAuth();
-  const lang = localStorage.getItem('ment.lang') || 'en';
+  const { lang } = useT();
   const copy = COPY[lang] || COPY.en;
   const [stage, setStage] = useState('ask');
   const [query, setQuery] = useState('');

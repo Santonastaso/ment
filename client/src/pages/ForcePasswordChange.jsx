@@ -37,8 +37,8 @@ export default function ForcePasswordChange() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-6">
-      <Card className="w-full max-w-[400px] rounded-xl border-[var(--border)] shadow-none">
+    <div className="auth-shell flex min-h-screen items-center justify-center bg-background p-6">
+      <Card className="w-full max-w-[400px]">
         <CardHeader>
           <CardTitle className="text-lg font-medium">{t('auth.forcePassword.title')}</CardTitle>
           <CardDescription>

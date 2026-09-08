@@ -15,7 +15,7 @@ export default function AppLayout() {
 
   return (
     <div className={cn('flex h-screen min-h-screen overflow-hidden bg-[var(--background)]', isDiscovery && 'discovery-app-shell')}>
-      {!isDiscovery && <aside className="flex h-full w-[224px] shrink-0 flex-col border-r border-[var(--sidebar-border)] bg-[var(--sidebar)] max-md:hidden">
+      {!isDiscovery && <aside className="flex h-full w-[236px] shrink-0 flex-col border-r border-[var(--sidebar-border)] bg-[var(--sidebar)] max-md:hidden">
         <Sidebar />
       </aside>}
 
@@ -39,8 +39,8 @@ export default function AppLayout() {
             </Sheet>
           }
         />
-        <main className={cn('flex-1 overflow-auto bg-[var(--background)] px-4 py-6 sm:px-8', isDiscovery && 'px-0 py-0 sm:px-0')}>
-          <div className={cn('mx-auto w-full max-w-[1180px]', isDiscovery && 'max-w-none')}>
+        <main className={cn('flex-1 overflow-auto bg-[var(--background)] px-5 py-8 sm:px-10', isDiscovery && 'px-0 py-0 sm:px-0')}>
+          <div className={cn('mx-auto w-full max-w-[1200px]', isDiscovery && 'max-w-none')}>
             <Outlet />
           </div>
         </main>

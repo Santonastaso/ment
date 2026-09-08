@@ -62,13 +62,13 @@ export default function RequestAccess() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background p-6">
+    <div className="auth-shell flex min-h-screen flex-col items-center justify-center bg-background p-6">
       <div className="mb-8 flex items-center gap-2">
         <span className="flex size-10 items-center justify-center rounded-lg bg-primary text-base font-bold text-primary-foreground">M</span>
         <span className="text-xl font-semibold">MENT</span>
       </div>
 
-      <Card className="w-full max-w-[520px] rounded-xl border-[var(--border)] shadow-none">
+      <Card className="w-full max-w-[520px]">
         <CardHeader>
           <CardTitle className="text-lg font-medium">{t('auth.requestAccess.title')}</CardTitle>
           <CardDescription>{t('auth.requestAccess.description')}</CardDescription>

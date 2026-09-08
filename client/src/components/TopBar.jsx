@@ -30,11 +30,11 @@ export default function TopBar({ mobileMenu, discovery = false }) {
   }
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b border-[var(--border)] bg-[#fbfbfa]/95 px-4 backdrop-blur sm:px-6">
+    <header className="sticky top-0 z-30 flex h-[60px] shrink-0 items-center gap-3 border-b border-[var(--border-subtle)] bg-[rgb(255_255_255_/_72%)] px-5 backdrop-blur sm:px-8">
       {mobileMenu}
       {!user?.is_admin && <div className="hidden flex-1 justify-center md:flex">
         <form onSubmit={submit} className="w-full max-w-md" role="search">
-          <div className="flex h-9 w-full items-center gap-2 rounded-lg border border-[var(--border)] bg-[#f0f0ee] px-3 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] transition-colors duration-150 focus-within:border-[#b8b8b4] focus-within:bg-white focus-within:ring-[3px] focus-within:ring-black/[0.05]">
+          <div className="flex h-10 w-full items-center gap-2 rounded-xl border border-[var(--border)] bg-[#faf8f4] px-3.5 text-sm transition-colors duration-150 focus-within:border-primary focus-within:bg-white focus-within:ring-[3px] focus-within:ring-primary/10">
             <Search className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             <input
               type="search"

@@ -1,6 +1,6 @@
 ﻿import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, LogOut, LifeBuoy } from 'lucide-react';
+import { ChevronDown, LogOut, LifeBuoy, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useT } from '../i18n/index.jsx';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -80,9 +80,18 @@ export default function UserMenu({ compact = false }) {
           <button
             type="button"
             role="menuitem"
+            onClick={() => { setOpen(false); navigate('/profile'); }}
+            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm hover:bg-muted"
+          >
+            <User className="size-4" />
+            {t('nav.myProfile')}
+          </button>
+          <button
+            type="button"
+            role="menuitem"
             data-testid="help-feedback-menu-item"
             onClick={() => { setOpen(false); setHelpOpen(true); }}
-            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm hover:bg-muted"
+            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm hover:bg-muted"
           >
             <LifeBuoy className="size-4" />
             {t('common.helpFeedback')}
@@ -91,7 +100,7 @@ export default function UserMenu({ compact = false }) {
             type="button"
             role="menuitem"
             onClick={handleSignOut}
-            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm hover:bg-muted"
+            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm hover:bg-muted"
           >
             <LogOut className="size-4" />
             {t('common.signOut')}

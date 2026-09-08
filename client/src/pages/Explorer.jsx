@@ -99,9 +99,9 @@ export default function Explorer() {
   const pageCount = Math.max(Math.ceil(total / PAGE_SIZE), 1);
 
   return (
-    <PageShell title={t('explorer.title')} className="gap-4">
+    <PageShell title={t('explorer.title')} description={t('explorer.entryTitle')} className="gap-6">
 
-              <Surface>
+              <Surface className="directory-filter-panel">
                 <SurfaceBody className="space-y-3">
                   <form onSubmit={submitSearch} className="flex gap-2">
                     <Input aria-label={t('explorer.searchLabel')} placeholder={t('explorer.searchLabel')} value={inputValue} onChange={e => setInputValue(e.target.value)} />
@@ -192,11 +192,11 @@ function PersonCard({ person, onRequest }) {
   const isAlumnus = person.role === 'alumnus';
 
   return (
-    <Surface>
+    <Surface className="directory-person-card">
       <SurfaceBody className="flex flex-col gap-3">
         <div className="flex items-start gap-3">
           <Avatar className="size-10">
-            <AvatarFallback className="bg-muted text-sm font-medium text-foreground">{initials}</AvatarFallback>
+            <AvatarFallback className="bg-accent text-sm font-semibold text-primary">{initials}</AvatarFallback>
           </Avatar>
           <div className="min-w-0 flex-1">
             <Link to={`/profile/${person.id}`} className="block truncate font-medium text-foreground hover:text-primary hover:underline">

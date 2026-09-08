@@ -61,7 +61,7 @@ export default function Groups() {
 
   return (
     <PageShell title={t('groups.pageTitle')} description={t('groups.pageDescription')}>
-      <Surface>
+      <Surface className="group-create-card">
         <SurfaceHeader title={t('groups.create.title')} description={t('groups.create.description')} />
         <SurfaceBody className="grid gap-3 pt-5 sm:grid-cols-[minmax(180px,260px)_1fr_auto] sm:items-end">
           {error && <p className="sm:col-span-3 text-sm text-rose-600" role="alert">{error}</p>}
@@ -93,7 +93,7 @@ export default function Groups() {
         </SurfaceBody>
       </Surface>
 
-      <Surface>
+      <Surface className="group-list-card">
         <SurfaceHeader title={t('groups.list.title')} />
         <SurfaceBody className="pt-5">
           {loading ? (
@@ -103,7 +103,7 @@ export default function Groups() {
           ) : (
             <div className="divide-y divide-[var(--border)]">
               {groups.map((group) => (
-                <div key={group.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+                <div key={group.id} className="group-row flex flex-wrap items-center justify-between gap-3 py-4">
                   <div className="min-w-0">
                     <p className="font-medium text-foreground">{group.name}</p>
                     {group.description && <p className="text-sm text-muted-foreground">{group.description}</p>}

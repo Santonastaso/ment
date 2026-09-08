@@ -24,9 +24,9 @@ export default function Sidebar({ onNavigate }) {
       ];
 
   return (
-    <div className="flex h-full flex-col px-3 py-4">
-      <Link to={user?.is_admin ? '/admin' : '/'} onClick={onNavigate} className="mb-6 flex h-9 items-center gap-2 rounded-md px-2 hover:bg-[var(--sidebar-accent)]">
-        <span className="flex size-7 items-center justify-center rounded-md bg-[#202124] text-xs font-bold text-white">
+    <div className="flex h-full flex-col px-3 py-5">
+      <Link to={user?.is_admin ? '/admin' : '/'} onClick={onNavigate} className="mb-8 flex h-10 items-center gap-2.5 rounded-xl px-2 hover:bg-[var(--sidebar-accent)]">
+        <span className="flex size-7 items-center justify-center rounded-lg bg-primary text-xs font-bold text-white shadow-[0_3px_8px_rgba(217,119,87,0.22)]">
           M
         </span>
         <span className="text-[15px] font-semibold tracking-[-0.02em] text-foreground">MENT</span>
@@ -46,9 +46,9 @@ export default function Sidebar({ onNavigate }) {
               onClick={onNavigate}
               data-testid={item.testid}
               className={cn(
-                'flex h-8 items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium transition-colors duration-150',
+                'flex h-9 items-center gap-2.5 rounded-xl px-3 text-[13px] font-medium transition-colors duration-150',
                 active
-                  ? 'bg-[#e9e9e7] text-foreground shadow-[inset_0_0_0_1px_rgba(0,0,0,0.03)]'
+                  ? 'bg-[var(--sidebar-accent)] text-foreground shadow-[inset_0_0_0_1px_rgba(217,119,87,0.08)]'
                   : 'text-muted-foreground hover:bg-[var(--sidebar-accent)] hover:text-foreground'
               )}
             >

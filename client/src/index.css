@@ -2,41 +2,41 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Design language: dense CRM chrome, quiet grey canvas, hairline borders. */
+/* Ment's shared visual language: warm canvas, calm surfaces, one clear action. */
 @layer base {
   :root {
     --font-sans: 'Aptos', 'Helvetica Neue', Helvetica, sans-serif;
-    --background: #f1f1ef;
-    --foreground: #242426;
-    --card: #fafaf9;
-    --card-foreground: #242426;
+    --background: #fbfaf7;
+    --foreground: #201e1b;
+    --card: #ffffff;
+    --card-foreground: #201e1b;
     --popover: #ffffff;
-    --popover-foreground: #242426;
-    --primary: #202124;
+    --popover-foreground: #201e1b;
+    --primary: #d97757;
     --primary-foreground: #ffffff;
-    --secondary: #e8e8e5;
-    --secondary-foreground: #3f3f42;
-    --muted: #e8e8e5;
-    --muted-foreground: #737373;
-    --accent: #e4e4e1;
-    --accent-foreground: #242426;
+    --secondary: #f3f0ea;
+    --secondary-foreground: #4b463f;
+    --muted: #f3f0ea;
+    --muted-foreground: #7c7770;
+    --accent: #fbeee6;
+    --accent-foreground: #201e1b;
     --destructive: #dc2626;
     --destructive-foreground: #ffffff;
-    --border: #d8d8d4;
-    --border-subtle: #e6e6e2;
-    --input: #cfcfca;
-    --ring: rgba(32, 33, 36, 0.14);
-    --radius: 7px;
-    --shadow-card: 0 1px 2px rgba(18, 18, 18, 0.035);
-    --shadow-overlay: 0 18px 60px rgba(18, 18, 18, 0.18);
-    --sidebar: #f4f4f2;
-    --sidebar-foreground: #3f3f42;
-    --sidebar-primary: #202124;
+    --border: #e3ded4;
+    --border-subtle: #ece8e0;
+    --input: #e3ded4;
+    --ring: rgba(217, 119, 87, 0.22);
+    --radius: 18px;
+    --shadow-card: 0 6px 18px rgba(48, 40, 32, 0.05);
+    --shadow-overlay: 0 18px 60px rgba(48, 40, 32, 0.18);
+    --sidebar: #f7f5f0;
+    --sidebar-foreground: #4b463f;
+    --sidebar-primary: #d97757;
     --sidebar-primary-foreground: #ffffff;
-    --sidebar-accent: #e7e7e4;
-    --sidebar-accent-foreground: #242426;
-    --sidebar-border: #dededb;
-    --sidebar-ring: rgba(32, 33, 36, 0.14);
+    --sidebar-accent: #fbeee6;
+    --sidebar-accent-foreground: #201e1b;
+    --sidebar-border: #ece8e0;
+    --sidebar-ring: rgba(217, 119, 87, 0.22);
   }
 
   * {
@@ -54,7 +54,7 @@
 
   h1, h2, h3 {
     font-family: var(--font-sans), system-ui, sans-serif;
-    font-weight: 500;
+    font-weight: 600;
     color: var(--foreground);
     letter-spacing: -0.01em;
   }
@@ -65,7 +65,7 @@
   }
 
   thead {
-    background: #f3f3f1;
+    background: #faf8f4;
   }
 
   th {
@@ -164,6 +164,16 @@
 .discovery-empty { margin-top: 1.4rem; border: 1px solid #e3ded4; border-radius: 18px; background: white; padding: 1rem; color: #7c7770; }
 .discovery-empty p { margin: 0 0 .7rem; }
 .discovery-empty button { border: 0; background: transparent; color: #c15f3c; font-weight: 600; text-decoration: underline; }
+.auth-shell { background: radial-gradient(circle at 50% -10%, #fbeee6 0, #fbfaf7 35%, #fbfaf7 100%); }
+.marketing-hero { position: relative; overflow: hidden; background: radial-gradient(circle at 50% -20%, #fbeee6 0, #fbfaf7 52%, #fbfaf7 100%); }
+.marketing-hero::before { position: absolute; top: 13%; left: calc(50% - 280px); width: 560px; height: 560px; border-radius: 50%; background: rgb(217 119 87 / 5%); content: ''; filter: blur(4px); pointer-events: none; }
+.marketing-hero > div { position: relative; }
+.directory-filter-panel { background: linear-gradient(135deg, #fff 0%, #fffaf7 100%); }
+.directory-person-card { height: 100%; transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease; }
+.directory-person-card:hover { border-color: #d8b3a4; box-shadow: 0 10px 24px rgb(48 40 32 / 8%); transform: translateY(-2px); }
+.group-create-card { background: linear-gradient(135deg, #fff 0%, #fffaf7 100%); }
+.group-row { border-radius: 12px; padding-inline: .5rem; transition: background .15s ease; }
+.group-row:hover { background: #faf8f4; }
 @keyframes discoveryRise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes discoveryPop { from { transform: scale(.6); } to { transform: scale(1); } }
 @keyframes discoveryShimmer { to { background-position: -200% 0; } }
@@ -182,22 +192,22 @@
 
   .input {
     display: flex;
-    min-height: 38px;
+    min-height: 42px;
     width: 100%;
-    border-radius: 6px;
+    border-radius: 12px;
     border: 1px solid var(--input);
     background-color: var(--card);
-    padding: 6px 10px;
+    padding: 8px 12px;
     font-size: 14px;
     line-height: 1.4;
     color: var(--foreground);
     transition: border-color 150ms ease, box-shadow 150ms ease;
   }
-  .input::placeholder { color: #a3a3a8; }
+  .input::placeholder { color: #aaa49b; }
   .input:focus-visible {
     outline: none;
-    border-color: #777773;
-    box-shadow: 0 0 0 3px rgba(32, 33, 36, 0.08);
+    border-color: #d97757;
+    box-shadow: 0 0 0 3px rgba(217, 119, 87, 0.12);
   }
   .input:disabled { cursor: not-allowed; opacity: 0.5; }
   textarea.input {
@@ -223,7 +233,7 @@
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: #8a8a8a;
+    color: #aaa49b;
   }
 
   .section-title {
