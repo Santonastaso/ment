@@ -416,7 +416,7 @@ export default function Profile() {
       )}
 
       {validTabs.length > 1 && (
-        <nav className="flex items-center gap-6 overflow-x-auto whitespace-nowrap border-b border-[var(--border)]" aria-label={t('profile.tabs.label')}>
+        <nav className="flex items-center gap-6 overflow-x-auto overflow-y-hidden whitespace-nowrap border-b border-[var(--border)]" aria-label={t('profile.tabs.label')}>
           {validTabs.map(key => (
             <button
               key={key}
