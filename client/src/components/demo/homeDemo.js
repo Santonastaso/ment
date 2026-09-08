@@ -51,6 +51,31 @@ export async function loadConversationCandidates(api) {
     request_eligible: true,
   }));
 }
+
+export function getDiscoveryMatches({ query, people, userId }) {
+  const scenario = classifyNeed(query);
+  const suggested = scenario ? suggestPeople({ question: query, scenario, people, userId }) : [];
+  const ranked = suggested.length
+    ? suggested
+    : people
+      .filter(person => person.id !== userId && person.mentorship_available !== false && person.request_eligible !== false)
+      .sort((a, b) => Number(b.match_score || 0) - Number(a.match_score || 0))
+      .slice(0, 3)
+      .map(person => ({ person, evidence: person.match_reasons || [] }));
+  return ranked.slice(0, 3).map(({ person, evidence }) => ({
+    person,
+    reason: evidence[0] || `${person.name?.split(' ')[0] || 'They'} can share relevant experience from ${person.job_title || person.department || 'their work'}.`,
+  }));
+}
+
+export function createDiscoveryDraft({ userName, person, query, reason, variant = 0 }) {
+  const from = userName?.split(' ')[0] || 'there';
+  const to = person.name?.split(' ')[0] || 'there';
+  const context = variant === 0
+    ? `I am looking for help with ${query.trim()}. I saw that ${reason.charAt(0).toLowerCase()}${reason.slice(1)}`
+    : `I am working on ${query.trim()} and your background stood out to me: ${reason}`;
+  return `Hi ${to},\n\nI'm ${from}. ${context}\n\nWould you be open to a short conversation in the next couple of weeks? Happy to work around your schedule.\n\nThanks so much,\n${from}`;
+}
 export function discoveryReply({ question, previousQuestion = '', people = [], userId, intent = 'one_off' }) {
   const combined = [previousQuestion, question].filter(Boolean).join('\n');
   const scenario = classifyNeed(question) || classifyNeed(previousQuestion);

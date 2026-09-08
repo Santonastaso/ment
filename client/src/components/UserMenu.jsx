@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import HelpFeedbackModal from './HelpFeedbackModal.jsx';
 
-export default function UserMenu() {
+export default function UserMenu({ compact = false }) {
   const { user, session, logout } = useAuth();
   const { t } = useT();
   const email = session?.user?.email || '';
@@ -56,6 +56,7 @@ export default function UserMenu() {
         aria-haspopup="menu"
         className={cn(
           'inline-flex h-9 items-center gap-2 rounded-lg px-2 text-sm font-medium text-foreground',
+          compact && 'size-9 justify-center rounded-full p-0',
           'outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50'
         )}
       >
@@ -64,8 +65,7 @@ export default function UserMenu() {
             {initials}
           </AvatarFallback>
         </Avatar>
-        <span className="hidden max-w-[120px] truncate sm:inline">{user?.name}</span>
-        <ChevronDown className="size-4 text-muted-foreground" />
+        {!compact && <><span className="hidden max-w-[120px] truncate sm:inline">{user?.name}</span><ChevronDown className="size-4 text-muted-foreground" /></>}
       </button>
 
       {open && (

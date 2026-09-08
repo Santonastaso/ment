@@ -1,22 +1,27 @@
 import React, { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar.jsx';
 import TopBar from './TopBar.jsx';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Menu } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '../context/AuthContext.jsx';
 
 export default function AppLayout() {
   const [mobileNav, setMobileNav] = useState(false);
+  const location = useLocation();
+  const { user } = useAuth();
+  const isDiscovery = location.pathname === '/' && !user?.is_admin;
 
   return (
-    <div className="flex h-screen min-h-screen overflow-hidden bg-[var(--background)]">
-      <aside className="flex h-full w-[224px] shrink-0 flex-col border-r border-[var(--sidebar-border)] bg-[var(--sidebar)] max-md:hidden">
+    <div className={cn('flex h-screen min-h-screen overflow-hidden bg-[var(--background)]', isDiscovery && 'discovery-app-shell')}>
+      {!isDiscovery && <aside className="flex h-full w-[224px] shrink-0 flex-col border-r border-[var(--sidebar-border)] bg-[var(--sidebar)] max-md:hidden">
         <Sidebar />
-      </aside>
+      </aside>}
 
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar
+          discovery={isDiscovery}
           mobileMenu={
             <Sheet open={mobileNav} onOpenChange={setMobileNav}>
               <SheetTrigger
@@ -34,8 +39,8 @@ export default function AppLayout() {
             </Sheet>
           }
         />
-        <main className="flex-1 overflow-auto bg-[var(--background)] px-4 py-6 sm:px-8">
-          <div className="mx-auto w-full max-w-[1180px]">
+        <main className={cn('flex-1 overflow-auto bg-[var(--background)] px-4 py-6 sm:px-8', isDiscovery && 'px-0 py-0 sm:px-0')}>
+          <div className={cn('mx-auto w-full max-w-[1180px]', isDiscovery && 'max-w-none')}>
             <Outlet />
           </div>
         </main>

@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Search } from 'lucide-react';
 import UserMenu from './UserMenu.jsx';
 import LanguageSwitcher from '../i18n/LanguageSwitcher.jsx';
 import { useT } from '../i18n/index.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 
-export default function TopBar({ mobileMenu }) {
+export default function TopBar({ mobileMenu, discovery = false }) {
   const { t } = useT();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -18,6 +18,15 @@ export default function TopBar({ mobileMenu }) {
     // Route to Explorer; pass the query so it can pre-filter. Empty query just
     // opens Explorer.
     navigate(query ? `/explorer?q=${encodeURIComponent(query)}` : '/explorer');
+  }
+
+  if (discovery) {
+    return (
+      <header className="discovery-topbar">
+        <Link to="/" className="discovery-brand" aria-label="Ment home"><span>M</span>Ment</Link>
+        <div className="flex items-center gap-2 sm:gap-4"><Link to="/explorer?mode=directory" className="discovery-directory-link">Directory</Link><LanguageSwitcher /><UserMenu compact /></div>
+      </header>
+    );
   }
 
   return (
