@@ -228,7 +228,7 @@ export default function EscoSuggestInput({
         <ul
           id={listboxId}
           role="listbox"
-          className="absolute z-50 left-0 right-0 mt-1 max-h-64 overflow-auto rounded-lg border border-[var(--border)] bg-white [box-shadow:var(--shadow-card)] text-sm"
+          className="absolute left-0 right-0 z-50 mt-1 max-h-64 overflow-auto rounded-lg border border-[var(--border)] bg-popover text-sm"
         >
           {suggestions.map((item, idx) => {
             const active = idx === highlight;

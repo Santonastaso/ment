@@ -1,6 +1,6 @@
 ﻿import React, { useMemo, useState } from 'react';
 import api from '../api/index.js';
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { createDraft } from './demo/homeDemo.js';
 import { homeCopy } from './demo/homeCopy.js';
 import { useT } from '../i18n/index.jsx';
@@ -21,9 +21,14 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
   const idempotencyKey = useRef(crypto.randomUUID());
   const submitLock = useRef(false);
   const submittedPayload = useRef(null);
+  const bodyRef = useRef(null);
   const [scheduledAt, setScheduledAt] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    bodyRef.current?.scrollTo({ top: 0 });
+  }, [step]);
 
   // Min datetime: 1 hour from now
   const minDate = new Date(Date.now() + 60 * 60 * 1000);
@@ -93,23 +98,19 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl [box-shadow:var(--shadow-overlay)] w-full max-w-md max-h-[90vh] flex flex-col">
-        <div className="p-6 border-b border-[var(--border-subtle)] flex-shrink-0">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 p-4">
+      <div className="session-request-modal flex max-h-[calc(100vh-2rem)] w-full max-w-[560px] flex-col overflow-hidden rounded-[18px] border border-[var(--border)] bg-card [box-shadow:var(--shadow-overlay)]">
+        <div className="flex-shrink-0 border-b border-[var(--border-subtle)] px-6 py-5">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-foreground">{t('components.sessionRequest.title')}</h2>
-            <button disabled={submitting} aria-label={copy.close} onClick={onClose} className="text-muted-foreground hover:text-secondary-foreground text-2xl leading-none">&times;</button>
+            <h2 className="text-xl font-semibold tracking-[-0.02em] text-foreground">{t('components.sessionRequest.title')}</h2>
+            <button disabled={submitting} aria-label={copy.close} onClick={onClose} className="grid size-9 place-items-center rounded-lg text-2xl leading-none text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">&times;</button>
           </div>
           <p className="text-sm text-muted-foreground mt-1">{t('components.sessionRequest.subtitle', { name: mentor.name, department: mentor.department })}</p>
         </div>
 
-        <div className="p-6 space-y-5 overflow-y-auto">
+        <div ref={bodyRef} className="session-modal-scroll min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-5">
           {/* Step indicator */}
-          <div className="flex gap-2 mb-2">
-            {Array.from({ length: TOTAL_STEPS }, (_, i) => (
-              <div key={i} className={`h-1.5 flex-1 rounded-full ${(i + 1) <= step ? 'bg-primary' : 'bg-gray-200'}`} />
-            ))}
-          </div>
+          <p className="text-xs font-medium tabular-nums text-muted-foreground">{step} / {TOTAL_STEPS}</p>
 
           {/* STEP 1 — Topics */}
           {step === 1 && (
@@ -179,7 +180,7 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
                   <p className="text-[11px] uppercase tracking-wide text-foreground font-medium mb-1">{t('components.sessionRequest.step2TopicsPicked')}</p>
                   <div className="flex flex-wrap gap-1.5">
                     {selectedTopics.map(t => (
-                      <span key={t} className="bg-white text-foreground border border-[var(--border)] rounded-full px-2.5 py-0.5 text-xs">
+                      <span key={t} className="rounded-md border border-[var(--border)] bg-card px-2.5 py-0.5 text-xs text-foreground">
                         {t}
                       </span>
                     ))}
@@ -205,12 +206,14 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
           )}
 
           {step === 4 && (
-            <div className="space-y-4 rounded-lg border border-border bg-muted/40 p-4 text-sm">
-              <p className="font-medium text-foreground">{t('components.sessionRequest.reviewTitle')}</p>
-              <p><span className="font-medium">{copy.recipient}:</span> {mentor.name}</p>
+            <div className="space-y-5 text-sm">
+              <div className="border-b border-border pb-4">
+                <p className="font-semibold text-foreground">{t('components.sessionRequest.reviewTitle')}</p>
+                <p className="mt-2"><span className="font-medium">{copy.recipient}:</span> {mentor.name}</p>
+              </div>
               <p className="text-xs text-muted-foreground">{copy.draft}</p>
               <label className="block">{t('components.sessionRequest.title')}<input className="input mt-1" value={requestTitle} maxLength={120} disabled={submitting || !!submittedPayload.current} onChange={e => setRequestTitle(e.target.value)} /></label>
-              <label className="block">{copy.message}<textarea className="input mt-1 min-h-48" value={draft} maxLength={6000} disabled={submitting || !!submittedPayload.current} onChange={e => { setDraft(e.target.value); setDraftEdited(true); }} /></label>
+              <label className="block">{copy.message}<textarea className="input mt-1 min-h-40 resize-none" value={draft} maxLength={6000} disabled={submitting || !!submittedPayload.current} onChange={e => { setDraft(e.target.value); setDraftEdited(true); }} /></label>
               <p>{intent === 'ongoing' ? copy.ongoing : copy.oneOff}</p>
               <div><span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('components.sessionRequest.reviewQuestion')}</span><p className="mt-1 text-foreground">{question}</p></div>
               {selectedTopics.length > 0 && <div><span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('components.sessionRequest.reviewTopics')}</span><p className="mt-1 text-foreground">{selectedTopics.join(', ')}</p></div>}
@@ -222,10 +225,10 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
           {error && <div role="alert" className="text-red-600 text-sm">{error}<a className="mt-2 block underline" href="/explorer?mode=directory">{copy.browse}</a></div>}
         </div>
 
-        <div className="px-6 pb-6 flex justify-between gap-3 flex-shrink-0">
+        <div className="flex flex-shrink-0 justify-end gap-2 border-t border-[var(--border-subtle)] px-6 py-4">
           {step === 1 && (
             <>
-              <Button onClick={onClose} variant="ghost">{t('components.sessionRequest.cancel')}</Button>
+              <Button onClick={onClose} variant="outline">{t('components.sessionRequest.cancel')}</Button>
               <Button onClick={() => setStep(2)}>
                 {selectedTopics.length === 0 ? t('components.sessionRequest.skip') : t('components.sessionRequest.continue')}
               </Button>

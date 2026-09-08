@@ -121,7 +121,7 @@ export default function AcceptanceModal({ sessions, onAcknowledged, onClose }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="acceptance-modal-title"
-        className="bg-white rounded-2xl [box-shadow:var(--shadow-overlay)] w-full max-w-xl max-h-[85vh] flex flex-col"
+        className="flex max-h-[85vh] w-full max-w-xl flex-col rounded-[10px] border border-[var(--border)] bg-card [box-shadow:var(--shadow-overlay)]"
       >
         <div className="p-6 border-b border-[var(--border-subtle)] flex-shrink-0">
           <div className="flex items-center justify-between gap-3">
@@ -179,7 +179,7 @@ export default function AcceptanceModal({ sessions, onAcknowledged, onClose }) {
                         value={draftDate}
                         min={minDateTimeLocal()}
                         onChange={(e) => setDraftDate(e.target.value)}
-                        className="rounded-[10px] border border-[var(--input)] bg-white px-3 py-1.5 text-sm"
+                        className="rounded-lg border border-[var(--input)] bg-card px-3 py-1.5 text-sm"
                       />
                       <Button
                         type="button"

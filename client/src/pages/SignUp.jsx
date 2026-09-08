@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import LegalLinks from '../components/LegalLinks.jsx';
 
 // Public org self-signup.
 // Creates a brand new organization + admin user via the `public-signup`
@@ -87,7 +88,7 @@ export default function SignUp() {
   }
 
   return (
-    <div className="auth-shell min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="auth-shell flex min-h-screen flex-col items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
           <div className="flex items-center justify-between gap-3">
@@ -192,6 +193,7 @@ export default function SignUp() {
           </form>
         </CardContent>
       </Card>
+      <LegalLinks className="mt-6" />
     </div>
   );
 }

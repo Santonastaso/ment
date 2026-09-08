@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import LegalLinks from '../components/LegalLinks.jsx';
 
 const COMPANY_SIZES = ['1-50', '51-200', '201-1000', '1000+'];
 
@@ -64,7 +65,7 @@ export default function RequestAccess() {
   return (
     <div className="auth-shell flex min-h-screen flex-col items-center justify-center bg-background p-6">
       <div className="mb-8 flex items-center gap-2">
-        <span className="flex size-10 items-center justify-center rounded-lg bg-primary text-base font-bold text-primary-foreground">M</span>
+        <span className="flex size-10 items-center justify-center rounded-full bg-primary text-base font-bold text-primary-foreground">M</span>
         <span className="text-xl font-semibold">MENT</span>
       </div>
 
@@ -164,6 +165,7 @@ export default function RequestAccess() {
           )}
         </CardContent>
       </Card>
+      <LegalLinks className="mt-6" />
     </div>
   );
 }

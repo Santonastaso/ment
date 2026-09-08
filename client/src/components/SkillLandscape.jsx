@@ -43,7 +43,7 @@ function SkillRow({ entry, kind, isOwnProfile, onDelete }) {
         type="button"
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
-        className="flex w-full items-center justify-between gap-3 py-2.5 text-left"
+        className="flex w-full items-center justify-between gap-3 rounded-full px-3 py-2 text-left hover:bg-[var(--control-surface)]"
       >
         <span className="min-w-0 truncate text-sm font-medium text-foreground">{entry.skill}</span>
         <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
@@ -63,7 +63,7 @@ function SkillRow({ entry, kind, isOwnProfile, onDelete }) {
             role="dialog"
             aria-modal="true"
             aria-labelledby={`skill-row-title-${entry.id ?? entry.skill}`}
-            className="w-full max-w-md rounded-2xl bg-white [box-shadow:var(--shadow-overlay)]"
+            className="w-full max-w-md rounded-[10px] border border-[var(--border)] bg-card [box-shadow:var(--shadow-overlay)]"
           >
             <div className="flex items-start justify-between gap-3 border-b border-[var(--border-subtle)] p-5">
               <h2 id={`skill-row-title-${entry.id ?? entry.skill}`} className="text-base font-medium leading-snug text-foreground">
@@ -126,7 +126,7 @@ function Section({ title, items, kind, isOwnProfile, onDelete }) {
         <span className="text-xs text-muted-foreground tabular-nums">({items.length})</span>
       </header>
 
-      <div className="divide-y divide-[var(--border-subtle)]">
+      <div className="grid gap-0.5">
         {visible.map((entry, i) => (
           <SkillRow
             key={entry.id ?? `${entry.skill}-${i}`}

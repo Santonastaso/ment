@@ -186,7 +186,7 @@ export default function Onboarding() {
   return (
     <div className="space-y-8">
       <div className="flex items-center gap-2">
-        <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">M</span>
+        <span className="flex size-9 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">M</span>
         <div>
           <h1 className="text-xl font-medium tracking-[-0.01em] text-foreground">{t('onboarding.header.title')}</h1>
           <p className="text-sm text-muted-foreground">{t('onboarding.header.subtitle')}</p>

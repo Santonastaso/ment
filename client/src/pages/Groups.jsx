@@ -61,9 +61,9 @@ export default function Groups() {
 
   return (
     <PageShell title={t('groups.pageTitle')} description={t('groups.pageDescription')}>
-      <Surface className="group-create-card">
-        <SurfaceHeader title={t('groups.create.title')} description={t('groups.create.description')} />
-        <SurfaceBody className="grid gap-3 pt-5 sm:grid-cols-[minmax(180px,260px)_1fr_auto] sm:items-end">
+      <Surface className="group-create-card rounded-none border-x-0 border-t-0 bg-transparent">
+        <SurfaceHeader className="px-0 pt-0 sm:px-0" title={t('groups.create.title')} description={t('groups.create.description')} />
+        <SurfaceBody className="grid gap-3 px-0 pt-4 sm:grid-cols-[minmax(180px,260px)_1fr_auto] sm:items-end sm:px-0">
           {error && <p className="sm:col-span-3 text-sm text-rose-600" role="alert">{error}</p>}
           <div>
             <label className="label" htmlFor="group-name">{t('groups.create.name')}</label>
@@ -93,9 +93,9 @@ export default function Groups() {
         </SurfaceBody>
       </Surface>
 
-      <Surface className="group-list-card">
-        <SurfaceHeader title={t('groups.list.title')} />
-        <SurfaceBody className="pt-5">
+      <Surface className="group-list-card rounded-none border-x-0 border-b-0 bg-transparent">
+        <SurfaceHeader className="px-0 sm:px-0" title={t('groups.list.title')} />
+        <SurfaceBody className="px-0 pt-4 sm:px-0">
           {loading ? (
             <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
           ) : groups.length === 0 ? (

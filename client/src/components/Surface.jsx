@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 
 export function Surface({ className, children, ...props }) {
   return (
-    <Card className={cn('rounded-[18px] border border-[var(--border)] bg-card shadow-[var(--shadow-card)]', className)} {...props}>
+    <Card className={cn('gap-0 rounded-[var(--panel-radius)] border-0 bg-[var(--surface)] py-0', className)} {...props}>
       {children}
     </Card>
   );
@@ -13,7 +13,7 @@ export function SurfaceHeader({ title, description, action, className }) {
   return (
     <CardHeader
       className={cn(
-        'flex flex-row items-start justify-between space-y-0 border-b border-[var(--border-subtle)] bg-transparent px-5 pb-4 pt-5 sm:px-6',
+        'flex flex-row items-start justify-between space-y-0 bg-transparent px-4 pb-2 pt-4 sm:px-5',
         className
       )}
     >
@@ -27,7 +27,7 @@ export function SurfaceHeader({ title, description, action, className }) {
 }
 
 export function SurfaceBody({ className, children }) {
-  return <CardContent className={cn('px-5 pb-5 pt-4 sm:px-6 sm:pb-6', className)}>{children}</CardContent>;
+  return <CardContent className={cn('px-4 pb-4 pt-3 sm:px-5 sm:pb-5', className)}>{children}</CardContent>;
 }
 
 /** Card with only a header row (metrics, toolbar). */

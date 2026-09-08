@@ -16,6 +16,7 @@ const Profile = lazy(() => import('./pages/Profile.jsx'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard.jsx'));
 const AdminOps = lazy(() => import('./pages/AdminOps.jsx'));
 const KnowledgeGraph = lazy(() => import('./pages/KnowledgeGraph.jsx'));
+const LegalPage = lazy(() => import('./pages/LegalPage.jsx'));
 const AppLayout = lazy(() => import('./components/AppLayout.jsx'));
 
 function page(node) {
@@ -109,6 +110,8 @@ export default function App() {
       <Route path="/login" element={<LoginRoute />} />
       <Route path="/sign-up" element={page(<SignUp />)} />
       <Route path="/request-access" element={page(<RequestAccess />)} />
+      <Route path="/terms" element={page(<LegalPage type="terms" />)} />
+      <Route path="/privacy" element={page(<LegalPage type="privacy" />)} />
       <Route path="/change-password" element={<ChangePasswordRoute />} />
       <Route path="/onboarding" element={<OnboardingRoute />} />
       <Route element={<ProtectedRoute />}>

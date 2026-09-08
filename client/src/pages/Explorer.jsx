@@ -101,15 +101,14 @@ export default function Explorer() {
   return (
     <PageShell title={t('explorer.title')} description={t('explorer.entryTitle')} className="gap-6">
 
-              <Surface className="directory-filter-panel">
-                <SurfaceBody className="space-y-3">
+              <Surface className="directory-filter-panel rounded-none border-0 bg-transparent">
+                <SurfaceBody className="space-y-3 px-0 py-0">
                   <form onSubmit={submitSearch} className="flex gap-2">
                     <Input aria-label={t('explorer.searchLabel')} placeholder={t('explorer.searchLabel')} value={inputValue} onChange={e => setInputValue(e.target.value)} />
                     <Button type="submit">{t('explorer.searchButton')}</Button>
                   </form>
-                  <Button type="button" size="sm" variant="ghost" onClick={() => { setInputValue(''); setSearchParams({}); }}>{t('explorer.clearFilters')}</Button>
                 </SurfaceBody>
-                <SurfaceBody className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                <SurfaceBody className="grid grid-cols-2 gap-2 px-0 pb-0 pt-3 sm:grid-cols-3 lg:grid-cols-5">
                   <select className="input w-full" value={persona} onChange={e => setParam('persona', e.target.value)} aria-label={t('explorer.filterPersona')}>
                     <option value="">{t('explorer.personaAny')}</option>
                     <option value="student">{t('explorer.personaStudent')}</option>
@@ -132,6 +131,9 @@ export default function Explorer() {
                     {(facets.languages || []).map(l => <option key={l} value={l}>{l.toUpperCase()}</option>)}
                   </select>
                 </SurfaceBody>
+                <SurfaceBody className="px-0 pb-0 pt-2">
+                  <Button type="button" size="sm" variant="ghost" onClick={() => { setInputValue(''); setSearchParams({}); }}>{t('explorer.clearFilters')}</Button>
+                </SurfaceBody>
               </Surface>
 
               {dirError ? (
@@ -140,8 +142,8 @@ export default function Explorer() {
                   <Button onClick={() => setRetry(n => n + 1)}>{t('explorer.retry')}</Button>
                 </SurfaceBody></Surface>
               ) : dirLoading ? (
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {[1, 2, 3, 4, 5, 6].map(i => <Skeleton key={i} className="h-44 rounded-xl" />)}
+                <div className="grid gap-1">
+                  {[1, 2, 3, 4, 5, 6].map(i => <Skeleton key={i} className="my-3 h-20 rounded-lg" />)}
                 </div>
               ) : total === 0 ? (
                 <Surface>
@@ -164,7 +166,7 @@ export default function Explorer() {
                       </Button>
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid gap-1">
                     {dirData.people.map(person => (
                       <PersonCard key={person.id} person={person} onRequest={() => setRequestingMentor(person)} />
                     ))}
@@ -192,9 +194,8 @@ function PersonCard({ person, onRequest }) {
   const isAlumnus = person.role === 'alumnus';
 
   return (
-    <Surface className="directory-person-card">
-      <SurfaceBody className="flex flex-col gap-3">
-        <div className="flex items-start gap-3">
+    <article className="directory-person-row -mx-3 grid gap-3 rounded-[var(--panel-radius)] px-3 py-3 hover:bg-[var(--control-surface)] sm:grid-cols-[minmax(240px,1fr)_minmax(240px,0.85fr)_auto] sm:items-center">
+        <div className="flex min-w-0 flex-1 items-start gap-3">
           <Avatar className="size-10">
             <AvatarFallback className="bg-accent text-sm font-semibold text-primary">{initials}</AvatarFallback>
           </Avatar>
@@ -210,15 +211,16 @@ function PersonCard({ person, onRequest }) {
                 person.location,
               ].filter(Boolean).join(' · ')}
             </p>
-            <span className="mt-1 inline-flex items-center rounded-full border border-[var(--border)] px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+            <p className="mt-1 text-[11px] font-medium text-muted-foreground">
               {isAlumnus ? t('explorer.personaAlumnusSingular') : t('explorer.personaStudentSingular')}
-            </span>
+            </p>
           </div>
         </div>
-        {(person.skills || []).length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
+        <div className="flex min-w-0 flex-col gap-2">
+          {(person.skills || []).length > 0 && (
+          <div className="flex flex-wrap gap-x-2 gap-y-1">
             {person.skills.slice(0, 4).map(s => (
-              <span key={s.skill} className="rounded-full border border-border bg-muted/40 px-2 py-0.5 text-xs text-foreground">
+              <span key={s.skill} className="text-xs text-muted-foreground">
                 {s.skill}
               </span>
             ))}
@@ -226,14 +228,14 @@ function PersonCard({ person, onRequest }) {
               <span className="rounded-full px-1 py-0.5 text-xs text-muted-foreground">+{person.skills.length - 4}</span>
             )}
           </div>
-        )}
-        <div className="mt-auto flex items-center gap-2">
-          <Button variant="outline" className="flex-1" onClick={onRequest}>{t('explorer.requestSession')}</Button>
+          )}
+        </div>
+        <div className="flex shrink-0 items-center justify-end gap-2">
+          <Button variant="outline" onClick={onRequest}>{t('explorer.requestSession')}</Button>
           <Link to={`/profile/${person.id}`} className={buttonVariants({ variant: 'ghost', size: 'default' })}>
             {t('explorer.viewProfile')}
           </Link>
         </div>
-      </SurfaceBody>
-    </Surface>
+    </article>
   );
 }

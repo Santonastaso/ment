@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import LegalLinks from '../components/LegalLinks.jsx';
 
 export default function ForcePasswordChange() {
   const { user, session, signOut, refreshProfile } = useAuth();
@@ -37,7 +38,7 @@ export default function ForcePasswordChange() {
   }
 
   return (
-    <div className="auth-shell flex min-h-screen items-center justify-center bg-background p-6">
+    <div className="auth-shell flex min-h-screen flex-col items-center justify-center bg-background p-6">
       <Card className="w-full max-w-[400px]">
         <CardHeader>
           <CardTitle className="text-lg font-medium">{t('auth.forcePassword.title')}</CardTitle>
@@ -62,6 +63,7 @@ export default function ForcePasswordChange() {
           <Button type="button" variant="ghost" className="mt-3 w-full" onClick={signOut}>{t('auth.forcePassword.signOut')}</Button>
         </CardContent>
       </Card>
+      <LegalLinks className="mt-6" />
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 /** Standard page wrapper — full width of the main column, consistent vertical rhythm. */
 export function PageShell({ title, description, action, children, className, compact }) {
   return (
-    <div className={cn('flex w-full flex-col gap-7', className)}>
+    <div className={cn('flex w-full flex-col gap-5', className)}>
       {(title || description || action) && (
         <PageHeader title={title} description={description} action={action} compact={compact} />
       )}

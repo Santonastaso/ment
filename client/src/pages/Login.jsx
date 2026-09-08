@@ -3,10 +3,10 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useT } from '../i18n/index.jsx';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import LegalLinks from '../components/LegalLinks.jsx';
 
 export default function Login() {
   const { signIn } = useAuth();
@@ -33,16 +33,13 @@ export default function Login() {
   return (
     <div className="auth-shell flex min-h-screen flex-col items-center justify-center bg-background p-6">
       <div className="mb-8 flex items-center gap-2">
-        <span className="flex size-10 items-center justify-center rounded-lg bg-primary text-base font-bold text-primary-foreground">M</span>
+        <span className="flex size-10 items-center justify-center rounded-full bg-primary text-base font-bold text-primary-foreground">M</span>
         <span className="text-xl font-semibold">MENT</span>
       </div>
-      <Card className="w-full max-w-[400px]">
-        <CardHeader>
-          <CardTitle className="text-lg font-medium">{t('auth.login.title')}</CardTitle>
-          <CardDescription>{t('auth.login.description')}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="w-full max-w-[360px]">
+        <h1 className="text-xl font-semibold tracking-[-0.025em]">{t('auth.login.title')}</h1>
+        <p className="mt-1.5 text-sm leading-6 text-muted-foreground">{t('auth.login.description')}</p>
+        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">{t('auth.login.emailLabel')}</Label>
               <Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder={t('auth.login.emailPlaceholder')} autoComplete="email" required autoFocus />
@@ -59,24 +56,17 @@ export default function Login() {
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? t('auth.login.submitting') : t('auth.login.submit')}
             </Button>
-          </form>
-        </CardContent>
-      </Card>
-      <div className="mt-4 flex flex-col items-center gap-2 text-center text-sm text-muted-foreground">
+        </form>
+      </div>
+      <div className="mt-5 text-center text-sm text-muted-foreground">
         <p>
           {t('auth.login.newHerePrefix')}{' '}
-          <Link to="/sign-up" className="font-medium text-primary underline-offset-4 hover:underline" data-testid="login-signup-link">
-            {t('auth.login.startTeamLink')}
-          </Link>
-        </p>
-        <p>
-          {t('auth.login.orPrefix')}{' '}
           <Link to="/request-access" className="font-medium text-primary underline-offset-4 hover:underline">
             {t('auth.login.requestPilotLink')}
-          </Link>{' '}
-          {t('auth.login.requestPilotSuffix')}
+          </Link>.
         </p>
       </div>
+      <LegalLinks className="mt-6" />
     </div>
   );
 }

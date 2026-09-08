@@ -203,7 +203,7 @@ export default function ReflectionLog({
           card-in-card container, no repeated title (the parent panel is
           already labelled "Weekly check-in"). */}
       {showForm && (
-        <div className="space-y-4 border-b border-[var(--border)] pb-5">
+        <div className="space-y-4 pb-4">
           {PROMPTS.map(p => (
             <div key={p.key}>
               <label className="label">{t(p.labelKey)}</label>
@@ -245,7 +245,7 @@ export default function ReflectionLog({
           <p className="text-sm text-muted-foreground">{t('components.reflection.empty')}</p>
         )
       ) : (
-        <div className="divide-y divide-[var(--border)]">
+        <div className="grid gap-2">
           {visibleEntries.map(entry => (
             <Entry
               key={entry.id}
@@ -363,7 +363,7 @@ function Entry({ entry, onApply, onDelete, onReclassify, timeAgo }) {
             role="dialog"
             aria-modal="true"
             aria-labelledby={`reflection-modal-title-${entry.id}`}
-            className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl bg-white [box-shadow:var(--shadow-overlay)]"
+            className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-[10px] border border-[var(--border)] bg-card [box-shadow:var(--shadow-overlay)]"
           >
             <div className="flex items-start justify-between gap-3 border-b border-[var(--border-subtle)] p-5">
               <div>

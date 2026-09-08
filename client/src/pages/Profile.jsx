@@ -115,16 +115,10 @@ export default function Profile() {
   const [editingCareerId, setEditingCareerId] = useState(null);
   const [editCareerDraft, setEditCareerDraft] = useState(null);
 
-  // Availability (P3) — mentor pause + return-on date.
   const [availabilitySaving, setAvailabilitySaving] = useState(false);
-  const [returnDateDraft, setReturnDateDraft] = useState('');
-  const [availabilityNoteDraft, setAvailabilityNoteDraft] = useState('');
-  // Multi-period OOO (P4) — list of [start, end] unavailability windows.
-  const [periods, setPeriods] = useState([]);
-  const [periodStart, setPeriodStart] = useState('');
-  const [periodEnd, setPeriodEnd] = useState('');
-  const [periodNote, setPeriodNote] = useState('');
-  const [periodSaving, setPeriodSaving] = useState(false);
+  const [capacity, setCapacity] = useState(null);
+  const [capacityDraft, setCapacityDraft] = useState({ weekly_limit: '', monthly_limit: '' });
+  const [capacityError, setCapacityError] = useState('');
 
   useEffect(() => {
     setReflectionDraft({ support_needed: '', managed_well: '' });
@@ -152,12 +146,15 @@ export default function Profile() {
             cohort_year: res.data.cohort_year || ''
           });
           setWantsToLearn(res.data.skills?.filter(s => s.type === 'wants_to_learn').map(s => s.skill) || []);
-          setReturnDateDraft(res.data.mentorship_unavailable_until || '');
-          setAvailabilityNoteDraft(res.data.mentorship_note || '');
           try {
-            const p = await api.get('/users/me/unavailable-periods');
-            setPeriods(p.data || []);
-          } catch { /* non-fatal */ }
+            setCapacityError('');
+            const capacityResponse = await api.get('/users/me/capacity');
+            setCapacity(capacityResponse.data);
+            setCapacityDraft({ weekly_limit: capacityResponse.data.weekly_limit, monthly_limit: capacityResponse.data.monthly_limit });
+          } catch {
+            setCapacity(null);
+            setCapacityError(t('components.sessionRequest.errorGeneric'));
+          }
         }
       } catch {
         navigate('/');
@@ -257,14 +254,10 @@ export default function Profile() {
     showToast(t('profile.toast.skillsUpdated'));
   }
 
-  async function setAvailability({ paused, until, note }) {
+  async function setAvailability({ paused }) {
     setAvailabilitySaving(true);
     try {
-      const payload = {};
-      if (paused !== undefined) payload.mentorship_paused = paused;
-      if (until !== undefined) payload.mentorship_unavailable_until = until || null;
-      if (note !== undefined) payload.mentorship_note = note || null;
-      await api.put('/users/me', payload);
+      await api.put('/users/me', { mentorship_paused: paused });
       await refreshProfile();
       showToast(t('profile.toast.availabilityUpdated'));
     } finally {
@@ -272,44 +265,22 @@ export default function Profile() {
     }
   }
 
-  async function setReminderPreference(value) {
+  async function saveCapacity() {
+    const weekly = Math.max(1, Math.min(50, Number(capacityDraft.weekly_limit) || 1));
+    const monthly = Math.max(weekly, Math.min(200, Number(capacityDraft.monthly_limit) || weekly));
     setAvailabilitySaving(true);
+    setCapacityError('');
     try {
-      await api.put('/users/me', { reflection_email_reminders: value });
+      await api.put('/users/me', { weekly_meeting_limit: weekly, monthly_meeting_limit: monthly });
+      const response = await api.get('/users/me/capacity');
+      setCapacity(response.data);
+      setCapacityDraft({ weekly_limit: response.data.weekly_limit, monthly_limit: response.data.monthly_limit });
       await refreshProfile();
-      showToast(t('profile.toast.remindersUpdated'));
+      showToast(t('profile.toast.availabilityUpdated'));
+    } catch {
+      setCapacityError(t('components.sessionRequest.errorGeneric'));
     } finally {
       setAvailabilitySaving(false);
-    }
-  }
-
-  async function reloadPeriods() {
-    const p = await api.get('/users/me/unavailable-periods');
-    setPeriods(p.data || []);
-  }
-
-  async function addPeriod() {
-    if (!periodStart || !periodEnd) return;
-    setPeriodSaving(true);
-    try {
-      await api.post('/users/me/unavailable-periods', {
-        start_date: periodStart, end_date: periodEnd, note: periodNote,
-      });
-      setPeriodStart(''); setPeriodEnd(''); setPeriodNote('');
-      await reloadPeriods();
-      showToast(t('profile.toast.availabilityUpdated'));
-    } finally {
-      setPeriodSaving(false);
-    }
-  }
-
-  async function removePeriod(id) {
-    setPeriodSaving(true);
-    try {
-      await api.delete(`/users/me/unavailable-periods/${id}`);
-      await reloadPeriods();
-    } finally {
-      setPeriodSaving(false);
     }
   }
 
@@ -407,26 +378,26 @@ export default function Profile() {
     : t('profile.skillLandscape.descOther', { name: firstName });
 
   return (
-    <PageShell>
+    <PageShell className="profile-page gap-4">
       {/* Toast */}
       {toast && (
-        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-[0_4px_12px_rgba(0,0,0,0.12)]">
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-lg border border-primary bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground">
           {toast}
         </div>
       )}
 
       {validTabs.length > 1 && (
-        <nav className="flex items-center gap-6 overflow-x-auto overflow-y-hidden whitespace-nowrap border-b border-[var(--border)]" aria-label={t('profile.tabs.label')}>
+        <nav className="profile-tabs flex items-center gap-1 overflow-x-auto overflow-y-hidden whitespace-nowrap" aria-label={t('profile.tabs.label')}>
           {validTabs.map(key => (
             <button
               key={key}
               type="button"
               onClick={() => setTab(key)}
               data-testid={`profile-tab-${key}`}
-              className={`-mb-px border-b-2 px-0.5 pb-2.5 pt-1 text-sm font-medium transition-colors ${
+              className={`rounded-full px-3.5 py-1.5 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/40 ${
                 tab === key
-                  ? 'border-[var(--foreground)] text-foreground'
-                  : 'border-transparent text-muted-foreground hover:text-foreground'
+                  ? 'bg-[var(--control-surface)] font-medium text-foreground'
+                  : 'text-muted-foreground hover:bg-[var(--control-surface)] hover:text-foreground'
               }`}
             >
               {t(`profile.tab.${key}`)}
@@ -437,18 +408,18 @@ export default function Profile() {
 
       {tab === 'overview' && (
       <>
-      <Surface>
-        <SurfaceBody className="pt-6 space-y-4">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <Avatar className="size-16 border-2 border-border shadow-sm">
-                <AvatarFallback className="bg-primary text-lg font-bold text-primary-foreground">
+      <Surface className="border-0 bg-transparent">
+        <SurfaceBody className="space-y-3 px-0 pb-1 pt-2 sm:px-0 sm:pb-1">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <Avatar className="size-12">
+                <AvatarFallback className="bg-primary text-sm font-semibold text-primary-foreground">
                   {profile.name?.charAt(0)}
                 </AvatarFallback>
               </Avatar>
               <div>
-                <h1 className="text-2xl font-medium tracking-[-0.01em]">{profile.name}</h1>
-                <div className="mt-2 flex flex-wrap items-center gap-2">
+                <h1 className="text-[22px] font-medium tracking-[-0.02em]">{profile.name}</h1>
+                <div className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
                   {editing ? (
                     <>
                       <input className="input w-48 text-sm" placeholder={t('profile.placeholder.role')} value={form.current_role} onChange={e => setForm(f => ({ ...f, current_role: e.target.value }))} />
@@ -461,24 +432,22 @@ export default function Profile() {
                     </>
                   ) : (
                     <>
-                      {profile.role && (
-                        <Badge variant="secondary">{t(`profile.persona.${profile.role}`, profile.role)}</Badge>
-                      )}
-                      <Badge variant="outline">{profile.department}</Badge>
-                      {profile.program && <Badge variant="outline">{profile.program}</Badge>}
-                      {profile.cohort_year && <Badge variant="outline">{t('profile.fields.classOf', { year: profile.cohort_year })}</Badge>}
+                      {profile.role && <span>{t(`profile.persona.${profile.role}`, profile.role)}</span>}
+                      <span aria-hidden="true">·</span><span>{profile.department}</span>
+                      {profile.program && <><span aria-hidden="true">·</span><span>{profile.program}</span></>}
+                      {profile.cohort_year && <><span aria-hidden="true">·</span><span>{t('profile.fields.classOf', { year: profile.cohort_year })}</span></>}
                       {profile.location && (
-                        <Badge variant="outline" className="gap-1 font-normal">
+                        <span className="inline-flex items-center gap-1">
                           <MapPin className="size-3" />
                           {profile.location}
-                        </Badge>
+                        </span>
                       )}
                     </>
                   )}
                 </div>
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex shrink-0 gap-2">
               {isOwnProfile ? (
                 editing ? (
                   <>
@@ -512,13 +481,14 @@ export default function Profile() {
         </SurfaceBody>
       </Surface>
 
-      <div className={isOwnProfile ? 'grid items-start gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]' : ''}>
-      <Surface className="min-w-0">
+      <div className="flex flex-col gap-4">
+      <Surface className="min-w-0 bg-transparent">
         <SurfaceHeader
+          className="px-0 pt-2 sm:px-0"
           title={skillTitle}
           description={skillDescription}
         />
-        <SurfaceBody className="space-y-5 pt-5">
+        <SurfaceBody className="space-y-4 px-0 pt-3 sm:px-0">
           <SkillLandscape
             skillProgress={profile.skillProgress || profile.skills || []}
             isOwnProfile={isOwnProfile}
@@ -528,7 +498,7 @@ export default function Profile() {
 
         {/* Expertise signature */}
         {profile.expertiseSignature?.length > 0 && (
-          <div className="rounded-lg border border-border bg-muted/60 p-4">
+          <div className="rounded-[var(--panel-radius)] bg-[var(--surface)] p-4">
             <h3 className="mb-2 text-sm font-medium">{isOwnProfile ? t('profile.expertise.titleOwn') : t('profile.expertise.titleOther', { name: firstName })}</h3>
             <div className="flex flex-wrap gap-2">
               {profile.expertiseSignature.map(skill => (
@@ -541,8 +511,9 @@ export default function Profile() {
       </Surface>
 
       {isOwnProfile && (
-        <Surface>
+        <Surface className="bg-[var(--surface)] px-1">
           <SurfaceHeader
+            className="sm:px-4"
             title={t('profile.reflection.quickTitle')}
             description={t('profile.reflection.quickDesc')}
             action={
@@ -551,7 +522,7 @@ export default function Profile() {
               </Button>
             }
           />
-          <SurfaceBody className="pt-5">
+          <SurfaceBody className="pt-3 sm:px-4">
             <ProfileReflection draft={reflectionDraft} onDraftChange={setReflectionDraft} onSkillsApplied={refreshProfile} />
           </SurfaceBody>
         </Surface>
@@ -561,10 +532,10 @@ export default function Profile() {
       )}
 
       {isOwnProfile && tab === 'skills' && (
-        <Surface>
-          <SurfaceHeader title={t('profile.manageSkills.title')} description={t('profile.manageSkills.desc')} />
-          <SurfaceBody className="space-y-5 pt-5">
-          <div>
+        <Surface className="bg-transparent">
+          <SurfaceHeader className="px-0 pt-1 sm:px-0" title={t('profile.manageSkills.title')} description={t('profile.manageSkills.desc')} />
+          <SurfaceBody className="grid gap-8 px-0 pt-4 sm:px-0 lg:grid-cols-2 lg:gap-10">
+          <div className="min-w-0">
             <h3 className="mb-3 text-base font-bold text-foreground">{t('profile.manageSkills.canTeach')}</h3>
             <TeachSkillsEditor
               value={teachEditorValue}
@@ -574,7 +545,7 @@ export default function Profile() {
             />
           </div>
 
-          <div>
+          <div className="min-w-0">
             <h3 className="mb-3 text-base font-bold text-foreground">{t('profile.manageSkills.wantsToLearn')}</h3>
             <SkillTagInput
               value={wantsToLearn}
@@ -588,9 +559,11 @@ export default function Profile() {
       )}
 
       {isOwnProfile && tab === 'availability' && (
-        <Surface>
+        <Surface className="bg-transparent">
           <SurfaceHeader
+            className="px-0 pt-1 sm:px-0"
             title={t('profile.availability.title')}
+            description={t('profile.availability.capacityDesc')}
             action={
               <Button
                 type="button"
@@ -604,153 +577,28 @@ export default function Profile() {
               </Button>
             }
           />
-          <SurfaceBody className="pt-5">
-            <p className="flex items-center gap-2 text-sm font-medium" data-testid="availability-status">
-              <span className={`size-1.5 rounded-full ${profile.mentorship_paused ? 'bg-zinc-400' : 'bg-emerald-500'}`} aria-hidden="true" />
+          <SurfaceBody className="px-0 pt-5 sm:px-0">
+            {capacityError && <p role="alert" className="mb-4 text-sm text-destructive">{capacityError}</p>}
+            <p className="text-sm font-medium" data-testid="availability-status">
               {profile.mentorship_paused
                 ? t('profile.availability.paused')
-                : profile.mentorship_unavailable_until && new Date(profile.mentorship_unavailable_until) > new Date()
-                  ? t('profile.availability.backOn', { date: profile.mentorship_unavailable_until })
-                  : t('profile.availability.available')}
+                : t('profile.availability.available')}
             </p>
-            {profile.mentorship_note && (
-              <p className="mt-0.5 text-xs text-muted-foreground">{profile.mentorship_note}</p>
-            )}
-
-            <label className="mt-5 flex items-start gap-3 text-sm text-foreground">
-              <input type="checkbox" checked={profile.reflection_email_reminders !== false} disabled={availabilitySaving}
-                onChange={(e) => setReminderPreference(e.target.checked)} className="mt-0.5 size-4 accent-[var(--primary)]" />
-              <span>
-                <span className="block font-medium">{t('profile.availability.emailReminders')}</span>
-                <span className="block text-xs text-muted-foreground">{t('profile.availability.emailRemindersDesc')}</span>
-              </span>
-            </label>
-
-            <div className="mt-4 flex flex-wrap items-end gap-x-4 gap-y-3">
-              <div className="w-44">
-                <label className="label">{t('profile.availability.returnOn')}</label>
-                <input
-                  type="date"
-                  className="input w-full text-sm"
-                  title={t('profile.availability.returnHint')}
-                  data-testid="availability-return-date"
-                  value={returnDateDraft}
-                  min={new Date().toISOString().slice(0, 10)}
-                  onChange={(e) => setReturnDateDraft(e.target.value)}
-                  disabled={availabilitySaving}
-                />
-              </div>
-              <div className="w-64 max-w-full">
-                <label className="label">{t('profile.availability.note')}</label>
-                <input
-                  type="text"
-                  className="input w-full text-sm"
-                  maxLength={120}
-                  placeholder={t('profile.availability.notePlaceholder')}
-                  data-testid="availability-note"
-                  value={availabilityNoteDraft}
-                  onChange={(e) => setAvailabilityNoteDraft(e.target.value)}
-                  disabled={availabilitySaving}
-                />
-              </div>
-              <div className="ml-auto flex gap-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => {
-                    setReturnDateDraft(profile.mentorship_unavailable_until || '');
-                    setAvailabilityNoteDraft(profile.mentorship_note || '');
-                  }}
-                  disabled={availabilitySaving}
-                >
-                  {t('profile.availability.reset')}
-                </Button>
-                <Button
-                  type="button"
-                  data-testid="save-availability"
-                  onClick={() => setAvailability({ until: returnDateDraft, note: availabilityNoteDraft })}
-                  disabled={availabilitySaving}
-                >
-                  {availabilitySaving ? t('profile.btn.saving') : t('profile.btn.save')}
-                </Button>
-              </div>
-            </div>
-
-            {/* Multi-period out-of-office windows (P4) */}
-            <div className="mt-6 border-t border-[var(--border)] pt-5">
-              <p className="label-meta">{t('profile.availability.periodsTitle')}</p>
-
-              {periods.length > 0 ? (
-                <ul className="mt-2 divide-y divide-[var(--border)]" data-testid="unavailable-periods">
-                  {periods.map((p) => (
-                    <li key={p.id} className="flex items-center justify-between gap-3 py-2 text-sm">
-                      <span className="min-w-0">
-                        <span className="font-medium text-foreground">{p.start_date} → {p.end_date}</span>
-                        {p.note && <span className="ml-2 text-xs text-muted-foreground">{p.note}</span>}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => removePeriod(p.id)}
-                        disabled={periodSaving}
-                        aria-label={t('profile.availability.periodRemove')}
-                        className="text-muted-foreground hover:text-red-500 text-sm leading-none"
-                      >
-                        ×
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="mt-2 text-xs text-muted-foreground italic">{t('profile.availability.periodsEmpty')}</p>
-              )}
-
-              <div className="mt-3 grid gap-3 sm:grid-cols-[150px_150px_minmax(200px,300px)_auto] sm:items-end">
-                <div>
-                  <label className="label">{t('profile.availability.periodStart')}</label>
-                  <input
-                    type="date"
-                    className="input w-full text-sm"
-                    value={periodStart}
-                    min={new Date().toISOString().slice(0, 10)}
-                    onChange={(e) => setPeriodStart(e.target.value)}
-                    disabled={periodSaving}
-                  />
-                </div>
-                <div>
-                  <label className="label">{t('profile.availability.periodEnd')}</label>
-                  <input
-                    type="date"
-                    className="input w-full text-sm"
-                    value={periodEnd}
-                    min={periodStart || new Date().toISOString().slice(0, 10)}
-                    onChange={(e) => setPeriodEnd(e.target.value)}
-                    disabled={periodSaving}
-                  />
-                </div>
-                <div>
-                  <label className="label">{t('profile.availability.note')}</label>
-                  <input
-                    type="text"
-                    className="input w-full text-sm"
-                    maxLength={120}
-                    placeholder={t('profile.availability.periodNotePlaceholder')}
-                    value={periodNote}
-                    onChange={(e) => setPeriodNote(e.target.value)}
-                    disabled={periodSaving}
-                  />
-                </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  data-testid="add-period"
-                  onClick={addPeriod}
-                  disabled={periodSaving || !periodStart || !periodEnd || periodEnd < periodStart}
-                >
-                  {t('profile.availability.periodAdd')}
-                </Button>
-              </div>
-            </div>
-
+            {capacity && <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              {[
+                { period: 'weekly', limit: capacityDraft.weekly_limit, booked: capacity.weekly_booked, max: 50 },
+                { period: 'monthly', limit: capacityDraft.monthly_limit, booked: capacity.monthly_booked, max: 200 },
+              ].map(item => (
+                <section key={item.period} className="rounded-[var(--panel-radius)] bg-[var(--surface)] p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div><h3 className="text-sm font-semibold">{t(`profile.availability.${item.period}`)}</h3><p className="mt-0.5 text-xs text-muted-foreground">{t('profile.availability.booked', { booked: item.booked, limit: item.limit })}</p></div>
+                    <input type="number" min="1" max={item.max} className="input h-9 min-h-0 w-20 text-center" aria-label={t(`profile.availability.${item.period}Limit`)} value={item.limit} disabled={availabilitySaving} onChange={event => setCapacityDraft(previous => ({ ...previous, [`${item.period}_limit`]: event.target.value }))} />
+                  </div>
+                  <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-background"><div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, (item.booked / Math.max(1, Number(item.limit))) * 100)}%` }} /></div>
+                </section>
+              ))}
+            </div>}
+            {capacity && <div className="mt-4 flex justify-end"><Button type="button" data-testid="save-availability" onClick={saveCapacity} disabled={availabilitySaving || Number(capacityDraft.monthly_limit) < Number(capacityDraft.weekly_limit)}>{availabilitySaving ? t('profile.btn.saving') : t('profile.availability.saveCapacity')}</Button></div>}
           </SurfaceBody>
         </Surface>
       )}
@@ -770,7 +618,7 @@ export default function Profile() {
         <SurfaceBody className="pt-5">
 
         {isOwnProfile && showAddCareer && (
-          <div className="mb-5 space-y-3 border-b border-[var(--border)] pb-5">
+          <div className="mb-5 space-y-3 pb-3">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <input className="input text-sm" placeholder={t('profile.career.roleTitle')} value={newCareer.role} onChange={e => setNewCareer(c => ({...c, role: e.target.value}))} />
               <select className="input text-sm" value={newCareer.department} onChange={e => setNewCareer(c => ({...c, department: e.target.value}))}>
@@ -813,7 +661,7 @@ export default function Profile() {
                     {group.company}
                   </p>
                 )}
-                <div className={group.entries.length > 1 ? 'space-y-3 border-l border-border pl-4' : 'space-y-3'}>
+                <div className={group.entries.length > 1 ? 'space-y-3 pl-4' : 'space-y-3'}>
             {group.entries.map(entry => (
               editingCareerId === entry.id && editCareerDraft ? (
                 <div key={entry.id} className="space-y-3 rounded-md border border-[var(--border)] p-4">

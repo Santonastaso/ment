@@ -67,23 +67,20 @@ export default function TeachSkillsEditor({ value = [], onChange, placeholder, l
       {error && <p role="alert" className="mb-2 text-sm text-destructive">{error}</p>}
       <fieldset disabled={busy} className="min-w-0">
       {value.length > 0 && (
-        <div className="divide-y divide-[var(--border-subtle)] border-b border-[var(--border-subtle)]">
+        <div className="grid gap-0.5">
           {value.map((entry, i) => (
             <button
               key={i}
               type="button"
               onClick={() => { setDraft(entry.example_project || ''); setEditingIdx(i); setError(''); }}
               aria-haspopup="dialog"
-              className="flex w-full items-center justify-between gap-3 py-2.5 text-left first:pt-0"
+              className="flex w-full items-center justify-between gap-3 rounded-full px-3 py-2 text-left hover:bg-[var(--control-surface)]"
             >
               <span className="min-w-0">
                 <span className="block text-sm font-semibold text-foreground">{entry.skill}</span>
                 <span className="block truncate text-xs text-muted-foreground">{entry.example_project || t('components.teachSkills.giveExample')}</span>
               </span>
               <span className="flex shrink-0 items-center gap-2.5">
-                {entry.example_project && (
-                  <span className="size-1.5 rounded-full bg-primary" aria-hidden="true" />
-                )}
                 <ChevronRight className="size-3.5 text-muted-foreground" aria-hidden="true" />
               </span>
             </button>
@@ -101,7 +98,7 @@ export default function TeachSkillsEditor({ value = [], onChange, placeholder, l
           onCommitEsco={(item) => addSkill(item.label)}
           onCommitCustom={(text) => addSkill(text)}
           placeholder={effectivePlaceholder}
-          inputClassName="input w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-ring"
+          inputClassName="input w-full px-4 py-2 text-sm focus-visible:ring-2 focus-visible:ring-ring"
           lang={lang}
           ariaLabel={ariaLabel || t('components.teachSkills.ariaAdd')}
         />
@@ -120,7 +117,7 @@ export default function TeachSkillsEditor({ value = [], onChange, placeholder, l
             role="dialog"
             aria-modal="true"
             aria-labelledby={`teach-skill-title-${editingIdx}`}
-            className="max-h-[85vh] overflow-y-auto w-full max-w-md rounded-2xl bg-white [box-shadow:var(--shadow-overlay)]"
+            className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-[10px] border border-[var(--border)] bg-card [box-shadow:var(--shadow-overlay)]"
           >
             <div className="flex items-start justify-between gap-3 border-b border-[var(--border-subtle)] p-5">
               <h2 id={`teach-skill-title-${editingIdx}`} className="text-base font-medium leading-snug text-foreground">

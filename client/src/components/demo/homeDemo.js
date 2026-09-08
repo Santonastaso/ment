@@ -12,6 +12,11 @@ const topics = {
   technical: ['python', 'javascript', 'react', 'sql', 'software', 'coding', 'programmazione', 'informatique', 'data'],
   mentorship: ['mentor', 'leadership', 'coaching'],
 };
+const privateEquityProfiles = [
+  { role: 'Investment Associate', team: 'Private Equity', expertise: ['LBO modelling', 'deal sourcing', 'due diligence'], background: 'Private Equity · London' },
+  { role: 'Portfolio Operations Associate', team: 'Private Equity', expertise: ['value creation', 'operating plans', 'portfolio strategy'], background: 'Private Equity · Milan' },
+  { role: 'Vice President', team: 'Private Equity', expertise: ['deal execution', 'investment memos', 'commercial diligence'], background: 'Private Equity · Zurich' },
+];
 const contains = (text, term) => new RegExp(`(^|[^a-z0-9])${term}([a-z]*)(?=$|[^a-z0-9])`).test(text);
 export function classifyNeed(text) {
   const normalized = normalize(text);
@@ -62,10 +67,21 @@ export function getDiscoveryMatches({ query, people, userId }) {
       .sort((a, b) => Number(b.match_score || 0) - Number(a.match_score || 0))
       .slice(0, 3)
       .map(person => ({ person, evidence: person.match_reasons || [] }));
-  return ranked.slice(0, 3).map(({ person, evidence }) => ({
-    person,
-    reason: evidence[0] || `${person.name?.split(' ')[0] || 'They'} can share relevant experience from ${person.job_title || person.department || 'their work'}.`,
-  }));
+  const isPrivateEquityDemo = /private\s*equity/i.test(query);
+  return ranked.slice(0, 3).map(({ person }, index) => {
+    const demo = isPrivateEquityDemo ? privateEquityProfiles[index] : null;
+    const displayedPerson = demo ? { ...person, job_title: demo.role, department: demo.team } : person;
+    const expertise = demo?.expertise || [...new Set([
+      ...(person.skills || []).filter(skill => skill.type === 'can_teach').map(skill => skill.skill),
+      person.job_title,
+      person.department,
+    ].filter(Boolean))].slice(0, 3);
+    return {
+      person: displayedPerson,
+      expertise: expertise.length ? expertise : ['Professional experience'],
+      background: demo?.background || [person.program, person.location].filter(Boolean).join(' · ') || 'Relevant professional experience',
+    };
+  });
 }
 
 export function createDiscoveryDraft({ userName, person, query, reason, variant = 0 }) {

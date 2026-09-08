@@ -441,6 +441,11 @@ async function get(url) {
     if (error) throw new ApiError(error.message);
     return ok({ completed: data ?? 0 });
   }
+  if (url === '/users/me/capacity') {
+    const { data, error } = await supabase.rpc('my_meeting_capacity');
+    if (error) throw new ApiError(error.message);
+    return ok(data);
+  }
   if (url === '/users/me/unavailable-periods') {
     const { data, error } = await supabase
       .from('mentorship_unavailable_periods')
@@ -1006,6 +1011,7 @@ async function put(url, body = {}) {
       // Personal availability — drives whether the user shows up as a
       // mentor candidate.
       'mentorship_paused', 'mentorship_unavailable_until', 'mentorship_note',
+      'weekly_meeting_limit', 'monthly_meeting_limit',
       // Optional monthly goal — feeds the soft nudge on the dashboard.
       'monthly_session_goal',
     ];

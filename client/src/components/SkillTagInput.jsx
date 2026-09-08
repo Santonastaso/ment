@@ -65,14 +65,14 @@ export default function SkillTagInput({ value = [], onChange, placeholder, lang,
       {error && <p role="alert" className="mb-2 text-sm text-destructive">{error}</p>}
       <fieldset disabled={busy} className="min-w-0">
       {value.length > 0 && (
-        <div className="divide-y divide-[var(--border-subtle)] border-b border-[var(--border-subtle)]">
+        <div className="grid gap-0.5">
           {value.map((skill, i) => (
             <button
               key={i}
               type="button"
               onClick={() => setOpenIdx(i)}
               aria-haspopup="dialog"
-              className="flex w-full items-center justify-between gap-3 py-2.5 text-left first:pt-0"
+              className="flex w-full items-center justify-between gap-3 rounded-full px-3 py-2 text-left hover:bg-[var(--control-surface)]"
             >
               <span className="min-w-0 truncate text-sm font-medium text-foreground">{skill}</span>
               <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -91,7 +91,7 @@ export default function SkillTagInput({ value = [], onChange, placeholder, lang,
           onCommitEsco={(item) => addSkill(item.label)}
           onCommitCustom={(text) => addSkill(text)}
           placeholder={effectivePlaceholder}
-          inputClassName="input w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-ring"
+          inputClassName="input w-full px-4 py-2 text-sm focus-visible:ring-2 focus-visible:ring-ring"
           lang={lang}
           ariaLabel={ariaLabel || t('components.skillTag.ariaAdd')}
         />
@@ -110,7 +110,7 @@ export default function SkillTagInput({ value = [], onChange, placeholder, lang,
             role="dialog"
             aria-modal="true"
             aria-labelledby={`skill-tag-title-${openIdx}`}
-            className="w-full max-w-md rounded-2xl bg-white [box-shadow:var(--shadow-overlay)]"
+            className="w-full max-w-md rounded-[10px] border border-[var(--border)] bg-card [box-shadow:var(--shadow-overlay)]"
           >
             <div className="flex items-start justify-between gap-3 border-b border-[var(--border-subtle)] p-5">
               <h2 id={`skill-tag-title-${openIdx}`} className="text-base font-medium leading-snug text-foreground">

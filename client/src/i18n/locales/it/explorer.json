@@ -34,8 +34,8 @@
   "explorer.directoryEmptyTitle": "Ancora nessuno qui",
   "explorer.directoryEmptyBody": "I colleghi compariranno in questa directory man mano che completano l'onboarding.",
   "explorer.requestSession": "Richiedi una sessione",
-  "explorer.clearFilters": "",
-  "explorer.directoryError": "",
-  "explorer.retry": "",
-  "explorer.searchLabel": ""
+  "explorer.clearFilters": "Azzera filtri",
+  "explorer.directoryError": "Impossibile caricare la directory.",
+  "explorer.retry": "Riprova",
+  "explorer.searchLabel": "Cerca nella directory"
 }

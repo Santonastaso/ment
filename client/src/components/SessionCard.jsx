@@ -178,7 +178,7 @@ export default function SessionCard({ session, currentUserId, onUpdate }) {
             role="dialog"
             aria-modal="true"
             aria-labelledby={`session-modal-title-${session.id}`}
-            className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl bg-white [box-shadow:var(--shadow-overlay)]"
+            className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-[10px] border border-[var(--border)] bg-card [box-shadow:var(--shadow-overlay)]"
           >
             {/* Header */}
             <div className="flex items-start justify-between gap-3 border-b border-[var(--border-subtle)] p-5">
