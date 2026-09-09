@@ -143,7 +143,9 @@ export default function Profile() {
             location: res.data.location || '',
             bio: res.data.bio || '',
             program: res.data.program || '',
-            cohort_year: res.data.cohort_year || ''
+            cohort_year: res.data.cohort_year || '',
+            linkedin_url: res.data.linkedin_url || '',
+            linkedin_headline: res.data.linkedin_headline || ''
           });
           setWantsToLearn(res.data.skills?.filter(s => s.type === 'wants_to_learn').map(s => s.skill) || []);
           try {
@@ -429,6 +431,8 @@ export default function Profile() {
                       <input className="input w-44 text-sm" placeholder={t('profile.fields.program')} value={form.program} onChange={e => setForm(f => ({ ...f, program: e.target.value }))} />
                       <input className="input w-28 text-sm" type="number" min="1900" max="2100" placeholder={t('profile.fields.cohortYear')} value={form.cohort_year} onChange={e => setForm(f => ({ ...f, cohort_year: e.target.value }))} />
                       <input className="input w-40 text-sm" placeholder={t('profile.placeholder.location')} value={form.location} onChange={e => setForm(f => ({ ...f, location: e.target.value }))} />
+                      <input className="input w-56 text-sm" type="url" placeholder={t('profile.fields.linkedin')} value={form.linkedin_url} onChange={e => setForm(f => ({ ...f, linkedin_url: e.target.value }))} />
+                      <input className="input w-56 text-sm" placeholder={t('profile.fields.linkedinHeadline')} value={form.linkedin_headline} onChange={e => setForm(f => ({ ...f, linkedin_headline: e.target.value }))} />
                     </>
                   ) : (
                     <>
@@ -442,6 +446,7 @@ export default function Profile() {
                           {profile.location}
                         </span>
                       )}
+                      {profile.linkedin_url && <a href={profile.linkedin_url} target="_blank" rel="noreferrer" className="font-medium text-foreground underline-offset-4 hover:underline">LinkedIn</a>}
                     </>
                   )}
                 </div>
@@ -457,6 +462,10 @@ export default function Profile() {
                 ) : (
                   <Button variant="outline" onClick={() => setEditing(true)}>{t('profile.btn.editProfile')}</Button>
                 )
+              ) : profile.session_id ? (
+                <Link to={`/conversations?session=${profile.session_id}`} className="inline-flex h-11 items-center rounded-full bg-[var(--control-surface)] px-5 text-sm font-semibold text-foreground hover:bg-[var(--control-surface-hover)]">
+                  {t('profile.btn.openChat')}
+                </Link>
               ) : profile.mentorship_available === false ? (
                 <Button variant="outline" className="h-11 px-6 text-base" disabled>
                   {t('profile.btn.currentlyUnavailable')}
@@ -475,9 +484,7 @@ export default function Profile() {
           )}
           {editing ? (
             <textarea className="input resize-none text-sm" rows={2} value={form.bio} onChange={e => setForm(f => ({ ...f, bio: e.target.value }))} placeholder={t('profile.placeholder.bio')} />
-          ) : profile.bio ? (
-            <p className="text-sm text-muted-foreground">{profile.bio}</p>
-          ) : null}
+          ) : <>{profile.linkedin_headline && <p className="text-sm font-medium text-foreground">{profile.linkedin_headline}</p>}{profile.bio && <p className="text-sm text-muted-foreground">{profile.bio}</p>}</>}
         </SurfaceBody>
       </Surface>
 
@@ -790,7 +797,7 @@ export default function Profile() {
         <SessionRequestModal
           mentor={profile}
           onClose={() => setShowModal(false)}
-          onSuccess={() => { setShowModal(false); showToast(t('profile.toast.sessionRequestSent')); }}
+          onSuccess={(session) => { setProfile((current) => ({ ...current, session_id: session.id, relationship_status: session.status })); setShowModal(false); showToast(t('profile.toast.sessionRequestSent')); }}
         />
       )}
     </PageShell>

@@ -54,6 +54,7 @@ export function buildSessionIcs(session, mentor, mentee) {
     `DTEND:${end}`,
     `SUMMARY:${escapeIcsText(session.title)}`,
     `DESCRIPTION:${description}`,
+    ...(session.meeting_url ? [`LOCATION:${escapeIcsText(session.meeting_url)}`, `URL:${escapeIcsText(session.meeting_url)}`] : []),
     `ORGANIZER;CN=${escapeIcsText(mentor.name)}:mailto:${mentor.email || ''}`,
     `ATTENDEE;CN=${escapeIcsText(mentee.name)};ROLE=REQ-PARTICIPANT:mailto:${mentee.email || ''}`,
     'STATUS:CONFIRMED',

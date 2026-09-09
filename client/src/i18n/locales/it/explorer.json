@@ -34,6 +34,7 @@
   "explorer.directoryEmptyTitle": "Ancora nessuno qui",
   "explorer.directoryEmptyBody": "I colleghi compariranno in questa directory man mano che completano l'onboarding.",
   "explorer.requestSession": "Richiedi una sessione",
+  "explorer.openChat": "Apri chat",
   "explorer.clearFilters": "Azzera filtri",
   "explorer.directoryError": "Impossibile caricare la directory.",
   "explorer.retry": "Riprova",

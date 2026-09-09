@@ -80,10 +80,6 @@ export default function Explorer() {
     return () => { cancelled = true; };
   }, [query, persona, program, cohort, location, language, page, retry]);
 
-  function removeFromResults() {
-    setRetry(n => n + 1);
-  }
-
   function submitSearch(e) {
     e?.preventDefault();
     updateParams(next => {
@@ -101,7 +97,7 @@ export default function Explorer() {
   return (
     <PageShell title={t('explorer.title')} description={t('explorer.entryTitle')} className="gap-6">
 
-              <Surface className="directory-filter-panel rounded-none border-0 bg-transparent">
+              <Surface className="directory-rail directory-filter-panel rounded-none border-0 bg-transparent">
                 <SurfaceBody className="space-y-3 px-0 py-0">
                   <form onSubmit={submitSearch} className="flex gap-2">
                     <Input aria-label={t('explorer.searchLabel')} placeholder={t('explorer.searchLabel')} value={inputValue} onChange={e => setInputValue(e.target.value)} />
@@ -154,7 +150,7 @@ export default function Explorer() {
                 </Surface>
               ) : (
                 <>
-                  <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
+                  <div className="directory-rail flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
                     <span>{t('explorer.showing', { from, to, total })}</span>
                     <div className="flex items-center gap-2">
                       <Button type="button" size="sm" variant="outline" disabled={page <= 1} onClick={() => setParam('page', String(page - 1))}>
@@ -166,7 +162,7 @@ export default function Explorer() {
                       </Button>
                     </div>
                   </div>
-                  <div className="grid gap-1">
+                  <div className="directory-rail grid gap-1">
                     {dirData.people.map(person => (
                       <PersonCard key={person.id} person={person} onRequest={() => setRequestingMentor(person)} />
                     ))}
@@ -178,8 +174,13 @@ export default function Explorer() {
         <SessionRequestModal
           mentor={requestingMentor}
           onClose={() => setRequestingMentor(null)}
-          onSuccess={() => {
-            removeFromResults(requestingMentor.id);
+          onSuccess={(session) => {
+            setDirData((current) => current ? {
+              ...current,
+              people: current.people.map((person) => person.id === requestingMentor.id
+                ? { ...person, relationship_status: session.status, session_id: session.id }
+                : person),
+            } : current);
             setRequestingMentor(null);
           }}
         />
@@ -194,7 +195,7 @@ function PersonCard({ person, onRequest }) {
   const isAlumnus = person.role === 'alumnus';
 
   return (
-    <article className="directory-person-row -mx-3 grid gap-3 rounded-[var(--panel-radius)] px-3 py-3 hover:bg-[var(--control-surface)] sm:grid-cols-[minmax(240px,1fr)_minmax(240px,0.85fr)_auto] sm:items-center">
+    <article className="directory-person-row grid max-w-full gap-3 rounded-[var(--panel-radius)] py-3 pl-3 hover:bg-[var(--control-surface)] md:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)] md:items-center xl:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)_auto]">
         <div className="flex min-w-0 flex-1 items-start gap-3">
           <Avatar className="size-10">
             <AvatarFallback className="bg-accent text-sm font-semibold text-primary">{initials}</AvatarFallback>
@@ -230,8 +231,14 @@ function PersonCard({ person, onRequest }) {
           </div>
           )}
         </div>
-        <div className="flex shrink-0 items-center justify-end gap-2">
-          <Button variant="outline" onClick={onRequest}>{t('explorer.requestSession')}</Button>
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 md:col-span-2 xl:col-span-1 xl:flex-nowrap">
+          {person.session_id ? (
+            <Link to={`/conversations?session=${person.session_id}`} className={buttonVariants({ variant: 'outline', size: 'default' })}>
+              {t('explorer.openChat')}
+            </Link>
+          ) : (
+            <Button variant="outline" onClick={onRequest}>{t('explorer.requestSession')}</Button>
+          )}
           <Link to={`/profile/${person.id}`} className={buttonVariants({ variant: 'ghost', size: 'default' })}>
             {t('explorer.viewProfile')}
           </Link>

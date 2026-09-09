@@ -216,10 +216,15 @@ async function fetchAuthEmail(userId) {
 async function loadProfile(userId, viewerId) {
   const isSelf = userId === viewerId;
   if (!isSelf) {
-    const { data, error } = await supabase.rpc('peer_profile', { p_user_id: userId });
+    const [{ data, error }, relationships, { data: linkedin }] = await Promise.all([
+      supabase.rpc('peer_profile', { p_user_id: userId }),
+      loadSessionRelationships(),
+      supabase.rpc('peer_linkedin', { p_user_id: userId }),
+    ]);
     if (error) throw new ApiError(error.message, 404);
     if (!data) throw new ApiError('User not found', 404);
-    return data;
+    const relationship = relationships.get(userId);
+    return { ...data, ...linkedin, relationship_status: relationship?.status, session_id: relationship?.session_id };
   }
 
   // After 0012 we no longer have direct SELECT on the full profiles row from
@@ -368,8 +373,11 @@ async function listMatches({ limit, role, includeDirectory = false } = {}) {
   }
   if (error) throw new ApiError(error.message);
 
-  const all = (data?.matches || []).map((m) => {
-    const candidate = m.user;
+  const peers = await Promise.all((data?.matches || []).map((m) =>
+    supabase.rpc('peer_profile', { p_user_id: m.user.id }).then(({ data: peer }) => peer)
+  ));
+  const all = (data?.matches || []).map((m, index) => {
+    const candidate = peers[index] || m.user;
     const renderedBase = renderReasons(m.structuredReasons, { id: viewer.id, name: viewer.name, department: viewer.department }, {
       id: candidate.id, name: candidate.name, department: candidate.department,
     }, { mentorOnly: role === 'mentor' });
@@ -382,7 +390,7 @@ async function listMatches({ limit, role, includeDirectory = false } = {}) {
       reasons,
       user: shapeUser(candidate),
     };
-  });
+  }).filter((match) => match.user.mentorship_available !== false);
 
   const sliced = limit ? all.slice(0, Number(limit)) : all;
   return { matches: sliced, total: data?.total ?? all.length };
@@ -405,13 +413,29 @@ async function listDirectory(params = {}) {
     p_working_language: params.language || null,
     p_query: params.q && params.q.trim() ? params.q.trim() : null,
   };
-  const { data, error } = await supabase.rpc('directory_browse', rpcArgs);
+  const [{ data, error }, relationships] = await Promise.all([
+    supabase.rpc('directory_browse', rpcArgs),
+    loadSessionRelationships(),
+  ]);
   if (error) throw new ApiError(error.message);
+  const sourcePeople = data?.people || [];
+  const people = sourcePeople
+    .filter((person) => person.mentorship_available !== false)
+    .map((person) => {
+      const relationship = relationships.get(person.id);
+      return { ...person, relationship_status: relationship?.status, session_id: relationship?.session_id };
+    });
   return {
-    total: data?.total ?? 0,
-    people: data?.people || [],
+    total: Math.max(0, (data?.total ?? 0) - (sourcePeople.length - people.length)),
+    people,
     facets: data?.facets || { programs: [], locations: [], languages: [], cohortYears: [] },
   };
+}
+
+async function loadSessionRelationships() {
+  const { data, error } = await supabase.rpc('my_session_relationships');
+  if (error) throw new ApiError(error.message);
+  return new Map((data || []).map((row) => [row.person_id, row]));
 }
 
 // ============================================================
@@ -494,6 +518,12 @@ async function get(url) {
     if (error) throw new ApiError(error.message);
     const enriched = await Promise.all((data || []).map((s) => enrichSession(s, viewer.id)));
     return ok(enriched);
+  }
+  if (/^\/sessions\/\d+\/messages$/.test(url)) {
+    const id = Number(url.split('/')[2]);
+    const { data, error } = await supabase.rpc('my_session_messages', { p_session_id: id });
+    if (error) throw new ApiError(error.message, 404);
+    return ok(data || []);
   }
   if (url === '/sessions/pending-acceptances') {
     const { data, error } = await supabase.rpc('pending_acceptances');
@@ -760,6 +790,13 @@ async function post(url, body = {}, opts = {}) {
       p_persona: body.persona || null,
     });
     if (error) throw new ApiError(error.message);
+    if (body.linkedin_url || body.linkedin_headline) {
+      const { error: linkedinError } = await supabase.from('profiles').update({
+        linkedin_url: body.linkedin_url || null,
+        linkedin_headline: body.linkedin_headline || null,
+      }).eq('id', viewer.id);
+      if (linkedinError) throw new ApiError(linkedinError.message);
+    }
     for (const item of body.can_teach || []) {
       if (typeof item !== 'object' || !item.example_project?.trim()) continue;
       const { error: skillError } = await supabase
@@ -793,6 +830,16 @@ async function post(url, body = {}, opts = {}) {
       if (messageError) throw new ApiError(messageError.message);
     }
     return ok(await enrichSession(data, viewer.id), 201);
+  }
+
+  if (/^\/sessions\/\d+\/messages$/.test(url)) {
+    const id = Number(url.split('/')[2]);
+    const { data, error } = await supabase.rpc('send_session_message', {
+      p_session_id: id,
+      p_body: body.body,
+    });
+    if (error) throw new ApiError(error.message);
+    return ok(data, 201);
   }
 
   if (/^\/sessions\/\d+\/acknowledge$/.test(url)) {
@@ -1006,7 +1053,7 @@ async function put(url, body = {}) {
       'department', 'seniority', 'bio',
       'tenure_years', 'location',
       // School fields — program + "class of" year.
-      'program', 'cohort_year',
+      'program', 'cohort_year', 'linkedin_url', 'linkedin_headline',
       'reflection_email_reminders',
       // Personal availability — drives whether the user shows up as a
       // mentor candidate.

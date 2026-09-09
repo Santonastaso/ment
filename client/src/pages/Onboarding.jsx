@@ -44,6 +44,8 @@ export default function Onboarding() {
   const [currentRole, setCurrentRole] = useState(user?.current_role || '');
   const [location, setLocation] = useState(user?.location || '');
   const [bio, setBio] = useState(user?.bio || '');
+  const [linkedinUrl, setLinkedinUrl] = useState(user?.linkedin_url || '');
+  const [linkedinHeadline, setLinkedinHeadline] = useState(user?.linkedin_headline || '');
   // start_date / end_date are "YYYY-MM" strings (native <input type="month"> format)
   const [career, setCareer] = useState([{ role: '', department: '', company: '', start_date: '', end_date: '' }]);
 
@@ -172,7 +174,9 @@ export default function Onboarding() {
         wants_to_learn: wantsToLearn,
         program,
         cohort_year: cohortYear,
-        persona
+        persona,
+        linkedin_url: linkedinUrl,
+        linkedin_headline: linkedinHeadline,
       });
       updateUser(res.data);
       navigate('/');
@@ -303,6 +307,10 @@ export default function Onboarding() {
                 <div className="sm:col-span-2">
                   <label className="label">{t('onboarding.fields.bio')}{suggested.has('bio') && <SuggestedPill source={classifierSource} />} <span className="font-normal text-muted-foreground">{t('onboarding.fields.optional')}</span></label>
                   <textarea className="input resize-none" rows={2} value={bio} onChange={e => setBio(e.target.value)} placeholder={t('onboarding.fields.bioPlaceholder')} />
+                </div>
+                <div className="sm:col-span-2 grid gap-3 sm:grid-cols-2">
+                  <div><label className="label">{t('onboarding.fields.linkedin')}</label><input className="input" type="url" value={linkedinUrl} onChange={e => setLinkedinUrl(e.target.value)} placeholder="https://linkedin.com/in/..." /></div>
+                  <div><label className="label">{t('onboarding.fields.linkedinHeadline')}</label><input className="input" value={linkedinHeadline} onChange={e => setLinkedinHeadline(e.target.value)} placeholder={t('onboarding.fields.linkedinHeadlinePlaceholder')} /></div>
                 </div>
               </div>
 

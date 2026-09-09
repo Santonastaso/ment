@@ -11,6 +11,7 @@ const ForcePasswordChange = lazy(() => import('./pages/ForcePasswordChange.jsx')
 const Onboarding = lazy(() => import('./pages/Onboarding.jsx'));
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
 const Explorer = lazy(() => import('./pages/Explorer.jsx'));
+const Conversations = lazy(() => import('./pages/Conversations.jsx'));
 const Groups = lazy(() => import('./pages/Groups.jsx'));
 const Profile = lazy(() => import('./pages/Profile.jsx'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard.jsx'));
@@ -117,6 +118,7 @@ export default function App() {
       <Route element={<ProtectedRoute />}>
         <Route path="/" element={<UserRoute>{page(<Dashboard />)}</UserRoute>} />
         <Route path="/explorer" element={<UserRoute>{page(<Explorer />)}</UserRoute>} />
+        <Route path="/conversations" element={<UserRoute>{page(<Conversations />)}</UserRoute>} />
         <Route path="/groups" element={<UserRoute>{page(<Groups />)}</UserRoute>} />
         <Route path="/profile" element={<UserRoute>{page(<Profile />)}</UserRoute>} />
         <Route path="/profile/:id" element={<UserRoute>{page(<Profile />)}</UserRoute>} />

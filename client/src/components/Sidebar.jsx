@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { CircleUserRound, MessageCircle, PanelLeftClose, PanelLeftOpen, Search, Server, Share2, Shield, SquarePen } from 'lucide-react';
+import { CircleUserRound, MessagesSquare, PanelLeftClose, PanelLeftOpen, Search, Server, Share2, Shield, SquarePen, UsersRound } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useT } from '../i18n/index.jsx';
 import { cn } from '@/lib/utils';
@@ -20,7 +20,8 @@ export default function Sidebar({ collapsed = false, onNavigate, onToggle }) {
     : [
         { to: '/', label: t('nav.home'), icon: SquarePen },
         { to: '/explorer', label: t('nav.explorer'), icon: Search },
-        { to: '/groups', label: t('nav.groups'), icon: MessageCircle },
+        { to: '/conversations', label: t('nav.messages'), icon: MessagesSquare },
+        { to: '/groups', label: t('nav.groups'), icon: UsersRound },
         { to: '/profile', label: t('nav.myProfile'), icon: CircleUserRound, match: (p, uid) => p === '/profile' || p === `/profile/${uid}` },
       ];
 
@@ -45,7 +46,7 @@ export default function Sidebar({ collapsed = false, onNavigate, onToggle }) {
             ? item.match(location.pathname, user?.id)
             : location.pathname === item.to;
           const Icon = item.icon;
-          const showBadge = item.to === '/' && pendingAcceptanceCount > 0;
+          const showBadge = item.to === '/conversations' && pendingAcceptanceCount > 0;
           return (
             <Link
               key={item.to}

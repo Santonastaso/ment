@@ -34,6 +34,7 @@
   "explorer.directoryEmptyTitle": "Aucun profil pour le moment",
   "explorer.directoryEmptyBody": "Les profils apparaîtront ici à mesure que les membres termineront leur inscription.",
   "explorer.requestSession": "Demander un échange",
+  "explorer.openChat": "Ouvrir le chat",
   "explorer.clearFilters": "Effacer les filtres",
   "explorer.directoryError": "Impossible de charger l'annuaire.",
   "explorer.retry": "Réessayer",

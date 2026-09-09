@@ -86,8 +86,8 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
         topics: selectedTopics,
       };
       submittedPayload.current ||= payload;
-      await api.post('/sessions', submittedPayload.current);
-      onSuccess?.();
+      const response = await api.post('/sessions', submittedPayload.current);
+      onSuccess?.(response.data);
     } catch (e) {
       setError(e.response?.data?.error || t('components.sessionRequest.errorGeneric'));
       if (e.response?.status >= 400 && e.response?.status < 500) submittedPayload.current = null;
