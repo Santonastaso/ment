@@ -410,9 +410,9 @@ export default function Profile() {
 
       {tab === 'overview' && (
       <>
-      <Surface className="border-0 bg-transparent">
-        <SurfaceBody className="space-y-3 px-0 pb-1 pt-2 sm:px-0 sm:pb-1">
-          <div className="flex items-start justify-between gap-3">
+      <Surface className="profile-overview-header bg-[var(--card)]">
+        <SurfaceBody className="profile-overview-header-body space-y-3 px-4 pb-4 pt-4 sm:px-5 sm:pb-5 sm:pt-5">
+          <div className="profile-identity-row flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
               <Avatar className="size-12">
                 <AvatarFallback className="bg-primary text-sm font-semibold text-primary-foreground">

@@ -195,6 +195,10 @@
 .directory-filter-panel, .group-create-card { background: var(--card); }
 .directory-rail { width: 100%; max-width: 100%; min-width: 0; }
 .directory-person-card { height: 100%; transition: border-color .12s ease; }
+.profile-overview-header { border: 1px solid var(--border-subtle); border-radius: var(--panel-radius); }
+.profile-overview-header-body { min-width: 0; }
+.profile-identity-row { min-width: 0; }
+
 .directory-person-card:hover { border-color: #aaa49b; }
 .conversations-shell { display: grid; grid-template-columns: 300px minmax(0, 1fr); height: 100vh; min-height: 0; background: var(--background); }
 .conversation-list { min-width: 0; overflow-y: auto; border-right: 1px solid var(--sidebar-border); background: var(--sidebar); padding: 12px 8px; }
@@ -240,8 +244,8 @@
 .conversation-context > span { display: inline-block; border-radius: 999px; background: var(--control-surface); color: var(--muted-foreground); padding: 4px 8px; font-size: 10px; }
 .conversation-context h2 { margin: 8px 0 3px; font-size: 18px; font-weight: 600; letter-spacing: -.02em; }
 .conversation-context p { margin: 0; color: var(--muted-foreground); font-size: 12px; }
-.conversation-message { width: fit-content; max-width: min(78%, 560px); margin: 10px 0; }
-.conversation-message.is-mine { margin-left: auto; border-radius: var(--control-radius); background: var(--control-surface); padding: 10px 13px; }
+.conversation-message { display: inline-block; width: fit-content; max-width: min(78%, 560px); margin: 10px 0; box-sizing: border-box; overflow-wrap: anywhere; text-align: left; }
+.conversation-message.is-mine { margin-left: auto; margin-right: 0; border-radius: 20px; background: var(--control-surface); padding: 10px 13px; }
 .conversation-message p { margin: 0; white-space: pre-wrap; font-size: 14px; line-height: 1.5; }
 .conversation-message time { display: block; margin-top: 4px; color: var(--muted-foreground); font-size: 9.5px; }
 .conversation-system { width: fit-content; margin: 14px auto; border-radius: 999px; background: var(--control-surface); color: var(--muted-foreground); padding: 5px 9px; font-size: 10.5px; }
