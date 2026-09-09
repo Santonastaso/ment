@@ -192,7 +192,7 @@ export default function Conversations() {
               {messages.map((message) => message.kind === 'system' || message.kind === 'schedule' ? (
                 <div className="conversation-system" key={message.id}>{message.body}</div>
               ) : (
-                <div className={cn('conversation-message', message.sender_id === user?.id ? 'is-mine' : 'is-theirs')} key={message.id}>
+                <div className={cn('conversation-message', (message.sender_id === user?.id || (message.kind === 'request' && selected.isMentee)) ? 'is-mine' : 'is-theirs')} key={message.id}>
                   <p>{message.body}</p><time>{new Date(message.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</time>
                 </div>
               ))}

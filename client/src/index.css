@@ -252,8 +252,9 @@
 .conversation-context > span { display: inline-block; border-radius: 999px; background: var(--control-surface); color: var(--muted-foreground); padding: 4px 8px; font-size: 10px; }
 .conversation-context h2 { margin: 8px 0 3px; font-size: 18px; font-weight: 600; letter-spacing: -.02em; }
 .conversation-context p { margin: 0; color: var(--muted-foreground); font-size: 12px; }
-.conversation-message { display: inline-block; width: fit-content; max-width: min(78%, 560px); margin: 10px 0; box-sizing: border-box; overflow-wrap: anywhere; text-align: left; }
+.conversation-message { display: block; width: fit-content; max-width: min(78%, 560px); margin: 10px 0; box-sizing: border-box; overflow-wrap: anywhere; text-align: left; }
 .conversation-message.is-mine { margin-left: auto; margin-right: 0; border-radius: 20px; background: var(--control-surface); padding: 10px 13px; }
+.conversation-message.is-theirs { margin-left: 0; margin-right: auto; }
 .conversation-message p { margin: 0; white-space: pre-wrap; font-size: 14px; line-height: 1.5; }
 .conversation-message time { display: block; margin-top: 4px; color: var(--muted-foreground); font-size: 9.5px; }
 .conversation-system { width: fit-content; margin: 14px auto; border-radius: 999px; background: var(--control-surface); color: var(--muted-foreground); padding: 5px 9px; font-size: 10.5px; }
