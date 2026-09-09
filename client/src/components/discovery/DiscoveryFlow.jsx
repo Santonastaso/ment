@@ -12,21 +12,21 @@ const COPY = {
     finding: 'Finding relevant profiles', chooseLead: 'These profiles match your request.', chooseBold: 'Select one to prepare the request.',
     expertise: 'Expert in', background: 'Matching background', available: 'Available', choose: 'Choose', selected: 'Selected', different: 'Ask for different people', browse: 'browse the full directory', notRight: 'Not quite right?', or: 'or',
     to: 'To', intro: "Here's a suggested intro. Edit anything, then send when it feels like you.", suggested: 'Suggested draft', send: 'Send request', regenerate: 'Regenerate', edit: 'Edit', remaining: '{count} requests left this month',
-    sent: 'Request sent to {name}.', sentSubline: "The conversation is ready. Continue there when they reply.", openChat: 'Open chat', again: 'Ask about something else', retry: 'Try again', error: 'We could not complete that request. Please try again.', noMatches: 'No available matches yet. Try a different angle or browse the directory.',
+    sent: 'Request sent to {name}.', sentSubline: "The conversation is ready. Continue there when they reply.", openChat: 'Open chat', again: 'Ask about something else', retry: 'Try again', error: 'We could not complete that request. Please try again.', noMatches: 'No available matches yet. Try a different angle or browse the directory.', snapshot: 'Your connections', upcoming: 'Upcoming', pending: 'Pending', completed: 'Completed', viewAll: 'View conversations',
   },
   it: {
     greeting: 'Ciao {name}, con chi vorresti entrare in contatto?', placeholder: 'Chiedi a Ment',
     finding: 'Cerco profili pertinenti', chooseLead: 'Questi profili corrispondono alla richiesta.', chooseBold: 'Selezionane uno per preparare il messaggio.',
     expertise: 'Esperto in', background: 'Contesto della ricerca', available: 'Disponibile', choose: 'Scegli', selected: 'Scelto', different: 'Mostra altre persone', browse: 'sfoglia la directory', notRight: 'Non è quello che cercavi?', or: 'oppure',
     to: 'A', intro: 'Ecco un messaggio proposto. Modifica tutto quello che vuoi, poi invialo quando ti sembra giusto.', suggested: 'Messaggio proposto', send: 'Invia richiesta', regenerate: 'Rigenera', edit: 'Modifica', remaining: '{count} richieste rimaste questo mese',
-    sent: 'Richiesta inviata a {name}.', sentSubline: 'La conversazione è pronta. Continua da lì quando risponderà.', openChat: 'Apri chat', again: "Chiedi qualcos'altro", retry: 'Riprova', error: 'Non siamo riusciti a completare la richiesta. Riprova.', noMatches: 'Non ci sono ancora corrispondenze disponibili. Prova un altro approccio o sfoglia la directory.',
+    sent: 'Richiesta inviata a {name}.', sentSubline: 'La conversazione è pronta. Continua da lì quando risponderà.', openChat: 'Apri chat', again: "Chiedi qualcos'altro", retry: 'Riprova', error: 'Non siamo riusciti a completare la richiesta. Riprova.', noMatches: 'Non ci sono ancora corrispondenze disponibili. Prova un altro approccio o sfoglia la directory.', snapshot: 'Le tue connessioni', upcoming: 'In programma', pending: 'In attesa', completed: 'Completate', viewAll: 'Vedi conversazioni',
   },
   fr: {
     greeting: 'Bonjour {name}, avec qui souhaitez-vous entrer en contact ?', placeholder: 'Demandez à Ment',
     finding: 'Recherche de profils pertinents', chooseLead: 'Ces profils correspondent à votre demande.', chooseBold: 'Sélectionnez-en un pour préparer le message.',
     expertise: 'Expert en', background: 'Parcours correspondant', available: 'Disponible', choose: 'Choisir', selected: 'Sélectionné', different: 'Voir d’autres personnes', browse: 'parcourir l’annuaire', notRight: 'Pas tout à fait ?', or: 'ou',
     to: 'À', intro: 'Voici un message proposé. Modifiez ce que vous voulez, puis envoyez-le lorsqu’il vous convient.', suggested: 'Message proposé', send: 'Envoyer la demande', regenerate: 'Régénérer', edit: 'Modifier', remaining: '{count} demandes restantes ce mois-ci',
-    sent: 'Demande envoyée à {name}.', sentSubline: 'La conversation est prête. Continuez là lorsqu’une réponse arrive.', openChat: 'Ouvrir le chat', again: 'Poser une autre question', retry: 'Réessayer', error: 'Nous n’avons pas pu finaliser cette demande. Réessayez.', noMatches: 'Aucune correspondance disponible pour le moment. Essayez un autre angle ou parcourez l’annuaire.',
+    sent: 'Demande envoyée à {name}.', sentSubline: 'La conversation est prête. Continuez là lorsqu’une réponse arrive.', openChat: 'Ouvrir le chat', again: 'Poser une autre question', retry: 'Réessayer', error: 'Nous n’avons pas pu finaliser cette demande. Réessayez.', noMatches: 'Aucune correspondance disponible pour le moment. Essayez un autre angle ou parcourez l’annuaire.', snapshot: 'Vos connexions', upcoming: 'À venir', pending: 'En attente', completed: 'Terminées', viewAll: 'Voir les conversations',
   },
 };
 
@@ -62,11 +62,13 @@ export default function DiscoveryFlow() {
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
+  const [connections, setConnections] = useState([]);
   const [sessionId, setSessionId] = useState(null);
   const threadEndRef = useRef(null);
   const idempotencyKey = useRef(null);
 
   useEffect(() => { if (stage !== 'ask') threadEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); }, [stage, selected]);
+  useEffect(() => { if (!user?.id || stage !== 'ask') return; api.get('/sessions').then(({ data }) => setConnections(data || [])).catch(() => {}); }, [stage, user?.id]);
 
   async function findMatches(nextQuery) {
     setError(''); setSubmittedQuery(nextQuery); setStage('matching');
@@ -121,7 +123,7 @@ export default function DiscoveryFlow() {
   const firstName = user?.name?.split(' ')[0] || '';
   const isConversation = stage !== 'ask';
   return <section className={`discovery-flow ${isConversation ? 'is-conversation' : ''}`} aria-label="Ment discovery"><div className="discovery-thread">
-    {stage === 'ask' && <div className="discovery-ask-block"><h1>{text(copy, 'greeting', { name: firstName })}</h1>{composer()}{error && <p className="discovery-error" role="alert">{error}</p>}</div>}
+    {stage === 'ask' && <div className="discovery-ask-block"><h1>{text(copy, 'greeting', { name: firstName })}</h1>{composer()}{connections.length > 0 && <div className="discovery-connections"><div className="discovery-connection-people"><span className="discovery-connections-label">{copy.snapshot}</span><span className="discovery-avatars">{connections.slice(0, 3).map((session, index) => { const peer = session.mentor_id === user?.id ? session.mentee : session.mentor; return <span key={session.id} className="discovery-avatar" style={{ backgroundColor: avatarTints[index % avatarTints.length] }}>{initials(peer?.name)}</span>; })}</span></div><div className="discovery-connection-counts"><span>{copy.upcoming} <strong>{connections.filter(session => session.status === 'scheduled').length}</strong></span><span>{copy.pending} <strong>{connections.filter(session => session.status === 'pending').length}</strong></span><span>{copy.completed} <strong>{connections.filter(session => session.status === 'completed').length}</strong></span></div><Link to="/conversations" className="discovery-connections-link">{copy.viewAll}</Link></div>}{error && <p className="discovery-error" role="alert">{error}</p>}</div>}
     {isConversation && <div className="discovery-conversation">{submittedQuery && <div className="discovery-user-bubble">{submittedQuery}</div>}
     {stage === 'matching' && <><div className="discovery-assistant-line"><span className="discovery-agent-label">MENT</span><span>{copy.finding}<span className="discovery-ellipsis">...</span></span></div><div className="discovery-skeletons" aria-hidden="true">{[1, 2, 3].map(item => <span key={item} />)}</div></>}
     {stage === 'choose' && <div className="discovery-reveal"><div className="discovery-assistant-line"><span className="discovery-agent-label">MENT</span><p>{copy.chooseLead} <strong>{copy.chooseBold}</strong></p></div><div className="discovery-match-grid" role="radiogroup" aria-label="Choose a person">{matches.map((match, index) => <MatchCard key={match.person.id} match={match} index={index} selected={selected?.person.id === match.person.id} onSelect={choose} copy={copy} />)}</div><p className="discovery-escape">{copy.notRight} <button type="button" onClick={() => findMatches(submittedQuery)}>{copy.different}</button>, {copy.or} <a href="/explorer?mode=directory">{copy.browse}</a>.</p></div>}
