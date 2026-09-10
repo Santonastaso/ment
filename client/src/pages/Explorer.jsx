@@ -195,7 +195,7 @@ function PersonCard({ person, onRequest }) {
   const isAlumnus = person.role === 'alumnus';
 
   return (
-    <article className="directory-person-row grid max-w-full gap-3 rounded-[var(--panel-radius)] py-3 pl-3 hover:bg-[var(--control-surface)] md:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)] md:items-center xl:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)_auto]">
+    <article className="directory-person-row grid max-w-full gap-3 rounded-[var(--panel-radius)] py-3 pl-3 hover:bg-[var(--control-surface)] md:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)] md:items-center xl:grid-cols-[minmax(0,1fr)_minmax(240px,0.8fr)_260px]">
         <div className="flex min-w-0 flex-1 items-start gap-3">
           <Avatar className="size-10">
             <AvatarFallback className="bg-accent text-sm font-semibold text-primary">{initials}</AvatarFallback>
@@ -231,15 +231,15 @@ function PersonCard({ person, onRequest }) {
           </div>
           )}
         </div>
-        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 md:col-span-2 xl:col-span-1 xl:flex-nowrap">
+        <div className="directory-actions grid min-w-0 grid-cols-[154px_106px] items-center justify-end gap-2 md:col-span-2 xl:col-span-1">
           {person.session_id ? (
-            <Link to={`/conversations?session=${person.session_id}`} className={buttonVariants({ variant: 'outline', size: 'default' })}>
+            <Link to={`/conversations?session=${person.session_id}`} className={buttonVariants({ variant: 'outline', size: 'default' }) + ' w-full justify-center'}>
               {t('explorer.openChat')}
             </Link>
           ) : (
-            <Button variant="outline" onClick={onRequest}>{t('explorer.requestSession')}</Button>
+            <Button variant="outline" className="w-full justify-center" onClick={onRequest}>{t('explorer.requestSession')}</Button>
           )}
-          <Link to={`/profile/${person.id}`} className={buttonVariants({ variant: 'ghost', size: 'default' })}>
+          <Link to={`/profile/${person.id}`} className={buttonVariants({ variant: 'ghost', size: 'default' }) + ' w-full justify-center'}>
             {t('explorer.viewProfile')}
           </Link>
         </div>

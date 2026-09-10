@@ -199,6 +199,9 @@
 .discovery-empty { margin-top: 1.4rem; border: 0; border-radius: var(--panel-radius); background: var(--control-surface); padding: 1rem; color: #7c7770; }
 .discovery-empty p { margin: 0 0 .7rem; }
 .discovery-empty button { border: 0; background: transparent; color: #c15f3c; font-weight: 600; text-decoration: underline; }
+.landing-shell { min-height: 100vh; background: #f1f1ef; }
+.landing-nav { background: #f1f1ef; }
+.landing-cta-pair > a { display: inline-flex; }
 .auth-shell { background: var(--background); }
 .directory-filter-panel, .group-create-card { background: var(--card); }
 .directory-rail { width: 100%; max-width: 100%; min-width: 0; }
@@ -246,6 +249,12 @@
 .conversation-meeting > div > span { color: var(--muted-foreground); font-size: 11.5px; }
 .conversation-video-link svg { width: 14px; }
 .conversation-meeting-actions > div button { border-radius: var(--control-radius); background: var(--control-surface-hover); padding: 8px 12px; color: var(--foreground); }
+.calendar-more { position: relative; }
+.calendar-more summary { cursor: pointer; list-style: none; border-radius: var(--control-radius); background: var(--control-surface-hover); padding: 8px 12px; color: var(--foreground); font-size: 12.5px; font-weight: 600; }
+.calendar-more summary::-webkit-details-marker { display: none; }
+.calendar-more-menu { position: absolute; right: 0; z-index: 20; display: grid; min-width: 150px; gap: 2px; margin-top: 6px; padding: 5px; border: 1px solid var(--border-subtle); border-radius: 12px; background: var(--card); box-shadow: var(--shadow-overlay); }
+.calendar-more-menu a { padding: 7px 9px; color: var(--foreground); font-size: 12px; white-space: nowrap; }
+.calendar-more-menu a:hover { border-radius: 7px; background: var(--control-surface); }
 .conversation-scheduler { grid-column: 2 / -1; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding-top: 8px; }
 .conversation-messages { grid-row: 3; min-height: 0; overflow-y: auto; background: var(--background); background-image: none; padding: 24px max(24px, calc((100% - 720px) / 2)) 18px; scrollbar-width: thin; }
 .conversation-context { margin-bottom: 28px; text-align: center; }

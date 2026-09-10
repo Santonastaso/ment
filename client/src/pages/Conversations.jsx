@@ -181,7 +181,7 @@ export default function Conversations() {
                 <div className="conversation-meeting-actions">
                   <Button size="sm" variant="outline" onClick={() => setScheduleOpen((value) => !value)}>{selected.scheduled_at ? t('conversations.reschedule') : t('conversations.schedule')}</Button>
                   {selected.meeting_url && <a className="conversation-video-link" href={selected.meeting_url} target="_blank" rel="noreferrer"><Video />{t('conversations.join')}</a>}
-                  {selected.scheduled_at && <IcsDownloadButton sessionId={selected.id} />}
+                  {selected.scheduled_at && <IcsDownloadButton sessionId={selected.id} session={selected} />}
                 </div>
                 {scheduleOpen && <div className="conversation-scheduler"><input className="input" type="datetime-local" value={scheduledAt} min={localDateTime(new Date(Date.now() + 3600000))} onChange={(event) => setScheduledAt(event.target.value)} /><Button size="sm" onClick={saveSchedule} disabled={!scheduledAt || savingSchedule}>{t('common.save')}</Button></div>}
               </div>

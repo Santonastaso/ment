@@ -14,15 +14,15 @@ function Brand() {
 
 function NavBar({ t }) {
   return (
-    <header className="border-b border-border bg-background">
+    <header className="landing-nav border-b border-border bg-transparent">
       <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-5 sm:px-6">
         <Brand />
         <nav className="flex items-center gap-1.5" aria-label="Account">
-          <Link to="/request-access">
-            <Button variant="ghost" size="sm">{t('landing.nav.bookDemo')}</Button>
-          </Link>
           <Link to="/login">
             <Button size="sm">{t('landing.nav.signIn')}</Button>
+          </Link>
+          <Link to="/request-access">
+            <Button variant="outline" size="sm">{t('landing.nav.bookDemo')}</Button>
           </Link>
         </nav>
       </div>
@@ -116,7 +116,7 @@ function Hero({ t }) {
         <p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-muted-foreground sm:text-[17px]">
           {t('landing.hero.subtitle')}
         </p>
-        <div className="mt-7 flex flex-wrap items-center justify-center gap-2.5">
+        <div className="landing-cta-pair mt-7 flex flex-wrap items-center justify-center gap-2.5">
           <Link to="/login"><Button size="lg">{t('landing.hero.ctaPrimary')}</Button></Link>
           <Link to="/request-access"><Button size="lg" variant="outline">{t('landing.hero.ctaSecondary')}</Button></Link>
         </div>
@@ -159,7 +159,7 @@ function Closing({ t }) {
           <h2 className="max-w-xl text-2xl font-semibold tracking-[-0.03em]">{t('landing.finalCta.title')}</h2>
           <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">{t('landing.finalCta.subtitle')}</p>
         </div>
-        <div className="flex shrink-0 gap-2.5">
+        <div className="landing-cta-pair flex shrink-0 gap-2.5">
           <Link to="/login"><Button size="lg">{t('landing.finalCta.ctaPrimary')}</Button></Link>
           <Link to="/request-access"><Button size="lg" variant="outline">{t('landing.finalCta.ctaSecondary')}</Button></Link>
         </div>
@@ -185,7 +185,7 @@ function Footer({ t }) {
 export default function LandingPage() {
   const { t } = useT();
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="landing-shell min-h-screen text-foreground">
       <NavBar t={t} />
       <main>
         <Hero t={t} />

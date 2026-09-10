@@ -8,7 +8,7 @@ import { createDiscoveryDraft, getDiscoveryMatches, loadConversationCandidates }
 
 const COPY = {
   en: {
-    greeting: 'Hi {name}, who would you like to connect?', placeholder: 'Ask Ment',
+    greeting: 'Hi {name}, who would you like to connect with?', placeholder: 'Ask Ment',
     finding: 'Finding relevant profiles', chooseLead: 'These profiles match your request.', chooseBold: 'Select one to prepare the request.',
     expertise: 'Expert in', background: 'Matching background', available: 'Available', choose: 'Choose', selected: 'Selected', different: 'Ask for different people', browse: 'browse the full directory', notRight: 'Not quite right?', or: 'or',
     to: 'To', intro: "Here's a suggested intro. Edit anything, then send when it feels like you.", suggested: 'Suggested draft', send: 'Send request', regenerate: 'Regenerate', edit: 'Edit', remaining: '{count} requests left this month',
@@ -117,7 +117,7 @@ export default function DiscoveryFlow() {
   }
 
   function composer() {
-    return <form className="discovery-composer" onSubmit={submit}><textarea value={query} onChange={event => setQuery(event.target.value)} maxLength={2000} rows={1} placeholder={copy.placeholder} aria-label={copy.placeholder} disabled={stage === 'matching' || sending} /><button className="discovery-send" type="submit" disabled={!query.trim() || stage === 'matching'} aria-label="Send message"><ArrowUp /></button></form>;
+    return <form className="discovery-composer" onSubmit={submit}><textarea value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} maxLength={2000} rows={1} placeholder={copy.placeholder} aria-label={copy.placeholder} disabled={stage === 'matching' || sending} /><button className="discovery-send" type="submit" disabled={!query.trim() || stage === 'matching'} aria-label="Send message"><ArrowUp /></button></form>;
   }
 
   const firstName = user?.name?.split(' ')[0] || '';
