@@ -20,6 +20,22 @@ function ok(data, status = 200) {
   return { data, status };
 }
 
+async function edgeFunctionError(error, data, fallback) {
+  let payload = data;
+  const response = error?.context;
+  if (!payload && response?.json) {
+    try {
+      payload = await response.clone().json();
+    } catch {
+      // Preserve the SDK error when the function returns a non-JSON response.
+    }
+  }
+  return new ApiError(
+    payload?.error || error?.message || fallback,
+    response?.status || error?.status || 502,
+  );
+}
+
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 async function getViewerId() {
@@ -707,7 +723,7 @@ async function post(url, body = {}, opts = {}) {
     const { data, error } = await supabase.functions.invoke('discovery-assistant', {
       body: { ...body, action: url.endsWith('/draft') ? 'draft' : 'match' },
     });
-    if (error || data?.error) throw new ApiError(data?.error || error?.message || 'ai_request_failed', error?.status || 502);
+    if (error || data?.error) throw await edgeFunctionError(error, data, 'ai_request_failed');
     return ok(data);
   }
 
@@ -949,7 +965,7 @@ async function post(url, body = {}, opts = {}) {
     const { data, error } = await supabase.functions.invoke('profile-ingest', {
       body: { storage_path: path, kind, lang: browserLanguage() },
     });
-    if (error || data?.error) throw new ApiError(data?.error || error?.message || 'profile_ingest_failed', error?.status || 502);
+    if (error || data?.error) throw await edgeFunctionError(error, data, 'profile_ingest_failed');
     return ok(data);
   }
 

@@ -11,27 +11,35 @@ const COPY = {
     finding: 'Finding relevant profiles', chooseLead: 'These profiles match your request.', chooseBold: 'Select one to prepare the request.',
     expertise: 'Expert in', background: 'Matching background', available: 'Available', choose: 'Choose', selected: 'Selected', different: 'Ask for different people', browse: 'browse the full directory', notRight: 'Not quite right?', or: 'or',
     to: 'To', intro: "Here's a suggested intro. Edit anything, then send when it feels like you.", suggested: 'Suggested draft', send: 'Send request', regenerate: 'Regenerate', edit: 'Edit', remaining: '{count} requests left this month',
-    sent: 'Request sent to {name}.', sentSubline: "The conversation is ready. Continue there when they reply.", openChat: 'Open chat', again: 'Ask about something else', retry: 'Try again', error: 'We could not complete that request. Please try again.', aiMissing: 'Matching is not configured yet. Ask an administrator to connect Mistral.', noMatches: 'No available matches yet. Try a different angle or browse the directory.', snapshot: 'Your connections', upcoming: 'Upcoming', pending: 'Pending', completed: 'Completed', viewAll: 'View conversations', viewProfile: 'View profile', back: 'Back to matches', drafting: 'Preparing your request',
+    sent: 'Request sent to {name}.', sentSubline: "The conversation is ready. Continue there when they reply.", openChat: 'Open chat', again: 'Ask about something else', retry: 'Try again', error: 'We could not complete that request. Please try again.', aiMissing: 'Matching is not configured yet. Ask an administrator to connect Mistral.', aiBusy: 'Matching is temporarily rate-limited. Please try again in a moment.', aiAdmin: 'Matching needs an administrator to check the Mistral connection.', noMatches: 'No available matches yet. Try a different angle or browse the directory.', snapshot: 'Your connections', upcoming: 'Upcoming', pending: 'Pending', completed: 'Completed', viewAll: 'View conversations', viewProfile: 'View profile', back: 'Back to matches', drafting: 'Preparing your request',
   },
   it: {
     greeting: 'Ciao {name}, con chi vorresti entrare in contatto?', placeholder: 'Chiedi a Ment',
     finding: 'Cerco profili pertinenti', chooseLead: 'Questi profili corrispondono alla richiesta.', chooseBold: 'Selezionane uno per preparare il messaggio.',
     expertise: 'Esperto in', background: 'Contesto della ricerca', available: 'Disponibile', choose: 'Scegli', selected: 'Scelto', different: 'Mostra altre persone', browse: 'sfoglia la directory', notRight: 'Non è quello che cercavi?', or: 'oppure',
     to: 'A', intro: 'Ecco un messaggio proposto. Modifica tutto quello che vuoi, poi invialo quando ti sembra giusto.', suggested: 'Messaggio proposto', send: 'Invia richiesta', regenerate: 'Rigenera', edit: 'Modifica', remaining: '{count} richieste rimaste questo mese',
-    sent: 'Richiesta inviata a {name}.', sentSubline: 'La conversazione è pronta. Continua da lì quando risponderà.', openChat: 'Apri chat', again: "Chiedi qualcos'altro", retry: 'Riprova', error: 'Non siamo riusciti a completare la richiesta. Riprova.', aiMissing: 'Il matching non è ancora configurato. Chiedi a un amministratore di collegare Mistral.', noMatches: 'Non ci sono ancora corrispondenze disponibili. Prova un altro approccio o sfoglia la directory.', snapshot: 'Le tue connessioni', upcoming: 'In programma', pending: 'In attesa', completed: 'Completate', viewAll: 'Vedi conversazioni', viewProfile: 'Vedi profilo', back: 'Torna ai risultati', drafting: 'Preparo la richiesta',
+    sent: 'Richiesta inviata a {name}.', sentSubline: 'La conversazione è pronta. Continua da lì quando risponderà.', openChat: 'Apri chat', again: "Chiedi qualcos'altro", retry: 'Riprova', error: 'Non siamo riusciti a completare la richiesta. Riprova.', aiMissing: 'Il matching non è ancora configurato. Chiedi a un amministratore di collegare Mistral.', aiBusy: 'Il matching è temporaneamente limitato. Riprova tra poco.', aiAdmin: 'Un amministratore deve verificare la connessione a Mistral.', noMatches: 'Non ci sono ancora corrispondenze disponibili. Prova un altro approccio o sfoglia la directory.', snapshot: 'Le tue connessioni', upcoming: 'In programma', pending: 'In attesa', completed: 'Completate', viewAll: 'Vedi conversazioni', viewProfile: 'Vedi profilo', back: 'Torna ai risultati', drafting: 'Preparo la richiesta',
   },
   fr: {
     greeting: 'Bonjour {name}, avec qui souhaitez-vous entrer en contact ?', placeholder: 'Demandez à Ment',
     finding: 'Recherche de profils pertinents', chooseLead: 'Ces profils correspondent à votre demande.', chooseBold: 'Sélectionnez-en un pour préparer le message.',
     expertise: 'Expert en', background: 'Parcours correspondant', available: 'Disponible', choose: 'Choisir', selected: 'Sélectionné', different: 'Voir d’autres personnes', browse: 'parcourir l’annuaire', notRight: 'Pas tout à fait ?', or: 'ou',
     to: 'À', intro: 'Voici un message proposé. Modifiez ce que vous voulez, puis envoyez-le lorsqu’il vous convient.', suggested: 'Message proposé', send: 'Envoyer la demande', regenerate: 'Régénérer', edit: 'Modifier', remaining: '{count} demandes restantes ce mois-ci',
-    sent: 'Demande envoyée à {name}.', sentSubline: 'La conversation est prête. Continuez là lorsqu’une réponse arrive.', openChat: 'Ouvrir le chat', again: 'Poser une autre question', retry: 'Réessayer', error: 'Nous n’avons pas pu finaliser cette demande. Réessayez.', aiMissing: 'Le matching n’est pas encore configuré. Demandez à un administrateur de connecter Mistral.', noMatches: 'Aucune correspondance disponible pour le moment. Essayez un autre angle ou parcourez l’annuaire.', snapshot: 'Vos connexions', upcoming: 'À venir', pending: 'En attente', completed: 'Terminées', viewAll: 'Voir les conversations', viewProfile: 'Voir le profil', back: 'Retour aux résultats', drafting: 'Préparation de la demande',
+    sent: 'Demande envoyée à {name}.', sentSubline: 'La conversation est prête. Continuez là lorsqu’une réponse arrive.', openChat: 'Ouvrir le chat', again: 'Poser une autre question', retry: 'Réessayer', error: 'Nous n’avons pas pu finaliser cette demande. Réessayez.', aiMissing: 'Le matching n’est pas encore configuré. Demandez à un administrateur de connecter Mistral.', aiBusy: 'Le matching est temporairement limité. Réessayez dans un instant.', aiAdmin: 'Un administrateur doit vérifier la connexion à Mistral.', noMatches: 'Aucune correspondance disponible pour le moment. Essayez un autre angle ou parcourez l’annuaire.', snapshot: 'Vos connexions', upcoming: 'À venir', pending: 'En attente', completed: 'Terminées', viewAll: 'Voir les conversations', viewProfile: 'Voir le profil', back: 'Retour aux résultats', drafting: 'Préparation de la demande',
   },
 };
 
 const avatarTints = ['#fbeee6', '#eef0e7', '#e9eef7'];
 const pause = (ms) => new Promise(resolve => window.setTimeout(resolve, ms));
 const text = (copy, key, vars = {}) => copy[key].replace(/\{(\w+)\}/g, (_, name) => vars[name] ?? '');
+
+function requestErrorMessage(error, copy) {
+  const code = error.response?.data?.error;
+  if (code === 'ai_not_configured') return copy.aiMissing;
+  if (code === 'ai_rate_limited' || code === 'ai_temporarily_unavailable' || code === 'ai_provider_unreachable') return copy.aiBusy;
+  if (code === 'ai_provider_auth_failed' || code === 'ai_model_not_found') return copy.aiAdmin;
+  return copy.error;
+}
 
 function initials(name) {
   return String(name || '?').split(' ').filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase();
@@ -77,7 +85,7 @@ export default function DiscoveryFlow() {
       const [{ data }] = await Promise.all([api.post('/discovery/matches', { query: nextQuery }), pause(350)]);
       const nextMatches = (data.matches || []).map((person) => ({ person, expertise: person.expertise || [], background: person.background || '' }));
       setMatches(nextMatches); setStage(nextMatches.length ? 'choose' : 'empty');
-    } catch (requestError) { setStage('ask'); setError(requestError.response?.data?.error === 'ai_not_configured' ? copy.aiMissing : copy.error); }
+    } catch (requestError) { setStage('ask'); setError(requestErrorMessage(requestError, copy)); }
   }
 
   function submit(event) {
@@ -95,7 +103,7 @@ export default function DiscoveryFlow() {
       const { data } = await api.post('/discovery/draft', { query: submittedQuery, person_id: match.person.id, variant: 0 });
       setDraft(data.draft || ''); setStage('reachout');
     } catch (requestError) {
-      setStage('choose'); setError(requestError.response?.data?.error === 'ai_not_configured' ? copy.aiMissing : copy.error);
+      setStage('choose'); setError(requestErrorMessage(requestError, copy));
     }
   }
 
@@ -105,7 +113,7 @@ export default function DiscoveryFlow() {
     try {
       const { data } = await api.post('/discovery/draft', { query: submittedQuery, person_id: selected.person.id, variant });
       setDraft(data.draft || '');
-    } catch (requestError) { setError(requestError.response?.data?.error === 'ai_not_configured' ? copy.aiMissing : copy.error); }
+    } catch (requestError) { setError(requestErrorMessage(requestError, copy)); }
     finally { setSending(false); }
   }
 

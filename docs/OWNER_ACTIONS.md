@@ -13,7 +13,7 @@ Everything below is an external account, credential, data, or policy decision. T
 ## 1. Mistral
 
 - Create a production Mistral API key and approve the model/data-processing terms.
-- Set Supabase secrets: `AI_PROCESSING_ENABLED=true`, `MISTRAL_API`, and `MISTRAL_MODEL` (recommended starting point: `mistral-small-latest`). `MISTRAL_API_KEY` remains supported as a legacy alias.
+- Set Supabase secrets: `AI_PROCESSING_ENABLED=true`, `MISTRAL_API`, and `MISTRAL_MODEL` (recommended starting point: `ministral-3b-latest`). `MISTRAL_API_KEY` remains supported as a legacy alias.
 - Deploy `discovery-assistant`, `profile-ingest`, and `reflection-classify`.
 - Run five representative matching prompts and review the ranked people and drafted introductions before opening access.
 

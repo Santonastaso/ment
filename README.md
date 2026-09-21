@@ -105,7 +105,7 @@ supabase functions deploy admin-create-user admin-reset-password \
 
 # AI fails closed until explicitly enabled.
 supabase secrets set AI_PROCESSING_ENABLED=true \
-  MISTRAL_API=... MISTRAL_MODEL=mistral-small-latest \
+  MISTRAL_API=... MISTRAL_MODEL=ministral-3b-latest \
   APP_ORIGIN=https://YOUR_DOMAIN
 ```
 
