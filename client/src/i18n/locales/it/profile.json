@@ -88,6 +88,7 @@
   "profile.career.to": "A",
   "profile.career.toHint": "(lascia vuoto se è il tuo ruolo attuale)",
   "profile.career.descPlaceholder": "Di cosa ti occupavi in questo ruolo? (facoltativo)",
+  "profile.career.description": "Attività principali",
   "profile.career.add": "Aggiungi",
   "profile.career.edit": "Modifica",
   "profile.career.remove": "Rimuovi",

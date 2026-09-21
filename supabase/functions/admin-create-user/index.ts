@@ -96,6 +96,10 @@ Deno.serve(async (req) => {
     const manager_email = (r.manager_email || r.manager || '').toLowerCase();
     const can_teach = parseSkillList(r.can_teach);
     const wants_to_learn = parseSkillList(r.wants_to_learn);
+    const linkedin_url = r.linkedin_url || '';
+    const linkedin_headline = r.linkedin_headline || '';
+    const external_source = r.external_source || (r.essec_id ? 'essec' : '');
+    const external_id = r.external_id || r.essec_id || '';
 
     let userId = usersByEmail.get(email)?.id;
 
@@ -110,7 +114,9 @@ Deno.serve(async (req) => {
       if (!isPlatformAdmin && existingProfile.organization_id !== adminOrgId) { skipped++; continue; }
       const { error: profileError } = await ctx.sb.from('profiles').update({
         name, department, seniority, job_title, program, cohort_year, role: persona,
-        tenure_years, location,
+        tenure_years, location, linkedin_url, linkedin_headline,
+        external_source: external_source || null, external_id: external_id || null,
+        source_synced_at: external_source ? new Date().toISOString() : null,
       }).eq('id', userId);
       if (profileError) {
         failures.push({ row: rowIndex + 2, email, error: profileError.message });
@@ -140,7 +146,9 @@ Deno.serve(async (req) => {
       // Trigger seeded basic columns; upsert the rest in case metadata path differs.
       const { error: profileError } = await ctx.sb.from('profiles').update({
         name, department, seniority, job_title, program, cohort_year, role: persona,
-        tenure_years, location,
+        tenure_years, location, linkedin_url, linkedin_headline,
+        external_source: external_source || null, external_id: external_id || null,
+        source_synced_at: external_source ? new Date().toISOString() : null,
         onboarding_complete: true,
         organization_id: adminOrgId,
       }).eq('id', userId);

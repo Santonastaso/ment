@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { formatAdminDate, pmTranslate } from '../components/admin/adminPm.js';
 import AdminPmKpis from '../components/admin/AdminPmKpis.jsx';
+import AdminInvitationPanel from '../components/admin/AdminInvitationPanel.jsx';
 
 function StatCard({ label, value, sub }) {
   return (
@@ -832,6 +833,7 @@ export default function AdminDashboard() {
         <Surface>
           <SurfaceHeader title={t('admin.users.title')} />
           <SurfaceBody className="pt-5">
+          <AdminInvitationPanel />
           <form onSubmit={addExternalOutreachTarget} className="mb-5 flex flex-wrap items-end gap-3 rounded-lg border border-border bg-muted/30 p-3">
             <div className="min-w-56 flex-1">
               <Label htmlFor="outreach-email">{t('admin.pm.externalTargetEmail')}</Label>

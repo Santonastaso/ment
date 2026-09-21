@@ -1,7 +1,6 @@
 ﻿import React, { useMemo, useState } from 'react';
 import api from '../api/index.js';
 import { useEffect, useRef } from 'react';
-import { createDraft } from './demo/homeDemo.js';
 import { homeCopy } from './demo/homeCopy.js';
 import { useT } from '../i18n/index.jsx';
 import { Button } from './ui/button.jsx';
@@ -24,6 +23,7 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
   const bodyRef = useRef(null);
   const [scheduledAt, setScheduledAt] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [generatingDraft, setGeneratingDraft] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -34,11 +34,25 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
   const minDate = new Date(Date.now() + 60 * 60 * 1000);
   const minDateTime = new Date(minDate.getTime() - minDate.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 
-  function reviewDraft() {
+  async function reviewDraft() {
     if (scheduledAt && new Date(scheduledAt).getTime() < Date.now() + 60 * 60 * 1000) { setError(t('components.sessionRequest.step3Label')); return; }
-    if (!draftEdited) setDraft(createDraft({ name: mentor.name, question, intent, when: scheduledAt ? new Date(scheduledAt).toLocaleString(lang) : '', copy }));
+    setError('');
+    if (!draftEdited) {
+      setGeneratingDraft(true);
+      try {
+        const { data } = await api.post('/discovery/draft', { query: question.trim(), person_id: mentor.id, variant: 0 });
+        setDraft(data.draft || '');
+      } catch (requestError) {
+        setError(requestError.response?.data?.error === 'ai_not_configured'
+          ? 'Message drafting is not configured yet. Ask an administrator to connect Mistral.'
+          : (requestError.response?.data?.error || t('components.sessionRequest.errorGeneric')));
+        return;
+      } finally {
+        setGeneratingDraft(false);
+      }
+    }
     if (!requestTitle.trim()) setRequestTitle(question.trim().slice(0, 80));
-    setError(''); setStep(4);
+    setStep(4);
   }
 
   // Mentor's can_teach skills come through with the user payload from /matches
@@ -247,7 +261,7 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
           {step === 3 && (
             <>
               <Button onClick={() => { setStep(2); setError(''); }} variant="outline">{t('components.sessionRequest.back')}</Button>
-              <Button onClick={reviewDraft}>{t('components.sessionRequest.review')}</Button>
+              <Button onClick={reviewDraft} disabled={generatingDraft}>{generatingDraft ? 'Preparing…' : t('components.sessionRequest.review')}</Button>
             </>
           )}
           {step === 4 && (

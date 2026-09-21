@@ -38,14 +38,18 @@ The app is **server-less**: a React client talks directly to **Supabase** (Auth 
 │   ├── functions/                     Deno Edge Functions:
 │   │   ├── admin-create-user/         CSV/XLSX bulk import
 │   │   ├── admin-reset-password/      Generates a fresh temp password
-│   │   ├── profile-ingest/            PDF/DOCX → heuristic/ESCO profile draft
-│   │   ├── reflection-classify/       Heuristic/ESCO skill extraction
+│   │   ├── discovery-assistant/       Mistral profile ranking + editable drafts
+│   │   ├── profile-ingest/            PDF/DOCX → reviewed Mistral profile draft
+│   │   ├── reflection-classify/       Reviewed Mistral skill extraction
+│   │   ├── calendar-provider/         Google/Microsoft OAuth + event creation
+│   │   ├── admin-create-invitation/   Single-use invitation links
+│   │   ├── accept-invitation/         Invitation account activation
 │   │   ├── public-signup/             Organization self-signup
 │   │   └── send-notification-outbox/ Email reminder worker
 │   └── config.toml
 ```
 
-No Express server. No JWT secret. No CORS. No bcrypt. No nightly cron jobs to babysit.
+No Express server. Browser code uses the Supabase anon key; service credentials and third-party secrets stay inside Edge Functions.
 
 ---
 
@@ -96,11 +100,13 @@ Supabase CLI owns migration application and linting; there is no local SQL runne
 
 ```bash
 supabase functions deploy admin-create-user admin-reset-password \
-  profile-ingest reflection-classify
+  admin-create-invitation accept-invitation discovery-assistant \
+  profile-ingest reflection-classify calendar-provider
 
-# Optional — enables Anthropic-powered profile/reflection classification.
-# The default is off even when ANTHROPIC_API_KEY is present.
-supabase secrets set AI_CLASSIFICATION_ENABLED=true ANTHROPIC_API_KEY=sk-...
+# AI fails closed until explicitly enabled.
+supabase secrets set AI_PROCESSING_ENABLED=true \
+  MISTRAL_API=... MISTRAL_MODEL=mistral-small-latest \
+  APP_ORIGIN=https://YOUR_DOMAIN
 ```
 
 ### 4. Run the client
@@ -152,8 +158,8 @@ Seed/test users are managed in Supabase Auth. Admin-created users receive a one-
 - **Profile**: edit skills, career history, and expertise signature ("what colleagues seek you out for").
 - **Match cards**: request a session or dismiss with one click. Dismissals re-rank future matches.
 - **Session flow**: focus question → propose a time → mentor accepts → calendar `.ics` generated in-browser → mark complete with private reflection + 1–5 rating.
-- **Reflection log**: weekly two-question check-in. Curated keyword matching + ESCO extract skills you can apply to your landscape; Anthropic is opt-in.
-- **Onboarding wizard**: optional CV/perf-review upload (PDF/DOCX) prefills the form via heuristic + ESCO extraction; Anthropic is opt-in.
+- **Reflection log**: weekly two-question check-in. Mistral proposes concise skills; the member decides what to apply.
+- **Onboarding wizard**: optional CV/performance-review upload (PDF/DOCX) produces a reviewed Mistral profile draft.
 
 ### Admin experience
 - **Stats**: users, onboarding rate, sessions by status, top mentors, department activity, silos.
@@ -182,6 +188,10 @@ Seed/test users are managed in Supabase Auth. Admin-created users receive a one-
 | `seniority`      | No       | `junior`, `mid`, `senior`, `lead`    |
 | `tenure_years`   | No       | Integer                              |
 | `location`       | No       | Free text                            |
+| `linkedin_url`   | No       | Member LinkedIn profile URL          |
+| `linkedin_headline` | No    | Approved headline                    |
+| `external_source` | No      | Source system, e.g. `essec`          |
+| `external_id`    | No       | Stable source-system record ID       |
 | `manager_email`  | No       | Email of an already-imported user    |
 | `can_teach`      | No       | Comma-separated skills               |
 | `wants_to_learn` | No       | Comma-separated skills               |
@@ -229,8 +239,8 @@ Client signup is intentionally deferred. Public `/request-access` submissions ar
 These are the useful V1 notes that still apply after the Supabase migration:
 
 - **Notifications**: weekly email reminders now enqueue to `notification_outbox`; deploy the mailer with `RESEND_API_KEY` and invoke it on a schedule.
-- **Calendar**: `.ics` download is the only calendar integration. Google/Microsoft OAuth, availability, and two-way sync are not implemented.
-- **AI classification**: Anthropic is opt-in and the default heuristic/ESCO path is the production-safe baseline. Prompt calibration, few-shot examples, and shorter display aliases for long ESCO labels remain V1 polish.
+- **Calendar**: Google and Microsoft OAuth event creation is implemented; production credentials and provider approval are required. `.ics` remains the offline fallback. Two-way external edits are not yet synchronized back into Ment.
+- **AI**: Mistral matching, drafting, profile ingestion, and reflection extraction are implemented and fail closed until approved production credentials are configured.
 - **Matching**: feedback is still coarse-grained around departments. Per-skill feedback and incremental match recompute would matter at larger scale.
 - **Privacy and admin ops**: audit export exists, but retention policy, GDPR export/delete workflows, org-level settings, 2FA/SSO, and legal consent screens are not built.
 - **Accessibility/i18n/PWA**: English, Italian, and French catalogs are wired; French copy is still being completed. No PWA install/offline mode exists, and touch/keyboard accessibility should get a dedicated audit before broad rollout.
@@ -246,10 +256,11 @@ These are the useful V1 notes that still apply after the Supabase migration:
 - **Default profile privacy**: other colleagues see first name + last initial, role, department, location, bio, and teachable skills. Company names, career details, wants-to-learn, shadow-role answers, reflections, and ratings are private by default.
 - **Audit log**: written exclusively by triggers and the admin RPCs, never by app code. Sensitive content is never recorded — only actions and counts.
 - **Storage**: two private buckets (`profile-uploads`, `imports`) with RLS so users only see their own uploads and admins only access their own import paths unless they are platform admins.
-- **Edge Functions**: Deno; verify_jwt is on. Anthropic is disabled unless `AI_CLASSIFICATION_ENABLED=true`; the Anthropic key lives in `supabase secrets`, never in the client bundle.
+- **Edge Functions**: Deno. Mistral and calendar credentials live in `supabase secrets`, never in the client bundle. Public invitation acceptance validates a single-use hashed token.
 
 ## Privacy/compliance notes
 
 - Supabase projects are deployed to one primary region; Supabase documents `eu-central-1` as Central EU / Frankfurt in its [available regions](https://supabase.com/docs/guides/platform/regions).
 - Supabase provides hosted security/compliance controls and links to its DPA from the official [Supabase security docs](https://supabase.com/docs/guides/security) and [DPA](https://supabase.com/legal/dpa). Verify the current DPA/subprocessor schedule before signing a client.
-- Anthropic processing is off by default. If enabled, verify Anthropic's current commercial terms/DPA flow from the [Anthropic Privacy Center](https://privacy.anthropic.com/en/articles/7996862-how-do-i-view-and-sign-your-data-processing-addendum-dpa) first.
+- Mistral processing is off by default. Review the selected provider terms, DPA, subprocessors, data location, and retention before enabling it.
+- See `docs/OWNER_ACTIONS.md` for the release-owner checklist and `docs/COMPLIANCE_SUMMARY.md` for implemented controls and open policy decisions.

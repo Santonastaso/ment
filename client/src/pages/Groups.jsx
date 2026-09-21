@@ -4,8 +4,12 @@ import { useT } from '../i18n/index.jsx';
 import { PageShell } from '../components/PageShell.jsx';
 import { Surface, SurfaceBody, SurfaceHeader } from '../components/Surface.jsx';
 import { Button } from '@/components/ui/button';
+import { Send } from 'lucide-react';
+import { useAuth } from '../context/AuthContext.jsx';
+import { supabase } from '../lib/supabase.js';
 
 export default function Groups() {
+  const { user } = useAuth();
   const { t } = useT();
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -13,6 +17,9 @@ export default function Groups() {
   const [description, setDescription] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [selectedGroup, setSelectedGroup] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [draft, setDraft] = useState('');
 
   async function load() {
     setLoading(true);
@@ -29,6 +36,33 @@ export default function Groups() {
 
   useEffect(() => { load(); }, []);
 
+  useEffect(() => {
+    if (!selectedGroup?.joined) { setMessages([]); return undefined; }
+    let active = true;
+    const refresh = () => api.get(`/groups/${selectedGroup.id}/messages`)
+      .then(({ data }) => { if (active) setMessages(data || []); })
+      .catch(() => { if (active) setError(t('groups.error.load')); });
+    refresh();
+    const channel = supabase.channel(`group-${selectedGroup.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_messages', filter: `group_id=eq.${selectedGroup.id}` }, refresh)
+      .subscribe();
+    return () => { active = false; supabase.removeChannel(channel); };
+  }, [selectedGroup?.id, selectedGroup?.joined]);
+
+  async function sendMessage(event) {
+    event.preventDefault();
+    const body = draft.trim();
+    if (!body || !selectedGroup) return;
+    setSaving(true); setError('');
+    try {
+      const { data } = await api.post(`/groups/${selectedGroup.id}/messages`, { body });
+      setMessages((items) => items.some((item) => item.id === data.id) ? items : [...items, data]);
+      setDraft('');
+    } catch (requestError) {
+      setError(requestError?.response?.data?.error || t('groups.error.save'));
+    } finally { setSaving(false); }
+  }
+
   async function createGroup() {
     if (!name.trim()) return;
     setSaving(true);
@@ -38,6 +72,7 @@ export default function Groups() {
       setName('');
       setDescription('');
       await load();
+      if (group.joined && selectedGroup?.id === group.id) setSelectedGroup(null);
     } catch (e) {
       setError(e?.response?.data?.error || t('groups.error.save'));
     } finally {
@@ -120,12 +155,31 @@ export default function Groups() {
                   >
                     {group.joined ? t('groups.leave') : t('groups.join')}
                   </Button>
+                  {group.joined && <Button type="button" size="sm" variant={selectedGroup?.id === group.id ? 'default' : 'outline'} onClick={() => setSelectedGroup(group)}>Chat</Button>}
                 </div>
               ))}
             </div>
           )}
         </SurfaceBody>
       </Surface>
+
+      {selectedGroup?.joined && <Surface>
+        <SurfaceHeader title={selectedGroup.name} description={selectedGroup.description || 'Group conversation'} />
+        <SurfaceBody className="pt-4">
+          <div className="flex min-h-80 flex-col gap-2 rounded-2xl bg-muted/40 p-4">
+            {messages.length === 0 && <p className="m-auto text-sm text-muted-foreground">No messages yet. Start the conversation.</p>}
+            {messages.map((message) => <div key={message.id} className={`max-w-[75%] rounded-2xl px-4 py-2 text-sm ${message.sender_id === user?.id ? 'ml-auto bg-primary text-primary-foreground' : 'mr-auto bg-background'}`}>
+              {message.sender_id !== user?.id && <strong className="mb-1 block text-xs">{message.sender_name}</strong>}
+              <p className="whitespace-pre-wrap">{message.body}</p>
+              <time className="mt-1 block text-[10px] opacity-60">{new Date(message.created_at).toLocaleString()}</time>
+            </div>)}
+          </div>
+          <form className="mt-3 flex gap-2" onSubmit={sendMessage}>
+            <input className="input flex-1" value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={6000} placeholder="Message the group" aria-label="Message the group" />
+            <Button type="submit" disabled={!draft.trim() || saving} aria-label="Send message"><Send className="size-4" /></Button>
+          </form>
+        </SurfaceBody>
+      </Surface>}
     </PageShell>
   );
 }

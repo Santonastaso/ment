@@ -22,31 +22,6 @@ function ok(data, status = 200) {
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
-// Client fallbacks keep the demo usable if an Edge Function is unavailable.
-// They are deliberately deterministic and clearly labelled as demo output.
-function demoReflection(supportNeeded = '', managedWell = '') {
-  const fixtures = [
-    ['project management', 'project planning', 'project manager'], ['data analysis', 'data analytics'],
-    ['communication', 'communicating'], ['leadership', 'team leadership'], ['mentoring', 'mentorship'],
-    ['content strategy', 'content'], ['Python'], ['SQL'], ['React'], ['Excel'],
-  ];
-  const match = (text) => {
-    const source = ` ${String(text).toLowerCase()} `;
-    return fixtures.filter(([name, ...aliases]) => [name, ...aliases].some(term => source.includes(` ${term.toLowerCase()} `))).map(([name]) => name).slice(0, 5);
-  };
-  return { extracted_gaps: match(supportNeeded), extracted_strengths: match(managedWell), esco_uris: {}, classifier_source: 'demo-client' };
-}
-
-function demoProfileProposal() {
-  return {
-    job_title: 'Sample: Marketing specialist', department: 'Marketing', location: '',
-    bio: 'Sample profile for review: I enjoy sharing content strategy and learning data analysis.',
-    career_history: [],
-    can_teach: [{ skill: 'content strategy', example_project: '' }, { skill: 'communication', example_project: '' }],
-    wants_to_learn: ['data analysis', 'project management'],
-  };
-}
-
 async function getViewerId() {
   const { data } = await supabase.auth.getSession();
   const id = data?.session?.user?.id;
@@ -470,6 +445,11 @@ async function get(url) {
     if (error) throw new ApiError(error.message);
     return ok(data);
   }
+  if (url === '/users/me/skill-evidence') {
+    const { data, error } = await supabase.rpc('my_skill_evidence');
+    if (error) throw new ApiError(error.message);
+    return ok(data || []);
+  }
   if (url === '/users/me/unavailable-periods') {
     const { data, error } = await supabase
       .from('mentorship_unavailable_periods')
@@ -512,6 +492,12 @@ async function get(url) {
     if (error) throw new ApiError(error.message);
     return ok(Array.isArray(data) ? data : []);
   }
+  if (/^\/groups\/\d+\/messages$/.test(url)) {
+    const id = Number(url.split('/')[2]);
+    const { data, error } = await supabase.rpc('my_group_messages', { p_group_id: id, p_limit: 200 });
+    if (error) throw new ApiError(error.message, 403);
+    return ok(data || []);
+  }
 
   if (url === '/sessions') {
     const { data, error } = await supabase.rpc('my_sessions');
@@ -525,6 +511,7 @@ async function get(url) {
     if (error) throw new ApiError(error.message, 404);
     return ok(data || []);
   }
+
   if (url === '/sessions/pending-acceptances') {
     const { data, error } = await supabase.rpc('pending_acceptances');
     if (error) throw new ApiError(error.message);
@@ -674,9 +661,9 @@ async function get(url) {
   }
   if (url === '/admin/template') {
     const csv =
-      'name,email,department,current_role,program,cohort_year,persona,tenure_years,location,manager_email,can_teach,wants_to_learn\n' +
-      'Jane Smith,jane.smith@university.edu,MSc Management,Research Assistant,MSc Management,2024,student,3,London,sarah.lead@university.edu,"React,TypeScript","system design,leadership"\n' +
-      'John Doe,john.doe@university.edu,MBA,Consultant,MBA,2019,alumnus,1,New York,frank.wu@university.edu,"Excel","financial modeling,Python"\n';
+      'name,email,department,current_role,program,cohort_year,persona,tenure_years,location,linkedin_url,linkedin_headline,external_source,external_id,manager_email,can_teach,wants_to_learn\n' +
+      'Jane Smith,jane.smith@university.edu,MSc Management,Research Assistant,MSc Management,2024,student,3,London,https://www.linkedin.com/in/jane-smith,Research Assistant at ESSEC,essec,ESSEC-001,sarah.lead@university.edu,"React,TypeScript","system design,leadership"\n' +
+      'John Doe,john.doe@university.edu,MBA,Consultant,MBA,2019,alumnus,1,New York,https://www.linkedin.com/in/john-doe,Consultant and ESSEC alumnus,essec,ESSEC-002,frank.wu@university.edu,"Excel","financial modeling,Python"\n';
     return ok(new Blob([csv], { type: 'text/csv' }));
   }
 
@@ -715,6 +702,14 @@ async function post(url, body = {}, opts = {}) {
   }
 
   const viewer = await getViewer();
+
+  if (url === '/discovery/matches' || url === '/discovery/draft') {
+    const { data, error } = await supabase.functions.invoke('discovery-assistant', {
+      body: { ...body, action: url.endsWith('/draft') ? 'draft' : 'match' },
+    });
+    if (error || data?.error) throw new ApiError(data?.error || error?.message || 'ai_request_failed', error?.status || 502);
+    return ok(data);
+  }
 
   if (url === '/users/me/skills') {
     const { skill, type, example_project } = body;
@@ -842,6 +837,13 @@ async function post(url, body = {}, opts = {}) {
     return ok(data, 201);
   }
 
+  if (/^\/sessions\/\d+\/read$/.test(url)) {
+    const id = Number(url.split('/')[2]);
+    const { error } = await supabase.rpc('mark_session_read', { p_session_id: id });
+    if (error) throw new ApiError(error.message, 404);
+    return ok({ id, read: true });
+  }
+
   if (/^\/sessions\/\d+\/acknowledge$/.test(url)) {
     const id = Number(url.split('/')[2]);
     const { error } = await supabase.rpc('acknowledge_session', { p_session_id: id });
@@ -874,6 +876,13 @@ async function post(url, body = {}, opts = {}) {
     return ok({ ok: true });
   }
 
+  if (/^\/groups\/\d+\/messages$/.test(url)) {
+    const id = Number(url.split('/')[2]);
+    const { data, error } = await supabase.rpc('send_group_message', { p_group_id: id, p_body: body.body });
+    if (error) throw new ApiError(error.message, 403);
+    return ok(data, 201);
+  }
+
   if (url === '/feedback') {
     const { data, error } = await supabase.rpc('submit_feedback', {
       p_category: body.category || 'general',
@@ -884,14 +893,12 @@ async function post(url, body = {}, opts = {}) {
   }
 
   if (url === '/reflections') {
-    const signals = demoReflection(body.support_needed, body.managed_well);
     const { data: row, error } = await supabase
       .from('reflection_logs')
       .insert({
         user_id: viewer.id,
         support_needed: (body.support_needed || '').trim(),
         managed_well: (body.managed_well || '').trim(),
-        ...signals,
       })
       .select()
       .single();
@@ -942,13 +949,8 @@ async function post(url, body = {}, opts = {}) {
     const { data, error } = await supabase.functions.invoke('profile-ingest', {
       body: { storage_path: path, kind, lang: browserLanguage() },
     });
-    if (!error) return ok(data);
-    const proposed = demoProfileProposal();
-    const { data: draft, error: draftError } = await supabase.from('profile_drafts').insert({
-      user_id: viewer.id, source: String(kind), proposed_json: proposed, classifier_source: 'demo-client',
-    }).select('id').single();
-    if (draftError) throw new ApiError(error.message);
-    return ok({ draft_id: draft.id, proposed, classifier_source: 'demo' });
+    if (error || data?.error) throw new ApiError(data?.error || error?.message || 'profile_ingest_failed', error?.status || 502);
+    return ok(data);
   }
 
   if (/^\/profile\/ingest\/\d+\/accept$/.test(url)) {

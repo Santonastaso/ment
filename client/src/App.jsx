@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 const LandingPage = lazy(() => import('./pages/LandingPage.jsx'));
 const Login = lazy(() => import('./pages/Login.jsx'));
 const RequestAccess = lazy(() => import('./pages/RequestAccess.jsx'));
+const AcceptInvitation = lazy(() => import('./pages/AcceptInvitation.jsx'));
 const SignUp = lazy(() => import('./pages/SignUp.jsx'));
 const ForcePasswordChange = lazy(() => import('./pages/ForcePasswordChange.jsx'));
 const Onboarding = lazy(() => import('./pages/Onboarding.jsx'));
@@ -18,6 +19,7 @@ const AdminDashboard = lazy(() => import('./pages/AdminDashboard.jsx'));
 const AdminOps = lazy(() => import('./pages/AdminOps.jsx'));
 const KnowledgeGraph = lazy(() => import('./pages/KnowledgeGraph.jsx'));
 const LegalPage = lazy(() => import('./pages/LegalPage.jsx'));
+const CalendarCallback = lazy(() => import('./pages/CalendarCallback.jsx'));
 const AppLayout = lazy(() => import('./components/AppLayout.jsx'));
 
 function page(node) {
@@ -111,8 +113,10 @@ export default function App() {
       <Route path="/login" element={<LoginRoute />} />
       <Route path="/sign-up" element={page(<SignUp />)} />
       <Route path="/request-access" element={page(<RequestAccess />)} />
+      <Route path="/invite/:token" element={page(<AcceptInvitation />)} />
       <Route path="/terms" element={page(<LegalPage type="terms" />)} />
       <Route path="/privacy" element={page(<LegalPage type="privacy" />)} />
+      <Route path="/calendar/callback" element={page(<CalendarCallback />)} />
       <Route path="/change-password" element={<ChangePasswordRoute />} />
       <Route path="/onboarding" element={<OnboardingRoute />} />
       <Route element={<ProtectedRoute />}>

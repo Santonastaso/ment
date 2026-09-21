@@ -88,6 +88,14 @@ function SkillRow({ entry, kind, isOwnProfile, onDelete }) {
                   <p className="mt-1 whitespace-pre-wrap text-sm text-foreground">{entry.example_project}</p>
                 </div>
               )}
+              {entry.evidence?.length > 0 && (
+                <div>
+                  <p className="label-meta">Conversations</p>
+                  <ul className="mt-2 space-y-2">
+                    {entry.evidence.map((item) => <li key={`${item.session_id}-${item.person_id}`} className="flex items-center justify-between gap-3 rounded-xl bg-muted px-3 py-2 text-sm"><span>{item.person_name}</span><time className="text-xs text-muted-foreground">{new Date(item.occurred_at).toLocaleDateString()}</time></li>)}
+                  </ul>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-2 border-t border-[var(--border-subtle)] p-4">

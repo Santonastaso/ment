@@ -13,6 +13,8 @@
   "onboarding.import.consent": "J'accepte que ce fichier soit traite pour preparer mon profil. Le traitement IA est facultatif.",
   "onboarding.import.consentRequired": "Confirmez d'abord le traitement du fichier.",
   "onboarding.import.error": "Could not read that file. Try another format or skip to enter manually.",
+  "onboarding.import.reviewNotice": "Les suggestions de l'IA sont un brouillon. Verifiez chaque champ avant d'enregistrer.",
+  "onboarding.import.suggested": "Suggere par l'IA",
   "onboarding.background.title": "Your background",
   "onboarding.background.desc": "Tell us about your current role and experience. This helps us find relevant matches.",
   "onboarding.fields.fullName": "Full name",
@@ -61,13 +63,5 @@
   "onboarding.persona.alumnus": "Alumnus",
   "onboarding.fields.program": "Program",
   "onboarding.fields.programPlaceholder": "e.g. MSc Management",
-  "onboarding.fields.cohortYear": "Class of (year)",
-  "onboarding.demo.consent": "",
-  "onboarding.demo.consentRequired": "",
-  "onboarding.demo.description": "",
-  "onboarding.demo.notice": "",
-  "onboarding.demo.preparing": "",
-  "onboarding.demo.reviewConsent": "",
-  "onboarding.demo.reviewRequired": "",
-  "onboarding.demo.sampleLabel": ""
+  "onboarding.fields.cohortYear": "Class of (year)"
 }

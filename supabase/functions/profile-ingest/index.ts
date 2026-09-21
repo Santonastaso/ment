@@ -11,7 +11,7 @@ import {
   jsonOk,
   requireUser,
 } from '../_shared/index.ts';
-import { sampleProfile } from '../_shared/demo.ts';
+import { aiErrorResponse, mistralJson } from '../_shared/mistral.ts';
 
 async function extractText(buf: Uint8Array, filename: string): Promise<string> {
   const lower = filename.toLowerCase();
@@ -22,7 +22,7 @@ async function extractText(buf: Uint8Array, filename: string): Promise<string> {
     for (let i = 1; i <= doc.numPages; i++) {
       const page = await doc.getPage(i);
       const tc = await page.getTextContent();
-      out += tc.items.map((it: { str?: string }) => it.str ?? '').join(' ') + '\n';
+      out += tc.items.map((item) => ('str' in item ? item.str : '')).join(' ') + '\n';
     }
     return out;
   }
@@ -63,9 +63,22 @@ Deno.serve(async (req) => {
   }
   if (!rawText || rawText.trim().length < 20) return jsonError('text_too_short', 400);
 
-  // Validate and retain the uploaded text, but never claim to infer its profile.
-  // Demo fixtures are unconditional, even when production AI credentials exist.
-  const { proposed, classifier_source } = sampleProfile();
+  let proposed;
+  let classifier_source;
+  try {
+    const result = await mistralJson<{ proposed?: unknown }>({
+      system: `Extract a professional profile from the supplied document. Return JSON with a proposed object containing: job_title (string), department (string), location (string), bio (string, max 500 characters), career_history (array of objects with company, role_title, start_year, end_year, description), can_teach (array of objects with skill and example_project), and wants_to_learn (array of strings). Use only explicit evidence from the document. Use empty strings or arrays when evidence is absent. Never infer sensitive personal data.`,
+      user: JSON.stringify({ source_kind: kind, document_text: rawText.slice(0, 30000) }),
+      temperature: 0,
+      maxTokens: 1800,
+    });
+    if (!result.value?.proposed || typeof result.value.proposed !== 'object') return jsonError('ai_invalid_response', 502);
+    proposed = result.value.proposed;
+    classifier_source = `mistral:${result.model}`;
+  } catch (error) {
+    const mapped = aiErrorResponse(error);
+    return jsonError(mapped.message, mapped.status);
+  }
 
   const { data: insert, error: insErr } = await ctx.sb
     .from('profile_drafts')

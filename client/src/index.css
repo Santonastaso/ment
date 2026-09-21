@@ -253,8 +253,8 @@
 .calendar-more summary { cursor: pointer; list-style: none; border-radius: var(--control-radius); background: var(--control-surface-hover); padding: 8px 12px; color: var(--foreground); font-size: 12.5px; font-weight: 600; }
 .calendar-more summary::-webkit-details-marker { display: none; }
 .calendar-more-menu { position: absolute; right: 0; z-index: 20; display: grid; min-width: 150px; gap: 2px; margin-top: 6px; padding: 5px; border: 1px solid var(--border-subtle); border-radius: 12px; background: var(--card); box-shadow: var(--shadow-overlay); }
-.calendar-more-menu a { padding: 7px 9px; color: var(--foreground); font-size: 12px; white-space: nowrap; }
-.calendar-more-menu a:hover { border-radius: 7px; background: var(--control-surface); }
+.calendar-more-menu a, .calendar-more-menu button { border: 0; background: transparent; padding: 7px 9px; color: var(--foreground); font-size: 12px; text-align: left; white-space: nowrap; }
+.calendar-more-menu a:hover, .calendar-more-menu button:hover { border-radius: 7px; background: var(--control-surface); }
 .conversation-scheduler { grid-column: 2 / -1; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding-top: 8px; }
 .conversation-messages { grid-row: 3; min-height: 0; overflow-y: auto; background: var(--background); background-image: none; padding: 24px max(24px, calc((100% - 720px) / 2)) 18px; scrollbar-width: thin; }
 .conversation-context { margin-bottom: 28px; text-align: center; }

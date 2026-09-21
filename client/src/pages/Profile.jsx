@@ -74,6 +74,14 @@ function formatPeriod(startY, startM, endY, endM, presentLabel = 'present', mont
   return `${start} – ${end}`;
 }
 
+function attachSkillEvidence(profile, evidence) {
+  const bySkill = new Map();
+  for (const item of evidence || []) bySkill.set(item.skill_id, [...(bySkill.get(item.skill_id) || []), item]);
+  const skills = (profile.skills || []).map((skill) => ({ ...skill, evidence: bySkill.get(skill.id) || [], session_count: (bySkill.get(skill.id) || []).length }));
+  const skillProgress = (profile.skillProgress || skills).map((skill) => ({ ...skill, evidence: bySkill.get(skill.id) || [], session_count: (bySkill.get(skill.id) || []).length }));
+  return { ...profile, skills, skillProgress };
+}
+
 export default function Profile() {
   const { id } = useParams();
   const { user: currentUser, updateUser } = useAuth();
@@ -135,7 +143,12 @@ export default function Profile() {
       setLoading(true);
       try {
         const res = await api.get(isOwnProfile ? '/users/me' : `/users/${targetId}`);
-        setProfile(res.data);
+        let loadedProfile = res.data;
+        if (isOwnProfile) {
+          const evidenceResponse = await api.get('/users/me/skill-evidence');
+          loadedProfile = attachSkillEvidence(loadedProfile, evidenceResponse.data);
+        }
+        setProfile(loadedProfile);
         if (isOwnProfile) {
           setForm({
             department: res.data.department,
@@ -187,8 +200,10 @@ export default function Profile() {
 
   async function refreshProfile() {
     const res = await api.get('/users/me');
-    setProfile(res.data);
-    setWantsToLearn(res.data.skills?.filter(s => s.type === 'wants_to_learn').map(s => s.skill) || []);
+    const evidenceResponse = await api.get('/users/me/skill-evidence');
+    const loadedProfile = attachSkillEvidence(res.data, evidenceResponse.data);
+    setProfile(loadedProfile);
+    setWantsToLearn(loadedProfile.skills?.filter(s => s.type === 'wants_to_learn').map(s => s.skill) || []);
   }
 
   async function handleDeleteSkillFromBubble(entry) {
@@ -627,12 +642,12 @@ export default function Profile() {
         {isOwnProfile && showAddCareer && (
           <div className="mb-5 space-y-3 pb-3">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              <input className="input text-sm" placeholder={t('profile.career.roleTitle')} value={newCareer.role} onChange={e => setNewCareer(c => ({...c, role: e.target.value}))} />
-              <select className="input text-sm" value={newCareer.department} onChange={e => setNewCareer(c => ({...c, department: e.target.value}))}>
+              <label className="grid gap-1 text-xs font-medium text-muted-foreground">{t('profile.career.roleTitle')}<input className="input text-sm text-foreground" value={newCareer.role} onChange={e => setNewCareer(c => ({...c, role: e.target.value}))} /></label>
+              <label className="grid gap-1 text-xs font-medium text-muted-foreground">{t('profile.career.department')}<select className="input text-sm text-foreground" value={newCareer.department} onChange={e => setNewCareer(c => ({...c, department: e.target.value}))}>
                 <option value="">{t('profile.career.department')}</option>
                 {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
-              <input className="input text-sm" placeholder={t('profile.career.company')} value={newCareer.company} onChange={e => setNewCareer(c => ({...c, company: e.target.value}))} />
+              </select></label>
+              <label className="grid gap-1 text-xs font-medium text-muted-foreground">{t('profile.career.company')}<input className="input text-sm text-foreground" value={newCareer.company} onChange={e => setNewCareer(c => ({...c, company: e.target.value}))} /></label>
               <div>
                 <label className="block text-[10px] text-ink-tertiary mb-1">{t('profile.career.from')}</label>
                 <MonthYearPicker
@@ -648,13 +663,13 @@ export default function Profile() {
                 />
               </div>
             </div>
-            <textarea
+            <label className="grid gap-1 text-xs font-medium text-muted-foreground">{t('profile.career.description')}<textarea
               className="input text-sm resize-none"
               rows={2}
               placeholder={t('profile.career.descPlaceholder')}
               value={newCareer.description}
               onChange={e => setNewCareer(c => ({...c, description: e.target.value}))}
-            />
+            /></label>
             <Button size="sm" onClick={handleAddCareer}>{t('profile.career.add')}</Button>
           </div>
         )}

@@ -1,6 +1,5 @@
-// Persist deterministic demo suggestions; applying them remains a user action.
 import { corsHeaders, jsonError, jsonOk, requireUser } from '../_shared/index.ts';
-import { demoReflection } from '../_shared/demo.ts';
+import { aiErrorResponse, mistralJson } from '../_shared/mistral.ts';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -28,7 +27,27 @@ Deno.serve(async (req) => {
   }
   if (!log) return jsonError('not_found', 404);
 
-  const result = demoReflection(log.support_needed ?? '', log.managed_well ?? '');
+  let result;
+  try {
+    const classified = await mistralJson<{ extracted_gaps?: string[]; extracted_strengths?: string[] }>({
+      system: 'Classify a private professional reflection into concise skill names. Return JSON with extracted_gaps and extracted_strengths arrays. Use at most five items per array. Use only evidence in the reflection, do not diagnose or infer sensitive traits.',
+      user: JSON.stringify({ support_needed: log.support_needed || '', managed_well: log.managed_well || '' }),
+      temperature: 0,
+      maxTokens: 350,
+    });
+    const normalize = (items: unknown) => Array.isArray(items)
+      ? [...new Set(items.map((item) => String(item || '').trim()).filter(Boolean))].slice(0, 5)
+      : [];
+    result = {
+      extracted_gaps: normalize(classified.value.extracted_gaps),
+      extracted_strengths: normalize(classified.value.extracted_strengths),
+      esco_uris: {},
+      classifier_source: `mistral:${classified.model}`,
+    };
+  } catch (classificationError) {
+    const mapped = aiErrorResponse(classificationError);
+    return jsonError(mapped.message, mapped.status);
+  }
   const { data: saved, error: updateError } = await ctx.sb
     .from('reflection_logs')
     .update(result)

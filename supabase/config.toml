@@ -17,3 +17,15 @@ verify_jwt = false
 
 [functions.send-notification-outbox]
 verify_jwt = true
+
+[functions.discovery-assistant]
+verify_jwt = true
+
+[functions.admin-create-invitation]
+verify_jwt = true
+
+[functions.accept-invitation]
+verify_jwt = false
+
+[functions.calendar-provider]
+verify_jwt = true

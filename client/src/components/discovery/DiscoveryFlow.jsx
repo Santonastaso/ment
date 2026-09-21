@@ -1,10 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowUp, Check, Pencil, RefreshCw, Send } from 'lucide-react';
+import { ArrowLeft, ArrowUp, Check, Pencil, RefreshCw, Send } from 'lucide-react';
 import api from '../../api/index.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useT } from '../../i18n/index.jsx';
-import { createDiscoveryDraft, getDiscoveryMatches, loadConversationCandidates } from '../demo/homeDemo.js';
 
 const COPY = {
   en: {
@@ -12,21 +11,21 @@ const COPY = {
     finding: 'Finding relevant profiles', chooseLead: 'These profiles match your request.', chooseBold: 'Select one to prepare the request.',
     expertise: 'Expert in', background: 'Matching background', available: 'Available', choose: 'Choose', selected: 'Selected', different: 'Ask for different people', browse: 'browse the full directory', notRight: 'Not quite right?', or: 'or',
     to: 'To', intro: "Here's a suggested intro. Edit anything, then send when it feels like you.", suggested: 'Suggested draft', send: 'Send request', regenerate: 'Regenerate', edit: 'Edit', remaining: '{count} requests left this month',
-    sent: 'Request sent to {name}.', sentSubline: "The conversation is ready. Continue there when they reply.", openChat: 'Open chat', again: 'Ask about something else', retry: 'Try again', error: 'We could not complete that request. Please try again.', noMatches: 'No available matches yet. Try a different angle or browse the directory.', snapshot: 'Your connections', upcoming: 'Upcoming', pending: 'Pending', completed: 'Completed', viewAll: 'View conversations',
+    sent: 'Request sent to {name}.', sentSubline: "The conversation is ready. Continue there when they reply.", openChat: 'Open chat', again: 'Ask about something else', retry: 'Try again', error: 'We could not complete that request. Please try again.', aiMissing: 'Matching is not configured yet. Ask an administrator to connect Mistral.', noMatches: 'No available matches yet. Try a different angle or browse the directory.', snapshot: 'Your connections', upcoming: 'Upcoming', pending: 'Pending', completed: 'Completed', viewAll: 'View conversations', viewProfile: 'View profile', back: 'Back to matches', drafting: 'Preparing your request',
   },
   it: {
     greeting: 'Ciao {name}, con chi vorresti entrare in contatto?', placeholder: 'Chiedi a Ment',
     finding: 'Cerco profili pertinenti', chooseLead: 'Questi profili corrispondono alla richiesta.', chooseBold: 'Selezionane uno per preparare il messaggio.',
     expertise: 'Esperto in', background: 'Contesto della ricerca', available: 'Disponibile', choose: 'Scegli', selected: 'Scelto', different: 'Mostra altre persone', browse: 'sfoglia la directory', notRight: 'Non è quello che cercavi?', or: 'oppure',
     to: 'A', intro: 'Ecco un messaggio proposto. Modifica tutto quello che vuoi, poi invialo quando ti sembra giusto.', suggested: 'Messaggio proposto', send: 'Invia richiesta', regenerate: 'Rigenera', edit: 'Modifica', remaining: '{count} richieste rimaste questo mese',
-    sent: 'Richiesta inviata a {name}.', sentSubline: 'La conversazione è pronta. Continua da lì quando risponderà.', openChat: 'Apri chat', again: "Chiedi qualcos'altro", retry: 'Riprova', error: 'Non siamo riusciti a completare la richiesta. Riprova.', noMatches: 'Non ci sono ancora corrispondenze disponibili. Prova un altro approccio o sfoglia la directory.', snapshot: 'Le tue connessioni', upcoming: 'In programma', pending: 'In attesa', completed: 'Completate', viewAll: 'Vedi conversazioni',
+    sent: 'Richiesta inviata a {name}.', sentSubline: 'La conversazione è pronta. Continua da lì quando risponderà.', openChat: 'Apri chat', again: "Chiedi qualcos'altro", retry: 'Riprova', error: 'Non siamo riusciti a completare la richiesta. Riprova.', aiMissing: 'Il matching non è ancora configurato. Chiedi a un amministratore di collegare Mistral.', noMatches: 'Non ci sono ancora corrispondenze disponibili. Prova un altro approccio o sfoglia la directory.', snapshot: 'Le tue connessioni', upcoming: 'In programma', pending: 'In attesa', completed: 'Completate', viewAll: 'Vedi conversazioni', viewProfile: 'Vedi profilo', back: 'Torna ai risultati', drafting: 'Preparo la richiesta',
   },
   fr: {
     greeting: 'Bonjour {name}, avec qui souhaitez-vous entrer en contact ?', placeholder: 'Demandez à Ment',
     finding: 'Recherche de profils pertinents', chooseLead: 'Ces profils correspondent à votre demande.', chooseBold: 'Sélectionnez-en un pour préparer le message.',
     expertise: 'Expert en', background: 'Parcours correspondant', available: 'Disponible', choose: 'Choisir', selected: 'Sélectionné', different: 'Voir d’autres personnes', browse: 'parcourir l’annuaire', notRight: 'Pas tout à fait ?', or: 'ou',
     to: 'À', intro: 'Voici un message proposé. Modifiez ce que vous voulez, puis envoyez-le lorsqu’il vous convient.', suggested: 'Message proposé', send: 'Envoyer la demande', regenerate: 'Régénérer', edit: 'Modifier', remaining: '{count} demandes restantes ce mois-ci',
-    sent: 'Demande envoyée à {name}.', sentSubline: 'La conversation est prête. Continuez là lorsqu’une réponse arrive.', openChat: 'Ouvrir le chat', again: 'Poser une autre question', retry: 'Réessayer', error: 'Nous n’avons pas pu finaliser cette demande. Réessayez.', noMatches: 'Aucune correspondance disponible pour le moment. Essayez un autre angle ou parcourez l’annuaire.', snapshot: 'Vos connexions', upcoming: 'À venir', pending: 'En attente', completed: 'Terminées', viewAll: 'Voir les conversations',
+    sent: 'Demande envoyée à {name}.', sentSubline: 'La conversation est prête. Continuez là lorsqu’une réponse arrive.', openChat: 'Ouvrir le chat', again: 'Poser une autre question', retry: 'Réessayer', error: 'Nous n’avons pas pu finaliser cette demande. Réessayez.', aiMissing: 'Le matching n’est pas encore configuré. Demandez à un administrateur de connecter Mistral.', noMatches: 'Aucune correspondance disponible pour le moment. Essayez un autre angle ou parcourez l’annuaire.', snapshot: 'Vos connexions', upcoming: 'À venir', pending: 'En attente', completed: 'Terminées', viewAll: 'Voir les conversations', viewProfile: 'Voir le profil', back: 'Retour aux résultats', drafting: 'Préparation de la demande',
   },
 };
 
@@ -41,11 +40,11 @@ function initials(name) {
 function MatchCard({ match, index, selected, onSelect, copy }) {
   const role = [match.person.job_title || match.person.current_role, match.person.department].filter(Boolean).join(' · ');
   return (
-    <button type="button" role="radio" aria-checked={selected} aria-label={`${copy.choose} ${match.person.name}`} onClick={() => onSelect(match)} className={`discovery-match-card ${selected ? 'is-selected' : ''}`}>
+    <article role="radio" aria-checked={selected} className={`discovery-match-card ${selected ? 'is-selected' : ''}`}>
       <span className="discovery-person-head"><span className="discovery-avatar" style={{ backgroundColor: avatarTints[index % avatarTints.length] }}>{initials(match.person.name)}{selected && <span className="discovery-selected-mark"><Check /></span>}</span><span className="min-w-0 text-left"><span className="block truncate text-[15.5px] font-semibold">{match.person.name}</span>{role && <span className="block truncate text-[12.5px] text-[var(--ment-muted)]">{role}</span>}</span></span>
       <span className="discovery-reason"><span><span className="discovery-micro">{copy.expertise}</span>{match.expertise.join(', ')}</span><span><span className="discovery-micro">{copy.background}</span>{match.background}</span></span>
-      <span className="mt-4 flex items-center justify-between gap-3"><span className="discovery-available"><i />{copy.available}</span><span className={`discovery-choose ${selected ? 'is-selected' : ''}`}>{selected ? copy.selected : copy.choose}</span></span>
-    </button>
+      <span className="mt-4 flex items-center justify-between gap-3"><span className="discovery-available"><i />{copy.available}</span><span className="flex items-center gap-2"><Link className="discovery-text-button" to={`/profile/${match.person.id}`}>{copy.viewProfile}</Link><button type="button" aria-label={`${copy.choose} ${match.person.name}`} onClick={() => onSelect(match)} className={`discovery-choose ${selected ? 'is-selected' : ''}`}>{selected ? copy.selected : copy.choose}</button></span></span>
+    </article>
   );
 }
 
@@ -64,20 +63,21 @@ export default function DiscoveryFlow() {
   const [error, setError] = useState('');
   const [connections, setConnections] = useState([]);
   const [sessionId, setSessionId] = useState(null);
+  const [remaining, setRemaining] = useState(null);
   const threadEndRef = useRef(null);
   const idempotencyKey = useRef(null);
 
   useEffect(() => { if (stage !== 'ask') threadEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); }, [stage, selected]);
-  useEffect(() => { if (!user?.id || stage !== 'ask') return; api.get('/sessions').then(({ data }) => setConnections(data || [])).catch(() => {}); }, [stage, user?.id]);
+  useEffect(() => { if (!user?.id || stage !== 'ask') return; Promise.all([api.get('/sessions'), api.get('/users/me/capacity')]).then(([sessions, capacity]) => { setConnections(sessions.data || []); const value = capacity.data; setRemaining(Number.isFinite(value?.monthly_limit) && Number.isFinite(value?.monthly_booked) ? Math.max(0, value.monthly_limit - value.monthly_booked) : null); }).catch(() => {}); }, [stage, user?.id]);
 
   async function findMatches(nextQuery) {
     setError(''); setSubmittedQuery(nextQuery); setStage('matching');
     setSelected(null); setDraft('');
     try {
-      const [people] = await Promise.all([loadConversationCandidates(api), pause(900)]);
-      const nextMatches = getDiscoveryMatches({ query: nextQuery, people, userId: user?.id });
+      const [{ data }] = await Promise.all([api.post('/discovery/matches', { query: nextQuery }), pause(350)]);
+      const nextMatches = (data.matches || []).map((person) => ({ person, expertise: person.expertise || [], background: person.background || '' }));
       setMatches(nextMatches); setStage(nextMatches.length ? 'choose' : 'empty');
-    } catch { setStage('ask'); setError(copy.error); }
+    } catch (requestError) { setStage('ask'); setError(requestError.response?.data?.error === 'ai_not_configured' ? copy.aiMissing : copy.error); }
   }
 
   function submit(event) {
@@ -88,16 +88,25 @@ export default function DiscoveryFlow() {
     findMatches(nextQuery);
   }
 
-  function choose(match) {
+  async function choose(match) {
     setSelected(match); setDraftVariant(0);
-    setDraft(createDiscoveryDraft({ userName: user?.name, person: match.person, query: submittedQuery, reason: `${match.expertise.join(', ')}; background in ${match.background}`, variant: 0 }));
-    setStage('reachout');
+    setStage('drafting'); setError('');
+    try {
+      const { data } = await api.post('/discovery/draft', { query: submittedQuery, person_id: match.person.id, variant: 0 });
+      setDraft(data.draft || ''); setStage('reachout');
+    } catch (requestError) {
+      setStage('choose'); setError(requestError.response?.data?.error === 'ai_not_configured' ? copy.aiMissing : copy.error);
+    }
   }
 
-  function regenerate() {
+  async function regenerate() {
     const variant = draftVariant === 0 ? 1 : 0;
-    setDraftVariant(variant);
-    setDraft(createDiscoveryDraft({ userName: user?.name, person: selected.person, query: submittedQuery, reason: `${selected.expertise.join(', ')}; background in ${selected.background}`, variant }));
+    setDraftVariant(variant); setSending(true); setError('');
+    try {
+      const { data } = await api.post('/discovery/draft', { query: submittedQuery, person_id: selected.person.id, variant });
+      setDraft(data.draft || '');
+    } catch (requestError) { setError(requestError.response?.data?.error === 'ai_not_configured' ? copy.aiMissing : copy.error); }
+    finally { setSending(false); }
   }
 
   async function sendRequest() {
@@ -126,6 +135,7 @@ export default function DiscoveryFlow() {
     {stage === 'ask' && <div className="discovery-ask-block"><h1>{text(copy, 'greeting', { name: firstName })}</h1>{composer()}{connections.length > 0 && <div className="discovery-connections"><div className="discovery-connection-people"><span className="discovery-connections-label">{copy.snapshot}</span><span className="discovery-avatars">{connections.slice(0, 3).map((session, index) => { const peer = session.mentor_id === user?.id ? session.mentee : session.mentor; return <span key={session.id} className="discovery-avatar" style={{ backgroundColor: avatarTints[index % avatarTints.length] }}>{initials(peer?.name)}</span>; })}</span></div><div className="discovery-connection-counts"><span>{copy.upcoming} <strong>{connections.filter(session => session.status === 'scheduled').length}</strong></span><span>{copy.pending} <strong>{connections.filter(session => session.status === 'pending').length}</strong></span><span>{copy.completed} <strong>{connections.filter(session => session.status === 'completed').length}</strong></span></div><Link to="/conversations" className="discovery-connections-link">{copy.viewAll}</Link></div>}{error && <p className="discovery-error" role="alert">{error}</p>}</div>}
     {isConversation && <div className="discovery-conversation">{submittedQuery && <div className="discovery-user-bubble">{submittedQuery}</div>}
     {stage === 'matching' && <><div className="discovery-assistant-line"><span className="discovery-agent-label">MENT</span><span>{copy.finding}<span className="discovery-ellipsis">...</span></span></div><div className="discovery-skeletons" aria-hidden="true">{[1, 2, 3].map(item => <span key={item} />)}</div></>}
+    {stage === 'drafting' && <div className="discovery-assistant-line"><span className="discovery-agent-label">MENT</span><span>{copy.drafting}<span className="discovery-ellipsis">...</span></span></div>}
     {stage === 'choose' && <div className="discovery-reveal"><div className="discovery-assistant-line"><span className="discovery-agent-label">MENT</span><p>{copy.chooseLead} <strong>{copy.chooseBold}</strong></p></div><div className="discovery-match-grid" role="radiogroup" aria-label="Choose a person">{matches.map((match, index) => <MatchCard key={match.person.id} match={match} index={index} selected={selected?.person.id === match.person.id} onSelect={choose} copy={copy} />)}</div><p className="discovery-escape">{copy.notRight} <button type="button" onClick={() => findMatches(submittedQuery)}>{copy.different}</button>, {copy.or} <a href="/explorer?mode=directory">{copy.browse}</a>.</p></div>}
     {stage === 'empty' && <div className="discovery-empty"><p>{copy.noMatches}</p><button type="button" onClick={reset}>{copy.retry}</button></div>}
     {(stage === 'reachout' || stage === 'sent') && selected && (
@@ -149,11 +159,12 @@ export default function DiscoveryFlow() {
             {stage === 'reachout' ? (
               <div className="discovery-actions">
                 <div className="flex flex-wrap items-center gap-2">
+                  <button type="button" className="discovery-text-button" onClick={() => setStage('choose')}><ArrowLeft />{copy.back}</button>
                   <button type="button" className="discovery-primary" onClick={sendRequest} disabled={sending || !draft.trim()}>{sending ? <RefreshCw className="animate-spin" /> : <Send />}{copy.send}</button>
                   <button type="button" className="discovery-ghost" onClick={regenerate}><RefreshCw />{copy.regenerate}</button>
                   <button type="button" className="discovery-text-button" onClick={() => document.querySelector('.discovery-draft textarea')?.focus()}><Pencil />{copy.edit}</button>
                 </div>
-                <span>{text(copy, 'remaining', { count: 3 })}</span>
+                {remaining !== null && <span>{text(copy, 'remaining', { count: remaining })}</span>}
               </div>
             ) : (
               <>

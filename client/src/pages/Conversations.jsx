@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { CalendarDays, Check, ChevronLeft, MessageCircle, Send, Video } from 'lucide-react';
+import { CalendarDays, Check, ChevronLeft, MessageCircle, Send } from 'lucide-react';
 import api from '../api/index.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useT } from '../i18n/index.jsx';
@@ -8,6 +8,7 @@ import { Button } from '../components/ui/button.jsx';
 import { Avatar, AvatarFallback } from '../components/ui/avatar.jsx';
 import IcsDownloadButton from '../components/IcsDownloadButton.jsx';
 import { cn } from '@/lib/utils';
+import { supabase } from '../lib/supabase.js';
 
 function initials(name = '') {
   return name.split(' ').map((part) => part[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || '?';
@@ -74,12 +75,15 @@ export default function Conversations() {
   useEffect(() => {
     if (!selectedId) { setMessages([]); return undefined; }
     let cancelled = false;
-    const refresh = () => loadMessages(selectedId).catch((requestError) => {
+    const refresh = () => Promise.all([loadMessages(selectedId), api.post(`/sessions/${selectedId}/read`, {})]).catch((requestError) => {
       if (!cancelled) setError(requestError.response?.data?.error || t('conversations.error'));
     });
     refresh();
-    const timer = window.setInterval(refresh, 5000);
-    return () => { cancelled = true; window.clearInterval(timer); };
+    const channel = supabase.channel(`session-${selectedId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'session_messages', filter: `session_id=eq.${selectedId}` }, () => refresh())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'sessions', filter: `id=eq.${selectedId}` }, () => loadSessions())
+      .subscribe();
+    return () => { cancelled = true; supabase.removeChannel(channel); };
   }, [selectedId]);
 
   useEffect(() => { endRef.current?.scrollIntoView({ block: 'end' }); }, [messages, selectedId]);
@@ -110,7 +114,7 @@ export default function Conversations() {
     setSending(true); setError('');
     try {
       const response = await api.post(`/sessions/${selected.id}/messages`, { body });
-      setMessages((items) => [...items, response.data]);
+      setMessages((items) => items.some((item) => item.id === response.data.id) ? items : [...items, response.data]);
       setDraft('');
       await loadSessions();
     } catch (requestError) {
@@ -179,9 +183,8 @@ export default function Conversations() {
                 <CalendarDays />
                 <div><strong>{selected.scheduled_at ? new Date(selected.scheduled_at).toLocaleString() : t('conversations.pickTime')}</strong><span>{t('conversations.meetingSubline')}</span></div>
                 <div className="conversation-meeting-actions">
-                  <Button size="sm" variant="outline" onClick={() => setScheduleOpen((value) => !value)}>{selected.scheduled_at ? t('conversations.reschedule') : t('conversations.schedule')}</Button>
-                  {selected.meeting_url && <a className="conversation-video-link" href={selected.meeting_url} target="_blank" rel="noreferrer"><Video />{t('conversations.join')}</a>}
-                  {selected.scheduled_at && <IcsDownloadButton sessionId={selected.id} session={selected} />}
+                  {!selected.scheduled_at && <Button size="sm" variant="outline" onClick={() => setScheduleOpen(true)}>{t('conversations.schedule')}</Button>}
+                  {selected.scheduled_at && <IcsDownloadButton sessionId={selected.id} session={selected} label="Meeting" meetingUrl={selected.meeting_url} onReschedule={() => setScheduleOpen(true)} />}
                 </div>
                 {scheduleOpen && <div className="conversation-scheduler"><input className="input" type="datetime-local" value={scheduledAt} min={localDateTime(new Date(Date.now() + 3600000))} onChange={(event) => setScheduledAt(event.target.value)} /><Button size="sm" onClick={saveSchedule} disabled={!scheduledAt || savingSchedule}>{t('common.save')}</Button></div>}
               </div>

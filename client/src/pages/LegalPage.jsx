@@ -18,6 +18,7 @@ const POLICIES = {
     sections: [
       ['Information collected', 'Ment stores account details, organization membership, profile information, skills, availability, connection requests, meeting status, and feedback you choose to provide.'],
       ['How information is used', 'Profile and request data is used to rank relevant people, operate sessions, send service notifications, protect the platform, and provide aggregate program reporting.'],
+      ['AI-assisted features', 'Ment may use an approved AI provider to rank relevant profiles, extract skills from documents or reflections, and draft introductions. The system uses the information you provide, does not make employment or admissions decisions, and requires you to review suggestions before they are applied or sent. These features remain unavailable when the approved provider is not configured.'],
       ['Private information', 'Individual reflections and ratings remain private in the member experience. Organization reporting uses aggregate outcomes unless a feature clearly states otherwise.'],
       ['Service providers', 'Authentication, database, and hosting services are provided through the deployment infrastructure configured by Ment, including Supabase. Providers process data only to operate the service.'],
       ['Your choices', 'You can update profile information in Ment and contact your organization to request access, correction, export, or deletion where applicable.'],

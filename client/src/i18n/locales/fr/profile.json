@@ -88,6 +88,7 @@
   "profile.career.to": "To",
   "profile.career.toHint": "(leave empty if this is your current role)",
   "profile.career.descPlaceholder": "What did you do in this role? (optional)",
+  "profile.career.description": "Principales missions",
   "profile.career.add": "Add",
   "profile.career.edit": "Edit",
   "profile.career.remove": "Remove",

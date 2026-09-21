@@ -1,61 +1,72 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import api from '../api/index.js';
 import { buildSessionIcs, downloadIcs } from '../lib/ics.js';
+import { supabase } from '../lib/supabase.js';
 import { useT } from '../i18n/index.jsx';
 
-function calendarUrl(provider, session) {
-  if (!session?.scheduled_at) return '';
-  const start = new Date(session.scheduled_at);
-  const end = new Date(start.getTime() + (session.duration_minutes || 60) * 60_000);
-  const format = (date) => date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
-  const details = [session.pre_session_question, session.meeting_url].filter(Boolean).join('\n\n');
-  const title = encodeURIComponent(session.title || 'Mentoring session');
-  const startValue = format(start);
-  const endValue = format(end);
-  if (provider === 'google') {
-    return 'https://calendar.google.com/calendar/render?action=TEMPLATE&text=' + title + '&dates=' + startValue + '/' + endValue + '&details=' + encodeURIComponent(details) + '&location=' + encodeURIComponent(session.meeting_url || '');
-  }
-  return 'https://outlook.live.com/calendar/0/deeplink/compose?subject=' + title + '&startdt=' + encodeURIComponent(start.toISOString()) + '&enddt=' + encodeURIComponent(end.toISOString()) + '&body=' + encodeURIComponent(details) + '&location=' + encodeURIComponent(session.meeting_url || '');
-}
-
-export default function IcsDownloadButton({ sessionId, session, className = '' }) {
+export default function IcsDownloadButton({ sessionId, session, className = '', label, meetingUrl, onReschedule }) {
   const { t } = useT();
-  const [loading, setLoading] = useState(false);
+  const [connections, setConnections] = useState([]);
+  const [loading, setLoading] = useState('');
+  const [created, setCreated] = useState(null);
   const [error, setError] = useState('');
 
-  async function handleDownload() {
-    setLoading(true);
-    setError('');
+  useEffect(() => {
+    supabase.functions.invoke('calendar-provider', { body: { action: 'status' } })
+      .then(({ data, error: invokeError }) => {
+        if (invokeError || data?.error) throw new Error(data?.error || invokeError.message);
+        setConnections(data.connections || []);
+      })
+      .catch(() => setConnections([]));
+  }, []);
+
+  async function connect(provider) {
+    setLoading(provider); setError('');
     try {
-      const current = session || (await api.get('/sessions/' + sessionId)).data;
-      if (!current) throw new Error('not_found');
-      if (!current.scheduled_at) throw new Error('no_scheduled_at');
-      downloadIcs('session-' + sessionId + '.ics', buildSessionIcs(current, current.mentor, current.mentee));
-    } catch (e) {
-      setError('Could not add the session to your calendar. Please try again.');
-      console.error('ICS download failed', e);
-    } finally {
-      setLoading(false);
+      const { data, error: invokeError } = await supabase.functions.invoke('calendar-provider', { body: { action: 'authorization_url', provider } });
+      if (invokeError || data?.error) throw new Error(data?.error || invokeError.message);
+      window.location.assign(data.url);
+    } catch (requestError) {
+      setError(requestError.message === 'calendar_provider_not_configured' ? 'This calendar provider is not configured yet.' : 'Could not connect the calendar.');
+      setLoading('');
     }
   }
 
-  return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-      <button type="button" onClick={handleDownload} disabled={loading} className={'flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 font-medium transition-colors disabled:opacity-50 ' + className}>
-        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2V7H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-        {loading ? t('components.ics.downloading') : t('components.ics.addToCalendar')}
-      </button>
-      {session?.scheduled_at && (
-        <details className="calendar-more">
-          <summary>More</summary>
-          <div className="calendar-more-menu">
-            <a href={calendarUrl('google', session)} target="_blank" rel="noreferrer">Google Calendar</a>
-            <a href={calendarUrl('outlook', session)} target="_blank" rel="noreferrer">Outlook</a>
-            <a href="https://meet.google.com/new" target="_blank" rel="noreferrer">Google Meet</a>
-          </div>
-        </details>
-      )}
-      {error && <p className="w-full text-xs text-destructive" role="status" aria-live="polite">{error}</p>}
-    </div>
-  );
+  async function createEvent(provider) {
+    setLoading(provider); setError('');
+    try {
+      const { data, error: invokeError } = await supabase.functions.invoke('calendar-provider', { body: { action: 'create_event', provider, session_id: sessionId } });
+      if (invokeError || data?.error) throw new Error(data?.error || invokeError.message);
+      setCreated(data);
+    } catch (requestError) {
+      setError(requestError.message === 'calendar_not_connected' ? 'Reconnect your calendar and try again.' : 'Could not create the calendar event.');
+    } finally { setLoading(''); }
+  }
+
+  async function download() {
+    setLoading('ics'); setError('');
+    try {
+      const current = session || (await api.get('/sessions/' + sessionId)).data;
+      if (!current?.scheduled_at) throw new Error('no_scheduled_at');
+      downloadIcs('session-' + sessionId + '.ics', buildSessionIcs(current, current.mentor, current.mentee));
+    } catch {
+      setError('Could not download the calendar file.');
+    } finally { setLoading(''); }
+  }
+
+  const connected = new Set(connections.map((item) => item.provider));
+  return <div className="calendar-action">
+    <details className="calendar-more">
+      <summary className={className}>{created ? 'Meeting ready' : (label || t('components.ics.addToCalendar'))}</summary>
+      <div className="calendar-more-menu">
+        {(created?.join_url || meetingUrl) && <a href={created?.join_url || meetingUrl} target="_blank" rel="noreferrer">Join meeting</a>}
+        {onReschedule && <button type="button" onClick={onReschedule}>Change time</button>}
+        {connected.has('google') ? <button type="button" disabled={!!loading} onClick={() => createEvent('google')}>{loading === 'google' ? 'Adding…' : 'Add with Google'}</button> : <button type="button" disabled={!!loading} onClick={() => connect('google')}>Connect Google Calendar</button>}
+        {connected.has('microsoft') ? <button type="button" disabled={!!loading} onClick={() => createEvent('microsoft')}>{loading === 'microsoft' ? 'Adding…' : 'Add with Outlook'}</button> : <button type="button" disabled={!!loading} onClick={() => connect('microsoft')}>Connect Outlook</button>}
+        <button type="button" disabled={!!loading} onClick={download}>{loading === 'ics' ? 'Downloading…' : 'Download .ics'}</button>
+        {created?.html_url && <a href={created.html_url} target="_blank" rel="noreferrer">Open calendar event</a>}
+      </div>
+    </details>
+    {error && <p className="w-full text-xs text-destructive" role="status" aria-live="polite">{error}</p>}
+  </div>;
 }
