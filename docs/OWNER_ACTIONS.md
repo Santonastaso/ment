@@ -5,17 +5,20 @@ Everything below is an external account, credential, data, or policy decision. T
 ## 0. Supabase production project
 
 - Completed: this checkout is linked to production project `vqvjdtnpcamyrqkqsrfb`.
-- Completed: migrations `0038`, `0039`, and `0040` are applied and recorded remotely.
+- Completed: migrations `0038` through `0041` are applied and recorded remotely.
 - Completed: `admin-create-invitation`, `accept-invitation`, `discovery-assistant`, `profile-ingest`, `reflection-classify`, and `calendar-provider` are active.
 - Completed: linked database lint and unauthenticated endpoint smoke checks. The only remaining lint item is the intentional compatibility parameter `upsert_connection.p_status`.
-- Pending: run the full student/alumnus/admin smoke accounts after the external secrets and approved ESSEC staging data below are supplied.
+- Completed: live authenticated smoke coverage for AI matching, grounded reasons, discovery persistence, lazy Profile loading, and browser errors.
+- Pending: run the complete student/alumnus/admin regression suite after approved ESSEC staging data below is supplied.
 
 ## 1. Mistral
 
-- Create a production Mistral API key and approve the model/data-processing terms.
-- Set Supabase secrets: `AI_PROCESSING_ENABLED=true`, `MISTRAL_API`, and `MISTRAL_MODEL` (recommended starting point: `ministral-3b-latest`). `MISTRAL_API_KEY` remains supported as a legacy alias.
-- Deploy `discovery-assistant`, `profile-ingest`, and `reflection-classify`.
-- Run five representative matching prompts and review the ranked people and drafted introductions before opening access.
+- Completed: production Mistral processing is enabled with `MISTRAL_API` and a funded model.
+- Completed: `discovery-assistant`, `profile-ingest`, and `reflection-classify` are deployed.
+- Completed: discovery persists private turns, asks clarifying questions, returns grounded match reasons, and records content-free run telemetry.
+- Optional: set feature-specific model overrides listed in the README if quality testing supports different models.
+- Pending owner review: run five representative school-approved prompts and sign off ranking and draft quality before opening broad access.
+- Pending policy decision: ESCO identifiers remain unresolved for reflection suggestions. Do not send private reflection-derived terms to the public ESCO API without explicit approval; use an approved local taxonomy snapshot instead.
 
 ## 2. Google and Microsoft calendars
 

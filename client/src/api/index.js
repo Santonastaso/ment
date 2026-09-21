@@ -448,6 +448,19 @@ async function uploadToStorage(bucket, prefix, file) {
 async function get(url) {
   const viewer = await getViewer();
 
+  if (url === '/discovery/threads/latest') {
+    const { data, error } = await supabase
+      .from('discovery_threads')
+      .select('id,title,intent,turns,selected_person_id,archived,created_at,updated_at')
+      .eq('user_id', viewer.id)
+      .eq('archived', false)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw new ApiError(error.message);
+    return ok(data || null);
+  }
+
   if (url === '/users/me') {
     return ok(await loadProfile(viewer.id, viewer.id));
   }
@@ -719,9 +732,26 @@ async function post(url, body = {}, opts = {}) {
 
   const viewer = await getViewer();
 
+  if (url === '/discovery/feedback') {
+    if (!body.thread_id || typeof body.helpful !== 'boolean') throw new ApiError('invalid_discovery_feedback', 400);
+    const { data, error } = await supabase.from('discovery_feedback').upsert({
+      user_id: viewer.id,
+      thread_id: body.thread_id,
+      profile_id: body.profile_id || null,
+      helpful: body.helpful,
+      reason: String(body.reason || '').trim().slice(0, 500) || null,
+    }, { onConflict: 'user_id,thread_id' }).select('id,helpful').single();
+    if (error) throw new ApiError(error.message);
+    return ok(data, 201);
+  }
+
   if (url === '/discovery/matches' || url === '/discovery/draft') {
     const { data, error } = await supabase.functions.invoke('discovery-assistant', {
-      body: { ...body, action: url.endsWith('/draft') ? 'draft' : 'match' },
+      body: {
+        ...body,
+        lang: body.lang || browserLanguage(),
+        action: url.endsWith('/draft') ? 'draft' : 'match',
+      },
     });
     if (error || data?.error) throw await edgeFunctionError(error, data, 'ai_request_failed');
     return ok(data);
@@ -1063,6 +1093,25 @@ async function post(url, body = {}, opts = {}) {
 
 async function put(url, body = {}) {
   const viewer = await getViewer();
+
+  if (/^\/discovery\/threads\/[^/]+$/.test(url)) {
+    const id = url.split('/')[3];
+    const changes = {};
+    if (typeof body.archived === 'boolean') changes.archived = body.archived;
+    if (body.intent === 'one_off' || body.intent === 'ongoing') changes.intent = body.intent;
+    if (body.selected_person_id === null || typeof body.selected_person_id === 'string') {
+      changes.selected_person_id = body.selected_person_id;
+    }
+    changes.updated_at = new Date().toISOString();
+    const { data, error } = await supabase.from('discovery_threads')
+      .update(changes)
+      .eq('id', id)
+      .eq('user_id', viewer.id)
+      .select('id,title,intent,turns,selected_person_id,archived,created_at,updated_at')
+      .single();
+    if (error) throw new ApiError(error.message);
+    return ok(data);
+  }
 
   if (url === '/users/me') {
     const allowed = [

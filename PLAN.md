@@ -1,5 +1,11 @@
 # PM feedback completion plan
 
+> Historical implementation plan. Its hardcoded-demo AI rules are superseded
+> by the production Mistral integration documented in `README.md` and
+> `docs/OWNER_ACTIONS.md`. Discovery matching, drafting, profile extraction,
+> and reflection classification now use the configured provider and fail
+> closed when it is unavailable.
+
 Source: Feedback_After_Form_MVP (2).pdf, pages 1-9; page 10 has no extracted text.
 Reviewed against local main at 6719747 on 2026-09-07.
 This supersedes the older wave plan, including its contradictory Explorer entry prompt.

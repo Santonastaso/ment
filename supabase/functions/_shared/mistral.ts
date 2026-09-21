@@ -12,16 +12,18 @@ export class AiProviderError extends Error {
   }
 }
 
-function configuration() {
+function configuration(feature?: string) {
   const enabled = (Deno.env.get('AI_PROCESSING_ENABLED') || '').toLowerCase() === 'true';
   const apiKey = Deno.env.get('MISTRAL_API') || Deno.env.get('MISTRAL_API_KEY') || '';
-  const model = Deno.env.get('MISTRAL_MODEL') || '';
+  const featureKey = feature ? `MISTRAL_MODEL_${feature.toUpperCase().replace(/[^A-Z0-9]+/g, '_')}` : '';
+  const model = (featureKey && Deno.env.get(featureKey)) || Deno.env.get('MISTRAL_MODEL') || '';
   if (!enabled || !apiKey || !model) {
     console.error(JSON.stringify({
       event: 'mistral_configuration_error',
       enabled,
       has_api_key: Boolean(apiKey),
       has_model: Boolean(model),
+      feature: feature || 'default',
     }));
     throw new AiNotConfiguredError();
   }
@@ -39,10 +41,12 @@ function providerError(status: number) {
 export async function mistralJson<T>(options: {
   system: string;
   user: string;
+  feature?: string;
   temperature?: number;
   maxTokens?: number;
-}): Promise<{ value: T; model: string }> {
-  const { apiKey, model } = configuration();
+}): Promise<{ value: T; model: string; latencyMs: number }> {
+  const startedAt = performance.now();
+  const { apiKey, model } = configuration(options.feature);
   const requestBody = JSON.stringify({
     model,
     temperature: options.temperature ?? 0.1,
@@ -105,7 +109,11 @@ export async function mistralJson<T>(options: {
   const content = payload?.choices?.[0]?.message?.content;
   if (typeof content !== 'string' || !content.trim()) throw new AiProviderError('ai_invalid_response');
   try {
-    return { value: JSON.parse(content) as T, model: payload?.model || model };
+    return {
+      value: JSON.parse(content) as T,
+      model: payload?.model || model,
+      latencyMs: performance.now() - startedAt,
+    };
   } catch {
     throw new AiProviderError('ai_invalid_response');
   }

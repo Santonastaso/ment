@@ -143,6 +143,8 @@
 .discovery-user-bubble { width: fit-content; max-width: 78%; margin: 1.5rem 0 1.25rem auto; border-radius: 18px 18px 6px; background: var(--muted); padding: .75rem 1rem; font-size: 15px; line-height: 1.5; }
 .discovery-assistant-line { display: flex; max-width: 680px; align-items: flex-start; gap: .7rem; margin-top: 1.15rem; color: #5e5951; font-size: 15px; line-height: 1.5; }
 .discovery-assistant-line p { margin: 0; }
+.discovery-match-feedback { display: flex; align-items: center; gap: .45rem; margin-top: .8rem; color: var(--ment-muted); font-size: 12px; }
+.discovery-match-feedback button { min-height: 28px; padding: 0 .7rem; border-radius: 999px; background: var(--control-surface); color: var(--ment-ink); font-weight: 600; }
 .discovery-agent-label { flex: 0 0 auto; padding-top: .12rem; color: var(--primary); font-size: 10px; font-weight: 700; letter-spacing: .08em; }
 .discovery-ellipsis { display: inline-block; animation: discoveryEllipsis 1.15s infinite; }
 .discovery-skeletons { display: grid; gap: 3px; margin: 1.35rem 0; overflow: hidden; border: 0; border-radius: var(--panel-radius); background: transparent; }

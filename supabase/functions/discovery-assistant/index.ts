@@ -1,5 +1,8 @@
 import { corsHeaders, jsonError, jsonOk, requireUser } from '../_shared/index.ts';
+import { recordAiRun } from '../_shared/ai-telemetry.ts';
 import { aiErrorResponse, mistralJson } from '../_shared/mistral.ts';
+
+const PROMPT_VERSION = 'discovery-v2';
 
 type Candidate = {
   id: string;
@@ -15,8 +18,21 @@ type Candidate = {
 
 const cleanText = (value: unknown, max = 2000) => String(value || '').trim().slice(0, max);
 
-function publicCandidate(candidate: Candidate) {
+type RankedMatch = {
+  profile_id?: string;
+  reasons?: string[];
+  matched_expertise?: string[];
+};
+
+const LANGUAGES: Record<string, string> = { en: 'English', it: 'Italian', fr: 'French' };
+const localeName = (value: unknown) => LANGUAGES[String(value || '').toLowerCase()] || 'English';
+
+function publicCandidate(candidate: Candidate, ranked?: RankedMatch) {
   const expertise = [...new Set([...(candidate.skills || []), candidate.job_title, candidate.department].filter(Boolean))].slice(0, 3);
+  const allowedExpertise = new Map(expertise.map((item) => [String(item).toLowerCase(), String(item)]));
+  const matchedExpertise = Array.isArray(ranked?.matched_expertise)
+    ? ranked.matched_expertise.map((item) => allowedExpertise.get(cleanText(item, 100).toLowerCase())).filter(Boolean).slice(0, 3)
+    : [];
   return {
     id: candidate.id,
     name: candidate.name,
@@ -25,9 +41,53 @@ function publicCandidate(candidate: Candidate) {
     program: candidate.program,
     cohort_year: candidate.cohort_year,
     linkedin_headline: candidate.linkedin_headline,
-    expertise,
+    expertise: matchedExpertise.length ? matchedExpertise : expertise,
     background: [candidate.program, candidate.department].filter(Boolean).join(' · ') || candidate.job_title || 'Professional experience',
+    reasons: Array.isArray(ranked?.reasons)
+      ? ranked.reasons.map((reason) => cleanText(reason, 180)).filter(Boolean).slice(0, 2)
+      : [],
   };
+}
+
+async function persistTurns(
+  ctx: Awaited<ReturnType<typeof requireUser>>,
+  threadId: unknown,
+  query: string,
+  assistant: Record<string, unknown>,
+  selectedPersonId?: string,
+) {
+  const now = new Date().toISOString();
+  let existing = null;
+  if (typeof threadId === 'string' && threadId) {
+    const { data } = await ctx.sb.from('discovery_threads')
+      .select('id,turns')
+      .eq('id', threadId)
+      .eq('user_id', ctx.user.id)
+      .maybeSingle();
+    existing = data;
+  }
+  const nextTurns = assistant.kind === 'draft'
+    ? [{ role: 'assistant', ...assistant, at: now }]
+    : [{ role: 'user', content: query, at: now }, { role: 'assistant', ...assistant, at: now }];
+  const turns = [
+    ...(Array.isArray(existing?.turns) ? existing.turns : []),
+    ...nextTurns,
+  ].slice(-40);
+  if (existing?.id) {
+    const { data } = await ctx.sb.from('discovery_threads').update({
+      turns,
+      selected_person_id: selectedPersonId || null,
+      updated_at: now,
+    }).eq('id', existing.id).eq('user_id', ctx.user.id).select('id').single();
+    return data?.id || existing.id;
+  }
+  const { data } = await ctx.sb.from('discovery_threads').insert({
+    user_id: ctx.user.id,
+    title: query.slice(0, 80),
+    turns,
+    selected_person_id: selectedPersonId || null,
+  }).select('id').single();
+  return data?.id || null;
 }
 
 Deno.serve(async (req) => {
@@ -39,6 +99,7 @@ Deno.serve(async (req) => {
   const body = await req.json().catch(() => ({}));
   const action = body.action === 'draft' ? 'draft' : 'match';
   const query = cleanText(body.query);
+  const language = localeName(body.lang);
   if (query.length < 3) return jsonError('query_too_short');
 
   const { data: caller, error: callerError } = await ctx.sb.from('profiles')
@@ -95,14 +156,28 @@ Deno.serve(async (req) => {
     if (!selected) return jsonError('candidate_unavailable', 409);
     try {
       const result = await mistralJson<{ draft?: string }>({
-        system: 'You draft concise, warm introductions between verified university-network members. Use only supplied facts. Never invent employers, credentials, locations, skills, or relationships. Return JSON with one string field named draft. Keep it under 120 words.',
+        feature: 'discovery_draft',
+        system: `You draft concise, warm introductions between verified university-network members. Write in ${language}. Use only supplied facts. Never invent employers, credentials, locations, skills, or relationships. Return JSON with one string field named draft. Keep it under 120 words.`,
         user: JSON.stringify({ requester_first_name: String(caller.name || '').split(' ')[0], request: query, recipient: publicCandidate(selected), variant: Number(body.variant) || 0 }),
         temperature: Number(body.variant) ? 0.35 : 0.15,
         maxTokens: 350,
       });
       const draft = cleanText(result.value?.draft, 2000);
       if (!draft) return jsonError('ai_invalid_response', 502);
-      return jsonOk({ draft, model: result.model });
+      await recordAiRun(ctx.sb, {
+        userId: ctx.user.id,
+        organizationId: caller.organization_id,
+        feature: 'discovery_draft',
+        promptVersion: PROMPT_VERSION,
+        model: result.model,
+        latencyMs: result.latencyMs,
+      });
+      const threadId = await persistTurns(ctx, body.thread_id, query, {
+        kind: 'draft',
+        content: draft,
+        person: publicCandidate(selected),
+      }, selected.id);
+      return jsonOk({ draft, model: result.model, thread_id: threadId });
     } catch (error) {
       const mapped = aiErrorResponse(error);
       return jsonError(mapped.message, mapped.status);
@@ -111,17 +186,42 @@ Deno.serve(async (req) => {
 
   if (!candidates.length) return jsonOk({ matches: [] });
   try {
-    const result = await mistralJson<{ profile_ids?: string[] }>({
-      system: 'Rank verified university-network profiles for the user request. Use only supplied candidates. Return JSON with profile_ids containing up to three candidate IDs in best-first order. Never output an ID not present in candidates. Prefer direct skill and professional-background evidence; do not use location as professional background.',
+    const result = await mistralJson<{ matches?: RankedMatch[]; clarification?: string }>({
+      feature: 'discovery_match',
+      system: `Rank verified university-network profiles for the user request. Respond in ${language}. Use only supplied candidates and facts. If the request lacks enough professional context to rank responsibly, return {"clarification":"one short question","matches":[]}. Otherwise return {"clarification":"","matches":[{"profile_id":"candidate id","matched_expertise":["exact supplied skill"],"reasons":["one concrete reason tied directly to the request"]}]}. Return at most three matches in best-first order. Never output an ID not present in candidates. Never use location as expertise or professional background. Keep each reason under 24 words.`,
       user: JSON.stringify({ request: query, candidates: candidates.map(publicCandidate) }),
       temperature: 0,
-      maxTokens: 250,
+      maxTokens: 700,
     });
-    const validIds = [...new Set(Array.isArray(result.value?.profile_ids) ? result.value.profile_ids : [])]
-      .filter((id) => candidates.some((candidate) => candidate.id === id))
-      .slice(0, 3);
-    if (!validIds.length) return jsonError('ai_no_valid_matches', 422);
-    return jsonOk({ matches: validIds.map((id) => publicCandidate(candidates.find((candidate) => candidate.id === id)!)), model: result.model });
+    const clarification = cleanText(result.value?.clarification, 240);
+    const ranked = Array.isArray(result.value?.matches) ? result.value.matches : [];
+    const seen = new Set<string>();
+    const matches = ranked.flatMap((item) => {
+      const id = cleanText(item?.profile_id, 100);
+      const candidate = candidates.find((entry) => entry.id === id);
+      if (!candidate || seen.has(id)) return [];
+      seen.add(id);
+      return [publicCandidate(candidate, item)];
+    }).slice(0, 3);
+    await recordAiRun(ctx.sb, {
+      userId: ctx.user.id,
+      organizationId: caller.organization_id,
+      feature: 'discovery_match',
+      promptVersion: PROMPT_VERSION,
+      model: result.model,
+      latencyMs: result.latencyMs,
+    });
+    if (!matches.length && clarification) {
+      const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'clarification', content: clarification });
+      return jsonOk({ matches: [], clarification, thread_id: threadId, model: result.model });
+    }
+    if (!matches.length) return jsonError('ai_no_valid_matches', 422);
+    const threadId = await persistTurns(ctx, body.thread_id, query, {
+      kind: 'matches',
+      content: 'matches_ready',
+      matches,
+    });
+    return jsonOk({ matches, clarification: '', thread_id: threadId, model: result.model });
   } catch (error) {
     const mapped = aiErrorResponse(error);
     return jsonError(mapped.message, mapped.status);

@@ -32,6 +32,7 @@ export default function Onboarding() {
   const [draftId, setDraftId] = useState(null);
   const [classifierSource, setClassifierSource] = useState('');
   const [aiConsent, setAiConsent] = useState(false);
+  const [importKind, setImportKind] = useState('cv');
   const [suggested, setSuggested] = useState(() => new Set());
 
   // Step 1 — Background
@@ -118,7 +119,7 @@ export default function Onboarding() {
     setError('');
     const form = new FormData();
     form.append('file', file);
-    form.append('kind', 'performance_review');
+    form.append('kind', importKind);
     try {
       const res = await api.post('/profile/ingest', form, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -220,6 +221,13 @@ export default function Onboarding() {
                 <p className="text-muted-foreground text-sm">
                   {t('onboarding.import.desc')}
                 </p>
+              </div>
+              <div>
+                <label className="label" htmlFor="onboarding-import-kind">{t('onboarding.import.kind')}</label>
+                <select id="onboarding-import-kind" className="input" value={importKind} onChange={event => setImportKind(event.target.value)} disabled={uploading}>
+                  <option value="cv">{t('onboarding.import.kindCv')}</option>
+                  <option value="performance_review">{t('onboarding.import.kindReview')}</option>
+                </select>
               </div>
               <label className="block border-2 border-dashed border-[var(--input)] rounded-xl p-10 text-center cursor-pointer transition-colors duration-150 hover:border-foreground/30 hover:bg-muted">
                 <input

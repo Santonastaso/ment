@@ -109,6 +109,11 @@ supabase secrets set AI_PROCESSING_ENABLED=true \
   APP_ORIGIN=https://YOUR_DOMAIN
 ```
 
+Optional feature-specific overrides are supported when extraction quality or
+cost needs differ: `MISTRAL_MODEL_DISCOVERY_MATCH`,
+`MISTRAL_MODEL_DISCOVERY_DRAFT`, `MISTRAL_MODEL_PROFILE_INGEST`, and
+`MISTRAL_MODEL_REFLECTION`. Each falls back to `MISTRAL_MODEL`.
+
 ### 4. Run the client
 
 ```bash
