@@ -2,7 +2,7 @@ import { corsHeaders, jsonError, jsonOk, requireUser } from '../_shared/index.ts
 import { recordAiRun } from '../_shared/ai-telemetry.ts';
 import { aiErrorResponse, mistralJson } from '../_shared/mistral.ts';
 
-const PROMPT_VERSION = 'discovery-v2';
+const PROMPT_VERSION = 'discovery-v3';
 
 type Candidate = {
   id: string;
@@ -22,10 +22,23 @@ type RankedMatch = {
   profile_id?: string;
   reasons?: string[];
   matched_expertise?: string[];
+  confidence?: number;
+};
+
+type MatchResult = {
+  outcome?: 'matches' | 'clarification' | 'no_match';
+  matches?: RankedMatch[];
+  clarification?: string;
+  no_match_reason?: string;
 };
 
 const LANGUAGES: Record<string, string> = { en: 'English', it: 'Italian', fr: 'French' };
 const localeName = (value: unknown) => LANGUAGES[String(value || '').toLowerCase()] || 'English';
+const EMPTY_POOL_MESSAGES: Record<string, string> = {
+  English: 'There is no relevant professional in the current network for this request.',
+  Italian: 'Nella rete attuale non c’è un professionista pertinente per questa richiesta.',
+  French: 'Le réseau actuel ne contient aucun professionnel pertinent pour cette demande.',
+};
 
 function publicCandidate(candidate: Candidate, ranked?: RankedMatch) {
   const expertise = [...new Set([...(candidate.skills || []), candidate.job_title, candidate.department].filter(Boolean))].slice(0, 3);
@@ -47,6 +60,16 @@ function publicCandidate(candidate: Candidate, ranked?: RankedMatch) {
       ? ranked.reasons.map((reason) => cleanText(reason, 180)).filter(Boolean).slice(0, 2)
       : [],
   };
+}
+
+function hasGroundedExpertise(candidate: Candidate, ranked: RankedMatch) {
+  if (!Array.isArray(ranked.matched_expertise) || !ranked.matched_expertise.length) return false;
+  const supplied = new Set(
+    [...(candidate.skills || []), candidate.job_title, candidate.department, candidate.program, candidate.linkedin_headline]
+      .filter(Boolean)
+      .map((value) => cleanText(value, 200).toLowerCase()),
+  );
+  return ranked.matched_expertise.some((value) => supplied.has(cleanText(value, 200).toLowerCase()));
 }
 
 async function persistTurns(
@@ -184,22 +207,43 @@ Deno.serve(async (req) => {
     }
   }
 
-  if (!candidates.length) return jsonOk({ matches: [] });
+  if (!candidates.length) {
+    const reason = EMPTY_POOL_MESSAGES[language];
+    const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'no_match', content: reason });
+    return jsonOk({ matches: [], clarification: '', no_match: true, no_match_reason: reason, thread_id: threadId });
+  }
   try {
-    const result = await mistralJson<{ matches?: RankedMatch[]; clarification?: string }>({
+    const result = await mistralJson<MatchResult>({
       feature: 'discovery_match',
-      system: `Rank verified university-network profiles for the user request. Respond in ${language}. Use only supplied candidates and facts. If the request lacks enough professional context to rank responsibly, return {"clarification":"one short question","matches":[]}. Otherwise return {"clarification":"","matches":[{"profile_id":"candidate id","matched_expertise":["exact supplied skill"],"reasons":["one concrete reason tied directly to the request"]}]}. Return at most three matches in best-first order. Never output an ID not present in candidates. Never use location as expertise or professional background. Keep each reason under 24 words.`,
+      system: `Decide whether verified university-network profiles genuinely satisfy the user's request. Respond in ${language}. Use only supplied candidates and facts.
+
+Choose exactly one outcome:
+1. "matches": only when at least one candidate has direct, explicit evidence for the requested profession, industry, function, or skill.
+2. "clarification": only when the user's request itself is ambiguous or missing the professional need.
+3. "no_match": when the request is clear but no candidate has direct evidence for it.
+
+An explicit profession or domain is not ambiguous. If the user asks for a medical professional and no candidate has supplied medical or clinical credentials, return no_match. Do not ask whether they mean doctor, nurse, or another adjacent role. Do not substitute transferable skills, location, general seniority, or a merely adjacent profession. False positives are worse than returning no match.
+
+Return exactly one of these JSON shapes:
+{"outcome":"matches","clarification":"","no_match_reason":"","matches":[{"profile_id":"candidate id","confidence":0.0,"matched_expertise":["exact supplied candidate field"],"reasons":["one concrete reason tied directly to the request"]}]}
+{"outcome":"clarification","clarification":"one short question","no_match_reason":"","matches":[]}
+{"outcome":"no_match","clarification":"","no_match_reason":"one concise explanation that the current network has no relevant profile","matches":[]}
+
+For matches, confidence must be at least 0.75 and matched_expertise must copy an exact supplied skill, job title, department, program, or LinkedIn headline. Return at most three matches in best-first order. Never output an ID not present in candidates. Keep each reason under 24 words.`,
       user: JSON.stringify({ request: query, candidates: candidates.map(publicCandidate) }),
       temperature: 0,
       maxTokens: 700,
     });
+    const outcome = result.value?.outcome;
     const clarification = cleanText(result.value?.clarification, 240);
+    const noMatchReason = cleanText(result.value?.no_match_reason, 240);
     const ranked = Array.isArray(result.value?.matches) ? result.value.matches : [];
     const seen = new Set<string>();
     const matches = ranked.flatMap((item) => {
       const id = cleanText(item?.profile_id, 100);
       const candidate = candidates.find((entry) => entry.id === id);
-      if (!candidate || seen.has(id)) return [];
+      const confidence = Number(item?.confidence);
+      if (!candidate || seen.has(id) || !Number.isFinite(confidence) || confidence < 0.75 || !hasGroundedExpertise(candidate, item)) return [];
       seen.add(id);
       return [publicCandidate(candidate, item)];
     }).slice(0, 3);
@@ -211,11 +255,15 @@ Deno.serve(async (req) => {
       model: result.model,
       latencyMs: result.latencyMs,
     });
-    if (!matches.length && clarification) {
+    if (outcome === 'clarification' && !matches.length && clarification) {
       const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'clarification', content: clarification });
       return jsonOk({ matches: [], clarification, thread_id: threadId, model: result.model });
     }
-    if (!matches.length) return jsonError('ai_no_valid_matches', 422);
+    if (outcome === 'no_match' || !matches.length) {
+      const reason = noMatchReason || 'No relevant profile is currently available in this network.';
+      const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'no_match', content: reason });
+      return jsonOk({ matches: [], clarification: '', no_match: true, no_match_reason: reason, thread_id: threadId, model: result.model });
+    }
     const threadId = await persistTurns(ctx, body.thread_id, query, {
       kind: 'matches',
       content: 'matches_ready',
