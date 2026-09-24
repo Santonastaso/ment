@@ -1,4 +1,5 @@
 import { corsHeaders, jsonError, jsonOk, requireAdmin } from '../_shared/index.ts';
+import { enforceRateLimit } from '../_shared/rate-limit.ts';
 
 const emailPattern = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
@@ -19,6 +20,13 @@ Deno.serve(async (req) => {
 
   let ctx;
   try { ctx = await requireAdmin(req); } catch (response) { return response as Response; }
+  try {
+    if (!await enforceRateLimit(ctx.sb, 'create-invitation', ctx.user.id, 50, 86400)) {
+      return jsonError('rate_limited', 429);
+    }
+  } catch {
+    return jsonError('rate_limit_unavailable', 503);
+  }
   const organizationId = ctx.profile?.organization_id;
   if (!organizationId) return jsonError('organization_required', 403);
 

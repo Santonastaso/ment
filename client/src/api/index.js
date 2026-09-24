@@ -461,6 +461,27 @@ async function get(url) {
     return ok(data || null);
   }
 
+  if (url === '/discovery/threads' || url.startsWith('/discovery/threads?')) {
+    const params = new URLSearchParams(url.split('?')[1] || '');
+    const limit = Math.min(30, Math.max(1, Number(params.get('limit')) || 10));
+    const { data, error } = await supabase.from('discovery_threads')
+      .select('id,title,turns,selected_person_id,archived,created_at,updated_at')
+      .eq('user_id', viewer.id)
+      .order('updated_at', { ascending: false })
+      .limit(limit);
+    if (error) throw new ApiError(error.message);
+    return ok(data || []);
+  }
+
+  if (/^\/discovery\/threads\/[0-9a-f-]+$/i.test(url)) {
+    const id = url.split('/')[3];
+    const { data, error } = await supabase.from('discovery_threads')
+      .select('id,title,intent,turns,selected_person_id,archived,created_at,updated_at')
+      .eq('id', id).eq('user_id', viewer.id).single();
+    if (error) throw new ApiError(error.message);
+    return ok(data);
+  }
+
   if (url === '/users/me') {
     return ok(await loadProfile(viewer.id, viewer.id));
   }
@@ -604,6 +625,16 @@ async function get(url) {
     const { data, error } = await supabase.rpc('admin_pm_kpis', { p_org: org || null });
     if (error) throw new ApiError(error.message);
     return ok(data);
+  }
+  if (url === '/admin/ai-runs' || url.startsWith('/admin/ai-runs?')) {
+    const params = new URLSearchParams(url.split('?')[1] || '');
+    const limit = Math.min(200, Math.max(1, Number(params.get('limit')) || 100));
+    const { data, error } = await supabase.from('ai_runs')
+      .select('feature,model,status,latency_ms,prompt_version,error_code,created_at')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) throw new ApiError(error.message);
+    return ok(data || []);
   }
   if (url === '/admin/request-settings') {
     const { data, error } = await supabase.rpc('pm_request_settings', {
@@ -1315,6 +1346,14 @@ async function put(url, body = {}) {
 
 async function del(url) {
   const viewer = await getViewer();
+
+  if (/^\/discovery\/threads\/[0-9a-f-]+$/i.test(url)) {
+    const id = url.split('/')[3];
+    const { error } = await supabase.from('discovery_threads').delete()
+      .eq('id', id).eq('user_id', viewer.id);
+    if (error) throw new ApiError(error.message);
+    return ok({ ok: true });
+  }
 
   if (/^\/users\/me\/skills\/\d+$/.test(url)) {
     const id = Number(url.split('/')[4]);

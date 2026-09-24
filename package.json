@@ -10,7 +10,7 @@
     "dev": "npm run dev --prefix client",
     "build": "npm run build --prefix client",
     "lint": "supabase db lint --linked",
-    "deploy:functions": "supabase functions deploy admin-create-user admin-reset-password profile-ingest reflection-classify public-signup send-notification-outbox",
+    "deploy:functions": "supabase functions deploy admin-create-user admin-reset-password admin-create-invitation accept-invitation discovery-assistant profile-ingest reflection-classify public-signup send-notification-outbox calendar-provider",
     "check:i18n": "node scripts/check-i18n-coverage.mjs"
   },
   "devDependencies": {

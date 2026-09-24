@@ -2,6 +2,11 @@
 
 Everything below is an external account, credential, data, or policy decision. The application code is ready to consume these inputs and deliberately fails closed until they are supplied.
 
+## Current checkout release note
+
+- Not deployed: this checkout adds migration `0042_edge_rate_limits`, endpoint rate limits, failure telemetry, recent discovery history, and an organization-scoped AI diagnostics tab. Apply the migration and deploy the changed Edge Functions before relying on these controls in production.
+- The discovery history delete action permanently removes the selected private search thread and its dependent feedback.
+
 ## 0. Supabase production project
 
 - Completed: this checkout is linked to production project `vqvjdtnpcamyrqkqsrfb`.

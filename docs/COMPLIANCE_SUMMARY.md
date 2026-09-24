@@ -11,6 +11,7 @@ This is an engineering record, not legal advice.
 - User review before AI-generated profile drafts, skill suggestions, or outreach drafts are applied/sent.
 - Calendar OAuth tokens are encrypted with AES-GCM before storage and are never readable by browser clients.
 - Persisted audit events, private reflections/ratings, account deactivation, profile editing, and documented data-source provenance.
+- Content-free AI run telemetry records successful and failed processing; the admin view is limited by organization-scoped RLS. Edge rate-limit counters store only service-keyed HMAC digests and are inaccessible to member clients.
 
 ## Product transparency
 

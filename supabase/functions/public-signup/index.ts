@@ -19,6 +19,7 @@ import {
   jsonOk,
   adminClient,
 } from '../_shared/index.ts';
+import { enforceRateLimit, requestAddress } from '../_shared/rate-limit.ts';
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
@@ -51,6 +52,13 @@ Deno.serve(async (req) => {
   if (adminPassword.length > 200) return jsonError('password_too_long');
 
   const sb = adminClient();
+  try {
+    if (!await enforceRateLimit(sb, 'public-signup', requestAddress(req), 5, 3600)) {
+      return jsonError('rate_limited', 429);
+    }
+  } catch {
+    return jsonError('rate_limit_unavailable', 503);
+  }
 
   // Slug: prefer caller-supplied (slugified) else derived from company name.
   // Ensure uniqueness by appending a small random suffix if it collides.

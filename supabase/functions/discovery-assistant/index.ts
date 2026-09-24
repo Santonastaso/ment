@@ -1,6 +1,7 @@
 import { corsHeaders, jsonError, jsonOk, requireUser } from '../_shared/index.ts';
 import { recordAiRun } from '../_shared/ai-telemetry.ts';
 import { aiErrorResponse, mistralJson } from '../_shared/mistral.ts';
+import { enforceRateLimit } from '../_shared/rate-limit.ts';
 
 const PROMPT_VERSION = 'discovery-v3';
 
@@ -121,6 +122,13 @@ Deno.serve(async (req) => {
   try { ctx = await requireUser(req); } catch (response) { return response as Response; }
   const body = await req.json().catch(() => ({}));
   const action = body.action === 'draft' ? 'draft' : 'match';
+  try {
+    if (!await enforceRateLimit(ctx.sb, `discovery-${action}`, ctx.user.id, 30, 300)) {
+      return jsonError('rate_limited', 429);
+    }
+  } catch {
+    return jsonError('rate_limit_unavailable', 503);
+  }
   const query = cleanText(body.query);
   const language = localeName(body.lang);
   if (query.length < 3) return jsonError('query_too_short');
@@ -177,6 +185,7 @@ Deno.serve(async (req) => {
   if (action === 'draft') {
     const selected = candidates.find((candidate) => candidate.id === body.person_id);
     if (!selected) return jsonError('candidate_unavailable', 409);
+    const startedAt = Date.now();
     try {
       const result = await mistralJson<{ draft?: string }>({
         feature: 'discovery_draft',
@@ -203,6 +212,11 @@ Deno.serve(async (req) => {
       return jsonOk({ draft, model: result.model, thread_id: threadId });
     } catch (error) {
       const mapped = aiErrorResponse(error);
+      await recordAiRun(ctx.sb, {
+        userId: ctx.user.id, organizationId: caller.organization_id, feature: 'discovery_draft',
+        promptVersion: PROMPT_VERSION, model: 'unknown', latencyMs: Date.now() - startedAt,
+        status: 'failed', errorCode: mapped.message,
+      });
       return jsonError(mapped.message, mapped.status);
     }
   }
@@ -212,6 +226,7 @@ Deno.serve(async (req) => {
     const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'no_match', content: reason });
     return jsonOk({ matches: [], clarification: '', no_match: true, no_match_reason: reason, thread_id: threadId });
   }
+  const startedAt = Date.now();
   try {
     const result = await mistralJson<MatchResult>({
       feature: 'discovery_match',
@@ -272,6 +287,11 @@ For matches, confidence must be at least 0.75 and matched_expertise must copy an
     return jsonOk({ matches, clarification: '', thread_id: threadId, model: result.model });
   } catch (error) {
     const mapped = aiErrorResponse(error);
+    await recordAiRun(ctx.sb, {
+      userId: ctx.user.id, organizationId: caller.organization_id, feature: 'discovery_match',
+      promptVersion: PROMPT_VERSION, model: 'unknown', latencyMs: Date.now() - startedAt,
+      status: 'failed', errorCode: mapped.message,
+    });
     return jsonError(mapped.message, mapped.status);
   }
 });

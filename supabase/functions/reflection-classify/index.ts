@@ -2,6 +2,7 @@ import { corsHeaders, jsonError, jsonOk, requireUser } from '../_shared/index.ts
 import { normalizeLang } from '../_shared/esco.ts';
 import { recordAiRun } from '../_shared/ai-telemetry.ts';
 import { aiErrorResponse, mistralJson } from '../_shared/mistral.ts';
+import { enforceRateLimit } from '../_shared/rate-limit.ts';
 
 const LANGUAGE_NAMES: Record<string, string> = { en: 'English', it: 'Italian', fr: 'French' };
 const PROMPT_VERSION = 'reflection-v2';
@@ -12,6 +13,13 @@ Deno.serve(async (req) => {
 
   let ctx;
   try { ctx = await requireUser(req); } catch (r) { return r as Response; }
+  try {
+    if (!await enforceRateLimit(ctx.sb, 'reflection-classify', ctx.user.id, 20, 3600)) {
+      return jsonError('rate_limited', 429);
+    }
+  } catch {
+    return jsonError('rate_limit_unavailable', 503);
+  }
 
   const body = await req.json().catch(() => ({}));
   const lang = normalizeLang(body.lang);
@@ -35,6 +43,7 @@ Deno.serve(async (req) => {
   if (!log) return jsonError('not_found', 404);
 
   let result;
+  const startedAt = Date.now();
   try {
     const classified = await mistralJson<{ extracted_gaps?: string[]; extracted_strengths?: string[] }>({
       feature: 'reflection',
@@ -63,6 +72,12 @@ Deno.serve(async (req) => {
     });
   } catch (classificationError) {
     const mapped = aiErrorResponse(classificationError);
+    const { data: owner } = await ctx.sb.from('profiles').select('organization_id').eq('id', ctx.user.id).maybeSingle();
+    await recordAiRun(ctx.sb, {
+      userId: ctx.user.id, organizationId: owner?.organization_id, feature: 'reflection',
+      promptVersion: PROMPT_VERSION, model: 'unknown', latencyMs: Date.now() - startedAt,
+      status: 'failed', errorCode: mapped.message,
+    });
     return jsonError(mapped.message, mapped.status);
   }
   const { data: saved, error: updateError } = await ctx.sb

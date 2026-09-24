@@ -11,21 +11,21 @@ const COPY = {
     finding: 'Finding relevant profiles', chooseLead: 'These profiles match your request.', chooseBold: 'Select one to prepare the request.',
     expertise: 'Expert in', background: 'Matching background', why: 'Why this match', available: 'Available', choose: 'Choose', selected: 'Selected', different: 'Ask for different people', browse: 'browse the full directory', notRight: 'Not quite right?', or: 'or',
     to: 'To', intro: "Here's a suggested intro. Edit anything, then send when it feels like you.", suggested: 'Suggested draft', send: 'Send request', regenerate: 'Regenerate', edit: 'Edit', remaining: '{count} requests left this month',
-    sent: 'Request sent to {name}.', sentSubline: "The conversation is ready. Continue there when they reply.", openChat: 'Open chat', again: 'Ask about something else', newChat: 'New chat', retry: 'Start a new search', error: 'We could not complete that request. Please try again.', aiMissing: 'Matching is not configured yet. Ask an administrator to connect Mistral.', aiBusy: 'Matching is temporarily rate-limited. Please try again in a moment.', aiAdmin: 'Matching needs an administrator to check the Mistral connection.', noMatches: 'There is no relevant professional in the current network for this request.', snapshot: 'Your connections', upcoming: 'Upcoming', pending: 'Pending', completed: 'Completed', viewAll: 'View conversations', viewProfile: 'View profile', back: 'Back to matches', drafting: 'Preparing your request', useful: 'Were these matches useful?', yes: 'Yes', no: 'No', feedbackSaved: 'Thanks — this helps improve matching.',
+    sent: 'Request sent to {name}.', sentSubline: "The conversation is ready. Continue there when they reply.", openChat: 'Open chat', again: 'Ask about something else', newChat: 'New chat', recentSearches: 'Recent searches', deleteSearch: 'Delete search', confirmDeleteSearch: 'Delete this search and its saved conversation?', retry: 'Start a new search', error: 'We could not complete that request. Please try again.', aiMissing: 'Matching is not configured yet. Ask an administrator to connect Mistral.', aiBusy: 'Matching is temporarily rate-limited. Please try again in a moment.', aiAdmin: 'Matching needs an administrator to check the Mistral connection.', noMatches: 'There is no relevant professional in the current network for this request.', snapshot: 'Your connections', upcoming: 'Upcoming', pending: 'Pending', completed: 'Completed', viewAll: 'View conversations', viewProfile: 'View profile', back: 'Back to matches', drafting: 'Preparing your request', useful: 'Were these matches useful?', yes: 'Yes', no: 'No', feedbackSaved: 'Thanks — this helps improve matching.',
   },
   it: {
     greeting: 'Ciao {name}, con chi vorresti entrare in contatto?', placeholder: 'Chiedi a Ment',
     finding: 'Cerco profili pertinenti', chooseLead: 'Questi profili corrispondono alla richiesta.', chooseBold: 'Selezionane uno per preparare il messaggio.',
     expertise: 'Esperto in', background: 'Contesto della ricerca', why: 'Perché è adatto', available: 'Disponibile', choose: 'Scegli', selected: 'Scelto', different: 'Mostra altre persone', browse: 'sfoglia la directory', notRight: 'Non è quello che cercavi?', or: 'oppure',
     to: 'A', intro: 'Ecco un messaggio proposto. Modifica tutto quello che vuoi, poi invialo quando ti sembra giusto.', suggested: 'Messaggio proposto', send: 'Invia richiesta', regenerate: 'Rigenera', edit: 'Modifica', remaining: '{count} richieste rimaste questo mese',
-    sent: 'Richiesta inviata a {name}.', sentSubline: 'La conversazione è pronta. Continua da lì quando risponderà.', openChat: 'Apri chat', again: "Chiedi qualcos'altro", newChat: 'Nuova chat', retry: 'Inizia una nuova ricerca', error: 'Non siamo riusciti a completare la richiesta. Riprova.', aiMissing: 'Il matching non è ancora configurato. Chiedi a un amministratore di collegare Mistral.', aiBusy: 'Il matching è temporaneamente limitato. Riprova tra poco.', aiAdmin: 'Un amministratore deve verificare la connessione a Mistral.', noMatches: 'Nella rete attuale non c’è un professionista pertinente per questa richiesta.', snapshot: 'Le tue connessioni', upcoming: 'In programma', pending: 'In attesa', completed: 'Completate', viewAll: 'Vedi conversazioni', viewProfile: 'Vedi profilo', back: 'Torna ai risultati', drafting: 'Preparo la richiesta', useful: 'Questi match sono utili?', yes: 'Sì', no: 'No', feedbackSaved: 'Grazie — ci aiuta a migliorare il matching.',
+    sent: 'Richiesta inviata a {name}.', sentSubline: 'La conversazione è pronta. Continua da lì quando risponderà.', openChat: 'Apri chat', again: "Chiedi qualcos'altro", newChat: 'Nuova chat', recentSearches: 'Ricerche recenti', deleteSearch: 'Elimina ricerca', confirmDeleteSearch: 'Eliminare questa ricerca e la conversazione salvata?', retry: 'Inizia una nuova ricerca', error: 'Non siamo riusciti a completare la richiesta. Riprova.', aiMissing: 'Il matching non è ancora configurato. Chiedi a un amministratore di collegare Mistral.', aiBusy: 'Il matching è temporaneamente limitato. Riprova tra poco.', aiAdmin: 'Un amministratore deve verificare la connessione a Mistral.', noMatches: 'Nella rete attuale non c’è un professionista pertinente per questa richiesta.', snapshot: 'Le tue connessioni', upcoming: 'In programma', pending: 'In attesa', completed: 'Completate', viewAll: 'Vedi conversazioni', viewProfile: 'Vedi profilo', back: 'Torna ai risultati', drafting: 'Preparo la richiesta', useful: 'Questi match sono utili?', yes: 'Sì', no: 'No', feedbackSaved: 'Grazie — ci aiuta a migliorare il matching.',
   },
   fr: {
     greeting: 'Bonjour {name}, avec qui souhaitez-vous entrer en contact ?', placeholder: 'Demandez à Ment',
     finding: 'Recherche de profils pertinents', chooseLead: 'Ces profils correspondent à votre demande.', chooseBold: 'Sélectionnez-en un pour préparer le message.',
     expertise: 'Expert en', background: 'Parcours correspondant', why: 'Pourquoi ce profil', available: 'Disponible', choose: 'Choisir', selected: 'Sélectionné', different: 'Voir d’autres personnes', browse: 'parcourir l’annuaire', notRight: 'Pas tout à fait ?', or: 'ou',
     to: 'À', intro: 'Voici un message proposé. Modifiez ce que vous voulez, puis envoyez-le lorsqu’il vous convient.', suggested: 'Message proposé', send: 'Envoyer la demande', regenerate: 'Régénérer', edit: 'Modifier', remaining: '{count} demandes restantes ce mois-ci',
-    sent: 'Demande envoyée à {name}.', sentSubline: 'La conversation est prête. Continuez là lorsqu’une réponse arrive.', openChat: 'Ouvrir le chat', again: 'Poser une autre question', newChat: 'Nouveau chat', retry: 'Lancer une nouvelle recherche', error: 'Nous n’avons pas pu finaliser cette demande. Réessayez.', aiMissing: 'Le matching n’est pas encore configuré. Demandez à un administrateur de connecter Mistral.', aiBusy: 'Le matching est temporairement limité. Réessayez dans un instant.', aiAdmin: 'Un administrateur doit vérifier la connexion à Mistral.', noMatches: 'Le réseau actuel ne contient aucun professionnel pertinent pour cette demande.', snapshot: 'Vos connexions', upcoming: 'À venir', pending: 'En attente', completed: 'Terminées', viewAll: 'Voir les conversations', viewProfile: 'Voir le profil', back: 'Retour aux résultats', drafting: 'Préparation de la demande', useful: 'Ces profils sont-ils utiles ?', yes: 'Oui', no: 'Non', feedbackSaved: 'Merci — cela nous aide à améliorer les suggestions.',
+    sent: 'Demande envoyée à {name}.', sentSubline: 'La conversation est prête. Continuez là lorsqu’une réponse arrive.', openChat: 'Ouvrir le chat', again: 'Poser une autre question', newChat: 'Nouveau chat', recentSearches: 'Recherches récentes', deleteSearch: 'Supprimer la recherche', confirmDeleteSearch: 'Supprimer cette recherche et la conversation enregistrée ?', retry: 'Lancer une nouvelle recherche', error: 'Nous n’avons pas pu finaliser cette demande. Réessayez.', aiMissing: 'Le matching n’est pas encore configuré. Demandez à un administrateur de connecter Mistral.', aiBusy: 'Le matching est temporairement limité. Réessayez dans un instant.', aiAdmin: 'Un administrateur doit vérifier la connexion à Mistral.', noMatches: 'Le réseau actuel ne contient aucun professionnel pertinent pour cette demande.', snapshot: 'Vos connexions', upcoming: 'À venir', pending: 'En attente', completed: 'Terminées', viewAll: 'Voir les conversations', viewProfile: 'Voir le profil', back: 'Retour aux résultats', drafting: 'Préparation de la demande', useful: 'Ces profils sont-ils utiles ?', yes: 'Oui', no: 'Non', feedbackSaved: 'Merci — cela nous aide à améliorer les suggestions.',
   },
 };
 
@@ -75,11 +75,18 @@ export default function DiscoveryFlow() {
   const [threadId, setThreadId] = useState(null);
   const [clarification, setClarification] = useState('');
   const [noMatchReason, setNoMatchReason] = useState('');
+  const [history, setHistory] = useState([]);
+  const [historyError, setHistoryError] = useState('');
   const [matchFeedback, setMatchFeedback] = useState(null);
   const [remaining, setRemaining] = useState(null);
   const threadEndRef = useRef(null);
   const idempotencyKey = useRef(null);
   const flowVersion = useRef(0);
+
+  async function refreshHistory() {
+    const { data } = await api.get('/discovery/threads?limit=8');
+    setHistory(data || []);
+  }
 
   useEffect(() => { if (stage !== 'ask') threadEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); }, [stage, selected]);
   useEffect(() => {
@@ -107,6 +114,7 @@ export default function DiscoveryFlow() {
         setStage('reachout');
       }
     }).catch(() => {});
+    refreshHistory().catch(() => {});
   }, [user?.id]);
   useEffect(() => { if (!user?.id || stage !== 'ask') return; Promise.all([api.get('/sessions'), api.get('/users/me/capacity')]).then(([sessions, capacity]) => { setConnections(sessions.data || []); const value = capacity.data; setRemaining(Number.isFinite(value?.monthly_limit) && Number.isFinite(value?.monthly_booked) ? Math.max(0, value.monthly_limit - value.monthly_booked) : null); }).catch(() => {}); }, [stage, user?.id]);
 
@@ -121,6 +129,7 @@ export default function DiscoveryFlow() {
       const [{ data }] = await Promise.all([api.post('/discovery/matches', { query: request, thread_id: threadId }), pause(350)]);
       if (version !== flowVersion.current) return;
       setThreadId(data.thread_id || threadId);
+      refreshHistory().catch(() => {});
       const nextMatches = (data.matches || []).map((person) => ({ person, expertise: person.expertise || [], background: person.background || '', reasons: person.reasons || [] }));
       setMatches(nextMatches);
       if (data.clarification) {
@@ -149,6 +158,7 @@ export default function DiscoveryFlow() {
       const { data } = await api.post('/discovery/draft', { query: submittedQuery, person_id: match.person.id, variant: 0, thread_id: threadId });
       if (version !== flowVersion.current) return;
       setThreadId(data.thread_id || threadId); setDraft(data.draft || ''); setStage('reachout');
+      refreshHistory().catch(() => {});
     } catch (requestError) {
       if (version !== flowVersion.current) return;
       setStage('choose'); setError(requestErrorMessage(requestError, copy));
@@ -175,6 +185,7 @@ export default function DiscoveryFlow() {
       setSessionId(response.data.id);
       setStage('sent');
       if (threadId) await api.put(`/discovery/threads/${threadId}`, { archived: true, selected_person_id: selected.person.id });
+      refreshHistory().catch(() => {});
     } catch (requestError) { setError(requestError.response?.data?.error || copy.error); }
     finally { setSending(false); }
   }
@@ -189,11 +200,70 @@ export default function DiscoveryFlow() {
     }
   }
 
+  async function resumeSearch(id) {
+    setError('');
+    try {
+      const { data } = await api.get(`/discovery/threads/${id}`);
+      const lastAssistant = [...(data.turns || [])].reverse().find(turn => turn?.role === 'assistant');
+      const lastUser = [...(data.turns || [])].reverse().find(turn => turn?.role === 'user');
+      if (!lastAssistant || !lastUser?.content) return;
+      if (lastAssistant.kind === 'draft' && lastAssistant.person) {
+        const { data: sessions } = await api.get('/sessions');
+        const sentSession = (sessions || []).find(session =>
+          session.mentee_id === user?.id &&
+          session.mentor_id === lastAssistant.person.id &&
+          session.title === lastUser.content.slice(0, 80),
+        );
+        if (sentSession) {
+          setSelected({ person: lastAssistant.person, expertise: lastAssistant.person.expertise || [], background: lastAssistant.person.background || '', reasons: lastAssistant.person.reasons || [] });
+          setDraft(lastAssistant.content || '');
+          setSubmittedQuery(lastUser.content);
+          setSessionId(sentSession.id);
+          setThreadId(id);
+          setStage('sent');
+          return;
+        }
+      }
+      await api.put(`/discovery/threads/${id}`, { archived: false });
+      setThreadId(id);
+      setSubmittedQuery(lastUser.content);
+      setQuery(''); setMatches([]); setSelected(null); setDraft(''); setClarification(''); setNoMatchReason('');
+      if (lastAssistant.kind === 'matches' && Array.isArray(lastAssistant.matches)) {
+        setMatches(lastAssistant.matches.map(person => ({ person, expertise: person.expertise || [], background: person.background || '', reasons: person.reasons || [] })));
+        setStage('choose');
+      } else if (lastAssistant.kind === 'clarification') {
+        setClarification(lastAssistant.content || '');
+        setStage('clarify');
+      } else if (lastAssistant.kind === 'no_match') {
+        setNoMatchReason(lastAssistant.content || '');
+        setStage('empty');
+      } else if (lastAssistant.kind === 'draft' && lastAssistant.person) {
+        const person = lastAssistant.person;
+        setSelected({ person, expertise: person.expertise || [], background: person.background || '', reasons: person.reasons || [] });
+        setDraft(lastAssistant.content || '');
+        setStage('reachout');
+      }
+    } catch {
+      setHistoryError(copy.error);
+    }
+  }
+
+  async function deleteSearch(id) {
+    if (!window.confirm(copy.confirmDeleteSearch)) return;
+    try {
+      await api.delete(`/discovery/threads/${id}`);
+      setHistory(items => items.filter(item => item.id !== id));
+      if (threadId === id) reset();
+    } catch {
+      setHistoryError(copy.error);
+    }
+  }
+
   async function reset() {
     flowVersion.current += 1;
     const currentThread = threadId;
     setStage('ask'); setQuery(''); setSubmittedQuery(''); setMatches([]); setSelected(null); setDraft(''); setSending(false); setError(''); setSessionId(null); setThreadId(null); setClarification(''); setNoMatchReason(''); setMatchFeedback(null); idempotencyKey.current = null;
-    if (currentThread) api.put(`/discovery/threads/${currentThread}`, { archived: true }).catch(() => {});
+    if (currentThread) api.put(`/discovery/threads/${currentThread}`, { archived: true }).then(refreshHistory).catch(() => {});
   }
 
   function composer() {
@@ -203,7 +273,7 @@ export default function DiscoveryFlow() {
   const firstName = user?.name?.split(' ')[0] || '';
   const isConversation = stage !== 'ask';
   return <section className={`discovery-flow ${isConversation ? 'is-conversation' : ''}`} aria-label="Ment discovery"><div className="discovery-thread">
-    {stage === 'ask' && <div className="discovery-ask-block"><h1>{text(copy, 'greeting', { name: firstName })}</h1>{composer()}{connections.length > 0 && <div className="discovery-connections"><div className="discovery-connection-people"><span className="discovery-connections-label">{copy.snapshot}</span><span className="discovery-avatars">{connections.slice(0, 3).map((session, index) => { const peer = session.mentor_id === user?.id ? session.mentee : session.mentor; return <span key={session.id} className="discovery-avatar" style={{ backgroundColor: avatarTints[index % avatarTints.length] }}>{initials(peer?.name)}</span>; })}</span></div><div className="discovery-connection-counts"><span>{copy.upcoming} <strong>{connections.filter(session => session.status === 'scheduled').length}</strong></span><span>{copy.pending} <strong>{connections.filter(session => session.status === 'pending').length}</strong></span><span>{copy.completed} <strong>{connections.filter(session => session.status === 'completed').length}</strong></span></div><Link to="/conversations" className="discovery-connections-link">{copy.viewAll}</Link></div>}{error && <p className="discovery-error" role="alert">{error}</p>}</div>}
+    {stage === 'ask' && <div className="discovery-ask-block"><h1>{text(copy, 'greeting', { name: firstName })}</h1>{composer()}{history.length > 0 && <details className="discovery-history"><summary>{copy.recentSearches}</summary><div>{history.map(item => { const title = [...(item.turns || [])].reverse().find(turn => turn?.role === 'user')?.content || item.title || ''; return <div className="discovery-history-row" key={item.id}><button type="button" onClick={() => resumeSearch(item.id)}>{title}</button><button type="button" aria-label={copy.deleteSearch} onClick={() => deleteSearch(item.id)}>×</button></div>; })}</div>{historyError && <p role="alert">{historyError}</p>}</details>}{connections.length > 0 && <div className="discovery-connections"><div className="discovery-connection-people"><span className="discovery-connections-label">{copy.snapshot}</span><span className="discovery-avatars">{connections.slice(0, 3).map((session, index) => { const peer = session.mentor_id === user?.id ? session.mentee : session.mentor; return <span key={session.id} className="discovery-avatar" style={{ backgroundColor: avatarTints[index % avatarTints.length] }}>{initials(peer?.name)}</span>; })}</span></div><div className="discovery-connection-counts"><span>{copy.upcoming} <strong>{connections.filter(session => session.status === 'scheduled').length}</strong></span><span>{copy.pending} <strong>{connections.filter(session => session.status === 'pending').length}</strong></span><span>{copy.completed} <strong>{connections.filter(session => session.status === 'completed').length}</strong></span></div><Link to="/conversations" className="discovery-connections-link">{copy.viewAll}</Link></div>}{error && <p className="discovery-error" role="alert">{error}</p>}</div>}
     {isConversation && <div className="discovery-conversation"><div className="discovery-conversation-toolbar"><button type="button" onClick={reset} disabled={sending}><Pencil />{copy.newChat}</button></div>{submittedQuery && <div className="discovery-user-bubble">{submittedQuery}</div>}
     {stage === 'matching' && <><div className="discovery-assistant-line"><span className="discovery-agent-label">MENT</span><span>{copy.finding}<span className="discovery-ellipsis">...</span></span></div><div className="discovery-skeletons" aria-hidden="true">{[1, 2, 3].map(item => <span key={item} />)}</div></>}
     {stage === 'clarify' && <div className="discovery-assistant-line"><span className="discovery-agent-label">MENT</span><p>{clarification}</p></div>}

@@ -20,6 +20,7 @@ import { Label } from '@/components/ui/label';
 import { formatAdminDate, pmTranslate } from '../components/admin/adminPm.js';
 import AdminPmKpis from '../components/admin/AdminPmKpis.jsx';
 import AdminInvitationPanel from '../components/admin/AdminInvitationPanel.jsx';
+import AdminAiRuns from '../components/admin/AdminAiRuns.jsx';
 
 function StatCard({ label, value, sub }) {
   return (
@@ -107,7 +108,7 @@ export default function AdminDashboard() {
   // Admin subpages live in the URL (?tab=) so deep links and back/forward work.
   const [searchParams, setSearchParams] = useSearchParams();
   const rawTab = searchParams.get('tab') || 'overview';
-  const validTabs = ['overview', 'kpis', 'people', 'privacy', 'audit', 'feedback'];
+  const validTabs = ['overview', 'kpis', 'ai', 'people', 'privacy', 'audit', 'feedback'];
   const tab = validTabs.includes(rawTab) ? rawTab : 'overview';
   function setTab(next) {
     const params = new URLSearchParams(searchParams);
@@ -828,6 +829,7 @@ export default function AdminDashboard() {
       )}
 
       {tab === 'kpis' && <AdminPmKpis data={kpis} loading={kpisLoading} error={loadErrors.kpis} onRefresh={loadKpis} />}
+      {tab === 'ai' && <AdminAiRuns t={t} />}
 
       {tab === 'people' && (
         <Surface>

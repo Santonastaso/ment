@@ -1,4 +1,5 @@
 import { adminClient, corsHeaders, jsonError, jsonOk } from '../_shared/index.ts';
+import { enforceRateLimit, requestAddress } from '../_shared/rate-limit.ts';
 
 async function sha256(value: string) {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
@@ -16,6 +17,13 @@ Deno.serve(async (req) => {
   if (password.length < 12) return jsonError('password_too_short', 400);
 
   const sb = adminClient();
+  try {
+    if (!await enforceRateLimit(sb, 'accept-invitation', requestAddress(req), 20, 3600)) {
+      return jsonError('rate_limited', 429);
+    }
+  } catch {
+    return jsonError('rate_limit_unavailable', 503);
+  }
   const tokenHash = await sha256(token);
   const { data: invitation, error: invitationError } = await sb.from('invitations')
     .select('*')

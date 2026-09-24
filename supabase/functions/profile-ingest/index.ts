@@ -14,6 +14,7 @@ import {
 import { recordAiRun } from '../_shared/ai-telemetry.ts';
 import { aiErrorResponse, mistralJson } from '../_shared/mistral.ts';
 import { normalizeLang } from '../_shared/esco.ts';
+import { enforceRateLimit } from '../_shared/rate-limit.ts';
 
 const LANGUAGE_NAMES: Record<string, string> = { en: 'English', it: 'Italian', fr: 'French' };
 const PROMPT_VERSION = 'profile-ingest-v2';
@@ -44,6 +45,13 @@ Deno.serve(async (req) => {
 
   let ctx;
   try { ctx = await requireUser(req); } catch (r) { return r as Response; }
+  try {
+    if (!await enforceRateLimit(ctx.sb, 'profile-ingest', ctx.user.id, 10, 3600)) {
+      return jsonError('rate_limited', 429);
+    }
+  } catch {
+    return jsonError('rate_limit_unavailable', 503);
+  }
 
   const body = await req.json().catch(() => ({}));
   const storagePath = (body.storage_path || '').toString();
@@ -74,6 +82,7 @@ Deno.serve(async (req) => {
 
   let proposed;
   let classifier_source;
+  const startedAt = Date.now();
   try {
     const result = await mistralJson<{ proposed?: unknown }>({
       feature: 'profile_ingest',
@@ -96,6 +105,12 @@ Deno.serve(async (req) => {
     });
   } catch (error) {
     const mapped = aiErrorResponse(error);
+    const { data: owner } = await ctx.sb.from('profiles').select('organization_id').eq('id', ctx.user.id).maybeSingle();
+    await recordAiRun(ctx.sb, {
+      userId: ctx.user.id, organizationId: owner?.organization_id, feature: 'profile_ingest',
+      promptVersion: PROMPT_VERSION, model: 'unknown', latencyMs: Date.now() - startedAt,
+      status: 'failed', errorCode: mapped.message,
+    });
     return jsonError(mapped.message, mapped.status);
   }
 

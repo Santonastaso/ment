@@ -9,6 +9,8 @@ export async function recordAiRun(
     promptVersion: string;
     model: string;
     latencyMs: number;
+    status?: 'succeeded' | 'failed';
+    errorCode?: string;
   },
 ) {
   try {
@@ -18,8 +20,9 @@ export async function recordAiRun(
       feature: value.feature,
       prompt_version: value.promptVersion,
       model: value.model,
-      status: 'succeeded',
+      status: value.status || 'succeeded',
       latency_ms: Math.max(0, Math.round(value.latencyMs)),
+      error_code: value.status === 'failed' ? value.errorCode || 'ai_request_failed' : null,
     });
   } catch {
     // Telemetry must never block the user-facing AI operation.
