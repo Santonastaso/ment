@@ -2,16 +2,17 @@
 
 Everything below is an external account, credential, data, or policy decision. The application code is ready to consume these inputs and deliberately fails closed until they are supplied.
 
-## Current checkout release note
+## Current production release
 
-- Not deployed: this checkout adds migration `0042_edge_rate_limits`, endpoint rate limits, failure telemetry, recent discovery history, and an organization-scoped AI diagnostics tab. Apply the migration and deploy the changed Edge Functions before relying on these controls in production.
+- Deployed in commit `68d5c2e`: migration `0042_edge_rate_limits`, endpoint rate limits, failure telemetry, recent discovery history, and the organization-scoped AI diagnostics tab.
+- Completed: production build, translation coverage, live admin diagnostics, authenticated discovery empty-pool behavior, Explorer request-state, conversation rendering, and new-chat reset smoke checks.
 - The discovery history delete action permanently removes the selected private search thread and its dependent feedback.
 
 ## 0. Supabase production project
 
 - Completed: this checkout is linked to production project `vqvjdtnpcamyrqkqsrfb`.
-- Completed: migrations `0038` through `0041` are applied and recorded remotely.
-- Completed: `admin-create-invitation`, `accept-invitation`, `discovery-assistant`, `profile-ingest`, `reflection-classify`, and `calendar-provider` are active.
+- Completed: migrations `0038` through `0042` are applied and recorded remotely.
+- Completed: all ten Edge Functions are deployed, including `calendar-provider` and the rate-limited invitation, discovery, profile-ingest, reflection, and notification endpoints.
 - Completed: linked database lint and unauthenticated endpoint smoke checks. The only remaining lint item is the intentional compatibility parameter `upsert_connection.p_status`.
 - Completed: live authenticated smoke coverage for AI matching, grounded reasons, discovery persistence, lazy Profile loading, and browser errors.
 - Pending: run the complete student/alumnus/admin regression suite after approved ESSEC staging data below is supplied.
@@ -31,7 +32,7 @@ Everything below is an external account, credential, data, or policy decision. T
 - Register `https://YOUR_DOMAIN/calendar/callback` and the localhost callback for testing.
 - Approve Google Calendar event scope and Microsoft `Calendars.ReadWrite`, `OnlineMeetings.ReadWrite`, `User.Read`, and `offline_access` scopes.
 - Set Supabase secrets: `APP_ORIGIN`, `CALENDAR_TOKEN_ENCRYPTION_KEY` (a unique random value of at least 32 characters), `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, and `MICROSOFT_TENANT_ID`.
-- Deploy `calendar-provider` and complete one Google and one Microsoft test booking.
+- Pending: after OAuth credentials and scopes are configured, complete one Google and one Microsoft test booking.
 
 ## 3. ESSEC member data
 
