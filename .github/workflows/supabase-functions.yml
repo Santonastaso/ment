@@ -42,5 +42,5 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
         run: |
-          supabase functions deploy admin-create-user admin-reset-password profile-ingest reflection-classify \
+          supabase functions deploy admin-create-user admin-reset-password profile-ingest reflection-classify discovery-assistant \
             --project-ref "$SUPABASE_PROJECT_REF"

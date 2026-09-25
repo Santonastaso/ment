@@ -781,7 +781,7 @@ async function post(url, body = {}, opts = {}) {
       body: {
         ...body,
         lang: body.lang || browserLanguage(),
-        action: url.endsWith('/draft') ? 'draft' : 'match',
+        action: url.endsWith('/draft') ? 'draft' : 'chat',
       },
     });
     if (error || data?.error) throw await edgeFunctionError(error, data, 'ai_request_failed');
