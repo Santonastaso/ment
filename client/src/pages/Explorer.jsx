@@ -97,14 +97,12 @@ export default function Explorer() {
   return (
     <PageShell title={t('explorer.title')} description={t('explorer.entryTitle')} className="gap-6">
 
-              <Surface className="directory-rail directory-filter-panel rounded-none border-0 bg-transparent">
-                <SurfaceBody className="space-y-3 px-0 py-0">
-                  <form onSubmit={submitSearch} className="flex gap-2">
+              <div className="directory-rail grid min-w-0 gap-3">
+                  <form onSubmit={submitSearch} className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-2">
                     <Input aria-label={t('explorer.searchLabel')} placeholder={t('explorer.searchLabel')} value={inputValue} onChange={e => setInputValue(e.target.value)} />
                     <Button type="submit">{t('explorer.searchButton')}</Button>
                   </form>
-                </SurfaceBody>
-                <SurfaceBody className="grid grid-cols-2 gap-2 px-0 pb-0 pt-3 sm:grid-cols-3 lg:grid-cols-5">
+                <div className="grid w-full min-w-0 grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
                   <select className="input w-full" value={persona} onChange={e => setParam('persona', e.target.value)} aria-label={t('explorer.filterPersona')}>
                     <option value="">{t('explorer.personaAny')}</option>
                     <option value="student">{t('explorer.personaStudent')}</option>
@@ -126,11 +124,11 @@ export default function Explorer() {
                     <option value="">{t('explorer.allLanguages')}</option>
                     {(facets.languages || []).map(l => <option key={l} value={l}>{l.toUpperCase()}</option>)}
                   </select>
-                </SurfaceBody>
-                <SurfaceBody className="px-0 pb-0 pt-2">
+                </div>
+                <div>
                   <Button type="button" size="sm" variant="ghost" onClick={() => { setInputValue(''); setSearchParams({}); }}>{t('explorer.clearFilters')}</Button>
-                </SurfaceBody>
-              </Surface>
+                </div>
+              </div>
 
               {dirError ? (
                 <Surface><SurfaceBody className="space-y-3" role="alert">

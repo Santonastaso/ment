@@ -9,7 +9,7 @@ import SessionRequestModal from '../components/SessionRequestModal.jsx';
 import PastMeetings from '../components/PastMeetings.jsx';
 import MonthYearPicker from '../components/MonthYearPicker.jsx';
 import ProfileReflection from '../components/ProfileReflection.jsx';
-import { PageShell } from '../components/PageShell.jsx';
+import { PageSection, PageShell } from '../components/PageShell.jsx';
 import { Surface, SurfaceBody, SurfaceHeader } from '../components/Surface.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -22,6 +22,27 @@ import { useT } from '../i18n/index.jsx';
 const DEPARTMENTS = ['Engineering', 'Finance', 'Marketing', 'Operations', 'HR', 'Legal', 'Product', 'Design', 'Sales', 'Other'];
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function safeLinkedInHref(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && /(^|\.)linkedin\.com$/i.test(url.hostname) ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+function conciseHeadline(profile) {
+  const repeated = [profile.current_role, profile.department, profile.program, profile.location,
+    profile.cohort_year ? `class of ${profile.cohort_year}` : '']
+    .filter(Boolean).map(value => value.toLowerCase());
+  return (profile.linkedin_headline || '').split(/[|·]/)
+    .map(part => part.trim())
+    .filter(part => {
+      const normalized = part.replace(/^essec\s+/i, '').toLowerCase();
+      return normalized && normalized !== 'demo profile' && !repeated.some(value => normalized === value || normalized.includes(value));
+    }).join(' · ');
+}
 
 // Convert (year, month) to "YYYY-MM" string that <input type="month"> expects.
 function ymToInput(year, month) {
@@ -370,6 +391,9 @@ export default function Profile() {
     showToast(t('profile.toast.entryUpdated'));
   }
 
+  const linkedinHref = safeLinkedInHref(profile?.linkedin_url);
+  const headlineSummary = conciseHeadline(profile || {});
+
   if (loading) {
     return (
       <PageShell>
@@ -395,7 +419,7 @@ export default function Profile() {
     : t('profile.skillLandscape.descOther', { name: firstName });
 
   return (
-    <PageShell className="profile-page gap-4">
+    <PageShell className="profile-page gap-5">
       {/* Toast */}
       {toast && (
         <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-lg border border-primary bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground">
@@ -425,7 +449,7 @@ export default function Profile() {
 
       {tab === 'overview' && (
       <>
-      <Surface className="profile-overview-header bg-[var(--card)]">
+      <Surface className="profile-overview-header">
         <SurfaceBody className="profile-overview-header-body space-y-3 px-4 pb-4 pt-4 sm:px-5 sm:pb-5 sm:pt-5">
           <div className="profile-identity-row flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
@@ -434,7 +458,7 @@ export default function Profile() {
                   {profile.name?.charAt(0)}
                 </AvatarFallback>
               </Avatar>
-              <div>
+              <div className="min-w-0 flex-1">
                 <h1 className="text-[22px] font-medium tracking-[-0.02em]">{profile.name}</h1>
                 <div className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
                   {editing ? (
@@ -461,7 +485,7 @@ export default function Profile() {
                           {profile.location}
                         </span>
                       )}
-                      {profile.linkedin_url && <a href={profile.linkedin_url} target="_blank" rel="noreferrer" className="font-medium text-foreground underline-offset-4 hover:underline">LinkedIn</a>}
+                      {linkedinHref && <a href={linkedinHref} target="_blank" rel="noreferrer" className="font-medium text-foreground underline-offset-4 hover:underline">LinkedIn</a>}
                     </>
                   )}
                 </div>
@@ -499,18 +523,12 @@ export default function Profile() {
           )}
           {editing ? (
             <textarea className="input resize-none text-sm" rows={2} value={form.bio} onChange={e => setForm(f => ({ ...f, bio: e.target.value }))} placeholder={t('profile.placeholder.bio')} />
-          ) : <>{profile.linkedin_headline && <p className="text-sm font-medium text-foreground">{profile.linkedin_headline}</p>}{profile.bio && <p className="text-sm text-muted-foreground">{profile.bio}</p>}</>}
+          ) : <div className="space-y-1">{headlineSummary && <p className="text-sm text-muted-foreground">{headlineSummary}</p>}{profile.bio && <p className="text-sm text-muted-foreground">{profile.bio}</p>}</div>}
         </SurfaceBody>
       </Surface>
 
       <div className="flex flex-col gap-4">
-      <Surface className="min-w-0 bg-transparent">
-        <SurfaceHeader
-          className="px-0 pt-2 sm:px-0"
-          title={skillTitle}
-          description={skillDescription}
-        />
-        <SurfaceBody className="space-y-4 px-0 pt-3 sm:px-0">
+      <PageSection title={skillTitle} description={skillDescription} className="min-w-0">
           <SkillLandscape
             skillProgress={profile.skillProgress || profile.skills || []}
             isOwnProfile={isOwnProfile}
@@ -520,17 +538,16 @@ export default function Profile() {
 
         {/* Expertise signature */}
         {profile.expertiseSignature?.length > 0 && (
-          <div className="rounded-[var(--panel-radius)] bg-[var(--surface)] p-4">
-            <h3 className="mb-2 text-sm font-medium">{isOwnProfile ? t('profile.expertise.titleOwn') : t('profile.expertise.titleOther', { name: firstName })}</h3>
+          <div className="pt-1">
+            <h3 className="mb-2 text-sm font-semibold">{isOwnProfile ? t('profile.expertise.titleOwn') : t('profile.expertise.titleOther', { name: firstName })}</h3>
             <div className="flex flex-wrap gap-2">
               {profile.expertiseSignature.map(skill => (
-                <Badge key={skill}>{skill}</Badge>
+                <Badge key={skill} variant="secondary" className="h-auto rounded-full bg-[var(--control-surface)] px-3 py-1 text-[13px] text-foreground">{skill}</Badge>
               ))}
             </div>
           </div>
         )}
-        </SurfaceBody>
-      </Surface>
+      </PageSection>
 
       {isOwnProfile && (
         <Surface className="bg-[var(--surface)] px-1">

@@ -133,7 +133,11 @@
 .discovery-conversation-toolbar svg { width: 16px; height: 16px; stroke-width: 2.1; }
 .discovery-ask-block { max-width: 760px; padding-top: clamp(10rem, 30vh, 20rem); }
 .discovery-history { margin-top: .75rem; color: var(--ment-muted); font-size: 13px; }
-.discovery-history summary { width: fit-content; cursor: pointer; padding: .45rem .2rem; }
+.discovery-history summary { display: grid; width: 36px; height: 36px; place-items: center; cursor: pointer; border-radius: var(--control-radius); color: var(--ment-muted); }
+.discovery-history summary::-webkit-details-marker { display: none; }
+.discovery-history summary::marker { content: ''; }
+.discovery-history summary:hover, .discovery-history summary:focus-visible { background: var(--control-surface); color: var(--ment-ink); outline: none; }
+.discovery-history summary svg { width: 17px; height: 17px; }
 .discovery-history > div { margin-top: .25rem; border-radius: var(--control-radius); background: var(--control-surface); padding: .35rem .65rem; }
 .discovery-history-row { display: flex; align-items: center; gap: .5rem; border-bottom: 1px solid color-mix(in srgb, var(--border) 45%, transparent); }
 .discovery-history-row:last-child { border-bottom: 0; }

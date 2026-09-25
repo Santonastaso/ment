@@ -146,16 +146,19 @@ export default function Groups() {
                       {t('groups.members', { count: group.member_count || 0 })}
                     </p>
                   </div>
-                  <Button
-                    type="button"
-                    variant={group.joined ? 'outline' : 'default'}
-                    size="sm"
-                    disabled={saving}
-                    onClick={() => toggleMembership(group)}
-                  >
-                    {group.joined ? t('groups.leave') : t('groups.join')}
-                  </Button>
-                  {group.joined && <Button type="button" size="sm" variant={selectedGroup?.id === group.id ? 'default' : 'outline'} onClick={() => setSelectedGroup(group)}>Chat</Button>}
+                  <div className="flex shrink-0 items-center gap-2">
+                    {group.joined && <Button type="button" size="sm" variant={selectedGroup?.id === group.id ? 'default' : 'outline'} onClick={() => setSelectedGroup(group)}>Chat</Button>}
+                    <Button
+                      type="button"
+                      variant={group.joined ? 'link' : 'default'}
+                      size="sm"
+                      className={group.joined ? 'px-2 text-muted-foreground hover:text-destructive' : ''}
+                      disabled={saving}
+                      onClick={() => toggleMembership(group)}
+                    >
+                      {group.joined ? t('groups.leave') : t('groups.join')}
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
