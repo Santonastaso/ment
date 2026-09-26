@@ -7,7 +7,6 @@ import SkillCloud, { SkillCloudFilters } from '../components/SkillCloud.jsx';
 import { Field } from '../components/ui/field.jsx';
 import SessionRequestModal from '../components/SessionRequestModal.jsx';
 
-import PastMeetings from '../components/PastMeetings.jsx';
 import MonthYearPicker from '../components/MonthYearPicker.jsx';
 import ProfileReflection from '../components/ProfileReflection.jsx';
 import { PageSection, PageShell } from '../components/PageShell.jsx';
@@ -118,7 +117,7 @@ export default function Profile() {
   const [searchParams, setSearchParams] = useSearchParams();
   const rawTab = searchParams.get('tab') || 'overview';
   const validTabs = isOwnProfile
-    ? ['overview', 'skills', 'availability', 'experience', 'meetings', 'reflections']
+    ? ['overview', 'skills', 'availability', 'experience', 'reflections']
     : ['overview', 'experience'];
   const tab = validTabs.includes(rawTab) ? rawTab : 'overview';
   function setTab(next) {
@@ -856,23 +855,6 @@ export default function Profile() {
         )}
         </SurfaceBody>
       </Surface>
-      )}
-
-      {isOwnProfile && tab === 'meetings' && (
-        <Surface>
-          <SurfaceHeader
-            title={t('profile.pastMeetings.title')}
-            description={
-              <>
-                {t('profile.pastMeetings.descPrefix')}
-                <Link to="/" className="text-primary hover:underline">{t('profile.pastMeetings.dashboard')}</Link>.
-              </>
-            }
-          />
-          <SurfaceBody className="pt-5">
-            <PastMeetings currentUserId={currentUser?.id} />
-          </SurfaceBody>
-        </Surface>
       )}
 
       {isOwnProfile && tab === 'reflections' && (

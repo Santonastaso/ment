@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { CalendarDays, Check, ChevronLeft, MessageCircle, Send, UsersRound } from 'lucide-react';
 import api from '../api/index.js';
@@ -23,6 +23,39 @@ function statusLabel(status, t) {
   return t(`conversations.status.${status}`, status);
 }
 
+// A meeting is a state of a conversation, not a separate object, so the list
+// carries it. `needs` is what the viewer can act on right now — that is the
+// whole of an alumnus's job here, and the sidebar badge counts it.
+function rowState(session) {
+  if (session.status === 'pending') return session.isMentor ? 'needs' : 'waiting';
+  if (session.status === 'scheduled') {
+    if (!session.scheduled_at) return 'needs';
+    if (new Date(session.scheduled_at) < new Date() && !session.viewer_completed) return 'needs';
+    return 'scheduled';
+  }
+  if (session.status === 'completed') return 'past';
+  return 'closed';
+}
+
+// Short enough to sit inline beside the name.
+function stateLabel(session, state, t) {
+  if (state === 'needs') {
+    if (session.status === 'pending') return t('conversations.state.reply');
+    if (!session.scheduled_at) return t('conversations.state.confirmTime');
+    return t('conversations.state.markComplete');
+  }
+  if (state === 'waiting') return t('conversations.state.awaitingReply');
+  if (state === 'scheduled') return formatMessageTime(session.scheduled_at);
+  return statusLabel(session.status, t);
+}
+
+const FILTERS = [
+  { key: 'all', label: 'conversations.filter.all', match: () => true },
+  { key: 'needs', label: 'conversations.filter.needsYou', match: s => s === 'needs' },
+  { key: 'scheduled', label: 'conversations.filter.scheduled', match: s => s === 'scheduled' },
+  { key: 'past', label: 'conversations.filter.past', match: s => s === 'past' || s === 'closed' },
+];
+
 function localDateTime(value) {
   if (!value) return '';
   const date = new Date(value);
@@ -36,6 +69,13 @@ export default function Conversations() {
   const selectedId = Number(params.get('session')) || null;
   const selectedGroupId = Number(params.get('group')) || null;
   const [sessions, setSessions] = useState([]);
+  const [filter, setFilter] = useState('all');
+  // Sessions the current filter admits, newest meeting first.
+  const visibleSessions = useMemo(() => {
+    const match = FILTERS.find(option => option.key === filter)?.match ?? (() => true);
+    return sessions.filter(session => match(rowState(session)));
+  }, [sessions, filter]);
+
   const [groups, setGroups] = useState([]);
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -190,6 +230,25 @@ export default function Conversations() {
     <section className={cn('conversations-shell', (selectedId || selectedGroupId) && 'has-selection')}>
       <aside className="conversation-list" aria-label={t('conversations.title')}>
         <header><h1>{t('conversations.title')}</h1><span>{sessions.length + groups.length}</span></header>
+        {(sessions.length > 0 || groups.length > 0) && (
+          <div className="conversation-filters" role="group" aria-label={t('conversations.filter.label')}>
+            {FILTERS.map(option => {
+              const count = option.key === 'all'
+                ? sessions.length + groups.length
+                : sessions.filter(s => option.match(rowState(s))).length;
+              return (
+                <button
+                  key={option.key}
+                  type="button"
+                  aria-pressed={filter === option.key}
+                  onClick={() => setFilter(option.key)}
+                >
+                  {t(option.label)}<span className="conversation-filter-count">{count}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
         {sessions.length === 0 && groups.length === 0 ? (
           <div className="conversation-empty">
             <MessageCircle />
@@ -198,23 +257,39 @@ export default function Conversations() {
             <Link to="/explorer">{t('conversations.findPeople')}</Link>
           </div>
         ) : <>
-        {sessions.map((session) => {
+        {visibleSessions.map((session) => {
           const peer = otherPerson(session, user?.id);
+          const state = rowState(session);
           return (
             <button key={session.id} type="button" onClick={() => setParams({ session: String(session.id) })} className={cn('conversation-list-item', session.id === selectedId && 'is-active')}>
               <Avatar className="size-9"><AvatarFallback>{initials(peer?.name)}</AvatarFallback></Avatar>
-              <span className="min-w-0"><strong>{peer?.name}</strong><small>{session.title}</small></span>
-              <em className={`status-${session.status}`}>{statusLabel(session.status, t)}</em>
+              <span className="min-w-0">
+                {/* Who, what state, when — the scannable line. */}
+                <span className="conversation-list-top">
+                  <strong>{peer?.name}</strong>
+                  <em className={`conversation-state is-${state}`}>{stateLabel(session, state, t)}</em>
+                </span>
+                {/* What they actually asked about. */}
+                <small>{session.title}</small>
+              </span>
             </button>
           );
         })}
-        {groups.map((group) => (
+        {filter === 'all' && groups.map((group) => (
           <button key={`group-${group.id}`} type="button" onClick={() => setParams({ group: String(group.id) })} className={cn('conversation-list-item', group.id === selectedGroupId && 'is-active')}>
             <Avatar className="size-9"><AvatarFallback><UsersRound className="size-4" /></AvatarFallback></Avatar>
-            <span className="min-w-0"><strong>{group.name}</strong><small>{group.description || t('nav.groups')}</small></span>
-            <em>{t('nav.groups')}</em>
+            <span className="min-w-0">
+              <span className="conversation-list-top">
+                <strong>{group.name}</strong>
+                <em className="conversation-state is-group">{t('nav.groups')}</em>
+              </span>
+              <small>{group.description || t('nav.groups')}</small>
+            </span>
           </button>
         ))}
+        {!visibleSessions.length && filter !== 'all' && (
+          <p className="conversation-list-empty">{t('conversations.filter.empty')}</p>
+        )}
         </>}
       </aside>
 

@@ -46,7 +46,10 @@ function LoginRoute() {
     if (user.must_change_password) return <Navigate to="/change-password" replace />;
     if (!user.onboarding_complete && !user.is_admin) return <Navigate to="/onboarding" replace />;
     if (user.is_admin) return <Navigate to="/admin" replace />;
-    return <Navigate to="/" replace />;
+    // Students arrive to find someone, so they land in the discovery chat.
+    // Alumni never search — they respond — so they land in Messages. This is
+    // the landing route only; both keep the same sidebar and can reach either.
+    return <Navigate to={user.role === 'alumnus' ? '/conversations' : '/'} replace />;
   }
   return page(<Login />);
 }

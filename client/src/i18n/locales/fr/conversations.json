@@ -21,5 +21,15 @@
   "conversations.status.scheduled": "Acceptee",
   "conversations.status.completed": "Terminee",
   "conversations.status.declined": "Refusee",
-  "conversations.status.cancelled": "Annulee"
+  "conversations.status.cancelled": "Annulee",
+  "conversations.filter.label": "Filtrer les conversations",
+  "conversations.filter.all": "Toutes",
+  "conversations.filter.needsYou": "À traiter",
+  "conversations.filter.scheduled": "Programmées",
+  "conversations.filter.past": "Passées",
+  "conversations.filter.empty": "Rien ici pour le moment.",
+  "conversations.state.reply": "Répondre",
+  "conversations.state.confirmTime": "Confirmer l’horaire",
+  "conversations.state.markComplete": "Marquer terminée",
+  "conversations.state.awaitingReply": "En attente de réponse"
 }
