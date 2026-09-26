@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import SessionRequestModal from '../components/SessionRequestModal.jsx';
 import { PageShell } from '../components/PageShell.jsx';
 import { Surface, SurfaceBody } from '../components/Surface.jsx';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -196,54 +196,45 @@ function PersonCard({ person, onRequest }) {
   const isAlumnus = person.role === 'alumnus';
 
   return (
-    <article className="directory-person-row grid max-w-full gap-3 rounded-[var(--panel-radius)] py-3 pl-3 hover:bg-[var(--control-surface)] md:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)] md:items-center xl:grid-cols-[minmax(0,1fr)_minmax(240px,0.8fr)_260px]">
-        <div className="flex min-w-0 flex-1 items-start gap-3">
-          <Avatar className="size-10">
-            <AvatarFallback className="bg-accent text-sm font-semibold text-primary">{initials}</AvatarFallback>
-          </Avatar>
-          <div className="min-w-0 flex-1">
-            <Link to={`/profile/${person.id}`} className="block truncate font-medium text-foreground hover:text-primary hover:underline">
-              {person.name}
-            </Link>
-            <p className="truncate text-xs text-muted-foreground">
-              {[
-                person.program,
-                person.cohort_year ? t('explorer.classOf', { year: person.cohort_year }) : null,
-                person.current_role,
-                person.location,
-              ].filter(Boolean).join(' · ')}
-            </p>
-            <p className="mt-1 text-[11px] font-medium text-muted-foreground">
-              {isAlumnus ? t('explorer.personaAlumnusSingular') : t('explorer.personaStudentSingular')}
-            </p>
-          </div>
-        </div>
-        <div className="flex min-w-0 flex-col gap-2">
-          {(person.skills || []).length > 0 && (
-          <div className="flex flex-wrap gap-x-2 gap-y-1">
-            {person.skills.slice(0, 4).map(s => (
-              <span key={s.skill} className="text-xs text-muted-foreground">
-                {s.skill}
-              </span>
-            ))}
-            {person.skills.length > 4 && (
-              <span className="rounded-full px-1 py-0.5 text-xs text-muted-foreground">+{person.skills.length - 4}</span>
-            )}
-          </div>
-          )}
-        </div>
-        <div className="directory-actions grid min-w-0 grid-cols-[154px_106px] items-center justify-end gap-2 md:col-span-2 xl:col-span-1">
-          {person.session_id ? (
-            <Link to={`/conversations?session=${person.session_id}`} className={buttonVariants({ variant: 'outline', size: 'default' }) + ' w-full justify-center'}>
-              {t('explorer.openChat')}
-            </Link>
-          ) : (
-            <Button variant="outline" className="w-full justify-center" onClick={onRequest}>{t('explorer.requestSession')}</Button>
-          )}
-          <Link to={`/profile/${person.id}`} className={buttonVariants({ variant: 'ghost', size: 'default' }) + ' w-full justify-center'}>
-            {t('explorer.viewProfile')}
+    <article className="person-row">
+      <Avatar className="person-row-avatar size-10">
+        <AvatarFallback className="bg-accent text-sm font-semibold text-primary">{initials}</AvatarFallback>
+      </Avatar>
+
+      <span className="person-row-identity">
+        <Link to={`/profile/${person.id}`} className="person-row-name">{person.name}</Link>
+        <span className="person-row-role">
+          {[
+            isAlumnus ? t('explorer.personaAlumnusSingular') : t('explorer.personaStudentSingular'),
+            person.current_role,
+            person.program,
+            person.cohort_year ? t('explorer.classOf', { year: person.cohort_year }) : null,
+            person.location,
+          ].filter(Boolean).join(' · ')}
+        </span>
+      </span>
+
+      <span className="person-row-actions">
+        <Link to={`/profile/${person.id}`} className="person-row-link">{t('explorer.viewProfile')}</Link>
+        {person.session_id ? (
+          <Link to={`/conversations?session=${person.session_id}`} className="person-row-action">
+            {t('explorer.openChat')}
           </Link>
-        </div>
+        ) : (
+          <button type="button" className="person-row-action" onClick={onRequest}>{t('explorer.requestSession')}</button>
+        )}
+      </span>
+
+      {(person.skills || []).length > 0 && (
+        <span className="person-row-meta">
+          {person.skills.slice(0, 4).map(s => (
+            <span key={s.skill} className="person-row-chip">{s.skill}</span>
+          ))}
+          {person.skills.length > 4 && (
+            <span className="person-row-note">+{person.skills.length - 4}</span>
+          )}
+        </span>
+      )}
     </article>
   );
 }

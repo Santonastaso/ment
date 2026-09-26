@@ -96,37 +96,37 @@ function MatchCard({ match, index, selected, onSelect, copy }) {
   const background = [person.program, person.cohort_year].filter(Boolean).join(' · ') || '';
 
   return (
-    <article role="radio" aria-checked={selected} className={`discovery-match-card ${selected ? 'is-selected' : ''}`}>
-      <span className="discovery-avatar" style={{ backgroundColor: avatarTints[index % avatarTints.length] }}>
+    <article role="radio" aria-checked={selected} className={`person-row discovery-match-card ${selected ? 'is-selected' : ''}`}>
+      <span className="discovery-avatar person-row-avatar" style={{ backgroundColor: avatarTints[index % avatarTints.length] }}>
         {initials(person.name)}
         {selected && <span className="discovery-selected-mark"><Check /></span>}
       </span>
 
-      <span className="discovery-match-identity">
-        <span className="discovery-match-name">{person.name}</span>
-        {role && <span className="discovery-match-role">{role}</span>}
+      <span className="person-row-identity">
+        <span className="person-row-name">{person.name}</span>
+        {role && <span className="person-row-role">{role}</span>}
       </span>
 
-      <span className="discovery-match-actions">
-        <Link className="discovery-text-button" to={`/profile/${person.id}`}>{copy.viewProfile}</Link>
+      <span className="person-row-actions">
+        <Link className="person-row-link" to={`/profile/${person.id}`}>{copy.viewProfile}</Link>
         <button
           type="button"
           aria-label={`${copy.choose} ${person.name}`}
           onClick={() => onSelect(match)}
-          className={`discovery-choose ${selected ? 'is-selected' : ''}`}
+          className={`person-row-action ${selected ? 'is-selected' : ''}`}
         >
           {selected ? copy.selected : copy.choose}
         </button>
       </span>
 
       {match.reasons?.length > 0 && (
-        <p className="discovery-match-why">{match.reasons.join(' ')}</p>
+        <p className="person-row-detail">{match.reasons.join(' ')}</p>
       )}
 
       {(expertise.length > 0 || background) && (
-        <span className="discovery-match-meta">
-          {expertise.map(item => <span className="discovery-match-chip" key={item}>{item}</span>)}
-          {background && <span className="discovery-match-background">{background}</span>}
+        <span className="person-row-meta">
+          {expertise.map(item => <span className="person-row-chip" key={item}>{item}</span>)}
+          {background && <span className="person-row-note">{background}</span>}
         </span>
       )}
     </article>

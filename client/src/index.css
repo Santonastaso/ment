@@ -242,36 +242,43 @@
 .discovery-skeletons { display: grid; gap: 3px; margin: 1.35rem 0; overflow: hidden; border: 0; border-radius: var(--panel-radius); background: transparent; }
 .discovery-skeletons span { display: block; height: 92px; background: var(--muted); animation: pulse 1.5s ease-in-out infinite; }
 .discovery-match-grid { display: grid; gap: 0; margin: 1.35rem 0; overflow: visible; border: 0; border-radius: 0; background: transparent; }
-/* One reading column per match: who they are and the actions on the top line,
-   then the reason, then supporting detail — each indented to the name so the
-   eye follows a single left edge instead of scanning four columns. */
-.discovery-match-card {
+/* Shared person row. One reading column: avatar, name and actions on the top
+   line, then supporting detail indented to the name, so the eye follows a
+   single left edge. Used by the discovery match cards and the Explorer
+   directory — the same information in the same shape on both tabs. */
+.person-row {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  grid-template-areas: "avatar identity actions" ". reason reason" ". meta meta";
-  align-items: start; gap: .5rem .75rem;
+  grid-template-areas: "avatar identity actions" ". detail detail" ". meta meta";
+  align-items: start; gap: .45rem .75rem;
   width: 100%; min-width: 0;
   border: 0; border-bottom: 1px solid color-mix(in srgb, var(--border) 65%, transparent); border-radius: 8px;
   background: transparent; padding: 14px 12px; text-align: left; transition: background .12s ease;
 }
-.discovery-match-card:last-child { border-bottom-color: transparent; }
-.discovery-match-card:hover { background: var(--control-surface); }
-.discovery-match-card.is-selected { background: var(--control-surface); box-shadow: none; }
+.person-row:last-child { border-bottom-color: transparent; }
+.person-row:hover { background: var(--control-surface); }
+.person-row.is-selected { background: var(--control-surface); box-shadow: none; }
+.person-row-avatar { grid-area: avatar; }
+.person-row-identity { grid-area: identity; display: grid; min-width: 0; align-content: center; gap: .1rem; min-height: 40px; }
+.person-row-name { overflow: hidden; color: var(--foreground); font-size: 15px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+a.person-row-name:hover { color: var(--primary); text-decoration: underline; }
+.person-row-role { overflow: hidden; color: var(--muted-foreground); font-size: 12.5px; text-overflow: ellipsis; white-space: nowrap; }
+.person-row-actions { grid-area: actions; display: flex; align-items: center; gap: .35rem; align-self: center; }
+.person-row-detail { grid-area: detail; min-width: 0; margin: 0; color: #5e5951; font-size: 13.5px; line-height: 1.5; }
+.person-row-meta { grid-area: meta; display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: .35rem .5rem; }
+.person-row-chip { border-radius: var(--control-radius); background: var(--control-surface-hover); padding: .15rem .55rem; color: #5e5951; font-size: 11.5px; font-weight: 500; }
+.person-row-note { color: var(--muted-foreground); font-size: 11.5px; }
+/* Row actions: one quiet text link, one filled control. */
+.person-row-action { border: 0; border-radius: var(--control-radius); background: var(--control-surface-hover); color: #5e5951; padding: .4rem .9rem; font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+.person-row-action:hover { background: var(--accent); }
+.person-row-action.is-selected { background: var(--primary); color: white; }
+.person-row-link { border: 0; background: transparent; color: #7c7770; padding: .4rem .55rem; font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+.person-row-link:hover { color: var(--foreground); }
+
 .discovery-avatar { position: relative; display: grid; width: 40px; height: 40px; flex: 0 0 auto; place-items: center; border-radius: 50%; color: #4b463f; font-size: 13px; font-weight: 700; }
-.discovery-match-card > .discovery-avatar { grid-area: avatar; }
 .discovery-selected-mark { position: absolute; right: -3px; bottom: -3px; display: grid; width: 19px; height: 19px; place-items: center; border: 2px solid var(--card); border-radius: 50%; background: var(--primary); color: white; }
 .discovery-selected-mark svg { width: 11px; }
-.discovery-match-identity { grid-area: identity; display: grid; min-width: 0; align-content: center; gap: .1rem; min-height: 40px; }
-.discovery-match-name { overflow: hidden; color: var(--foreground); font-size: 15px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
-.discovery-match-role { overflow: hidden; color: var(--muted-foreground); font-size: 12.5px; text-overflow: ellipsis; white-space: nowrap; }
-.discovery-match-actions { grid-area: actions; display: flex; align-items: center; gap: .35rem; align-self: center; }
-.discovery-match-why { grid-area: reason; min-width: 0; margin: 0; color: #5e5951; font-size: 13.5px; line-height: 1.5; }
-.discovery-match-meta { grid-area: meta; display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: .35rem .5rem; }
-.discovery-match-chip { border-radius: var(--control-radius); background: var(--control-surface-hover); padding: .15rem .55rem; color: #5e5951; font-size: 11.5px; font-weight: 500; }
-.discovery-match-background { color: var(--muted-foreground); font-size: 11.5px; }
 .discovery-micro { display: block; margin-bottom: .35rem; color: #aaa49b; font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
-.discovery-choose { border: 0; border-radius: var(--control-radius); background: var(--control-surface-hover); color: #5e5951; padding: .4rem .9rem; font-size: 12.5px; font-weight: 600; }
-.discovery-choose.is-selected { border-color: var(--primary); background: var(--primary); color: white; }
 .discovery-again { border: 0; background: transparent; color: #7c7770; text-decoration: underline; text-underline-offset: 3px; }
 .discovery-reachout { max-width: 700px; margin-top: 2.3rem; }
 .discovery-assistant-message { display: grid; grid-template-columns: 32px minmax(0, 1fr); align-items: start; gap: .75rem; }
@@ -396,7 +403,7 @@
 .profile-tabs::-webkit-scrollbar { display: none; }
 @keyframes discoveryEllipsis { 50% { opacity: .35; } }
 @media (prefers-reduced-motion: reduce) { .discovery-ellipsis, .discovery-skeletons span { animation: none; } }
-@media (max-width: 700px) { .discovery-flow { padding-inline: 1rem; } .discovery-ask-block { padding-top: 22vh; } .discovery-match-card { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "avatar identity" ". reason" ". meta" ". actions"; gap: .5rem .65rem; padding: 14px 10px; } .discovery-match-actions { justify-content: flex-start; padding-top: .15rem; } .discovery-user-bubble { max-width: 88%; } .discovery-actions { align-items: flex-start; flex-direction: column; } .discovery-assistant-message { grid-template-columns: 28px minmax(0, 1fr); gap: .55rem; } .discovery-agent-mark { width: 28px; height: 28px; } .discovery-connections { flex-wrap: wrap; gap: 8px 12px; } .discovery-connections-link { margin-left: 0; } }
+@media (max-width: 700px) { .discovery-flow { padding-inline: 1rem; } .discovery-ask-block { padding-top: 22vh; } .person-row { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "avatar identity" ". detail" ". meta" ". actions"; gap: .5rem .65rem; padding: 14px 10px; } .person-row-actions { justify-content: flex-start; padding-top: .15rem; } .discovery-user-bubble { max-width: 88%; } .discovery-actions { align-items: flex-start; flex-direction: column; } .discovery-assistant-message { grid-template-columns: 28px minmax(0, 1fr); gap: .55rem; } .discovery-agent-mark { width: 28px; height: 28px; } .discovery-connections { flex-wrap: wrap; gap: 8px 12px; } .discovery-connections-link { margin-left: 0; } }
 @media (max-width: 760px) { .conversations-shell { grid-template-columns: 1fr; } .conversations-shell.has-selection .conversation-list { display: none; } .conversations-shell:not(.has-selection) .conversation-thread { display: none; } .conversation-back { display: grid; place-items: center; } .conversation-header { grid-template-columns: 28px 36px minmax(0, 1fr) auto; padding-inline: 12px; } .conversation-request-banner, .conversation-meeting { margin-inline: 12px; } .conversation-meeting { grid-template-columns: 22px minmax(0, 1fr); } .conversation-meeting-actions { grid-column: 2; flex-wrap: wrap; } .conversation-messages { padding-inline: 16px; } .conversation-composer { width: calc(100% - 24px); } }
 
 @layer components {
