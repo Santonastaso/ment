@@ -4,6 +4,23 @@ import { buildSessionIcs, downloadIcs } from '../lib/ics.js';
 import { supabase } from '../lib/supabase.js';
 import { useT } from '../i18n/index.jsx';
 
+
+// supabase-js surfaces a non-2xx edge response as a FunctionsHttpError whose
+// body hangs off `context`, not `data` — so the specific reason was being
+// swallowed and every failure read as "Could not connect the calendar".
+async function providerErrorMessage(error, t) {
+  let code = error?.message;
+  const response = error?.context;
+  if (response?.json) {
+    try { code = (await response.clone().json())?.error || code; } catch { /* non-JSON body */ }
+  }
+  if (code === 'calendar_provider_not_configured' || code === 'calendar_not_configured') {
+    return t('components.ics.notConfigured');
+  }
+  if (code === 'calendar_not_connected') return t('components.ics.reconnect');
+  return t('components.ics.connectFailed');
+}
+
 export default function IcsDownloadButton({ sessionId, session, className = '', label, meetingUrl, onReschedule }) {
   const { t } = useT();
   const [connections, setConnections] = useState([]);
@@ -27,7 +44,7 @@ export default function IcsDownloadButton({ sessionId, session, className = '', 
       if (invokeError || data?.error) throw new Error(data?.error || invokeError.message);
       window.location.assign(data.url);
     } catch (requestError) {
-      setError(requestError.message === 'calendar_provider_not_configured' ? 'This calendar provider is not configured yet.' : 'Could not connect the calendar.');
+      setError(await providerErrorMessage(requestError, t));
       setLoading('');
     }
   }
@@ -39,7 +56,7 @@ export default function IcsDownloadButton({ sessionId, session, className = '', 
       if (invokeError || data?.error) throw new Error(data?.error || invokeError.message);
       setCreated(data);
     } catch (requestError) {
-      setError(requestError.message === 'calendar_not_connected' ? 'Reconnect your calendar and try again.' : 'Could not create the calendar event.');
+      setError(await providerErrorMessage(requestError, t));
     } finally { setLoading(''); }
   }
 
@@ -48,7 +65,12 @@ export default function IcsDownloadButton({ sessionId, session, className = '', 
     try {
       const current = session || (await api.get('/sessions/' + sessionId)).data;
       if (!current?.scheduled_at) throw new Error('no_scheduled_at');
-      downloadIcs('session-' + sessionId + '.ics', buildSessionIcs(current, current.mentor, current.mentee));
+      // The calendar entry is named for whoever the viewer is meeting, not the
+      // session's internal title — "Event 61" tells nobody anything.
+      const peer = current.isMentor ? current.mentee : current.mentor;
+      const summary = t('components.ics.summary', { name: peer?.name || t('components.match.unknown') });
+      const slug = (peer?.name || 'ment').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      downloadIcs(`chat-with-${slug}.ics`, buildSessionIcs(current, current.mentor, current.mentee, { summary }));
     } catch {
       setError('Could not download the calendar file.');
     } finally { setLoading(''); }

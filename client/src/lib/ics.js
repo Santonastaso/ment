@@ -28,7 +28,7 @@ function foldLine(line) {
   return parts.join('\r\n ');
 }
 
-export function buildSessionIcs(session, mentor, mentee) {
+export function buildSessionIcs(session, mentor, mentee, options = {}) {
   if (!session?.scheduled_at) throw new Error('session_has_no_scheduled_at');
   const now = toIcsDate(new Date().toISOString());
   const start = toIcsDate(session.scheduled_at);
@@ -52,7 +52,7 @@ export function buildSessionIcs(session, mentor, mentee) {
     `DTSTAMP:${now}`,
     `DTSTART:${start}`,
     `DTEND:${end}`,
-    `SUMMARY:${escapeIcsText(session.title)}`,
+    `SUMMARY:${escapeIcsText(options.summary || session.title || 'Ment conversation')}`,
     `DESCRIPTION:${description}`,
     ...(session.meeting_url ? [`LOCATION:${escapeIcsText(session.meeting_url)}`, `URL:${escapeIcsText(session.meeting_url)}`] : []),
     `ORGANIZER;CN=${escapeIcsText(mentor.name)}:mailto:${mentor.email || ''}`,

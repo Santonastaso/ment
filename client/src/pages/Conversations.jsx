@@ -4,6 +4,7 @@ import { CalendarDays, Check, ChevronLeft, MessageCircle, Send, UsersRound } fro
 import api from '../api/index.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useT } from '../i18n/index.jsx';
+import { Field } from '../components/ui/field.jsx';
 import { formatMessageTime } from '../lib/utils.js';
 import { Button } from '../components/ui/button.jsx';
 import { Avatar, AvatarFallback } from '../components/ui/avatar.jsx';
@@ -332,7 +333,19 @@ export default function Conversations() {
                   {!selected.scheduled_at && <Button size="sm" variant="outline" onClick={() => setScheduleOpen(true)}>{t('conversations.schedule')}</Button>}
                   {selected.scheduled_at && <IcsDownloadButton sessionId={selected.id} session={selected} label="Meeting" meetingUrl={selected.meeting_url} onReschedule={() => setScheduleOpen(true)} />}
                 </div>
-                {scheduleOpen && <div className="conversation-scheduler"><input className="input" type="datetime-local" value={scheduledAt} min={localDateTime(new Date(Date.now() + 3600000))} onChange={(event) => setScheduledAt(event.target.value)} /><Button size="sm" onClick={saveSchedule} disabled={!scheduledAt || savingSchedule}>{t('common.save')}</Button></div>}
+                {scheduleOpen && (
+                  <div className="conversation-scheduler">
+                    <Field
+                      label={t('conversations.newTime')}
+                      type="datetime-local"
+                      value={scheduledAt}
+                      min={localDateTime(new Date(Date.now() + 3600000))}
+                      onChange={(event) => setScheduledAt(event.target.value)}
+                    />
+                    <Button size="sm" onClick={saveSchedule} disabled={!scheduledAt || savingSchedule}>{t('common.save')}</Button>
+                    <Button size="sm" variant="ghost" onClick={() => setScheduleOpen(false)}>{t('common.cancel', 'Cancel')}</Button>
+                  </div>
+                )}
               </div>
             )}
 

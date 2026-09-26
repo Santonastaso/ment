@@ -321,5 +321,9 @@
   "components.skillCloud.noneYet": "Ancora nessuna conversazione — comparirà dopo la prima.",
   "components.skillCloud.conversationsOne": "{count} conversazione",
   "components.skillCloud.conversationsMany": "{count} conversazioni",
-  "components.skillCloud.cameUpWith": "Ne hai parlato con"
+  "components.skillCloud.cameUpWith": "Ne hai parlato con",
+  "components.ics.summary": "Conversazione con {name}",
+  "components.ics.notConfigured": "La sincronizzazione del calendario non è ancora configurata. Scarica il file .ics.",
+  "components.ics.reconnect": "Ricollega il calendario e riprova.",
+  "components.ics.connectFailed": "Servizio calendario non raggiungibile. Riprova tra poco."
 }

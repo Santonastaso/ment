@@ -423,7 +423,11 @@ a.person-row-name:hover { color: var(--primary); text-decoration: underline; }
 .calendar-more-menu { position: absolute; right: 0; z-index: 20; display: grid; min-width: 150px; gap: 2px; margin-top: 6px; padding: 5px; border: 1px solid var(--border-subtle); border-radius: 12px; background: var(--card); box-shadow: var(--shadow-overlay); }
 .calendar-more-menu a, .calendar-more-menu button { border: 0; background: transparent; padding: 7px 9px; color: var(--foreground); font-size: 12px; text-align: left; white-space: nowrap; }
 .calendar-more-menu a:hover, .calendar-more-menu button:hover { border-radius: 7px; background: var(--control-surface); }
-.conversation-scheduler { grid-column: 2 / -1; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding-top: 8px; }
+/* Its own row across the whole meeting block, so the field is not squeezed
+   into the column the actions occupy. */
+.conversation-scheduler { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; border-top: 1px solid var(--border-subtle); padding-top: 10px; }
+.conversation-scheduler .floating-field { flex: 1 1 200px; min-width: 0; background: var(--background); }
+.conversation-scheduler .floating-field input { padding: 19px 12px 7px; }
 /* Matches the discovery transcript: a chat column carries no scroll track. */
 .conversation-messages { grid-row: 3; min-height: 0; overflow-y: auto; background: var(--background); background-image: none; padding: 24px max(24px, calc((100% - 720px) / 2)) 18px; scrollbar-width: none; }
 .conversation-messages::-webkit-scrollbar { width: 0; height: 0; display: none; }

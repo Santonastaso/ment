@@ -31,5 +31,6 @@
   "conversations.state.reply": "Reply",
   "conversations.state.confirmTime": "Confirm time",
   "conversations.state.markComplete": "Mark complete",
-  "conversations.state.awaitingReply": "Awaiting reply"
+  "conversations.state.awaitingReply": "Awaiting reply",
+  "conversations.newTime": "New time"
 }

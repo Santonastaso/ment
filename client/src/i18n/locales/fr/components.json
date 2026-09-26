@@ -321,5 +321,9 @@
   "components.skillCloud.noneYet": "Aucune conversation pour le moment — cela se remplira après la première.",
   "components.skillCloud.conversationsOne": "{count} conversation",
   "components.skillCloud.conversationsMany": "{count} conversations",
-  "components.skillCloud.cameUpWith": "Abordé avec"
+  "components.skillCloud.cameUpWith": "Abordé avec",
+  "components.ics.summary": "Échange avec {name}",
+  "components.ics.notConfigured": "La synchronisation du calendrier n’est pas encore configurée. Téléchargez le fichier .ics.",
+  "components.ics.reconnect": "Reconnectez votre calendrier et réessayez.",
+  "components.ics.connectFailed": "Service de calendrier injoignable. Réessayez dans un instant."
 }

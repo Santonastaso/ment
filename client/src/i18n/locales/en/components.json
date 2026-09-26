@@ -337,5 +337,9 @@
   "components.skillCloud.noneYet": "No conversations yet \u2014 this fills in after your first one.",
   "components.skillCloud.conversationsOne": "{count} conversation",
   "components.skillCloud.conversationsMany": "{count} conversations",
-  "components.skillCloud.cameUpWith": "Came up with"
+  "components.skillCloud.cameUpWith": "Came up with",
+  "components.ics.summary": "Chat with {name}",
+  "components.ics.notConfigured": "Calendar sync is not set up yet. Download the .ics file instead.",
+  "components.ics.reconnect": "Reconnect your calendar and try again.",
+  "components.ics.connectFailed": "Could not reach the calendar service. Try again shortly."
 }
