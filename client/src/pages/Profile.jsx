@@ -3,7 +3,7 @@ import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx';
 import SkillTagInput from '../components/SkillTagInput.jsx';
 import TeachSkillsEditor from '../components/TeachSkillsEditor.jsx';
-import SkillCloud from '../components/SkillCloud.jsx';
+import SkillCloud, { SkillCloudFilters } from '../components/SkillCloud.jsx';
 import { Field } from '../components/ui/field.jsx';
 import SessionRequestModal from '../components/SessionRequestModal.jsx';
 
@@ -135,6 +135,7 @@ export default function Profile() {
   const [toast, setToast] = useState('');
   const [reflectionDraft, setReflectionDraft] = useState({ support_needed: '', managed_well: '' });
   const [reflectionOpen, setReflectionOpen] = useState(false);
+  const [skillFilter, setSkillFilter] = useState('all');
 
   // Edit form state
   const [form, setForm] = useState({});
@@ -512,7 +513,7 @@ export default function Profile() {
             </p>
           )}
           {editing ? (
-            <div className="mt-1 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="mt-1 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               <Field
                 label={t('profile.placeholder.role')}
                 value={form.current_role}
@@ -571,10 +572,16 @@ export default function Profile() {
       </Surface>
 
       <div className="flex flex-col gap-4">
-      <PageSection title={skillTitle} description={skillDescription} className="min-w-0 gap-2">
+      <PageSection
+        title={skillTitle}
+        description={skillDescription}
+        action={isOwnProfile ? <SkillCloudFilters value={skillFilter} onChange={setSkillFilter} /> : null}
+        className="min-w-0 gap-3"
+      >
           <SkillCloud
             skillProgress={profile.skillProgress || profile.skills || []}
             isOwnProfile={isOwnProfile}
+            filter={skillFilter}
             onDeleteSkill={isOwnProfile ? handleDeleteSkillFromBubble : undefined}
           />
 

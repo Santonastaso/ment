@@ -38,9 +38,28 @@ function centreOrder(items) {
 
 const identity = (entry) => `${entry.type}:${entry.skill}`;
 
-export default function SkillCloud({ skillProgress = [], isOwnProfile, onDeleteSkill }) {
+// Rendered beside the section title rather than above the cloud, so the
+// filters cost no vertical space of their own.
+export function SkillCloudFilters({ value, onChange }) {
   const { t } = useT();
-  const [filter, setFilter] = useState('all');
+  return (
+    <div className="skill-cloud-filters" role="group" aria-label={t('components.skillCloud.filterLabel')}>
+      {FILTERS.map(option => (
+        <button
+          key={option.key}
+          type="button"
+          aria-pressed={value === option.key}
+          onClick={() => onChange(option.key)}
+        >
+          {t(option.label)}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export default function SkillCloud({ skillProgress = [], isOwnProfile, onDeleteSkill, filter = 'all' }) {
+  const { t } = useT();
   const [selectedKey, setSelectedKey] = useState(null);
 
   const entries = useMemo(
@@ -79,21 +98,6 @@ export default function SkillCloud({ skillProgress = [], isOwnProfile, onDeleteS
 
   return (
     <div className="min-w-0">
-      <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
-        <div className="skill-cloud-filters" role="group" aria-label={t('components.skillCloud.filterLabel')}>
-          {FILTERS.map(option => (
-            <button
-              key={option.key}
-              type="button"
-              aria-pressed={filter === option.key}
-              onClick={() => setFilter(option.key)}
-            >
-              {t(option.label)}
-            </button>
-          ))}
-        </div>
-      </div>
-
       <div className="skill-cloud-stage">
         <div className="skill-cloud" role="group" aria-label={t('components.skillCloud.cloudLabel')}>
           {centreOrder(visible).map(entry => {
