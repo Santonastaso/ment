@@ -242,23 +242,35 @@
 .discovery-skeletons { display: grid; gap: 3px; margin: 1.35rem 0; overflow: hidden; border: 0; border-radius: var(--panel-radius); background: transparent; }
 .discovery-skeletons span { display: block; height: 92px; background: var(--muted); animation: pulse 1.5s ease-in-out infinite; }
 .discovery-match-grid { display: grid; gap: 0; margin: 1.35rem 0; overflow: visible; border: 0; border-radius: 0; background: transparent; }
-.discovery-match-card { display: grid; grid-template-columns: minmax(180px, 1.1fr) minmax(260px, 1.8fr) minmax(200px, 1.2fr); align-items: start; gap: .85rem 1.25rem; width: 100%; min-width: 0; border: 0; border-bottom: 1px solid color-mix(in srgb, var(--border) 65%, transparent); border-radius: 4px; background: transparent; padding: 13px 12px; text-align: left; transition: background .12s ease; }
+/* One reading column per match: who they are and the actions on the top line,
+   then the reason, then supporting detail — each indented to the name so the
+   eye follows a single left edge instead of scanning four columns. */
+.discovery-match-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: "avatar identity actions" ". reason reason" ". meta meta";
+  align-items: start; gap: .5rem .75rem;
+  width: 100%; min-width: 0;
+  border: 0; border-bottom: 1px solid color-mix(in srgb, var(--border) 65%, transparent); border-radius: 8px;
+  background: transparent; padding: 14px 12px; text-align: left; transition: background .12s ease;
+}
 .discovery-match-card:last-child { border-bottom-color: transparent; }
 .discovery-match-card:hover { background: var(--control-surface); }
 .discovery-match-card.is-selected { background: var(--control-surface); box-shadow: none; }
-.discovery-person-head { display: flex; align-items: center; gap: .7rem; }
-.discovery-person-head, .discovery-reason, .discovery-match-why { min-width: 0; }
-.discovery-avatar { position: relative; display: grid; width: 46px; height: 46px; flex: 0 0 auto; place-items: center; border-radius: 50%; color: #4b463f; font-size: 13px; font-weight: 700; }
+.discovery-avatar { position: relative; display: grid; width: 40px; height: 40px; flex: 0 0 auto; place-items: center; border-radius: 50%; color: #4b463f; font-size: 13px; font-weight: 700; }
+.discovery-match-card > .discovery-avatar { grid-area: avatar; }
 .discovery-selected-mark { position: absolute; right: -3px; bottom: -3px; display: grid; width: 19px; height: 19px; place-items: center; border: 2px solid var(--card); border-radius: 50%; background: var(--primary); color: white; }
 .discovery-selected-mark svg { width: 11px; }
-.discovery-reason { display: grid; grid-template-columns: 1.3fr 1fr; gap: 1.25rem; color: #5e5951; font-size: 13px; line-height: 1.45; }
-.discovery-reason > span { display: grid; gap: .1rem; }
-.discovery-match-why { color: #5e5951; font-size: 13px; line-height: 1.45; }
-.discovery-match-footer { grid-column: 1 / -1; display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: .75rem; padding-top: .15rem; }
+.discovery-match-identity { grid-area: identity; display: grid; min-width: 0; align-content: center; gap: .1rem; min-height: 40px; }
+.discovery-match-name { overflow: hidden; color: var(--foreground); font-size: 15px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.discovery-match-role { overflow: hidden; color: var(--muted-foreground); font-size: 12.5px; text-overflow: ellipsis; white-space: nowrap; }
+.discovery-match-actions { grid-area: actions; display: flex; align-items: center; gap: .35rem; align-self: center; }
+.discovery-match-why { grid-area: reason; min-width: 0; margin: 0; color: #5e5951; font-size: 13.5px; line-height: 1.5; }
+.discovery-match-meta { grid-area: meta; display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: .35rem .5rem; }
+.discovery-match-chip { border-radius: var(--control-radius); background: var(--control-surface-hover); padding: .15rem .55rem; color: #5e5951; font-size: 11.5px; font-weight: 500; }
+.discovery-match-background { color: var(--muted-foreground); font-size: 11.5px; }
 .discovery-micro { display: block; margin-bottom: .35rem; color: #aaa49b; font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
-.discovery-available { display: inline-flex; align-items: center; gap: .35rem; color: #1e7a54; font-size: 12px; font-weight: 500; }
-.discovery-available i { display: block; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-.discovery-choose { border: 0; border-radius: 10px; background: var(--control-surface-hover); color: #5e5951; padding: .45rem .8rem; font-size: 12.5px; font-weight: 600; }
+.discovery-choose { border: 0; border-radius: var(--control-radius); background: var(--control-surface-hover); color: #5e5951; padding: .4rem .9rem; font-size: 12.5px; font-weight: 600; }
 .discovery-choose.is-selected { border-color: var(--primary); background: var(--primary); color: white; }
 .discovery-again { border: 0; background: transparent; color: #7c7770; text-decoration: underline; text-underline-offset: 3px; }
 .discovery-reachout { max-width: 700px; margin-top: 2.3rem; }
@@ -380,7 +392,7 @@
 .profile-tabs::-webkit-scrollbar { display: none; }
 @keyframes discoveryEllipsis { 50% { opacity: .35; } }
 @media (prefers-reduced-motion: reduce) { .discovery-ellipsis, .discovery-skeletons span { animation: none; } }
-@media (max-width: 700px) { .discovery-flow { padding-inline: 1rem; } .discovery-ask-block { padding-top: 22vh; } .discovery-match-card { grid-template-columns: minmax(0, 1fr); gap: .8rem; border-radius: 6px; padding: 14px 10px; } .discovery-reason { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; } .discovery-match-footer { flex-wrap: wrap; } .discovery-user-bubble { max-width: 88%; } .discovery-actions { align-items: flex-start; flex-direction: column; } .discovery-assistant-message { grid-template-columns: 28px minmax(0, 1fr); gap: .55rem; } .discovery-agent-mark { width: 28px; height: 28px; } .discovery-connections { flex-wrap: wrap; gap: 8px 12px; } .discovery-connections-link { margin-left: 0; } }
+@media (max-width: 700px) { .discovery-flow { padding-inline: 1rem; } .discovery-ask-block { padding-top: 22vh; } .discovery-match-card { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "avatar identity" ". reason" ". meta" ". actions"; gap: .5rem .65rem; padding: 14px 10px; } .discovery-match-actions { justify-content: flex-start; padding-top: .15rem; } .discovery-user-bubble { max-width: 88%; } .discovery-actions { align-items: flex-start; flex-direction: column; } .discovery-assistant-message { grid-template-columns: 28px minmax(0, 1fr); gap: .55rem; } .discovery-agent-mark { width: 28px; height: 28px; } .discovery-connections { flex-wrap: wrap; gap: 8px 12px; } .discovery-connections-link { margin-left: 0; } }
 @media (max-width: 760px) { .conversations-shell { grid-template-columns: 1fr; } .conversations-shell.has-selection .conversation-list { display: none; } .conversations-shell:not(.has-selection) .conversation-thread { display: none; } .conversation-back { display: grid; place-items: center; } .conversation-header { grid-template-columns: 28px 36px minmax(0, 1fr) auto; padding-inline: 12px; } .conversation-request-banner, .conversation-meeting { margin-inline: 12px; } .conversation-meeting { grid-template-columns: 22px minmax(0, 1fr); } .conversation-meeting-actions { grid-column: 2; flex-wrap: wrap; } .conversation-messages { padding-inline: 16px; } .conversation-composer { width: calc(100% - 24px); } }
 
 @layer components {

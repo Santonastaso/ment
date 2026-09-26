@@ -9,21 +9,21 @@ const COPY = {
   en: {
     greeting: 'Hi {name}, who would you like to connect with?', placeholder: 'Ask Ment',
     finding: 'Thinking through your request', chooseLead: 'These profiles match your request.', chooseBold: 'Select one to prepare the request.',
-    expertise: 'Expert in', background: 'Matching background', why: 'Why this match', available: 'Available', choose: 'Choose', selected: 'Selected', different: 'Ask for different people', browse: 'browse the full directory', notRight: 'Not quite right?', or: 'or',
+    why: 'Why this match', choose: 'Choose', selected: 'Selected', different: 'Ask for different people', browse: 'browse the full directory', notRight: 'Not quite right?', or: 'or',
     to: 'To', intro: "Here's a suggested intro. Edit anything, then send when it feels like you.", suggested: 'Suggested draft', send: 'Send request', regenerate: 'Regenerate', edit: 'Edit',
     sent: 'Request sent to {name}.', sentSubline: "The conversation is ready. Continue there when they reply.", openChat: 'Open chat', again: 'Ask about something else', newChat: 'New chat', recentSearches: 'Recent searches', deleteSearch: 'Delete search', confirmDeleteSearch: 'Delete this search and its saved conversation?', retry: 'Start a new search', error: 'We could not complete that request. Please try again.', aiMissing: 'Matching is not configured yet. Ask an administrator to connect Mistral.', aiBusy: 'Matching is temporarily rate-limited. Please try again in a moment.', aiAdmin: 'Matching needs an administrator to check the Mistral connection.', noMatches: 'There is no relevant professional in the current network for this request.', snapshot: 'Your connections', upcoming: 'Upcoming', pending: 'Pending', completed: 'Completed', viewAll: 'View conversations', viewProfile: 'View profile', back: 'Back to matches', drafting: 'Preparing your request', useful: 'Were these matches useful?', yes: 'Yes', no: 'No', feedbackSaved: 'Thanks — this helps improve matching.',
   },
   it: {
     greeting: 'Ciao {name}, con chi vorresti entrare in contatto?', placeholder: 'Chiedi a Ment',
     finding: 'Sto valutando la richiesta', chooseLead: 'Questi profili corrispondono alla richiesta.', chooseBold: 'Selezionane uno per preparare il messaggio.',
-    expertise: 'Esperto in', background: 'Contesto della ricerca', why: 'Perché è adatto', available: 'Disponibile', choose: 'Scegli', selected: 'Scelto', different: 'Mostra altre persone', browse: 'sfoglia la directory', notRight: 'Non è quello che cercavi?', or: 'oppure',
+    why: 'Perché è adatto', choose: 'Scegli', selected: 'Scelto', different: 'Mostra altre persone', browse: 'sfoglia la directory', notRight: 'Non è quello che cercavi?', or: 'oppure',
     to: 'A', intro: 'Ecco un messaggio proposto. Modifica tutto quello che vuoi, poi invialo quando ti sembra giusto.', suggested: 'Messaggio proposto', send: 'Invia richiesta', regenerate: 'Rigenera', edit: 'Modifica',
     sent: 'Richiesta inviata a {name}.', sentSubline: 'La conversazione è pronta. Continua da lì quando risponderà.', openChat: 'Apri chat', again: "Chiedi qualcos'altro", newChat: 'Nuova chat', recentSearches: 'Ricerche recenti', deleteSearch: 'Elimina ricerca', confirmDeleteSearch: 'Eliminare questa ricerca e la conversazione salvata?', retry: 'Inizia una nuova ricerca', error: 'Non siamo riusciti a completare la richiesta. Riprova.', aiMissing: 'Il matching non è ancora configurato. Chiedi a un amministratore di collegare Mistral.', aiBusy: 'Il matching è temporaneamente limitato. Riprova tra poco.', aiAdmin: 'Un amministratore deve verificare la connessione a Mistral.', noMatches: 'Nella rete attuale non c’è un professionista pertinente per questa richiesta.', snapshot: 'Le tue connessioni', upcoming: 'In programma', pending: 'In attesa', completed: 'Completate', viewAll: 'Vedi conversazioni', viewProfile: 'Vedi profilo', back: 'Torna ai risultati', drafting: 'Preparo la richiesta', useful: 'Questi match sono utili?', yes: 'Sì', no: 'No', feedbackSaved: 'Grazie — ci aiuta a migliorare il matching.',
   },
   fr: {
     greeting: 'Bonjour {name}, avec qui souhaitez-vous entrer en contact ?', placeholder: 'Demandez à Ment',
     finding: 'J’analyse votre demande', chooseLead: 'Ces profils correspondent à votre demande.', chooseBold: 'Sélectionnez-en un pour préparer le message.',
-    expertise: 'Expert en', background: 'Parcours correspondant', why: 'Pourquoi ce profil', available: 'Disponible', choose: 'Choisir', selected: 'Sélectionné', different: 'Voir d’autres personnes', browse: 'parcourir l’annuaire', notRight: 'Pas tout à fait ?', or: 'ou',
+    why: 'Pourquoi ce profil', choose: 'Choisir', selected: 'Sélectionné', different: 'Voir d’autres personnes', browse: 'parcourir l’annuaire', notRight: 'Pas tout à fait ?', or: 'ou',
     to: 'À', intro: 'Voici un message proposé. Modifiez ce que vous voulez, puis envoyez-le lorsqu’il vous convient.', suggested: 'Message proposé', send: 'Envoyer la demande', regenerate: 'Régénérer', edit: 'Modifier',
     sent: 'Demande envoyée à {name}.', sentSubline: 'La conversation est prête. Continuez là lorsqu’une réponse arrive.', openChat: 'Ouvrir le chat', again: 'Poser une autre question', newChat: 'Nouveau chat', recentSearches: 'Recherches récentes', deleteSearch: 'Supprimer la recherche', confirmDeleteSearch: 'Supprimer cette recherche et la conversation enregistrée ?', retry: 'Lancer une nouvelle recherche', error: 'Nous n’avons pas pu finaliser cette demande. Réessayez.', aiMissing: 'Le matching n’est pas encore configuré. Demandez à un administrateur de connecter Mistral.', aiBusy: 'Le matching est temporairement limité. Réessayez dans un instant.', aiAdmin: 'Un administrateur doit vérifier la connexion à Mistral.', noMatches: 'Le réseau actuel ne contient aucun professionnel pertinent pour cette demande.', snapshot: 'Vos connexions', upcoming: 'À venir', pending: 'En attente', completed: 'Terminées', viewAll: 'Voir les conversations', viewProfile: 'Voir le profil', back: 'Retour aux résultats', drafting: 'Préparation de la demande', useful: 'Ces profils sont-ils utiles ?', yes: 'Oui', no: 'Non', feedbackSaved: 'Merci — cela nous aide à améliorer les suggestions.',
   },
@@ -82,13 +82,53 @@ function visibleTurns(storedTurns) {
 }
 
 function MatchCard({ match, index, selected, onSelect, copy }) {
-  const role = [match.person.job_title || match.person.current_role, match.person.department].filter(Boolean).join(' · ');
+  const person = match.person;
+  const jobTitle = person.job_title || person.current_role;
+  const role = [jobTitle, person.department].filter(Boolean).join(' · ');
+
+  // The subtitle already names the role and department, and the server falls
+  // back to exactly those when it has no matched expertise — so drop anything
+  // that would just repeat it and show only what adds information.
+  const shown = new Set([jobTitle, person.department].filter(Boolean).map(value => value.toLowerCase()));
+  const expertise = (match.expertise || []).filter(item => item && !shown.has(String(item).toLowerCase()));
+
+  // Academic background is the part the subtitle doesn't carry.
+  const background = [person.program, person.cohort_year].filter(Boolean).join(' · ') || '';
+
   return (
     <article role="radio" aria-checked={selected} className={`discovery-match-card ${selected ? 'is-selected' : ''}`}>
-      <span className="discovery-person-head"><span className="discovery-avatar" style={{ backgroundColor: avatarTints[index % avatarTints.length] }}>{initials(match.person.name)}{selected && <span className="discovery-selected-mark"><Check /></span>}</span><span className="min-w-0 text-left"><span className="block truncate text-[15.5px] font-semibold">{match.person.name}</span>{role && <span className="block truncate text-[12.5px] text-[var(--ment-muted)]">{role}</span>}</span></span>
-      <span className="discovery-reason"><span><span className="discovery-micro">{copy.expertise}</span>{match.expertise.join(', ')}</span><span><span className="discovery-micro">{copy.background}</span>{match.background}</span></span>
-      {match.reasons?.length > 0 && <span className="discovery-match-why"><span className="discovery-micro">{copy.why}</span>{match.reasons.join(' ')}</span>}
-      <span className="discovery-match-footer"><span className="discovery-available"><i />{copy.available}</span><span className="flex items-center gap-2"><Link className="discovery-text-button" to={`/profile/${match.person.id}`}>{copy.viewProfile}</Link><button type="button" aria-label={`${copy.choose} ${match.person.name}`} onClick={() => onSelect(match)} className={`discovery-choose ${selected ? 'is-selected' : ''}`}>{selected ? copy.selected : copy.choose}</button></span></span>
+      <span className="discovery-avatar" style={{ backgroundColor: avatarTints[index % avatarTints.length] }}>
+        {initials(person.name)}
+        {selected && <span className="discovery-selected-mark"><Check /></span>}
+      </span>
+
+      <span className="discovery-match-identity">
+        <span className="discovery-match-name">{person.name}</span>
+        {role && <span className="discovery-match-role">{role}</span>}
+      </span>
+
+      <span className="discovery-match-actions">
+        <Link className="discovery-text-button" to={`/profile/${person.id}`}>{copy.viewProfile}</Link>
+        <button
+          type="button"
+          aria-label={`${copy.choose} ${person.name}`}
+          onClick={() => onSelect(match)}
+          className={`discovery-choose ${selected ? 'is-selected' : ''}`}
+        >
+          {selected ? copy.selected : copy.choose}
+        </button>
+      </span>
+
+      {match.reasons?.length > 0 && (
+        <p className="discovery-match-why">{match.reasons.join(' ')}</p>
+      )}
+
+      {(expertise.length > 0 || background) && (
+        <span className="discovery-match-meta">
+          {expertise.map(item => <span className="discovery-match-chip" key={item}>{item}</span>)}
+          {background && <span className="discovery-match-background">{background}</span>}
+        </span>
+      )}
     </article>
   );
 }
