@@ -181,8 +181,7 @@ export default function Profile() {
             bio: res.data.bio || '',
             program: res.data.program || '',
             cohort_year: res.data.cohort_year || '',
-            linkedin_url: res.data.linkedin_url || '',
-            linkedin_headline: res.data.linkedin_headline || ''
+            linkedin_url: res.data.linkedin_url || ''
           });
           setWantsToLearn(res.data.skills?.filter(s => s.type === 'wants_to_learn').map(s => s.skill) || []);
           try {
@@ -417,9 +416,6 @@ export default function Profile() {
   const skillTitle = isOwnProfile
     ? t('profile.skillLandscape.titleOwn')
     : t('profile.skillLandscape.titleOther', { name: firstName });
-  const skillDescription = isOwnProfile
-    ? t('profile.skillLandscape.descOwn')
-    : t('profile.skillLandscape.descOther', { name: firstName });
 
   return (
     <PageShell className="profile-page gap-5">
@@ -554,12 +550,6 @@ export default function Profile() {
                 onChange={e => setForm(f => ({ ...f, linkedin_url: e.target.value }))}
               />
               <Field
-                label={t('profile.fields.linkedinHeadline')}
-                value={form.linkedin_headline}
-                onChange={e => setForm(f => ({ ...f, linkedin_headline: e.target.value }))}
-                className="sm:col-span-2 lg:col-span-1"
-              />
-              <Field
                 label={t('profile.placeholder.bio')}
                 as="textarea"
                 value={form.bio}
@@ -574,7 +564,6 @@ export default function Profile() {
       <div className="flex flex-col gap-4">
       <PageSection
         title={skillTitle}
-        description={skillDescription}
         action={isOwnProfile ? <SkillCloudFilters value={skillFilter} onChange={setSkillFilter} /> : null}
         className="min-w-0 gap-3"
       >
