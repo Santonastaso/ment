@@ -6,10 +6,16 @@ import { ChevronRight, X } from 'lucide-react';
 import { useModalA11y } from '../lib/useModalA11y.js';
 
 // Draft ownership stays in Profile so changing tabs does not discard an answer.
-export default function ProfileReflection({ history = false, draft, onDraftChange, onSkillsApplied }) {
+// `open`/`onOpenChange` let Profile drive the check-in from its header row, so
+// "Start check-in" can sit beside "View history" instead of below it. Left
+// uncontrolled, the component still renders its own start button.
+export default function ProfileReflection({ history = false, draft, onDraftChange, onSkillsApplied, open: openProp, onOpenChange }) {
   const { t, lang } = useT();
   const fieldId = useId();
-  const [open, setOpen] = useState(false);
+  const [openInternal, setOpenInternal] = useState(false);
+  const controlled = typeof openProp === 'boolean';
+  const open = controlled ? openProp : openInternal;
+  const setOpen = controlled ? (onOpenChange || (() => {})) : setOpenInternal;
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(history);
   const [error, setError] = useState('');
@@ -75,7 +81,7 @@ export default function ProfileReflection({ history = false, draft, onDraftChang
 
   return (
     <div className="space-y-3">
-      {!history && !open && <Button type="button" onClick={() => setOpen(true)}>{t('components.reflection.startCheckIn')}</Button>}
+      {!history && !open && !controlled && <Button type="button" onClick={() => setOpen(true)}>{t('components.reflection.startCheckIn')}</Button>}
       {!history && open && (
         <form onSubmit={submit} className="space-y-3">
           {['support_needed', 'managed_well'].map(key => (
@@ -119,24 +125,28 @@ function ContinuationIntent() {
     }
   }
 
+  // Question left, answers right — it reads as its own question rather than a
+  // step of the check-in. The disclaimer drops to fine print underneath.
   return (
-    <section className="pt-3">
-      <p className="text-sm font-medium">{t('profile.reflection.continueTitle')}</p>
-      <p className="mt-0.5 text-xs text-muted-foreground">{t('profile.reflection.continueHelp')}</p>
-      <div className="mt-2 flex flex-wrap gap-2">
-        {['yes', 'unsure', 'no'].map((value) => (
-          <Button
-            key={value}
-            type="button"
-            size="sm"
-            variant={answer === value ? 'secondary' : 'outline'}
-            disabled={saving}
-            onClick={() => save(value)}
-          >
-            {t(`profile.reflection.continue.${value}`)}
-          </Button>
-        ))}
+    <section className="mt-1 border-t border-[var(--border-subtle)] pt-3">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <p className="text-sm font-medium">{t('profile.reflection.continueTitle')}</p>
+        <div className="flex flex-wrap gap-2">
+          {['yes', 'unsure', 'no'].map((value) => (
+            <Button
+              key={value}
+              type="button"
+              size="sm"
+              variant={answer === value ? 'secondary' : 'outline'}
+              disabled={saving}
+              onClick={() => save(value)}
+            >
+              {t(`profile.reflection.continue.${value}`)}
+            </Button>
+          ))}
+        </div>
       </div>
+      <p className="mt-2 text-xs text-muted-foreground">{t('profile.reflection.continueHelp')}</p>
     </section>
   );
 }

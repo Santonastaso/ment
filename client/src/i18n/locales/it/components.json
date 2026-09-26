@@ -308,5 +308,18 @@
   "components.meeting.outcomeCareer": "Conversazione di carriera",
   "components.meeting.outcomeReferral": "Referral effettuato",
   "components.meeting.outcomeMentorship": "Mentorship confermata",
-  "components.skillLandscape.showLess": "Mostra meno"
+  "components.skillLandscape.showLess": "Mostra meno",
+
+  "components.skillCloud.filterLabel": "Filtra le competenze",
+  "components.skillCloud.cloudLabel": "Nuvola di competenze",
+  "components.skillCloud.filterAll": "Tutte",
+  "components.skillCloud.filterStrengths": "Punti di forza",
+  "components.skillCloud.filterGrowing": "In crescita",
+  "components.skillCloud.legendSize": "Pi\u00f9 grande = se ne \u00e8 parlato pi\u00f9 spesso",
+  "components.skillCloud.kindStrength": "Punto di forza",
+  "components.skillCloud.kindGrowing": "In crescita",
+  "components.skillCloud.noneYet": "Ancora nessuna conversazione \u2014 comparir\u00e0 dopo la prima.",
+  "components.skillCloud.conversationsOne": "{count} conversazione",
+  "components.skillCloud.conversationsMany": "{count} conversazioni",
+  "components.skillCloud.cameUpWith": "Ne hai parlato con"
 }

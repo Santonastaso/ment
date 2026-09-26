@@ -3,7 +3,7 @@ import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx';
 import SkillTagInput from '../components/SkillTagInput.jsx';
 import TeachSkillsEditor from '../components/TeachSkillsEditor.jsx';
-import SkillLandscape from '../components/SkillLandscape.jsx';
+import SkillCloud from '../components/SkillCloud.jsx';
 import SessionRequestModal from '../components/SessionRequestModal.jsx';
 
 import PastMeetings from '../components/PastMeetings.jsx';
@@ -133,6 +133,7 @@ export default function Profile() {
   const [showModal, setShowModal] = useState(false);
   const [toast, setToast] = useState('');
   const [reflectionDraft, setReflectionDraft] = useState({ support_needed: '', managed_well: '' });
+  const [reflectionOpen, setReflectionOpen] = useState(false);
 
   // Edit form state
   const [form, setForm] = useState({});
@@ -529,10 +530,9 @@ export default function Profile() {
 
       <div className="flex flex-col gap-4">
       <PageSection title={skillTitle} description={skillDescription} className="min-w-0">
-          <SkillLandscape
+          <SkillCloud
             skillProgress={profile.skillProgress || profile.skills || []}
             isOwnProfile={isOwnProfile}
-            firstName={firstName}
             onDeleteSkill={isOwnProfile ? handleDeleteSkillFromBubble : undefined}
           />
 
@@ -556,13 +556,26 @@ export default function Profile() {
             title={t('profile.reflection.quickTitle')}
             description={t('profile.reflection.quickDesc')}
             action={
-              <Button variant="outline" size="sm" onClick={() => setTab('reflections')}>
-                {t('profile.reflection.viewHistory')}
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" onClick={() => setTab('reflections')}>
+                  {t('profile.reflection.viewHistory')}
+                </Button>
+                {!reflectionOpen && (
+                  <Button size="sm" onClick={() => setReflectionOpen(true)}>
+                    {t('components.reflection.startCheckIn')}
+                  </Button>
+                )}
+              </div>
             }
           />
           <SurfaceBody className="pt-3 sm:px-4">
-            <ProfileReflection draft={reflectionDraft} onDraftChange={setReflectionDraft} onSkillsApplied={refreshProfile} />
+            <ProfileReflection
+              draft={reflectionDraft}
+              onDraftChange={setReflectionDraft}
+              onSkillsApplied={refreshProfile}
+              open={reflectionOpen}
+              onOpenChange={setReflectionOpen}
+            />
           </SurfaceBody>
         </Surface>
       )}

@@ -324,5 +324,18 @@
   "components.monthYear.monthLabel": "Month",
   "components.monthYear.yearLabel": "Year",
 
-  "components.esco.searching": "Searching ESCO…"
+  "components.esco.searching": "Searching ESCO…",
+
+  "components.skillCloud.filterLabel": "Filter skills",
+  "components.skillCloud.cloudLabel": "Skill cloud",
+  "components.skillCloud.filterAll": "All",
+  "components.skillCloud.filterStrengths": "Strengths",
+  "components.skillCloud.filterGrowing": "Growing",
+  "components.skillCloud.legendSize": "Larger = discussed more often",
+  "components.skillCloud.kindStrength": "Strength",
+  "components.skillCloud.kindGrowing": "Growing",
+  "components.skillCloud.noneYet": "No conversations yet \u2014 this fills in after your first one.",
+  "components.skillCloud.conversationsOne": "{count} conversation",
+  "components.skillCloud.conversationsMany": "{count} conversations",
+  "components.skillCloud.cameUpWith": "Came up with"
 }
