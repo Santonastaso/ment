@@ -15,5 +15,10 @@
   "groups.join": "Unisciti",
   "groups.leave": "Esci",
   "groups.error.load": "Impossibile caricare i gruppi. Riprova.",
-  "groups.error.save": "Impossibile salvare la modifica. Riprova."
+  "groups.error.save": "Impossibile salvare la modifica. Riprova.",
+  "groups.chat": "Chat",
+  "groups.chatSubtitle": "Conversazione di gruppo",
+  "groups.chatEmpty": "Nessun messaggio. Inizia la conversazione.",
+  "groups.chatPlaceholder": "Scrivi al gruppo",
+  "groups.chatSend": "Invia messaggio"
 }

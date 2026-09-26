@@ -1,6 +1,16 @@
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge"
 
+// Chat message stamp: dd/mm/yy hh:mm. Shared by the direct and group
+// conversations so both read the same, and no seconds — a message is not an
+// event you time to the second.
+export function formatMessageTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const pad = (part) => String(part).padStart(2, '0');
+  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${String(date.getFullYear()).slice(-2)} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 export function cn(...inputs) {
   return twMerge(clsx(inputs));
 }

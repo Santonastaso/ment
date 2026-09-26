@@ -15,5 +15,10 @@
   "groups.join": "Join",
   "groups.leave": "Leave",
   "groups.error.load": "Could not load groups. Try again.",
-  "groups.error.save": "Could not save that change. Try again."
+  "groups.error.save": "Could not save that change. Try again.",
+  "groups.chat": "Chat",
+  "groups.chatSubtitle": "Group conversation",
+  "groups.chatEmpty": "No messages yet. Start the conversation.",
+  "groups.chatPlaceholder": "Message the group",
+  "groups.chatSend": "Send message"
 }

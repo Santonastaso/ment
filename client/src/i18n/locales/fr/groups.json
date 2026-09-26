@@ -15,5 +15,10 @@
   "groups.join": "Rejoindre",
   "groups.leave": "Quitter",
   "groups.error.load": "Impossible de charger les groupes. Reessayez.",
-  "groups.error.save": "Impossible d'enregistrer la modification. Reessayez."
+  "groups.error.save": "Impossible d'enregistrer la modification. Reessayez.",
+  "groups.chat": "Discussion",
+  "groups.chatSubtitle": "Conversation de groupe",
+  "groups.chatEmpty": "Aucun message. Lancez la conversation.",
+  "groups.chatPlaceholder": "Écrire au groupe",
+  "groups.chatSend": "Envoyer le message"
 }

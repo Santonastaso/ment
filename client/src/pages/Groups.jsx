@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import api from '../api/index.js';
 import { useT } from '../i18n/index.jsx';
+import { formatMessageTime } from '../lib/utils.js';
 import { PageShell } from '../components/PageShell.jsx';
 import { Surface, SurfaceBody, SurfaceHeader } from '../components/Surface.jsx';
 import { Button } from '@/components/ui/button';
-import { Send } from 'lucide-react';
+import { Send, Users } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { supabase } from '../lib/supabase.js';
 
@@ -136,30 +137,41 @@ export default function Groups() {
           ) : groups.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t('groups.list.empty')}</p>
           ) : (
-            <div className="divide-y divide-[var(--border)]">
+            <div>
               {groups.map((group) => (
-                <div key={group.id} className="group-row flex flex-wrap items-center justify-between gap-3 py-4">
-                  <div className="min-w-0">
-                    <p className="font-medium text-foreground">{group.name}</p>
-                    {group.description && <p className="text-sm text-muted-foreground">{group.description}</p>}
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {t('groups.members', { count: group.member_count || 0 })}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    {group.joined && <Button type="button" size="sm" variant={selectedGroup?.id === group.id ? 'default' : 'outline'} onClick={() => setSelectedGroup(group)}>Chat</Button>}
-                    <Button
+                <article key={group.id} className={`person-row ${selectedGroup?.id === group.id ? 'is-selected' : ''}`}>
+                  <span className="person-row-avatar group-row-mark" aria-hidden="true">
+                    <Users className="size-4" />
+                  </span>
+
+                  <span className="person-row-identity">
+                    <span className="person-row-name">{group.name}</span>
+                    <span className="person-row-role">
+                      {[group.description, t('groups.members', { count: group.member_count || 0 })]
+                        .filter(Boolean).join(' · ')}
+                    </span>
+                  </span>
+
+                  <span className="person-row-actions">
+                    {group.joined && (
+                      <button
+                        type="button"
+                        className={`person-row-action ${selectedGroup?.id === group.id ? 'is-selected' : ''}`}
+                        onClick={() => setSelectedGroup(group)}
+                      >
+                        {t('groups.chat')}
+                      </button>
+                    )}
+                    <button
                       type="button"
-                      variant={group.joined ? 'link' : 'default'}
-                      size="sm"
-                      className={group.joined ? 'px-2 text-muted-foreground hover:text-destructive' : ''}
+                      className={group.joined ? 'person-row-link' : 'person-row-action'}
                       disabled={saving}
                       onClick={() => toggleMembership(group)}
                     >
                       {group.joined ? t('groups.leave') : t('groups.join')}
-                    </Button>
-                  </div>
-                </div>
+                    </button>
+                  </span>
+                </article>
               ))}
             </div>
           )}
@@ -167,19 +179,19 @@ export default function Groups() {
       </Surface>
 
       {selectedGroup?.joined && <Surface>
-        <SurfaceHeader title={selectedGroup.name} description={selectedGroup.description || 'Group conversation'} />
+        <SurfaceHeader title={selectedGroup.name} description={selectedGroup.description || t('groups.chatSubtitle')} />
         <SurfaceBody className="pt-4">
           <div className="flex min-h-80 flex-col gap-2 rounded-2xl bg-muted/40 p-4">
-            {messages.length === 0 && <p className="m-auto text-sm text-muted-foreground">No messages yet. Start the conversation.</p>}
+            {messages.length === 0 && <p className="m-auto text-sm text-muted-foreground">{t('groups.chatEmpty')}</p>}
             {messages.map((message) => <div key={message.id} className={`max-w-[75%] rounded-2xl px-4 py-2 text-sm ${message.sender_id === user?.id ? 'ml-auto bg-primary text-primary-foreground' : 'mr-auto bg-background'}`}>
               {message.sender_id !== user?.id && <strong className="mb-1 block text-xs">{message.sender_name}</strong>}
               <p className="whitespace-pre-wrap">{message.body}</p>
-              <time className="mt-1 block text-[10px] opacity-60">{new Date(message.created_at).toLocaleString()}</time>
+              <time className="mt-1 block text-[10px] opacity-60">{formatMessageTime(message.created_at)}</time>
             </div>)}
           </div>
           <form className="mt-3 flex gap-2" onSubmit={sendMessage}>
-            <input className="input flex-1" value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={6000} placeholder="Message the group" aria-label="Message the group" />
-            <Button type="submit" disabled={!draft.trim() || saving} aria-label="Send message"><Send className="size-4" /></Button>
+            <input className="input flex-1" value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={6000} placeholder={t('groups.chatPlaceholder')} aria-label={t('groups.chatPlaceholder')} />
+            <Button type="submit" disabled={!draft.trim() || saving} aria-label={t('groups.chatSend')}><Send className="size-4" /></Button>
           </form>
         </SurfaceBody>
       </Surface>}

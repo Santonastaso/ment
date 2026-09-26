@@ -4,6 +4,7 @@ import { CalendarDays, Check, ChevronLeft, MessageCircle, Send, UsersRound } fro
 import api from '../api/index.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useT } from '../i18n/index.jsx';
+import { formatMessageTime } from '../lib/utils.js';
 import { Button } from '../components/ui/button.jsx';
 import { Avatar, AvatarFallback } from '../components/ui/avatar.jsx';
 import IcsDownloadButton from '../components/IcsDownloadButton.jsx';
@@ -26,13 +27,6 @@ function localDateTime(value) {
   if (!value) return '';
   const date = new Date(value);
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-}
-
-function formatConversationTime(value) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  const pad = (part) => String(part).padStart(2, '0');
-  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${String(date.getFullYear()).slice(-2)} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 export default function Conversations() {
@@ -251,7 +245,7 @@ export default function Conversations() {
             {selected?.status === 'scheduled' && (
               <div className="conversation-meeting">
                 <CalendarDays />
-                <div><strong>{selected.scheduled_at ? formatConversationTime(selected.scheduled_at) : t('conversations.pickTime')}</strong><span>{t('conversations.meetingSubline')}</span></div>
+                <div><strong>{selected.scheduled_at ? formatMessageTime(selected.scheduled_at) : t('conversations.pickTime')}</strong><span>{t('conversations.meetingSubline')}</span></div>
                 <div className="conversation-meeting-actions">
                   {!selected.scheduled_at && <Button size="sm" variant="outline" onClick={() => setScheduleOpen(true)}>{t('conversations.schedule')}</Button>}
                   {selected.scheduled_at && <IcsDownloadButton sessionId={selected.id} session={selected} label="Meeting" meetingUrl={selected.meeting_url} onReschedule={() => setScheduleOpen(true)} />}
@@ -266,7 +260,7 @@ export default function Conversations() {
                 <div className="conversation-system" key={message.id}>{message.body}</div>
               ) : (
                 <div className={cn('conversation-message', (message.sender_id === user?.id || (message.kind === 'request' && selected.isMentee)) ? 'is-mine' : 'is-theirs')} key={message.id}>
-                  {selectedGroup && message.sender_id !== user?.id && <strong>{message.sender_name}</strong>}<p>{message.body}</p><time>{formatConversationTime(message.created_at)}</time>
+                  {selectedGroup && message.sender_id !== user?.id && <strong>{message.sender_name}</strong>}<p>{message.body}</p><time>{formatMessageTime(message.created_at)}</time>
                 </div>
               ))}
               <div ref={endRef} />
