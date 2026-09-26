@@ -386,11 +386,17 @@ a.person-row-name:hover { color: var(--primary); text-decoration: underline; }
 .conversation-context > span { display: inline-block; border-radius: 999px; background: var(--control-surface); color: var(--muted-foreground); padding: 4px 8px; font-size: 10px; }
 .conversation-context h2 { margin: 8px 0 3px; font-size: 18px; font-weight: 600; letter-spacing: -.02em; }
 .conversation-context p { margin: 0; color: var(--muted-foreground); font-size: 12px; }
-.conversation-message { display: block; width: fit-content; max-width: min(78%, 560px); margin: 10px 0; box-sizing: border-box; overflow-wrap: anywhere; text-align: left; }
-.conversation-message.is-mine { margin-left: auto; margin-right: 0; border-radius: 20px; background: var(--control-surface); padding: 10px 13px; }
-.conversation-message.is-theirs { margin-left: 0; margin-right: auto; }
+/* Both sides get a bubble, as in the discovery transcript: same surface, told
+   apart by which side they sit on and which corner is squared off. Only the
+   sender's own messages used to be bubbles, which left a group thread — where
+   nearly every message is someone else's — looking unstyled. */
+.conversation-message { display: block; width: fit-content; max-width: min(78%, 560px); margin: 10px 0; box-sizing: border-box; background: var(--control-surface); padding: .6rem .85rem; overflow-wrap: anywhere; text-align: left; }
+.conversation-message.is-mine { margin-left: auto; margin-right: 0; border-radius: 16px 16px 4px 16px; }
+.conversation-message.is-theirs { margin-left: 0; margin-right: auto; border-radius: 16px 16px 16px 4px; }
+/* Group threads name the sender; one-to-one threads already know who it is. */
+.conversation-message strong { display: block; margin-bottom: 2px; color: var(--muted-foreground); font-size: 11.5px; font-weight: 600; }
 .conversation-message p { margin: 0; white-space: pre-wrap; font-size: 14px; line-height: 1.5; }
-.conversation-message time { display: block; margin-top: 4px; color: var(--muted-foreground); font-size: 9.5px; }
+.conversation-message time { display: block; margin-top: 4px; color: var(--muted-foreground); font-size: 10.5px; }
 .conversation-system { width: fit-content; margin: 14px auto; border-radius: 999px; background: var(--control-surface); color: var(--muted-foreground); padding: 5px 9px; font-size: 10.5px; }
 .conversation-composer { grid-row: 4; display: flex; width: min(calc(100% - 48px), 720px); min-height: 54px; align-items: center; gap: 8px; margin: 8px auto 18px; border-radius: var(--control-radius); background: var(--control-surface); padding: 7px 8px 7px 16px; }
 .conversation-placeholder { grid-row: 1 / -1; }

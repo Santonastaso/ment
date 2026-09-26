@@ -183,11 +183,17 @@ export default function Groups() {
         <SurfaceBody className="pt-4">
           <div className="flex min-h-80 flex-col gap-2 rounded-2xl bg-muted/40 p-4">
             {messages.length === 0 && <p className="m-auto text-sm text-muted-foreground">{t('groups.chatEmpty')}</p>}
-            {messages.map((message) => <div key={message.id} className={`max-w-[75%] rounded-2xl px-4 py-2 text-sm ${message.sender_id === user?.id ? 'ml-auto bg-primary text-primary-foreground' : 'mr-auto bg-background'}`}>
-              {message.sender_id !== user?.id && <strong className="mb-1 block text-xs">{message.sender_name}</strong>}
-              <p className="whitespace-pre-wrap">{message.body}</p>
-              <time className="mt-1 block text-[10px] opacity-60">{formatMessageTime(message.created_at)}</time>
-            </div>)}
+            {/* Same bubbles as the Messages tab and the discovery transcript. */}
+            {messages.map((message) => (
+              <div
+                key={message.id}
+                className={`conversation-message ${message.sender_id === user?.id ? 'is-mine' : 'is-theirs'}`}
+              >
+                {message.sender_id !== user?.id && <strong>{message.sender_name}</strong>}
+                <p>{message.body}</p>
+                <time>{formatMessageTime(message.created_at)}</time>
+              </div>
+            ))}
           </div>
           <form className="mt-3 flex gap-2" onSubmit={sendMessage}>
             <input className="input flex-1" value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={6000} placeholder={t('groups.chatPlaceholder')} aria-label={t('groups.chatPlaceholder')} />
