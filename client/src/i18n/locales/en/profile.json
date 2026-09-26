@@ -127,5 +127,11 @@
   "profile.persona.alumnus": "Alumnus",
   "profile.toast.skillSaveError": "Could not save your skills. Please try again.",
   "profile.fields.department": "Department",
-  "profile.fields.setBySchool": "Set by your school"
+  "profile.fields.setBySchool": "Set by your school",
+  "profile.notifyEmail.title": "Where should we write to you?",
+  "profile.notifyEmail.help": "Used for new match suggestions, meeting requests and reminders about upcoming conversations.",
+  "profile.notifyEmail.label": "Email for notifications",
+  "profile.notifyEmail.usingLogin": "Currently using your sign-in address, {email}.",
+  "profile.notifyEmail.invalid": "That does not look like an email address.",
+  "profile.notifyEmail.saved": "Notification email updated."
 }

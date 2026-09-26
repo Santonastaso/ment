@@ -42,5 +42,11 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
         run: |
-          supabase functions deploy admin-create-user admin-reset-password profile-ingest reflection-classify discovery-assistant \
+          # Keep this list in step with package.json deploy:functions. Five
+          # functions used to be missing here, so a change to any of them was
+          # committed but never reached production.
+          supabase functions deploy \
+            admin-create-user admin-reset-password admin-create-invitation accept-invitation \
+            discovery-assistant profile-ingest reflection-classify public-signup \
+            send-notification-outbox calendar-provider \
             --project-ref "$SUPABASE_PROJECT_REF"

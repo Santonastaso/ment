@@ -127,5 +127,11 @@
   "profile.reflection.continue.unsure": "Non sono sicuro/a",
   "profile.reflection.continue.no": "No",
   "profile.fields.department": "Dipartimento",
-  "profile.fields.setBySchool": "Definito dalla scuola"
+  "profile.fields.setBySchool": "Definito dalla scuola",
+  "profile.notifyEmail.title": "A quale indirizzo vuoi essere contattato?",
+  "profile.notifyEmail.help": "Usato per nuovi suggerimenti, richieste di incontro e promemoria sulle conversazioni in programma.",
+  "profile.notifyEmail.label": "Email per le notifiche",
+  "profile.notifyEmail.usingLogin": "Al momento usiamo il tuo indirizzo di accesso, {email}.",
+  "profile.notifyEmail.invalid": "Questo non sembra un indirizzo email.",
+  "profile.notifyEmail.saved": "Email per le notifiche aggiornata."
 }

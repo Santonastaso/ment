@@ -56,8 +56,14 @@ Deno.serve(async (req) => {
       .maybeSingle();
     if (!claim) continue;
 
-    const { data: authUser } = await sb.auth.admin.getUserById(row.user_id);
-    const email = authUser?.user?.email;
+    // Where the member asked to be written to, falling back to the address
+    // they sign in with. The two differ whenever the login is a placeholder or
+    // an address they no longer control.
+    const [{ data: profile }, { data: authUser }] = await Promise.all([
+      sb.from('profiles').select('notification_email').eq('id', row.user_id).maybeSingle(),
+      sb.auth.admin.getUserById(row.user_id),
+    ]);
+    const email = profile?.notification_email || authUser?.user?.email;
     if (!email) {
       failed++;
       await sb.from('notification_outbox').update({ status: 'failed', claimed_at: null }).eq('id', row.id).eq('status', 'sending');

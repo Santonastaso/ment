@@ -1153,6 +1153,8 @@ async function put(url, body = {}) {
       // School fields — program + "class of" year.
       // `program` is assigned by the school and deliberately not writable here.
       'cohort_year', 'linkedin_url', 'linkedin_headline',
+      // Delivery address for notifications; owner-writable, never peer-readable.
+      'notification_email',
       'reflection_email_reminders',
       // Personal availability — drives whether the user shows up as a
       // mentor candidate.

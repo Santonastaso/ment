@@ -135,6 +135,9 @@ export default function Profile() {
   const [reflectionDraft, setReflectionDraft] = useState({ support_needed: '', managed_well: '' });
   const [reflectionOpen, setReflectionOpen] = useState(false);
   const [skillFilter, setSkillFilter] = useState('all');
+  const [notifyEmail, setNotifyEmail] = useState('');
+  const [notifySaving, setNotifySaving] = useState(false);
+  const [notifyError, setNotifyError] = useState('');
 
   // Edit form state
   const [form, setForm] = useState({});
@@ -182,6 +185,7 @@ export default function Profile() {
             cohort_year: res.data.cohort_year || '',
             linkedin_url: res.data.linkedin_url || ''
           });
+          setNotifyEmail(res.data.notification_email || '');
           setWantsToLearn(res.data.skills?.filter(s => s.type === 'wants_to_learn').map(s => s.skill) || []);
           try {
             setCapacityError('');
@@ -205,6 +209,28 @@ export default function Profile() {
   function showToast(msg) {
     setToast(msg);
     setTimeout(() => setToast(''), 3000);
+  }
+
+  // Saved on its own rather than with the profile form: it lives on a
+  // different tab and an empty value is meaningful (fall back to the login).
+  async function handleSaveNotifyEmail() {
+    const value = notifyEmail.trim().toLowerCase();
+    if (value && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value)) {
+      setNotifyError(t('profile.notifyEmail.invalid'));
+      return;
+    }
+    setNotifySaving(true);
+    setNotifyError('');
+    try {
+      const res = await api.put('/users/me', { notification_email: value || null });
+      setProfile(prev => ({ ...prev, ...res.data }));
+      setNotifyEmail(res.data.notification_email || '');
+      showToast(t('profile.notifyEmail.saved'));
+    } catch {
+      setNotifyError(t('components.sessionRequest.errorGeneric'));
+    } finally {
+      setNotifySaving(false);
+    }
   }
 
   async function handleSaveProfile() {
@@ -668,6 +694,30 @@ export default function Profile() {
           />
           <SurfaceBody className="px-0 pt-5 sm:px-0">
             {capacityError && <p role="alert" className="mb-4 text-sm text-destructive">{capacityError}</p>}
+
+            {/* Where notifications go. Blank means the address you sign in
+                with, which is what most people want. */}
+            <section className="mb-6 rounded-[var(--panel-radius)] bg-[var(--surface)] p-4">
+              <h3 className="text-sm font-semibold">{t('profile.notifyEmail.title')}</h3>
+              <p className="mt-0.5 text-xs text-muted-foreground">{t('profile.notifyEmail.help')}</p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <Field
+                  label={t('profile.notifyEmail.label')}
+                  type="email"
+                  value={notifyEmail}
+                  onChange={e => setNotifyEmail(e.target.value)}
+                  placeholder={profile.email || ''}
+                  className="min-w-0 flex-1 basis-64 bg-background"
+                />
+                <Button size="sm" onClick={handleSaveNotifyEmail} disabled={notifySaving || notifyEmail === (profile.notification_email || '')}>
+                  {notifySaving ? t('profile.btn.saving') : t('profile.btn.save')}
+                </Button>
+              </div>
+              {notifyError && <p role="alert" className="mt-2 text-xs text-destructive">{notifyError}</p>}
+              {!notifyEmail && profile.email && (
+                <p className="mt-2 text-xs text-muted-foreground">{t('profile.notifyEmail.usingLogin', { email: profile.email })}</p>
+              )}
+            </section>
             <p className="text-sm font-medium" data-testid="availability-status">
               {profile.mentorship_paused
                 ? t('profile.availability.paused')
