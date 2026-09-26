@@ -128,6 +128,11 @@
 .floating-field.is-select::after { content: ''; position: absolute; top: 50%; right: 13px; width: 6px; height: 6px; border-right: 1.5px solid var(--muted-foreground); border-bottom: 1.5px solid var(--muted-foreground); transform: translateY(-70%) rotate(45deg); pointer-events: none; }
 /* Extra head room so the caption clears the first line of prose. */
 .floating-field textarea { min-height: 78px; padding-top: 26px; resize: vertical; }
+/* The label occupies the placeholder's position until the field is focused,
+   so showing both at once overlaps them. Reveal the placeholder only once the
+   label has moved out of the way. */
+.floating-field input::placeholder, .floating-field textarea::placeholder { color: var(--muted-foreground); opacity: 0; transition: opacity .15s ease; }
+.floating-field:focus-within input::placeholder, .floating-field:focus-within textarea::placeholder { opacity: .55; }
 /* Read-only fields are shown, not offered: no focus ring, no pointer. */
 .floating-field.is-readonly { background: var(--surface); }
 .floating-field.is-readonly:focus-within { border-color: transparent; background: var(--surface); }

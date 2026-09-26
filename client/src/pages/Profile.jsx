@@ -704,10 +704,12 @@ export default function Profile() {
                 <Field
                   label={t('profile.notifyEmail.label')}
                   type="email"
+                  inputMode="email"
+                  autoComplete="email"
                   value={notifyEmail}
-                  onChange={e => setNotifyEmail(e.target.value)}
+                  onChange={e => { setNotifyEmail(e.target.value); setNotifyError(''); }}
                   placeholder={profile.email || ''}
-                  className="min-w-0 flex-1 basis-64 bg-background"
+                  className="min-w-0 max-w-md flex-1 basis-72 bg-background"
                 />
                 <Button size="sm" onClick={handleSaveNotifyEmail} disabled={notifySaving || notifyEmail === (profile.notification_email || '')}>
                   {notifySaving ? t('profile.btn.saving') : t('profile.btn.save')}
