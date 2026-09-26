@@ -708,7 +708,7 @@ export default function Profile() {
         <SurfaceBody className="pt-5">
 
         {isOwnProfile && showAddCareer && (
-          <div className="mb-5 space-y-3 pb-3">
+          <div className="career-entry-form mb-5">
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               <Field
                 label={t('profile.career.roleTitle')}
@@ -745,14 +745,15 @@ export default function Profile() {
                   onChange={(v) => setNewCareer(c => ({ ...c, end_date: v }))}
                 />
               </div>
+              <Field
+                label={t('profile.career.description')}
+                as="textarea"
+                placeholder={t('profile.career.descPlaceholder')}
+                value={newCareer.description}
+                onChange={e => setNewCareer(c => ({ ...c, description: e.target.value }))}
+                className="sm:col-span-2 lg:col-span-3"
+              />
             </div>
-            <Field
-              label={t('profile.career.description')}
-              as="textarea"
-              placeholder={t('profile.career.descPlaceholder')}
-              value={newCareer.description}
-              onChange={e => setNewCareer(c => ({ ...c, description: e.target.value }))}
-            />
             <Button size="sm" onClick={handleAddCareer}>{t('profile.career.add')}</Button>
           </div>
         )}
@@ -769,51 +770,52 @@ export default function Profile() {
                 <div className={group.entries.length > 1 ? 'space-y-3 pl-4' : 'space-y-3'}>
             {group.entries.map(entry => (
               editingCareerId === entry.id && editCareerDraft ? (
-                <div key={entry.id} className="space-y-3 rounded-md border border-[var(--border)] p-4">
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    <input
-                      className="input text-sm"
-                      placeholder={t('profile.career.roleTitle')}
+                <div key={entry.id} className="career-entry-form">
+                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    <Field
+                      label={t('profile.career.roleTitle')}
                       value={editCareerDraft.role}
-                      onChange={e => setEditCareerDraft(d => ({...d, role: e.target.value}))}
+                      onChange={e => setEditCareerDraft(d => ({ ...d, role: e.target.value }))}
                     />
-                    <select
-                      className="input text-sm"
+                    <Field
+                      label={t('profile.career.department')}
+                      as="select"
                       value={editCareerDraft.department}
-                      onChange={e => setEditCareerDraft(d => ({...d, department: e.target.value}))}
+                      onChange={e => setEditCareerDraft(d => ({ ...d, department: e.target.value }))}
                     >
-                      <option value="">{t('profile.career.department')}</option>
+                      <option value="">—</option>
                       {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
-                    </select>
-                    <input
-                      className="input text-sm"
-                      placeholder={t('profile.career.company')}
+                    </Field>
+                    <Field
+                      label={t('profile.career.company')}
                       value={editCareerDraft.company}
-                      onChange={e => setEditCareerDraft(d => ({...d, company: e.target.value}))}
+                      onChange={e => setEditCareerDraft(d => ({ ...d, company: e.target.value }))}
                     />
-                    <div />
-                    <div>
-                      <label className="block text-[10px] text-ink-tertiary mb-1">{t('profile.career.from')}</label>
+                    <div className="career-period">
+                      <span className="career-period-label">{t('profile.career.from')}</span>
                       <MonthYearPicker
                         value={editCareerDraft.start_date}
-                        onChange={(v) => setEditCareerDraft(d => ({...d, start_date: v}))}
+                        onChange={(v) => setEditCareerDraft(d => ({ ...d, start_date: v }))}
                       />
                     </div>
-                    <div>
-                      <label className="block text-[10px] text-ink-tertiary mb-1">{t('profile.career.to')} <span className="text-ink-tertiary/70">{t('profile.career.toHint')}</span></label>
+                    <div className="career-period sm:col-span-2 lg:col-span-1">
+                      <span className="career-period-label">
+                        {t('profile.career.to')} <em>{t('profile.career.toHint')}</em>
+                      </span>
                       <MonthYearPicker
                         value={editCareerDraft.end_date}
-                        onChange={(v) => setEditCareerDraft(d => ({...d, end_date: v}))}
+                        onChange={(v) => setEditCareerDraft(d => ({ ...d, end_date: v }))}
                       />
                     </div>
+                    <Field
+                      label={t('profile.career.description')}
+                      as="textarea"
+                      placeholder={t('profile.career.descPlaceholder')}
+                      value={editCareerDraft.description}
+                      onChange={e => setEditCareerDraft(d => ({ ...d, description: e.target.value }))}
+                      className="sm:col-span-2 lg:col-span-3"
+                    />
                   </div>
-                  <textarea
-                    className="input text-sm resize-none"
-                    rows={2}
-                    placeholder={t('profile.career.descPlaceholder')}
-                    value={editCareerDraft.description}
-                    onChange={e => setEditCareerDraft(d => ({...d, description: e.target.value}))}
-                  />
                   <div className="flex gap-2">
                     <Button size="sm" onClick={handleSaveEditedCareer}>{t('profile.btn.save')}</Button>
                     <Button size="sm" variant="ghost" onClick={cancelEditCareer}>{t('profile.btn.cancel')}</Button>
