@@ -49,11 +49,15 @@ function stateLabel(session, state, t) {
   return statusLabel(session.status, t);
 }
 
+// `match` selects sessions; `groups` says whether group threads belong in the
+// view. Groups reuses the nav label rather than inventing a second word for
+// the same thing.
 const FILTERS = [
-  { key: 'all', label: 'conversations.filter.all', match: () => true },
+  { key: 'all', label: 'conversations.filter.all', match: () => true, groups: true },
   { key: 'needs', label: 'conversations.filter.needsYou', match: s => s === 'needs' },
   { key: 'scheduled', label: 'conversations.filter.scheduled', match: s => s === 'scheduled' },
   { key: 'past', label: 'conversations.filter.past', match: s => s === 'past' || s === 'closed' },
+  { key: 'groups', label: 'nav.groups', match: () => false, groups: true },
 ];
 
 function localDateTime(value) {
@@ -75,6 +79,7 @@ export default function Conversations() {
     const match = FILTERS.find(option => option.key === filter)?.match ?? (() => true);
     return sessions.filter(session => match(rowState(session)));
   }, [sessions, filter]);
+  const showGroups = FILTERS.find(option => option.key === filter)?.groups === true;
 
   const [groups, setGroups] = useState([]);
   const [messages, setMessages] = useState([]);
@@ -235,7 +240,9 @@ export default function Conversations() {
             {FILTERS.map(option => {
               const count = option.key === 'all'
                 ? sessions.length + groups.length
-                : sessions.filter(s => option.match(rowState(s))).length;
+                : option.key === 'groups'
+                  ? groups.length
+                  : sessions.filter(s => option.match(rowState(s))).length;
               return (
                 <button
                   key={option.key}
@@ -275,7 +282,7 @@ export default function Conversations() {
             </button>
           );
         })}
-        {filter === 'all' && groups.map((group) => (
+        {showGroups && groups.map((group) => (
           <button key={`group-${group.id}`} type="button" onClick={() => setParams({ group: String(group.id) })} className={cn('conversation-list-item', group.id === selectedGroupId && 'is-active')}>
             <Avatar className="size-9"><AvatarFallback><UsersRound className="size-4" /></AvatarFallback></Avatar>
             <span className="min-w-0">
@@ -287,7 +294,7 @@ export default function Conversations() {
             </span>
           </button>
         ))}
-        {!visibleSessions.length && filter !== 'all' && (
+        {!visibleSessions.length && !(showGroups && groups.length) && filter !== 'all' && (
           <p className="conversation-list-empty">{t('conversations.filter.empty')}</p>
         )}
         </>}
