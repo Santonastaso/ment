@@ -97,7 +97,7 @@ export default function Groups() {
 
   return (
     <PageShell title={t('groups.pageTitle')} description={t('groups.pageDescription')}>
-      <Surface className="group-create-card rounded-none border-x-0 border-t-0 bg-transparent">
+      <Surface className="group-create-card overflow-visible rounded-none border-x-0 border-t-0 bg-transparent">
         <SurfaceHeader className="px-0 pt-0 sm:px-0" title={t('groups.create.title')} description={t('groups.create.description')} />
         <SurfaceBody className="grid gap-3 px-0 pt-4 sm:grid-cols-[minmax(180px,260px)_1fr_auto] sm:items-end sm:px-0">
           {error && <p className="sm:col-span-3 text-sm text-rose-600" role="alert">{error}</p>}
@@ -129,7 +129,7 @@ export default function Groups() {
         </SurfaceBody>
       </Surface>
 
-      <Surface className="group-list-card rounded-none border-x-0 border-b-0 bg-transparent">
+      <Surface className="group-list-card overflow-visible rounded-none border-x-0 border-b-0 bg-transparent">
         <SurfaceHeader className="px-0 sm:px-0" title={t('groups.list.title')} />
         <SurfaceBody className="px-0 pt-4 sm:px-0">
           {loading ? (

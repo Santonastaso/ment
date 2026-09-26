@@ -622,7 +622,7 @@ export default function Profile() {
       )}
 
       {isOwnProfile && tab === 'skills' && (
-        <Surface className="bg-transparent">
+        <Surface className="overflow-visible bg-transparent">
           <SurfaceHeader className="px-0 pt-1 sm:px-0" title={t('profile.manageSkills.title')} description={t('profile.manageSkills.desc')} />
           <SurfaceBody className="grid gap-8 px-0 pt-4 sm:px-0 lg:grid-cols-2 lg:gap-10">
           <div className="min-w-0">
@@ -649,7 +649,7 @@ export default function Profile() {
       )}
 
       {isOwnProfile && tab === 'availability' && (
-        <Surface className="bg-transparent">
+        <Surface className="overflow-visible bg-transparent">
           <SurfaceHeader
             className="px-0 pt-1 sm:px-0"
             title={t('profile.availability.title')}
@@ -709,35 +709,50 @@ export default function Profile() {
 
         {isOwnProfile && showAddCareer && (
           <div className="mb-5 space-y-3 pb-3">
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              <label className="grid gap-1 text-xs font-medium text-muted-foreground">{t('profile.career.roleTitle')}<input className="input text-sm text-foreground" value={newCareer.role} onChange={e => setNewCareer(c => ({...c, role: e.target.value}))} /></label>
-              <label className="grid gap-1 text-xs font-medium text-muted-foreground">{t('profile.career.department')}<select className="input text-sm text-foreground" value={newCareer.department} onChange={e => setNewCareer(c => ({...c, department: e.target.value}))}>
-                <option value="">{t('profile.career.department')}</option>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              <Field
+                label={t('profile.career.roleTitle')}
+                value={newCareer.role}
+                onChange={e => setNewCareer(c => ({ ...c, role: e.target.value }))}
+              />
+              <Field
+                label={t('profile.career.department')}
+                as="select"
+                value={newCareer.department}
+                onChange={e => setNewCareer(c => ({ ...c, department: e.target.value }))}
+              >
+                <option value="">—</option>
                 {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
-              </select></label>
-              <label className="grid gap-1 text-xs font-medium text-muted-foreground">{t('profile.career.company')}<input className="input text-sm text-foreground" value={newCareer.company} onChange={e => setNewCareer(c => ({...c, company: e.target.value}))} /></label>
-              <div>
-                <label className="block text-[10px] text-ink-tertiary mb-1">{t('profile.career.from')}</label>
+              </Field>
+              <Field
+                label={t('profile.career.company')}
+                value={newCareer.company}
+                onChange={e => setNewCareer(c => ({ ...c, company: e.target.value }))}
+              />
+              <div className="career-period">
+                <span className="career-period-label">{t('profile.career.from')}</span>
                 <MonthYearPicker
                   value={newCareer.start_date}
-                  onChange={(v) => setNewCareer(c => ({...c, start_date: v}))}
+                  onChange={(v) => setNewCareer(c => ({ ...c, start_date: v }))}
                 />
               </div>
-              <div>
-                <label className="block text-[10px] text-ink-tertiary mb-1">{t('profile.career.to')} <span className="text-ink-tertiary/70">{t('profile.career.toHint')}</span></label>
+              <div className="career-period sm:col-span-2 lg:col-span-1">
+                <span className="career-period-label">
+                  {t('profile.career.to')} <em>{t('profile.career.toHint')}</em>
+                </span>
                 <MonthYearPicker
                   value={newCareer.end_date}
-                  onChange={(v) => setNewCareer(c => ({...c, end_date: v}))}
+                  onChange={(v) => setNewCareer(c => ({ ...c, end_date: v }))}
                 />
               </div>
             </div>
-            <label className="grid gap-1 text-xs font-medium text-muted-foreground">{t('profile.career.description')}<textarea
-              className="input text-sm resize-none"
-              rows={2}
+            <Field
+              label={t('profile.career.description')}
+              as="textarea"
               placeholder={t('profile.career.descPlaceholder')}
               value={newCareer.description}
-              onChange={e => setNewCareer(c => ({...c, description: e.target.value}))}
-            /></label>
+              onChange={e => setNewCareer(c => ({ ...c, description: e.target.value }))}
+            />
             <Button size="sm" onClick={handleAddCareer}>{t('profile.career.add')}</Button>
           </div>
         )}
