@@ -9,11 +9,12 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import api from '../api/index.js';
 import { useT } from '../i18n/index.jsx';
+import { languageOptions } from '../lib/languages.js';
 
 const PAGE_SIZE = 12;
 
 export default function Explorer() {
-  const { t } = useT();
+  const { t, lang } = useT();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // URL state supports direct links and browser navigation.
@@ -122,7 +123,9 @@ export default function Explorer() {
                   </select>
                   <select className="input w-full" value={language} onChange={e => setParam('language', e.target.value)} aria-label={t('explorer.filterLanguage')}>
                     <option value="">{t('explorer.allLanguages')}</option>
-                    {(facets.languages || []).map(l => <option key={l} value={l}>{l.toUpperCase()}</option>)}
+                    {languageOptions(facets.languages, lang).map(option => (
+                      <option key={option.code} value={option.code}>{option.label}</option>
+                    ))}
                   </select>
                 </div>
                 <div>

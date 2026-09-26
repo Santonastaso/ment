@@ -4,6 +4,7 @@ import { Share2, RefreshCw, Building2, Languages, GraduationCap, Info } from 'lu
 import api from '../api/index.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useT } from '../i18n/index.jsx';
+import { languageName } from '../lib/languages.js';
 import { PageShell } from '../components/PageShell.jsx';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -35,12 +36,6 @@ const EDGE_COLORS = {
 // Person->person edges backed by actual interactions (0026).
 const REAL_LINK_TYPES = new Set(['session', 'connection']);
 
-const LANG_LABELS = { en: 'English', it: 'Italiano', fr: 'Français', de: 'Deutsch', es: 'Español', pt: 'Português' };
-
-function langLabel(code) {
-  return LANG_LABELS[code] || (code ? code.toUpperCase() : code);
-}
-
 function deptColor(dept) {
   if (DEPT_COLORS[dept]) return DEPT_COLORS[dept];
   // Stable fallback hue for unknown departments.
@@ -51,7 +46,7 @@ function deptColor(dept) {
 
 export default function KnowledgeGraph() {
   const { user } = useAuth();
-  const { t: translate } = useT();
+  const { t: translate, lang } = useT();
   const t = useCallback((key, vars) => pmTranslate(translate, key, vars), [translate]);
   const isPlatform = user?.admin_scope === 'platform';
 
@@ -308,7 +303,7 @@ export default function KnowledgeGraph() {
           >
             <option value="">{t('graph.filter.allLanguages')}</option>
             {languages.map((l) => (
-              <option key={l} value={l}>{langLabel(l)}</option>
+              <option key={l} value={l}>{languageName(l, lang)}</option>
             ))}
           </select>
         </div>
