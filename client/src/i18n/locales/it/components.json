@@ -309,6 +309,7 @@
   "components.meeting.outcomeReferral": "Referral effettuato",
   "components.meeting.outcomeMentorship": "Mentorship confermata",
   "components.skillLandscape.showLess": "Mostra meno",
+
   "components.skillCloud.filterLabel": "Filtra le competenze",
   "components.skillCloud.cloudLabel": "Nuvola di competenze",
   "components.skillCloud.filterAll": "Tutte",

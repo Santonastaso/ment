@@ -5,6 +5,7 @@
   "components.match.requestSession": "Request a session",
   "components.match.removeFromSuggestions": "Remove from suggestions",
   "components.match.dismiss": "Dismiss",
+
   "components.session.status.pending": "Awaiting acceptance",
   "components.session.status.scheduled": "Scheduled",
   "components.session.status.completed": "Completed",
@@ -40,6 +41,7 @@
   "components.popup.done": "Done",
   "components.session.viewProfile": "View profile",
   "components.session.discardReflection": "Discard reflection",
+
   "components.sessionRequest.errorFocusQuestion": "Please enter your focus question.",
   "components.sessionRequest.errorGeneric": "Something went wrong. Please try again.",
   "components.sessionRequest.title": "Request a session",
@@ -71,6 +73,7 @@
   "components.sessionRequest.reviewNoTime": "I will suggest a time later",
   "components.sessionRequest.reviewNotice": "Nothing is sent until you confirm below.",
   "components.sessionRequest.confirm": "Confirm and send",
+
   "components.reflection.promptSupportNeeded": "What did you feel you needed support on this week?",
   "components.reflection.promptManagedWell": "What did you feel you managed well this week?",
   "components.reflection.errorAnswerOne": "Please answer at least one of the two questions.",
@@ -123,8 +126,10 @@
   "components.reflection.demo.label": "Suggested skills",
   "components.reflection.demo.notice": "Suggestions are editable before they affect your profile.",
   "components.reflection.demo.suggestions": "Suggested skills",
+
   "components.pastMeetings.loading": "Loading past meetings…",
   "components.pastMeetings.empty": "No completed meetings yet. Once you finish a session and mark it complete, it'll show up here.",
+
   "components.meeting.statusAwaitingYours": "Awaiting your acceptance",
   "components.meeting.statusAwaitingTheirs": "Awaiting their acceptance",
   "components.meeting.statusConfirmedNoDate": "Confirmed — date to be set",
@@ -194,6 +199,7 @@
   "components.matchReason.rating_excellent": "Your past sessions with {dept} colleagues have been consistently excellent — strong extra weight.",
   "components.matchReason.rating_positive": "Your past ratings of {dept} sessions skew positive — extra weight added.",
   "components.matchReason.past_dept_positive": "Past mentoring with {dept} colleagues has gone well — extra weight added.",
+
   "components.acceptance.titleOne": "Your session was accepted",
   "components.acceptance.titleMany": "Your sessions were accepted",
   "components.acceptance.close": "Close",
@@ -211,6 +217,7 @@
   "components.acceptance.errorDate": "Could not save the date. Try again.",
   "components.acceptance.saving": "Saving…",
   "components.acceptance.gotIt": "Got it",
+
   "components.help.categoryGeneral": "General comment",
   "components.help.categoryBug": "Bug or broken thing",
   "components.help.categoryIdea": "Idea or suggestion",
@@ -229,10 +236,12 @@
   "components.help.sending": "Sending…",
   "components.help.sendAnother": "Send another",
   "components.help.send": "Send message",
+
   "components.skillTag.placeholder": "Type a skill and press Enter",
   "components.skillTag.remove": "Remove {skill}",
   "components.skillTag.ariaAdd": "Add skill",
   "components.skillTag.add": "Add",
+
   "components.teachSkills.placeholder": "e.g. system design, financial modeling…",
   "components.teachSkills.addAnother": "Add another skill — Enter to confirm",
   "components.teachSkills.examplePlaceholder": "e.g. Led SEO audit, +18% organic signups",
@@ -244,6 +253,7 @@
   "components.teachSkills.giveExample": "Add an example",
   "components.teachSkills.exampleInstruction": "Use a concrete result or project. Maximum 80 characters.",
   "components.teachSkills.legacyExample": "Example",
+
   "components.skillLandscape.tierUntapped": "Untapped",
   "components.skillLandscape.tierActive": "Active",
   "components.skillLandscape.tierTrusted": "Trusted",
@@ -279,6 +289,7 @@
   "components.skillLandscape.showLess": "Show less",
   "components.skillLandscape.removeSkill": "Remove {skill}",
   "components.skillLandscape.removeThis": "Remove this skill",
+
   "components.rating.hint1": "Not useful",
   "components.rating.hint2": "Below expectations",
   "components.rating.hint3": "Useful",
@@ -286,14 +297,18 @@
   "components.rating.hint5": "Exceptional",
   "components.rating.aria": "Session rating",
   "components.rating.tapToRate": "Tap a star to rate (optional, private to you)",
+
   "components.ics.downloading": "Downloading…",
   "components.ics.addToCalendar": "Add to calendar",
+
   "components.suggested.heuristic": "Heuristic",
+
   "components.affinity.strong": "Strong match",
   "components.affinity.promising": "Promising match",
   "components.affinity.worth": "Worth a look",
   "components.affinity.aria": "Affinity: {dots} of 5 — {label}",
   "components.affinity.title": "Affinity score: {score}/100",
+
   "components.monthYear.month01": "Jan",
   "components.monthYear.month02": "Feb",
   "components.monthYear.month03": "Mar",
@@ -308,7 +323,9 @@
   "components.monthYear.month12": "Dec",
   "components.monthYear.monthLabel": "Month",
   "components.monthYear.yearLabel": "Year",
+
   "components.esco.searching": "Searching ESCO…",
+
   "components.skillCloud.filterLabel": "Filter skills",
   "components.skillCloud.cloudLabel": "Skill cloud",
   "components.skillCloud.filterAll": "All",
@@ -317,7 +334,7 @@
   "components.skillCloud.legendSize": "Larger = discussed more often",
   "components.skillCloud.kindStrength": "Strength",
   "components.skillCloud.kindGrowing": "Gap",
-  "components.skillCloud.noneYet": "No conversations yet — this fills in after your first one.",
+  "components.skillCloud.noneYet": "No conversations yet \u2014 this fills in after your first one.",
   "components.skillCloud.conversationsOne": "{count} conversation",
   "components.skillCloud.conversationsMany": "{count} conversations",
   "components.skillCloud.cameUpWith": "Came up with"
