@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, ArrowUp, Check, Clock3, Pencil, RefreshCw, Search, Send, ThumbsDown, ThumbsUp } from 'lucide-react';
 import api from '../../api/index.js';
@@ -367,16 +367,31 @@ export default function DiscoveryFlow() {
   const isConversation = stage !== 'ask';
   // The opening question names the thread, so the header says which search you are in.
   const threadTitle = turns.find(turn => turn.role === 'user')?.content || submittedQuery || copy.placeholder;
+
+  // The draft is persisted as a turn so a reload can restore it, but the
+  // reach-out panel below already renders it in an editable field — leaving it
+  // in the transcript too prints the same letter twice. Drop it here, and
+  // collapse any bubble that exactly repeats the one before it.
+  const renderedTurns = useMemo(() => {
+    const out = [];
+    for (const turn of turns) {
+      if (turn.role === 'assistant' && turn.kind === 'draft') continue;
+      const previous = out[out.length - 1];
+      if (previous && previous.role === turn.role && previous.content === turn.content) continue;
+      out.push(turn);
+    }
+    return out;
+  }, [turns]);
   return <section className={`discovery-flow ${isConversation ? 'is-conversation' : ''}`} aria-label="Ment discovery"><div className="discovery-thread">
     {stage === 'ask' && <div className="discovery-ask-block"><h1>{text(copy, 'greeting', { name: firstName })}</h1>{composer()}{history.length > 0 && <details className="discovery-history"><summary aria-label={copy.recentSearches} title={copy.recentSearches}><Clock3 aria-hidden="true" /></summary><div>{history.map(item => { const title = [...(item.turns || [])].reverse().find(turn => turn?.role === 'user')?.content || item.title || ''; return <div className="discovery-history-row" key={item.id}><button type="button" onClick={() => resumeSearch(item.id)}>{title}</button><button type="button" aria-label={copy.deleteSearch} onClick={() => deleteSearch(item.id)}>×</button></div>; })}</div>{historyError && <p role="alert">{historyError}</p>}</details>}{connections.length > 0 && <div className="discovery-connections"><div className="discovery-connection-people"><span className="discovery-connections-label">{copy.snapshot}</span><span className="discovery-avatars">{connections.slice(0, 3).map((session, index) => { const peer = session.mentor_id === user?.id ? session.mentee : session.mentor; return <span key={session.id} className="discovery-avatar" style={{ backgroundColor: avatarTints[index % avatarTints.length] }}>{initials(peer?.name)}</span>; })}</span></div><div className="discovery-connection-counts"><span>{copy.upcoming} <strong>{connections.filter(session => session.status === 'scheduled').length}</strong></span><span>{copy.pending} <strong>{connections.filter(session => session.status === 'pending').length}</strong></span><span>{copy.completed} <strong>{connections.filter(session => session.status === 'completed').length}</strong></span></div><Link to="/conversations" className="discovery-connections-link">{copy.viewAll}</Link></div>}{error && <p className="discovery-error" role="alert">{error}</p>}</div>}
-    {isConversation && <div className="discovery-conversation"><div className="discovery-conversation-toolbar"><span className="discovery-thread-title"><strong>{threadTitle}</strong></span><button type="button" onClick={reset} disabled={sending}><Pencil />{copy.newChat}</button></div><div className="discovery-header-fade" aria-hidden="true" /><div className="discovery-chat-transcript">{turns.map((turn, index) => {
+    {isConversation && <div className="discovery-conversation"><div className="discovery-conversation-toolbar"><span className="discovery-thread-title"><strong>{threadTitle}</strong></span><button type="button" onClick={reset} disabled={sending}><Pencil />{copy.newChat}</button></div><div className="discovery-header-fade" aria-hidden="true" /><div className="discovery-chat-transcript">{renderedTurns.map((turn, index) => {
       if (turn.role === 'user') return <div className="discovery-chat-turn is-user" key={`${turn.at || index}-${index}`}><div className="discovery-user-bubble">{turn.content}</div></div>;
       if (turn.role !== 'assistant') return null;
       const response = turn.kind === 'matches' && turn.content === 'matches_ready'
         ? `${copy.chooseLead} ${copy.chooseBold}`
         : turn.content;
       // One agent mark per run of assistant turns.
-      const continues = turns[index - 1]?.role === 'assistant';
+      const continues = renderedTurns[index - 1]?.role === 'assistant';
       return <div className={`discovery-chat-turn is-assistant ${turn.kind === 'error' ? 'is-error' : ''}`} key={`${turn.at || index}-${index}`}>{continues ? <span className="discovery-agent-mark-spacer" aria-hidden="true" /> : <span className="discovery-agent-mark" aria-label="Ment">M</span>}<p className="discovery-assistant-bubble">{renderInline(response)}</p></div>;
     })}</div>
     {stage === 'matching' && <div className="discovery-chat-turn is-assistant is-working"><span className="discovery-agent-mark" aria-label="Ment">M</span><p className="discovery-assistant-bubble">{copy.finding}<span className="discovery-ellipsis">...</span></p></div>}

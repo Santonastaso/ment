@@ -26,9 +26,19 @@ function capitalize(value) {
 }
 
 // Options for a language <select>, sorted by what the reader actually sees.
+// The column is free text, so the same language can arrive as 'en', 'EN' and
+// ' en ' and would otherwise list three times over. Fold those together on the
+// normalised code — which is still the value the filter queries with, so
+// nothing is lost. Genuinely different codes that happen to render the same
+// label are left alone: merging them would silently drop one from the filter.
 export function languageOptions(codes, locale = 'en') {
-  return (codes || [])
-    .filter(Boolean)
+  const seen = new Map();
+  for (const code of codes || []) {
+    if (!code) continue;
+    const key = String(code).trim().toLowerCase();
+    if (key && !seen.has(key)) seen.set(key, code);
+  }
+  return [...seen.values()]
     .map(code => ({ code, label: languageName(code, locale) }))
     .sort((a, b) => a.label.localeCompare(b.label, locale));
 }
