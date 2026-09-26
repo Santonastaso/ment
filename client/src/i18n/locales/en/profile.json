@@ -125,5 +125,7 @@
   "profile.fields.classOf": "Class of {year}",
   "profile.persona.student": "Student",
   "profile.persona.alumnus": "Alumnus",
-  "profile.toast.skillSaveError": "Could not save your skills. Please try again."
+  "profile.toast.skillSaveError": "Could not save your skills. Please try again.",
+  "profile.fields.department": "Department",
+  "profile.fields.setBySchool": "Set by your school"
 }

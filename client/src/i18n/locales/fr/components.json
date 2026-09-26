@@ -309,17 +309,16 @@
   "components.meeting.outcomeReferral": "Mise en relation effectuée",
   "components.meeting.outcomeMentorship": "Mentorat confirmé",
   "components.skillLandscape.showLess": "Afficher moins",
-
-  "components.skillCloud.filterLabel": "Filtrer les comp\u00e9tences",
-  "components.skillCloud.cloudLabel": "Nuage de comp\u00e9tences",
+  "components.skillCloud.filterLabel": "Filtrer les compétences",
+  "components.skillCloud.cloudLabel": "Nuage de compétences",
   "components.skillCloud.filterAll": "Toutes",
   "components.skillCloud.filterStrengths": "Forces",
-  "components.skillCloud.filterGrowing": "En d\u00e9veloppement",
-  "components.skillCloud.legendSize": "Plus grand = abord\u00e9 plus souvent",
+  "components.skillCloud.filterGrowing": "Lacunes",
+  "components.skillCloud.legendSize": "Plus grand = abordé plus souvent",
   "components.skillCloud.kindStrength": "Force",
-  "components.skillCloud.kindGrowing": "En d\u00e9veloppement",
-  "components.skillCloud.noneYet": "Aucune conversation pour le moment \u2014 cela se remplira apr\u00e8s la premi\u00e8re.",
+  "components.skillCloud.kindGrowing": "Lacune",
+  "components.skillCloud.noneYet": "Aucune conversation pour le moment — cela se remplira après la première.",
   "components.skillCloud.conversationsOne": "{count} conversation",
   "components.skillCloud.conversationsMany": "{count} conversations",
-  "components.skillCloud.cameUpWith": "Abord\u00e9 avec"
+  "components.skillCloud.cameUpWith": "Abordé avec"
 }

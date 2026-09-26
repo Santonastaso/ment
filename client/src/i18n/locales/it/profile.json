@@ -125,5 +125,7 @@
   "profile.reflection.continueHelp": "La risposta è privata e contribuisce solo ai dati aggregati sul programma.",
   "profile.reflection.continue.yes": "Sì",
   "profile.reflection.continue.unsure": "Non sono sicuro/a",
-  "profile.reflection.continue.no": "No"
+  "profile.reflection.continue.no": "No",
+  "profile.fields.department": "Dipartimento",
+  "profile.fields.setBySchool": "Definito dalla scuola"
 }

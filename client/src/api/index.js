@@ -1151,7 +1151,8 @@ async function put(url, body = {}) {
       'department', 'seniority', 'bio',
       'tenure_years', 'location',
       // School fields — program + "class of" year.
-      'program', 'cohort_year', 'linkedin_url', 'linkedin_headline',
+      // `program` is assigned by the school and deliberately not writable here.
+      'cohort_year', 'linkedin_url', 'linkedin_headline',
       'reflection_email_reminders',
       // Personal availability — drives whether the user shows up as a
       // mentor candidate.

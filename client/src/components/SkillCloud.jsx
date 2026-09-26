@@ -1,5 +1,4 @@
 import React, { useMemo, useState } from 'react';
-import { Button } from './ui/button.jsx';
 import { useT } from '../i18n/index.jsx';
 
 // Overview's skill landscape, drawn as a word cloud: type size carries the
@@ -132,55 +131,52 @@ export default function SkillCloud({ skillProgress = [], isOwnProfile, onDeleteS
         </div>
       </div>
 
+      {/* Detail sits on the same row shape the rest of the app uses: the skill
+          and its actions on the top line, the evidence beneath it. */}
       {selected && (
         <div className="skill-cloud-detail" aria-live="polite">
-          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-            <h3 className="text-[15px] font-medium text-foreground">{selected.skill}</h3>
-            <span className="label-meta">
-              {selected.type === 'can_teach'
-                ? t('components.skillCloud.kindStrength')
-                : t('components.skillCloud.kindGrowing')}
+          <article className="person-row">
+            <span className="person-row-identity" style={{ gridColumn: '1 / 3' }}>
+              <span className="person-row-name">{selected.skill}</span>
+              <span className="person-row-role">
+                {[
+                  selected.type === 'can_teach'
+                    ? t('components.skillCloud.kindStrength')
+                    : t('components.skillCloud.kindGrowing'),
+                  countLabel(selected.session_count),
+                ].join(' · ')}
+              </span>
             </span>
-          </div>
-          <p className="text-[13px] text-muted-foreground">{countLabel(selected.session_count)}</p>
 
-          {selected.example_project && (
-            <div>
-              <p className="label-meta">{t('components.skillLandscape.exampleLabel')}</p>
-              <p className="mt-0.5 whitespace-pre-wrap text-sm text-foreground">{selected.example_project}</p>
-            </div>
-          )}
+            {isOwnProfile && onDeleteSkill && (
+              <span className="person-row-actions">
+                <button
+                  type="button"
+                  className="person-row-link text-destructive hover:text-destructive"
+                  onClick={() => { onDeleteSkill(selected); setSelectedKey(null); }}
+                >
+                  {t('components.skillLandscape.removeThis')}
+                </button>
+              </span>
+            )}
 
-          {selected.evidence?.length > 0 && (
-            <div>
-              <p className="label-meta">{t('components.skillCloud.cameUpWith')}</p>
-              <ul className="mt-1 space-y-0.5">
+            {selected.example_project && (
+              <p className="person-row-detail">{selected.example_project}</p>
+            )}
+
+            {selected.evidence?.length > 0 && (
+              <span className="person-row-meta">
                 {selected.evidence.map(item => (
-                  <li
-                    key={`${item.session_id}-${item.person_id}`}
-                    className="flex items-center justify-between gap-3 text-[13px]"
-                  >
-                    <span>{item.person_name}</span>
-                    <time className="text-xs tabular-nums text-muted-foreground">
+                  <span key={`${item.session_id}-${item.person_id}`} className="person-row-chip">
+                    {item.person_name}
+                    <time className="ml-1.5 tabular-nums opacity-60">
                       {new Date(item.occurred_at).toLocaleDateString()}
                     </time>
-                  </li>
+                  </span>
                 ))}
-              </ul>
-            </div>
-          )}
-
-          {isOwnProfile && onDeleteSkill && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="-ml-2 mt-1 self-start text-destructive hover:text-destructive"
-              onClick={() => { onDeleteSkill(selected); setSelectedKey(null); }}
-            >
-              {t('components.skillLandscape.removeSkill', { skill: selected.skill })}
-            </Button>
-          )}
+              </span>
+            )}
+          </article>
         </div>
       )}
     </div>

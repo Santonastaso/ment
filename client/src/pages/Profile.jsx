@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import SkillTagInput from '../components/SkillTagInput.jsx';
 import TeachSkillsEditor from '../components/TeachSkillsEditor.jsx';
 import SkillCloud from '../components/SkillCloud.jsx';
+import { Field } from '../components/ui/field.jsx';
 import SessionRequestModal from '../components/SessionRequestModal.jsx';
 
 import PastMeetings from '../components/PastMeetings.jsx';
@@ -462,19 +463,7 @@ export default function Profile() {
               <div className="min-w-0 flex-1">
                 <h1 className="text-[22px] font-medium tracking-[-0.02em]">{profile.name}</h1>
                 <div className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-                  {editing ? (
-                    <>
-                      <input className="input w-48 text-sm" placeholder={t('profile.placeholder.role')} value={form.current_role} onChange={e => setForm(f => ({ ...f, current_role: e.target.value }))} />
-                      <select className="input w-40 text-sm" value={form.department} onChange={e => setForm(f => ({ ...f, department: e.target.value }))}>
-                        {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
-                      </select>
-                      <input className="input w-44 text-sm" placeholder={t('profile.fields.program')} value={form.program} onChange={e => setForm(f => ({ ...f, program: e.target.value }))} />
-                      <input className="input w-28 text-sm" type="number" min="1900" max="2100" placeholder={t('profile.fields.cohortYear')} value={form.cohort_year} onChange={e => setForm(f => ({ ...f, cohort_year: e.target.value }))} />
-                      <input className="input w-40 text-sm" placeholder={t('profile.placeholder.location')} value={form.location} onChange={e => setForm(f => ({ ...f, location: e.target.value }))} />
-                      <input className="input w-56 text-sm" type="url" placeholder={t('profile.fields.linkedin')} value={form.linkedin_url} onChange={e => setForm(f => ({ ...f, linkedin_url: e.target.value }))} />
-                      <input className="input w-56 text-sm" placeholder={t('profile.fields.linkedinHeadline')} value={form.linkedin_headline} onChange={e => setForm(f => ({ ...f, linkedin_headline: e.target.value }))} />
-                    </>
-                  ) : (
+                  {editing ? null : (
                     <>
                       {profile.role && <span>{t(`profile.persona.${profile.role}`, profile.role)}</span>}
                       <span aria-hidden="true">·</span><span>{profile.department}</span>
@@ -523,13 +512,66 @@ export default function Profile() {
             </p>
           )}
           {editing ? (
-            <textarea className="input resize-none text-sm" rows={2} value={form.bio} onChange={e => setForm(f => ({ ...f, bio: e.target.value }))} placeholder={t('profile.placeholder.bio')} />
+            <div className="mt-1 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+              <Field
+                label={t('profile.placeholder.role')}
+                value={form.current_role}
+                onChange={e => setForm(f => ({ ...f, current_role: e.target.value }))}
+              />
+              <Field
+                label={t('profile.fields.department')}
+                as="select"
+                value={form.department}
+                onChange={e => setForm(f => ({ ...f, department: e.target.value }))}
+              >
+                {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+              </Field>
+              {/* Program is assigned by the school, so it is shown but not offered. */}
+              <Field
+                label={t('profile.fields.program')}
+                value={form.program}
+                readOnly
+                hint={t('profile.fields.setBySchool')}
+              />
+              <Field
+                label={t('profile.fields.cohortYear')}
+                type="number"
+                min="1900"
+                max="2100"
+                value={form.cohort_year}
+                onChange={e => setForm(f => ({ ...f, cohort_year: e.target.value }))}
+              />
+              <Field
+                label={t('profile.placeholder.location')}
+                value={form.location}
+                onChange={e => setForm(f => ({ ...f, location: e.target.value }))}
+              />
+              <Field
+                label={t('profile.fields.linkedin')}
+                type="url"
+                value={form.linkedin_url}
+                onChange={e => setForm(f => ({ ...f, linkedin_url: e.target.value }))}
+              />
+              <Field
+                label={t('profile.fields.linkedinHeadline')}
+                value={form.linkedin_headline}
+                onChange={e => setForm(f => ({ ...f, linkedin_headline: e.target.value }))}
+                className="sm:col-span-2 lg:col-span-1"
+              />
+              <Field
+                label={t('profile.placeholder.bio')}
+                as="textarea"
+                value={form.bio}
+                onChange={e => setForm(f => ({ ...f, bio: e.target.value }))}
+                className="sm:col-span-2 lg:col-span-3"
+              />
+            </div>
           ) : <div className="space-y-1">{headlineSummary && <p className="text-sm text-muted-foreground">{headlineSummary}</p>}{profile.bio && <p className="text-sm text-muted-foreground">{profile.bio}</p>}</div>}
         </SurfaceBody>
       </Surface>
 
       <div className="flex flex-col gap-4">
-      <PageSection title={skillTitle} description={skillDescription} className="min-w-0">
+      <PageSection title={skillTitle} description={skillDescription} className="min-w-0 gap-2">
           <SkillCloud
             skillProgress={profile.skillProgress || profile.skills || []}
             isOwnProfile={isOwnProfile}

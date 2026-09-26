@@ -114,6 +114,25 @@
   }
 }
 
+/* Floating-label field: the label starts as placeholder text inside the
+   control and rises to a caption once the field is filled or focused. */
+.floating-field { position: relative; display: block; min-width: 0; border: 1px solid transparent; border-radius: 14px; background: var(--control-surface); transition: border-color .15s ease, background .15s ease; }
+.floating-field:focus-within { border-color: var(--primary); background: var(--card); }
+.floating-field > label { position: absolute; left: 14px; top: 50%; color: var(--muted-foreground); font-size: 14px; transform: translateY(-50%); transition: top .15s ease, font-size .15s ease, transform .15s ease; pointer-events: none; }
+.floating-field.is-filled > label, .floating-field:focus-within > label { top: 7px; font-size: 10.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; transform: none; }
+.floating-field.is-textarea > label { top: 12px; transform: none; }
+.floating-field input, .floating-field select, .floating-field textarea { width: 100%; border: 0; outline: 0; background: transparent; padding: 22px 14px 7px; color: var(--foreground); font: inherit; font-size: 14px; }
+.floating-field.is-select select { appearance: none; padding-right: 34px; }
+.floating-field.is-select::after { content: ''; position: absolute; top: 50%; right: 15px; width: 7px; height: 7px; border-right: 1.5px solid var(--muted-foreground); border-bottom: 1.5px solid var(--muted-foreground); transform: translateY(-70%) rotate(45deg); pointer-events: none; }
+.floating-field textarea { min-height: 88px; resize: vertical; }
+/* Read-only fields are shown, not offered: no focus ring, no pointer. */
+.floating-field.is-readonly { background: var(--surface); }
+.floating-field.is-readonly:focus-within { border-color: transparent; background: var(--surface); }
+.floating-field.is-readonly input, .floating-field.is-readonly select, .floating-field.is-readonly textarea { color: var(--muted-foreground); cursor: default; }
+.floating-field.is-readonly.is-select::after { opacity: .35; }
+.floating-field-hint { position: absolute; right: 14px; bottom: 7px; color: var(--muted-foreground); font-size: 10px; pointer-events: none; }
+.floating-field.is-readonly.is-select .floating-field-hint { right: 34px; }
+
 /* Skill cloud — Overview's glanceable landscape. Type size is the ranking:
    the biggest word is the skill that has come up most in conversations. */
 /* Same chip idiom as the Profile tab row above it: bare pills on the page,
@@ -157,11 +176,11 @@
 .skill-cloud-swatch { width: 22px; height: 3px; border-radius: 999px; background: var(--primary); }
 .skill-cloud-swatch.is-growing { height: 0; border-bottom: 2px dotted rgba(169, 80, 53, .34); background: transparent; }
 
-.skill-cloud-detail {
-  display: grid; gap: 7px; margin-top: 12px;
-  border: 1px solid var(--border-subtle); border-radius: 14px;
-  background: var(--card); padding: 13px 15px;
-}
+/* The detail hosts a .person-row, so it only supplies the frame. */
+.skill-cloud-detail { margin-top: 10px; border: 1px solid var(--border-subtle); border-radius: 14px; background: var(--card); padding: 2px 4px; }
+.skill-cloud-detail .person-row { border-bottom: 0; }
+.skill-cloud-detail .person-row:hover { background: transparent; }
+.skill-cloud-detail .person-row-identity { min-height: 0; }
 
 @keyframes bubbleIn {
   from { opacity: 0; transform: translateY(4px); }
