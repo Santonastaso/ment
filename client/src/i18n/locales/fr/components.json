@@ -46,6 +46,7 @@
   "components.sessionRequest.subtitle": "with {name} · {department}",
   "components.sessionRequest.step1Label": "What would you like to focus on?",
   "components.sessionRequest.step1Help": "Pick one or more topics from {name}'s strengths. You can also skip this and just describe it in the next step.",
+  "components.sessionRequest.availabilityNotice": "La disponibilité et les limites sont revérifiées lors de l'envoi.",
   "components.sessionRequest.step1NoSkills": "{name} hasn't listed any strengths yet — skip ahead and describe what you want to discuss.",
   "components.sessionRequest.step1SelectedOne": "{count} topic selected.",
   "components.sessionRequest.step1SelectedMany": "{count} topics selected.",

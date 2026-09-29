@@ -563,12 +563,19 @@ export default function Profile() {
         action={isOwnProfile ? <SkillCloudFilters value={skillFilter} onChange={setSkillFilter} /> : null}
         className="min-w-0 gap-3"
       >
-          <SkillCloud
-            skillProgress={profile.skillProgress || profile.skills || []}
-            isOwnProfile={isOwnProfile}
-            filter={skillFilter}
-            onDeleteSkill={isOwnProfile ? handleDeleteSkillFromBubble : undefined}
-          />
+          {isOwnProfile && !(profile.skillProgress || profile.skills || []).some(skill => skill.session_count > 0) ? (
+            <div className="rounded-[var(--panel-radius)] bg-[var(--surface)] p-5">
+              <p className="text-sm text-muted-foreground">{t('profile.skillLandscape.firstDay')}</p>
+              <Button size="sm" variant="outline" className="mt-3" onClick={() => setTab('skills')}>{t('profile.skillLandscape.addSkills')}</Button>
+            </div>
+          ) : (
+            <SkillCloud
+              skillProgress={profile.skillProgress || profile.skills || []}
+              isOwnProfile={isOwnProfile}
+              filter={skillFilter}
+              onDeleteSkill={isOwnProfile ? handleDeleteSkillFromBubble : undefined}
+            />
+          )}
 
         {/* Expertise signature */}
         {profile.expertiseSignature?.length > 0 && (

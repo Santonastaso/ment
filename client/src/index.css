@@ -414,7 +414,7 @@ a.person-row-name:hover { color: var(--primary); text-decoration: underline; }
 .conversation-request-banner { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 .conversation-request-banner p { margin: 3px 0 0; color: var(--muted-foreground); font-size: 12.5px; }
 .conversation-request-banner > div:last-child, .conversation-meeting-actions { display: flex; align-items: center; gap: 7px; }
-.conversation-waiting { width: fit-content; margin: 6px auto 2px; border-radius: 999px; background: var(--control-surface); color: var(--muted-foreground); padding: 7px 12px; font-size: 12px; }
+.conversation-waiting { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px 12px; width: fit-content; max-width: calc(100% - 24px); margin: 6px auto 2px; border-radius: var(--panel-radius); background: var(--control-surface); color: var(--muted-foreground); padding: 8px 12px; font-size: 12px; }
 .conversation-meeting { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; align-items: center; gap: 10px; }
 .conversation-meeting > svg { width: 18px; color: var(--muted-foreground); }
 .conversation-meeting > div > strong, .conversation-meeting > div > span { display: block; }

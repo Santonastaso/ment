@@ -46,6 +46,7 @@
   "components.sessionRequest.subtitle": "con {name} · {department}",
   "components.sessionRequest.step1Label": "Su cosa vorresti concentrarti?",
   "components.sessionRequest.step1Help": "Scegli uno o più argomenti tra le aree di competenza di {name}. Puoi anche saltare questo passaggio e descriverlo in quello successivo.",
+  "components.sessionRequest.availabilityNotice": "Disponibilità e limiti vengono ricontrollati prima dell'invio.",
   "components.sessionRequest.step1NoSkills": "{name} non ha ancora indicato competenze da insegnare — vai avanti e descrivi ciò di cui vuoi parlare.",
   "components.sessionRequest.step1SelectedOne": "{count} argomento selezionato.",
   "components.sessionRequest.step1SelectedMany": "{count} argomenti selezionati.",

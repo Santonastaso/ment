@@ -129,6 +129,7 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
           {/* STEP 1 — Topics */}
           {step === 1 && (
             <div>
+              <p className="mb-3 text-xs text-muted-foreground">{t('components.sessionRequest.availabilityNotice')}</p>
               <label className="label mb-1">
                 {t('components.sessionRequest.step1Label')}
               </label>

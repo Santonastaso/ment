@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { hasGroundedExpertise } from '../supabase/functions/_shared/discovery-guards.mjs';
+
+const candidate = { job_title: 'Brand Director', department: 'Marketing', skills: ['Content strategy'] };
+
+test('rejects adjacent roles even when the evidence exists on the profile', () => {
+  assert.equal(hasGroundedExpertise(candidate, {
+    matched_expertise: ['Marketing'],
+    reasons: ['No direct consulting expertise, but adjacent executive roles may include it.'],
+  }), false);
+});
+
+test('rejects invented evidence', () => {
+  assert.equal(hasGroundedExpertise(candidate, { matched_expertise: ['Management consulting'], reasons: ['Direct work'] }), false);
+});
+
+test('keeps directly evidenced candidates', () => {
+  assert.equal(hasGroundedExpertise(candidate, { matched_expertise: ['Content strategy'], reasons: ['Lists content strategy'] }), true);
+});

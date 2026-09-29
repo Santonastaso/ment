@@ -20,14 +20,19 @@ function otherPerson(session, viewerId) {
   return session.mentor_id === viewerId ? session.mentee : session.mentor;
 }
 
-function statusLabel(status, t) {
-  return t(`conversations.status.${status}`, status);
+function isExpired(session) {
+  return !!session.expired_at || (session.status === 'pending' && !!session.request_expires_at && new Date(session.request_expires_at) <= new Date());
+}
+
+function statusLabel(session, t) {
+  return isExpired(session) ? t('conversations.status.expired') : t(`conversations.status.${session.status}`, session.status);
 }
 
 // A meeting is a state of a conversation, not a separate object, so the list
 // carries it. `needs` is what the viewer can act on right now — that is the
 // whole of an alumnus's job here, and the sidebar badge counts it.
 function rowState(session) {
+  if (isExpired(session)) return 'closed';
   if (session.status === 'pending') return session.isMentor ? 'needs' : 'waiting';
   if (session.status === 'scheduled') {
     if (!session.scheduled_at) return 'needs';
@@ -47,7 +52,7 @@ function stateLabel(session, state, t) {
   }
   if (state === 'waiting') return t('conversations.state.awaitingReply');
   if (state === 'scheduled') return formatMessageTime(session.scheduled_at);
-  return statusLabel(session.status, t);
+  return statusLabel(session, t);
 }
 
 // `match` selects sessions; `groups` says whether group threads belong in the
@@ -265,6 +270,11 @@ export default function Conversations() {
     await loadSessions();
   }
 
+  async function withdrawRequest() {
+    try { await mutateSession({ status: 'cancelled' }); }
+    catch (requestError) { setError(requestError.response?.data?.error || t('conversations.error')); }
+  }
+
   async function sendMessage(event) {
     event.preventDefault();
     const body = draft.trim();
@@ -385,13 +395,17 @@ export default function Conversations() {
               <Link to={`/profile/${person?.id}`}>{t('conversations.profile')}</Link>
             </header>}
 
-            {selected?.status === 'pending' && selected.isMentor && (
+            {selected?.status === 'pending' && !isExpired(selected) && selected.isMentor && (
               <div className="conversation-request-banner">
                 <div><strong>{t('conversations.requestTitle')}</strong><p>{selected.pre_session_question}</p></div>
                 <div><Button size="sm" onClick={() => mutateSession({ status: 'scheduled' })}><Check />{t('conversations.accept')}</Button><Button size="sm" variant="outline" onClick={() => mutateSession({ status: 'declined' })}>{t('conversations.decline')}</Button></div>
               </div>
             )}
-            {selected?.status === 'pending' && selected.isMentee && <div className="conversation-waiting">{t('conversations.waiting', { name: person?.name?.split(' ')[0] })}</div>}
+            {selected?.status === 'pending' && !isExpired(selected) && selected.isMentee && <div className="conversation-waiting">
+              <span>{t('conversations.waiting', { name: person?.name?.split(' ')[0] })}</span>
+              {selected.request_expires_at && <span>{t('conversations.expires', { date: formatMessageTime(selected.request_expires_at) })}</span>}
+              <Button type="button" size="sm" variant="ghost" onClick={withdrawRequest}>{t('conversations.withdraw')}</Button>
+            </div>}
 
             {selected?.status === 'scheduled' && (
               <div className="conversation-meeting">
@@ -418,7 +432,7 @@ export default function Conversations() {
             )}
 
             <div className="conversation-messages" ref={messagesRef}>
-              <div className="conversation-context">{selected ? <><span>{statusLabel(selected.status, t)}</span><h2>{selected.title}</h2>{selected.topics?.length > 0 && <p>{selected.topics.join(' · ')}</p>}</> : <><span>{t('nav.groups')}</span><h2>{selectedGroup.name}</h2></>}</div>
+              <div className="conversation-context">{selected ? <><span>{statusLabel(selected, t)}</span><h2>{selected.title}</h2>{selected.topics?.length > 0 && <p>{selected.topics.join(' · ')}</p>}</> : <><span>{t('nav.groups')}</span><h2>{selectedGroup.name}</h2></>}</div>
               {hasOlder && <button type="button" className="conversation-load-older" disabled={loadingOlder} onClick={loadOlderMessages}>{t('conversations.loadOlder')}</button>}
               {messages.map((message) => message.kind === 'system' || message.kind === 'schedule' ? (
                 <div className="conversation-system" key={message.id}>{message.body}</div>
