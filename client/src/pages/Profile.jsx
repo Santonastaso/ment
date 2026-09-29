@@ -9,7 +9,7 @@ import SessionRequestModal from '../components/SessionRequestModal.jsx';
 
 import MonthYearPicker from '../components/MonthYearPicker.jsx';
 import ProfileReflection from '../components/ProfileReflection.jsx';
-import { PageSection, PageShell } from '../components/PageShell.jsx';
+import { PageShell } from '../components/PageShell.jsx';
 import { Surface, SurfaceBody, SurfaceHeader } from '../components/Surface.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -414,7 +414,7 @@ export default function Profile() {
     : t('profile.skillLandscape.titleOther', { name: firstName });
 
   return (
-    <PageShell className="profile-page gap-5">
+    <PageShell className="profile-page gap-8">
       {/* Toast */}
       {toast && (
         <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-lg border border-primary bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground">
@@ -557,12 +557,13 @@ export default function Profile() {
         </SurfaceBody>
       </Surface>
 
-      <div className="flex flex-col gap-4">
-      <PageSection
-        title={skillTitle}
-        action={isOwnProfile ? <SkillCloudFilters value={skillFilter} onChange={setSkillFilter} /> : null}
-        className="min-w-0 gap-3"
-      >
+      <div className="flex flex-col gap-12">
+      <Surface className="overflow-visible">
+        <SurfaceHeader
+          title={skillTitle}
+          action={isOwnProfile ? <SkillCloudFilters value={skillFilter} onChange={setSkillFilter} /> : null}
+        />
+        <SurfaceBody className="min-w-0 pt-3">
           {isOwnProfile && !(profile.skillProgress || profile.skills || []).some(skill => skill.session_count > 0) ? (
             <div className="rounded-[var(--panel-radius)] bg-[var(--surface)] p-5">
               <p className="text-sm text-muted-foreground">{t('profile.skillLandscape.firstDay')}</p>
@@ -588,7 +589,8 @@ export default function Profile() {
             </div>
           </div>
         )}
-      </PageSection>
+        </SurfaceBody>
+      </Surface>
 
       {isOwnProfile && (
         <Surface className="bg-[var(--surface)] px-1">

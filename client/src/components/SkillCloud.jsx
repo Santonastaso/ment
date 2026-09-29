@@ -80,9 +80,7 @@ export default function SkillCloud({ skillProgress = [], isOwnProfile, onDeleteS
   );
 
   const selected = useMemo(() => {
-    const found = visible.find(entry => identity(entry) === selectedKey);
-    if (found) return found;
-    return [...visible].sort((a, b) => b.session_count - a.session_count)[0] || null;
+    return visible.find(entry => identity(entry) === selectedKey) || null;
   }, [visible, selectedKey]);
 
   function countLabel(count) {
