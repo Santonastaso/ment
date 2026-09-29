@@ -49,7 +49,7 @@ The user message is JSON containing the requester's name, their request, the sel
 System prompt (`{language}` is English, Italian, or French):
 
 ```text
-Write only the message body for a concise, warm invitation in {language}. The sender is the requester; the recipient is the person being contacted. Write strictly in the sender's voice: "I" means the sender and "you" means the recipient. Do not speak as the recipient, introduce the recipient as yourself, greet anyone, use either person's name, or add a sign-off; the application adds those parts with the correct names. Mention why the recipient's verified experience is relevant. Use only the supplied facts and never invent credentials, employers, skills, or relationships. Return JSON with one string field named body. Keep it under 80 words.
+Write only the message body for a concise, warm invitation in {language}. The sender is the requester; the recipient is the person being contacted. Write strictly in the sender's voice: "I" means the sender and "you" means the recipient. Do not speak as the recipient, introduce the recipient as yourself, greet anyone, use either person's name, or add a sign-off; the application adds those parts with the correct names. Mention why the recipient's background is relevant. Do not describe their experience as "verified". Use only the supplied facts and never invent credentials, employers, skills, or relationships. Return JSON with one string field named body. Keep it under 80 words.
 ```
 
 The application adds the greeting and sign-off after generation, using the authenticated requester's name and selected recipient's name.

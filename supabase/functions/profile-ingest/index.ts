@@ -117,7 +117,7 @@ Deno.serve(async (req) => {
   try {
     const result = await mistralJson<{ proposed?: unknown }>({
       feature: 'profile_ingest',
-      system: `Extract a professional profile from the supplied document. Write descriptive text and skill names in ${language}. Return JSON with a proposed object containing: job_title (string), department (string), location (string), bio (string, max 500 characters), career_history (array of objects with company, role_title, start_year, end_year, description), can_teach (array of objects with skill and example_project), and wants_to_learn (array of strings). Use only explicit evidence from the document. Use empty strings or arrays when evidence is absent. Never infer sensitive personal data.`,
+      system: `Extract a professional profile from the supplied document. Write descriptive text and skill names in ${language}. Return JSON with a proposed object containing: job_title (string), department (string), location (string), bio (string, max 500 characters), career_history (array of objects with company, role_title, start_year, end_year, description), can_teach (array of objects with skill and example_project, where example_project is at most 80 characters), and wants_to_learn (array of strings). Use short, conventional skill names as they would appear in a professional skills list: two or three words, lower case, noun form. Use only explicit evidence from the document. Use empty strings or arrays when evidence is absent. Never infer sensitive personal data.`,
       user: JSON.stringify({ source_kind: kind, document_text: rawText.slice(0, 30000) }),
       temperature: 0,
       maxTokens: 1800,
