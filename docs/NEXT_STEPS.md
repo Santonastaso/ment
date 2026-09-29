@@ -161,6 +161,47 @@ error the client can only report as a generic failure.
 
 ---
 
+## 3.5 Deferred on purpose: stricter discovery match prompt
+
+Three prompt changes shipped on 29 Sep: drop "verified" from the draft wording,
+and give the reflection and profile-ingest prompts a fixed skill-naming form.
+
+A fourth was written, reviewed and **deliberately not applied**. It would have
+tightened the `discovery_match` prompt so a candidate whose reason acknowledges
+missing, indirect or adjacent evidence returns `no_match`, and replaced "return
+at most three matches" with "one strong match is a better answer than three weak
+ones".
+
+**Held back because the platform is in UI/UX testing and testers need to see
+matches.** With 125 members the stricter rule would return empty results
+noticeably more often — correct, but it reads as a broken product to someone
+evaluating the interface.
+
+The two edits, for whenever it is picked up:
+
+- after "False positives are worse than returning no match." add: *"If your
+  reason for a candidate would need to acknowledge missing, indirect or adjacent
+  evidence, the correct outcome for that candidate is no_match."*
+- in the closing paragraph, require `matched_expertise` to be *"the specific
+  evidence that satisfies the request, not merely a field copied from the
+  profile"*, and replace the three-match allowance as above.
+
+### Note: the code-side equivalent already shipped
+
+`_shared/discovery-guards.mjs` now rejects any candidate whose reason matches a
+weak-evidence pattern ("no direct", "adjacent", "may include", and the Italian
+and French equivalents). That is the same intent as the held-back prompt change,
+enforced in code rather than wording, and it is live.
+
+So **matching is already stricter than it was during earlier UX testing**, and
+the decision to hold the prompt back does not by itself keep results flowing. If
+testers start seeing empty results, that guard — not the prompt — is the thing to
+look at first. It is also the correct fix: the previous `hasGroundedExpertise`
+only checked that the expertise string existed somewhere on the candidate, and a
+candidate's own job title always does, so every candidate passed it.
+
+---
+
 ## 4. Suggested order
 
 1. **Notifications, end to end.** Producers for the session lifecycle, then key,

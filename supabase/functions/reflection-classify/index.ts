@@ -47,7 +47,9 @@ Deno.serve(async (req) => {
   try {
     const classified = await mistralJson<{ extracted_gaps?: string[]; extracted_strengths?: string[] }>({
       feature: 'reflection',
-      system: `Classify a private professional reflection into concise skill names written in ${language}. Return JSON with extracted_gaps and extracted_strengths arrays. Use at most five items per array. Use only evidence in the reflection, do not diagnose or infer sensitive traits.`,
+      system: `Classify a private professional reflection into concise skill names written in ${language}. Return JSON with extracted_gaps and extracted_strengths arrays. Use at most five items per array. Use only evidence in the reflection, do not diagnose or infer sensitive traits.
+
+Use short, conventional skill names as they would appear in a professional skills list: two or three words, lower case, noun form ("financial modelling", not "modelling financial statements"). Prefer a widely used name over a precise description.`,
       user: JSON.stringify({ support_needed: log.support_needed || '', managed_well: log.managed_well || '' }),
       temperature: 0,
       maxTokens: 350,
