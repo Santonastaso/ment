@@ -5,9 +5,10 @@ import { formatMessageTime } from '../lib/utils.js';
 import { PageShell } from '../components/PageShell.jsx';
 import { Surface, SurfaceBody, SurfaceHeader } from '../components/Surface.jsx';
 import { Button } from '@/components/ui/button';
-import { Send, Users } from 'lucide-react';
+import { Plus, Send, Users } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { supabase } from '../lib/supabase.js';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog.jsx';
 
 export default function Groups() {
   const { user } = useAuth();
@@ -21,6 +22,7 @@ export default function Groups() {
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
+  const [createOpen, setCreateOpen] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -73,7 +75,7 @@ export default function Groups() {
       setName('');
       setDescription('');
       await load();
-      if (group.joined && selectedGroup?.id === group.id) setSelectedGroup(null);
+      setCreateOpen(false);
     } catch (e) {
       setError(e?.response?.data?.error || t('groups.error.save'));
     } finally {
@@ -96,39 +98,7 @@ export default function Groups() {
   }
 
   return (
-    <PageShell title={t('groups.pageTitle')} description={t('groups.pageDescription')}>
-      <Surface className="group-create-card overflow-visible rounded-none border-x-0 border-t-0 bg-transparent">
-        <SurfaceHeader className="px-0 pt-0 sm:px-0" title={t('groups.create.title')} description={t('groups.create.description')} />
-        <SurfaceBody className="grid gap-3 px-0 pt-4 sm:grid-cols-[minmax(180px,260px)_1fr_auto] sm:items-end sm:px-0">
-          {error && <p className="sm:col-span-3 text-sm text-rose-600" role="alert">{error}</p>}
-          <div>
-            <label className="label" htmlFor="group-name">{t('groups.create.name')}</label>
-            <input
-              id="group-name"
-              className="input text-sm"
-              maxLength={80}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={t('groups.create.namePlaceholder')}
-            />
-          </div>
-          <div>
-            <label className="label" htmlFor="group-description">{t('groups.create.descriptionLabel')}</label>
-            <input
-              id="group-description"
-              className="input text-sm"
-              maxLength={160}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder={t('groups.create.descriptionPlaceholder')}
-            />
-          </div>
-          <Button type="button" onClick={createGroup} disabled={saving || !name.trim()}>
-            {saving ? t('groups.saving') : t('groups.create.submit')}
-          </Button>
-        </SurfaceBody>
-      </Surface>
-
+    <PageShell title={t('groups.pageTitle')} description={t('groups.pageDescription')} action={<Button type="button" size="icon" className="size-12 rounded-xl" aria-label={t('groups.create.title')} title={t('groups.create.title')} onClick={() => { setError(''); setCreateOpen(true); }}><Plus className="size-6" /></Button>}>
       <Surface className="group-list-card overflow-visible rounded-none border-x-0 border-b-0 bg-transparent">
         <SurfaceHeader className="px-0 sm:px-0" title={t('groups.list.title')} />
         <SurfaceBody className="px-0 pt-4 sm:px-0">
@@ -201,6 +171,28 @@ export default function Groups() {
           </form>
         </SurfaceBody>
       </Surface>}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('groups.create.title')}</DialogTitle>
+            <DialogDescription>{t('groups.create.description')}</DialogDescription>
+          </DialogHeader>
+          <form className="grid gap-3" onSubmit={(event) => { event.preventDefault(); createGroup(); }}>
+            <div>
+              <label className="label" htmlFor="group-name">{t('groups.create.name')}</label>
+              <input id="group-name" autoFocus className="input text-sm" maxLength={80} value={name} onChange={(event) => setName(event.target.value)} placeholder={t('groups.create.namePlaceholder')} />
+            </div>
+            <div>
+              <label className="label" htmlFor="group-description">{t('groups.create.descriptionLabel')}</label>
+              <input id="group-description" className="input text-sm" maxLength={160} value={description} onChange={(event) => setDescription(event.target.value)} placeholder={t('groups.create.descriptionPlaceholder')} />
+            </div>
+            {error && <p className="text-sm text-rose-600" role="alert">{error}</p>}
+            <div className="flex justify-end">
+              <Button type="submit" disabled={saving || !name.trim()}>{saving ? t('groups.saving') : t('groups.create.submit')}</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </PageShell>
   );
 }
