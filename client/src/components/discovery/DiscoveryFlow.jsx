@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, ArrowUp, Check, Clock3, Pencil, RefreshCw, Search, Send, ThumbsDown, ThumbsUp } from 'lucide-react';
 import api from '../../api/index.js';
@@ -159,8 +159,16 @@ export default function DiscoveryFlow() {
   const [deleteTargetId, setDeleteTargetId] = useState(null);
   const [matchFeedback, setMatchFeedback] = useState(null);
   const threadEndRef = useRef(null);
+  const composerInputRef = useRef(null);
   const idempotencyKey = useRef(null);
   const flowVersion = useRef(0);
+
+  useLayoutEffect(() => {
+    const input = composerInputRef.current;
+    if (!input) return;
+    input.style.height = 'auto';
+    input.style.height = `${Math.min(input.scrollHeight, 120)}px`;
+  }, [query, stage]);
 
   async function refreshHistory() {
     const { data } = await api.get('/discovery/threads?limit=8');
@@ -365,7 +373,7 @@ export default function DiscoveryFlow() {
   }
 
   function composer() {
-    return <form className="discovery-composer" onSubmit={submit}><textarea value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} maxLength={2000} rows={1} placeholder={copy.placeholder} aria-label={copy.placeholder} disabled={stage === 'matching' || sending} /><button className="discovery-send" type="submit" disabled={!query.trim() || stage === 'matching'} aria-label="Send message"><ArrowUp /></button></form>;
+    return <form className="discovery-composer" onSubmit={submit}><textarea ref={composerInputRef} value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} maxLength={2000} rows={1} placeholder={copy.placeholder} aria-label={copy.placeholder} disabled={stage === 'matching' || sending} /><button className="discovery-send" type="submit" disabled={!query.trim() || stage === 'matching'} aria-label="Send message"><ArrowUp /></button></form>;
   }
 
   const firstName = user?.name?.split(' ')[0] || '';
