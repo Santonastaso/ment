@@ -13,11 +13,11 @@ import { Button } from './ui/button.jsx';
 //   - an "Add to calendar" ICS button once a time is set
 // "Got it" persists the acknowledgement via acknowledge_session RPC so the
 // modal does not reappear on subsequent logins.
-function formatScheduled(iso) {
+function formatScheduled(iso, lang) {
   if (!iso) return null;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleString(undefined, {
+  return d.toLocaleString(lang, {
     weekday: 'short',
     year: 'numeric',
     month: 'short',
@@ -35,7 +35,7 @@ function minDateTimeLocal() {
 }
 
 export default function AcceptanceModal({ sessions, onAcknowledged, onClose }) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const [busy, setBusy] = useState(false);
   const [editingDateFor, setEditingDateFor] = useState(null);
   const [draftDate, setDraftDate] = useState('');
@@ -144,7 +144,7 @@ export default function AcceptanceModal({ sessions, onAcknowledged, onClose }) {
 
         <div className="p-6 space-y-4 overflow-y-auto">
           {localSessions.map((session) => {
-            const scheduled = formatScheduled(session.scheduled_at);
+            const scheduled = formatScheduled(session.scheduled_at, lang);
             const isEditing = editingDateFor === session.id;
             return (
               <div

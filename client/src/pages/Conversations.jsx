@@ -178,6 +178,20 @@ export default function Conversations() {
   }, []);
 
   useEffect(() => {
+    const refreshSessions = () => loadSessions().catch((requestError) => {
+      setError(requestError.response?.data?.error || t('conversations.error'));
+    });
+    const channel = supabase.channel('conversation-session-list')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions' }, refreshSessions)
+      .subscribe();
+    window.addEventListener('focus', refreshSessions);
+    return () => {
+      window.removeEventListener('focus', refreshSessions);
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  useEffect(() => {
     if (selectedGroupId) {
       let cancelled = false;
       setMessages([]);

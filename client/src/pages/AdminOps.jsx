@@ -7,6 +7,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { formatAdminDate } from '../components/admin/adminPm.js';
 
 function downloadTextFile(text, filename, type = 'text/csv') {
   const url = URL.createObjectURL(new Blob([text], { type }));
@@ -27,19 +28,8 @@ function shortId(value) {
   return value ? `${String(value).slice(0, 8)}…` : '—';
 }
 
-function formatDate(value) {
-  if (!value) return '—';
-  return new Date(value).toLocaleString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
 export default function AdminOps() {
-  const { t } = useT();
+  const { t, lang } = useT();
   const [ownerStats, setOwnerStats] = useState(null);
   const [ownerLoading, setOwnerLoading] = useState(false);
   const [orgNameDraft, setOrgNameDraft] = useState('');
@@ -276,7 +266,7 @@ export default function AdminOps() {
                 <tbody>
                   {accessRequests.map(request => (
                     <tr key={request.id} className="border-b border-[var(--border-subtle)] align-top">
-                      <td className="py-2 pr-4 whitespace-nowrap text-muted-foreground">{formatDate(request.createdAt)}</td>
+                      <td className="py-2 pr-4 whitespace-nowrap text-muted-foreground">{formatAdminDate(request.createdAt, '—', lang)}</td>
                       <td className="py-2 pr-4">
                         <p className="font-medium">{request.name}</p>
                         <p className="text-xs text-muted-foreground">{request.email}</p>

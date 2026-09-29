@@ -18,7 +18,7 @@ import { Button } from './ui/button.jsx';
 // In the expanded view: full topics list, the original focus question, and
 // (for past meetings) the mentee's private reflection where applicable.
 export default function MeetingRow({ session, currentUserId, mode = 'past', onUpdate }) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const [expanded, setExpanded] = useState(false);
   const [editingReflection, setEditingReflection] = useState(false);
   const [reflectionDraft, setReflectionDraft] = useState('');
@@ -62,8 +62,8 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
   }
   const hasDate = !!session.scheduled_at;
   const date = hasDate ? new Date(session.scheduled_at) : null;
-  const dateLabel = hasDate ? date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : null;
-  const timeLabel = hasDate ? date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '';
+  const dateLabel = hasDate ? date.toLocaleDateString(lang, { year: 'numeric', month: 'short', day: 'numeric' }) : null;
+  const timeLabel = hasDate ? date.toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' }) : '';
   const relative = hasDate
     ? (mode === 'upcoming' ? upcomingRelative(date, t) : pastRelative(date, t))
     : null;

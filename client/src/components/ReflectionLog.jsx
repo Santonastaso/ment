@@ -23,7 +23,7 @@ export default function ReflectionLog({
   hideHistory = false,
   showManualAdd = false,
 }) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const [entries, setEntries] = useState([]);
   const [latestEntryId, setLatestEntryId] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -166,7 +166,7 @@ export default function ReflectionLog({
         ? t('components.reflection.timeAgoWeekAgo', { count: weeks })
         : t('components.reflection.timeAgoWeeksAgo', { count: weeks });
     }
-    return normalized.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    return normalized.toLocaleDateString(lang, { year: 'numeric', month: 'short', day: 'numeric' });
   }
 
   return (

@@ -59,7 +59,7 @@ export function SkillCloudFilters({ value, onChange }) {
 }
 
 export default function SkillCloud({ skillProgress = [], isOwnProfile, onDeleteSkill, filter = 'all' }) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const [selectedKey, setSelectedKey] = useState(null);
 
   const entries = useMemo(
@@ -174,7 +174,7 @@ export default function SkillCloud({ skillProgress = [], isOwnProfile, onDeleteS
                   <span key={`${item.session_id}-${item.person_id}`} className="person-row-chip">
                     {item.person_name}
                     <time className="ml-1.5 tabular-nums opacity-60">
-                      {new Date(item.occurred_at).toLocaleDateString()}
+                      {new Date(item.occurred_at).toLocaleDateString(lang)}
                     </time>
                   </span>
                 ))}

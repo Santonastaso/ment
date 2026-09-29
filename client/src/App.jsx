@@ -35,6 +35,17 @@ function LoadingScreen() {
   );
 }
 
+function authGatePath(user) {
+  if (user?.must_change_password) return '/change-password';
+  if (user && !user.onboarding_complete && !user.is_admin) return '/onboarding';
+  return null;
+}
+
+function homePath(user) {
+  if (user.is_admin) return '/admin';
+  return user.role === 'alumnus' ? '/conversations' : '/';
+}
+
 // `/login` lives outside the protected tree. Once the user signs in we need an
 // explicit guard to push them to wherever the protected tree would have sent
 // them — change-password / onboarding / home / admin — instead of leaving them
@@ -43,13 +54,12 @@ function LoginRoute() {
   const { user, loading } = useAuth();
   if (loading) return <LoadingScreen />;
   if (user) {
-    if (user.must_change_password) return <Navigate to="/change-password" replace />;
-    if (!user.onboarding_complete && !user.is_admin) return <Navigate to="/onboarding" replace />;
-    if (user.is_admin) return <Navigate to="/admin" replace />;
+    const gate = authGatePath(user);
+    if (gate) return <Navigate to={gate} replace />;
     // Students arrive to find someone, so they land in the discovery chat.
     // Alumni never search — they respond — so they land in Messages. This is
     // the landing route only; both keep the same sidebar and can reach either.
-    return <Navigate to={user.role === 'alumnus' ? '/conversations' : '/'} replace />;
+    return <Navigate to={homePath(user)} replace />;
   }
   return page(<Login />);
 }
@@ -58,8 +68,8 @@ function ProtectedRoute() {
   const { user, loading } = useAuth();
   if (loading) return <LoadingScreen />;
   if (!user) return <Navigate to="/welcome" replace />;
-  if (user.must_change_password) return <Navigate to="/change-password" replace />;
-  if (!user.onboarding_complete && !user.is_admin) return <Navigate to="/onboarding" replace />;
+  const gate = authGatePath(user);
+  if (gate) return <Navigate to={gate} replace />;
   return page(<AppLayout />);
 }
 
@@ -67,11 +77,7 @@ function ChangePasswordRoute() {
   const { user, loading } = useAuth();
   if (loading) return <LoadingScreen />;
   if (!user) return <Navigate to="/login" replace />;
-  if (!user.must_change_password) {
-    if (user.is_admin) return <Navigate to="/admin" replace />;
-    if (!user.onboarding_complete) return <Navigate to="/onboarding" replace />;
-    return <Navigate to="/" replace />;
-  }
+  if (!user.must_change_password) return <Navigate to={homePath(user)} replace />;
   return page(<ForcePasswordChange />);
 }
 
@@ -79,8 +85,8 @@ function OnboardingRoute() {
   const { user, loading } = useAuth();
   if (loading) return <LoadingScreen />;
   if (!user) return <Navigate to="/login" replace />;
-  if (user.must_change_password) return <Navigate to="/change-password" replace />;
-  if (user.onboarding_complete) return <Navigate to="/" replace />;
+  if (user.must_change_password) return <Navigate to={authGatePath(user)} replace />;
+  if (user.onboarding_complete || user.is_admin) return <Navigate to={homePath(user)} replace />;
   return page(
     <div className="min-h-screen bg-background">
       <main className="mx-auto max-w-2xl px-4 py-10">

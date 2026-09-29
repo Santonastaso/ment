@@ -8,7 +8,7 @@
   "conversations.requestTitle": "Nuova richiesta di mentoring",
   "conversations.accept": "Accetta",
   "conversations.decline": "Rifiuta",
-  "conversations.waiting": "In attesa della risposta di {{name}}",
+  "conversations.waiting": "In attesa della risposta di {name}",
   "conversations.pickTime": "Scegli un orario",
   "conversations.meetingSubline": "Un link per la chiamata e l'invito calendario",
   "conversations.schedule": "Pianifica",

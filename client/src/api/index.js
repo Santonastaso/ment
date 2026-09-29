@@ -6,6 +6,7 @@
 
 import { supabase } from '../lib/supabase.js';
 import { browserLanguage } from '../lib/esco.js';
+import { getLang } from '../i18n/index.jsx';
 import { firstPersonize } from '../lib/utils.js';
 
 class ApiError extends Error {
@@ -678,7 +679,7 @@ async function post(url, body = {}, opts = {}) {
     const { data, error } = await supabase.functions.invoke('discovery-assistant', {
       body: {
         ...body,
-        lang: body.lang || browserLanguage(),
+        lang: body.lang || getLang(),
         action: url.endsWith('/draft') ? 'draft' : 'chat',
       },
     });

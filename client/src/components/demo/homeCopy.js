@@ -12,6 +12,7 @@ const en = {
   draft: 'Review and edit your message', recipient: 'Recipient', message: 'Your message', hello: 'Hello',
   ongoingDraft: 'I would like to explore ongoing support, if that works for you.', oneOffDraft: 'Would you be available for a one-off conversation?',
   proposedTime: 'Proposed time', flexibleDraft: 'We can agree on a time together.', emptyDraft: 'Enter the message you want to send.', close: 'Close', available: 'Available to request', unavailable: 'Currently unavailable',
+  preparing: 'Preparing…', aiUnavailable: 'Message drafting is not configured yet. Ask an administrator to connect Mistral.',
 };
 const it = {
   badge: 'Ricerca guidata', title: 'Chi potrebbe aiutarti a fare un passo avanti?', intro: 'Racconta su cosa stai lavorando e ti proporremo persone rilevanti nella community Ment.',
@@ -26,19 +27,21 @@ const it = {
   draft: 'Rivedi e modifica il messaggio', recipient: 'Destinatario', message: 'Il tuo messaggio', hello: 'Ciao',
   ongoingDraft: 'Vorrei valutare un supporto continuativo, se per te va bene.', oneOffDraft: 'Ti andrebbe una conversazione singola?',
   proposedTime: 'Orario proposto', flexibleDraft: 'Possiamo concordare insieme un orario.', emptyDraft: 'Inserisci il messaggio da inviare.', close: 'Chiudi', available: 'Disponibile per una richiesta', unavailable: 'Al momento non disponibile',
+  preparing: 'Preparazione…', aiUnavailable: 'La generazione del messaggio non è configurata. Chiedi a un amministratore di collegare Mistral.',
 };
 const fr = {
-  badge: 'Recherche guidee', title: 'Qui pourrait vous aider a avancer ?', intro: 'Expliquez votre besoin et nous vous proposerons des personnes pertinentes dans la communaute Ment.',
-  browse: 'Parcourir le repertoire', newSearch: 'Nouvelle recherche', archive: 'Archiver', continue: 'Continuer la conversation', recent: 'Vos conversations', relationships: 'Poursuivre une relation',
-  placeholder: 'Par exemple : preparer un entretien pour un stage', send: 'Envoyer', busy: 'Chargement...',
-  clarify: 'Cherchez-vous un stage, une reconversion, une aide technique ou un mentor parmi les alumni ? Precisez le sujet ou la competence.',
-  results: 'Ces suggestions combinent votre demande et le classement des profils Ment. La disponibilite et les limites seront verifiees lors de l envoi.',
-  empty: 'Aucun profil disponible ne correspond a ce sujet. Essayez une autre competence ou parcourez le repertoire.',
-  error: 'Impossible de charger le repertoire. Votre message est conserve : reessayez.', saveError: 'Conversation non enregistree. Reessayez avant de quitter cette page.', retry: 'Reessayer',
-  loadError: 'Impossible de charger les conversations enregistrees.', saved: 'Conversation enregistree', request: 'Relire la demande', evidence: 'Details du profil', you: 'Vous',
-  oneOff: 'Conversation ponctuelle', ongoing: 'Accompagnement regulier', intent: 'Quel type de soutien ?', resume: 'Ouvrir la rencontre existante', selected: 'Personne choisie',
+  badge: 'Recherche guidée', title: 'Qui pourrait vous aider à avancer ?', intro: 'Expliquez votre besoin et nous vous proposerons des personnes pertinentes dans la communauté Ment.',
+  browse: 'Parcourir le répertoire', newSearch: 'Nouvelle recherche', archive: 'Archiver', continue: 'Continuer la conversation', recent: 'Vos conversations', relationships: 'Poursuivre une relation',
+  placeholder: 'Par exemple : préparer un entretien pour un stage', send: 'Envoyer', busy: 'Chargement…',
+  clarify: 'Cherchez-vous un stage, une reconversion, une aide technique ou un mentor parmi les alumni ? Précisez le sujet ou la compétence.',
+  results: 'Ces suggestions combinent votre demande et le classement des profils Ment. La disponibilité et les limites seront vérifiées lors de l’envoi.',
+  empty: 'Aucun profil disponible ne correspond à ce sujet. Essayez une autre compétence ou parcourez le répertoire.',
+  error: 'Impossible de charger le répertoire. Votre message est conservé : réessayez.', saveError: 'Conversation non enregistrée. Réessayez avant de quitter cette page.', retry: 'Réessayer',
+  loadError: 'Impossible de charger les conversations enregistrées.', saved: 'Conversation enregistrée', request: 'Relire la demande', evidence: 'Détails du profil', you: 'Vous',
+  oneOff: 'Conversation ponctuelle', ongoing: 'Accompagnement régulier', intent: 'Quel type de soutien ?', resume: 'Ouvrir la rencontre existante', selected: 'Personne choisie',
   draft: 'Relisez et modifiez votre message', recipient: 'Destinataire', message: 'Votre message', hello: 'Bonjour',
-  ongoingDraft: 'Je souhaiterais envisager un accompagnement regulier, si cela vous convient.', oneOffDraft: 'Seriez-vous disponible pour une conversation ponctuelle ?',
-  proposedTime: 'Horaire propose', flexibleDraft: 'Nous pouvons convenir ensemble d un horaire.', emptyDraft: 'Saisissez le message a envoyer.', close: 'Fermer', available: 'Disponible pour une demande', unavailable: 'Indisponible actuellement',
+  ongoingDraft: 'Je souhaiterais envisager un accompagnement régulier, si cela vous convient.', oneOffDraft: 'Seriez-vous disponible pour une conversation ponctuelle ?',
+  proposedTime: 'Horaire proposé', flexibleDraft: 'Nous pouvons convenir ensemble d’un horaire.', emptyDraft: 'Saisissez le message à envoyer.', close: 'Fermer', available: 'Disponible pour une demande', unavailable: 'Indisponible actuellement',
+  preparing: 'Préparation…', aiUnavailable: 'La rédaction des messages n’est pas configurée. Demandez à un administrateur de connecter Mistral.',
 };
 export const homeCopy = lang => ({ en, it, fr }[lang] || en);

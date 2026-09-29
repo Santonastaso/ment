@@ -44,8 +44,8 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
         setDraft(data.draft || '');
       } catch (requestError) {
         setError(requestError.response?.data?.error === 'ai_not_configured'
-          ? 'Message drafting is not configured yet. Ask an administrator to connect Mistral.'
-          : (requestError.response?.data?.error || t('components.sessionRequest.errorGeneric')));
+          ? copy.aiUnavailable
+          : t('components.sessionRequest.errorGeneric'));
         return;
       } finally {
         setGeneratingDraft(false);
@@ -103,7 +103,7 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
       const response = await api.post('/sessions', submittedPayload.current);
       onSuccess?.(response.data);
     } catch (e) {
-      setError(e.response?.data?.error || t('components.sessionRequest.errorGeneric'));
+      setError(t('components.sessionRequest.errorGeneric'));
       if (e.response?.status >= 400 && e.response?.status < 500) submittedPayload.current = null;
       submitLock.current = false;
     } finally {
@@ -231,12 +231,12 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
               <p>{intent === 'ongoing' ? copy.ongoing : copy.oneOff}</p>
               <div><span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('components.sessionRequest.reviewQuestion')}</span><p className="mt-1 text-foreground">{question}</p></div>
               {selectedTopics.length > 0 && <div><span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('components.sessionRequest.reviewTopics')}</span><p className="mt-1 text-foreground">{selectedTopics.join(', ')}</p></div>}
-              <div><span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('components.sessionRequest.reviewWhen')}</span><p className="mt-1 text-foreground">{scheduledAt ? new Date(scheduledAt).toLocaleString() : t('components.sessionRequest.reviewNoTime')}</p></div>
+              <div><span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('components.sessionRequest.reviewWhen')}</span><p className="mt-1 text-foreground">{scheduledAt ? new Date(scheduledAt).toLocaleString(lang) : t('components.sessionRequest.reviewNoTime')}</p></div>
               <p className="text-xs text-muted-foreground">{t('components.sessionRequest.reviewNotice')}</p>
             </div>
           )}
 
-          {error && <div role="alert" className="text-red-600 text-sm">{error}<a className="mt-2 block underline" href="/explorer?mode=directory">{copy.browse}</a></div>}
+          {error && <p role="alert" className="text-red-600 text-sm">{error}</p>}
         </div>
 
         <div className="flex flex-shrink-0 justify-end gap-2 border-t border-[var(--border-subtle)] px-6 py-4">
@@ -261,7 +261,7 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
           {step === 3 && (
             <>
               <Button onClick={() => { setStep(2); setError(''); }} variant="outline">{t('components.sessionRequest.back')}</Button>
-              <Button onClick={reviewDraft} disabled={generatingDraft}>{generatingDraft ? 'Preparing…' : t('components.sessionRequest.review')}</Button>
+              <Button onClick={reviewDraft} disabled={generatingDraft}>{generatingDraft ? copy.preparing : t('components.sessionRequest.review')}</Button>
             </>
           )}
           {step === 4 && (

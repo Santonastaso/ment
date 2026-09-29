@@ -112,7 +112,25 @@ if (dangling.length) {
   usageGaps = dangling.length;
 }
 
-if (totalGaps === 0 && usageGaps === 0) {
+let formatGaps = 0;
+const placeholders = (value) => [...value.matchAll(/(?<!\{)\{(\w+)\}(?!\})/g)]
+  .map((match) => match[1]).sort().join(',');
+for (const ns of namespaces) {
+  const reference = loadLocaleNamespace(REFERENCE_LOCALE, ns);
+  for (const locale of LOCALES.filter((name) => name !== REFERENCE_LOCALE)) {
+    const catalog = loadLocaleNamespace(locale, ns);
+    for (const [key, source] of Object.entries(reference)) {
+      const translated = catalog[key];
+      if (typeof source !== 'string' || typeof translated !== 'string') continue;
+      if (/\{\{\w+\}\}/.test(translated) || placeholders(source) !== placeholders(translated)) {
+        console.error(`Invalid interpolation in ${locale}/${ns}.json: ${key}`);
+        formatGaps++;
+      }
+    }
+  }
+}
+
+if (totalGaps === 0 && usageGaps === 0 && formatGaps === 0) {
   process.exit(0);
 }
 process.exit(1);
