@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase.js';
 
 const AuthContext = createContext(null);
@@ -28,6 +28,7 @@ export function AuthProvider({ children }) {
   // the mentee. Surfaced as a badge in the sidebar and used by the dashboard
   // to decide whether to render the AcceptanceModal.
   const [pendingAcceptanceCount, setPendingAcceptanceCount] = useState(0);
+  const [unreadCounts, setUnreadCounts] = useState({ sessions: 0, groups: 0 });
 
   useEffect(() => {
     let mounted = true;
@@ -117,12 +118,34 @@ export function AuthProvider({ children }) {
     }
   }
 
+  const refreshUnreadCounts = useCallback(async () => {
+    if (!session?.user?.id) { setUnreadCounts({ sessions: 0, groups: 0 }); return; }
+    try {
+      const { data, error } = await supabase.rpc('my_unread_message_counts');
+      if (!error && data) setUnreadCounts({ sessions: data.sessions || 0, groups: data.groups || 0 });
+    } catch { /* Keep the last known badge state during a transient network error. */ }
+  }, [session?.user?.id]);
+
   // Refresh on login + every time the active session id changes
   useEffect(() => {
     if (session?.user?.id) refreshPendingAcceptances();
     else setPendingAcceptanceCount(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.user?.id]);
+
+  useEffect(() => {
+    if (!session?.user?.id) { setUnreadCounts({ sessions: 0, groups: 0 }); return undefined; }
+    refreshUnreadCounts();
+    const channel = supabase.channel(`unread-messages:${session.user.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'session_messages' }, refreshUnreadCounts)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_messages' }, refreshUnreadCounts)
+      .subscribe();
+    window.addEventListener('focus', refreshUnreadCounts);
+    return () => {
+      window.removeEventListener('focus', refreshUnreadCounts);
+      supabase.removeChannel(channel);
+    };
+  }, [session?.user?.id, refreshUnreadCounts]);
 
   return (
     <AuthContext.Provider
@@ -138,6 +161,8 @@ export function AuthProvider({ children }) {
         refreshProfile,
         pendingAcceptanceCount,
         refreshPendingAcceptances,
+        unreadCounts,
+        refreshUnreadCounts,
       }}
     >
       {children}

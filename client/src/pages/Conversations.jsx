@@ -8,6 +8,7 @@ import { Field } from '../components/ui/field.jsx';
 import { formatMessageTime } from '../lib/utils.js';
 import { Button } from '../components/ui/button.jsx';
 import { Avatar, AvatarFallback } from '../components/ui/avatar.jsx';
+import { Skeleton } from '../components/ui/skeleton.jsx';
 import IcsDownloadButton from '../components/IcsDownloadButton.jsx';
 import { cn } from '@/lib/utils';
 import { supabase } from '../lib/supabase.js';
@@ -77,7 +78,7 @@ function appendMessage(current, row) {
 }
 
 export default function Conversations() {
-  const { user, refreshPendingAcceptances } = useAuth();
+  const { user, refreshPendingAcceptances, refreshUnreadCounts } = useAuth();
   const { t } = useT();
   const [params, setParams] = useSearchParams();
   const selectedId = Number(params.get('session')) || null;
@@ -206,6 +207,7 @@ export default function Conversations() {
           if (cancelled) return;
           (data || []).forEach((item) => senderNamesRef.current.set(item.sender_id, item.sender_name));
           setMessages((current) => [...(data || []), ...current.filter((item) => !(data || []).some((loaded) => loaded.id === item.id))].sort((a, b) => a.id - b.id));
+          return api.post(`/groups/${selectedGroupId}/read`, {}).then(refreshUnreadCounts);
         })
         .catch((requestError) => { if (!cancelled) setError(requestError.response?.data?.error || t('conversations.error')); });
       refresh();
@@ -219,6 +221,7 @@ export default function Conversations() {
             senderNamesRef.current.set(row.sender_id, name);
             if (!cancelled) setMessages((current) => current.map((item) => item.id === row.id ? { ...item, sender_name: name } : item));
           }
+          if (row.sender_id !== user?.id) api.post(`/groups/${selectedGroupId}/read`, {}).then(refreshUnreadCounts).catch(() => {});
         })
         .subscribe();
       return () => { cancelled = true; supabase.removeChannel(channel); };
@@ -227,14 +230,14 @@ export default function Conversations() {
     let cancelled = false;
     setMessages([]);
     setHasOlder(false);
-    Promise.all([loadMessages(selectedId), api.post(`/sessions/${selectedId}/read`, {})]).catch((requestError) => {
+    Promise.all([loadMessages(selectedId), api.post(`/sessions/${selectedId}/read`, {})]).then(refreshUnreadCounts).catch((requestError) => {
       if (!cancelled) setError(requestError.response?.data?.error || t('conversations.error'));
     });
     const channel = supabase.channel(`session-${selectedId}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'session_messages', filter: `session_id=eq.${selectedId}` }, ({ new: row }) => {
         if (cancelled) return;
         setMessages((current) => appendMessage(current, row));
-        if (row.sender_id !== user?.id) api.post(`/sessions/${selectedId}/read`, {}).catch(() => {});
+        if (row.sender_id !== user?.id) api.post(`/sessions/${selectedId}/read`, {}).then(refreshUnreadCounts).catch(() => {});
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'sessions', filter: `id=eq.${selectedId}` }, () => loadSessions())
       .subscribe();
@@ -308,7 +311,22 @@ export default function Conversations() {
     } finally { setSavingSchedule(false); }
   }
 
-  if (loading) return <div className="conversation-loading">{t('common.loading')}</div>;
+  if (loading) return (
+    <div className="conversations-shell" role="status" aria-label={t('common.loading')}>
+      <aside className="conversation-list space-y-3 p-4">
+        <Skeleton className="mb-6 h-6 w-28" />
+        {[0, 1, 2, 3].map(index => (
+          <div key={index} className="flex items-center gap-3 py-2">
+            <Skeleton className="size-9 shrink-0 rounded-full" />
+            <div className="flex-1 space-y-2"><Skeleton className="h-4 w-3/4" /><Skeleton className="h-3 w-1/2" /></div>
+          </div>
+        ))}
+      </aside>
+      <div className="conversation-loading">
+        <div className="space-y-3"><Skeleton className="h-5 w-44" /><Skeleton className="h-4 w-64" /></div>
+      </div>
+    </div>
+  );
 
   return (
     <section className={cn('conversations-shell', (selectedId || selectedGroupId) && 'has-selection')}>
@@ -379,7 +397,7 @@ export default function Conversations() {
         </>}
       </aside>
 
-      <div className="conversation-thread">
+      <div key={selectedGroup ? `group-${selectedGroup.id}` : selected ? `session-${selected.id}` : 'empty'} className="conversation-thread">
         {!selected && !selectedGroup ? (
           <div className="conversation-placeholder"><MessageCircle /><p>{t('conversations.select')}</p></div>
         ) : (

@@ -15,8 +15,13 @@
   "nav.explorer": "Explorer",
   "nav.messages": "Messages",
   "nav.groups": "Groupes",
+  "nav.unreadConversations": "{count} conversations non lues",
+  "nav.unreadGroups": "{count} groupes avec des messages non lus",
   "nav.myProfile": "Mon profil",
   "nav.admin": "Administration",
   "nav.knowledgeGraph": "Graphe des competences",
-  "nav.platformOps": "Operations plateforme"
+  "nav.platformOps": "Operations plateforme",
+  "common.notFound.title": "Page introuvable",
+  "common.notFound.description": "Ce lien est peut-être obsolète ou la page a été déplacée.",
+  "common.notFound.back": "Retour à Ment"
 }

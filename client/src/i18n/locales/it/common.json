@@ -18,5 +18,10 @@
   "nav.admin": "Amministrazione",
   "nav.knowledgeGraph": "Grafo delle competenze",
   "nav.platformOps": "Operazioni piattaforma",
-  "nav.groups": "Groups"
+  "nav.groups": "Gruppi",
+  "nav.unreadConversations": "{count} conversazioni non lette",
+  "nav.unreadGroups": "{count} gruppi con messaggi non letti",
+  "common.notFound.title": "Pagina non trovata",
+  "common.notFound.description": "Il link potrebbe non essere aggiornato oppure la pagina è stata spostata.",
+  "common.notFound.back": "Torna a Ment"
 }

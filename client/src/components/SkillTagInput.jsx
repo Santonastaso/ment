@@ -8,9 +8,9 @@ import { useT } from '../i18n/index.jsx';
 // Tagged-input for plain skill strings. Each entry is just a string in the
 // `value` array. ESCO autocomplete is suggestive: the user can still confirm
 // a custom skill by pressing Enter without picking a suggestion.
-// Visual language: hairline row list; clicking a row opens a popup where the
-// skill can be removed.
-export default function SkillTagInput({ value = [], onChange, placeholder, lang, ariaLabel }) {
+// Profile uses compact tiles; onboarding keeps the row list. Both open the
+// same removal dialog.
+export default function SkillTagInput({ value = [], onChange, placeholder, lang, ariaLabel, tileLayout = false }) {
   const { t } = useT();
   const [input, setInput] = useState('');
   const [openIdx, setOpenIdx] = useState(null);
@@ -65,24 +65,25 @@ export default function SkillTagInput({ value = [], onChange, placeholder, lang,
       {error && <p role="alert" className="mb-2 text-sm text-destructive">{error}</p>}
       <fieldset disabled={busy} className="min-w-0">
       {value.length > 0 && (
-        <div className="grid gap-0.5">
+        <div className={tileLayout ? 'profile-skill-grid' : 'grid gap-0.5'}>
           {value.map((skill, i) => (
             <button
               key={i}
               type="button"
               onClick={() => setOpenIdx(i)}
               aria-haspopup="dialog"
-              className="flex w-full items-center justify-between gap-3 rounded-full px-3 py-2 text-left hover:bg-[var(--control-surface)]"
+              title={tileLayout ? t('components.skillTag.remove', { skill }) : undefined}
+              className={tileLayout ? 'profile-skill-tile is-learning' : 'flex w-full items-center justify-between gap-3 rounded-full px-3 py-2 text-left hover:bg-[var(--control-surface)]'}
             >
-              <span className="min-w-0 truncate text-sm font-medium text-foreground">{skill}</span>
-              <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <span className={tileLayout ? 'min-w-0 text-sm font-medium text-foreground' : 'min-w-0 truncate text-sm font-medium text-foreground'}>{skill}</span>
+              {!tileLayout && <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />}
             </button>
           ))}
         </div>
       )}
 
-      <label htmlFor={inputId} className="mt-3 mb-2 block text-sm font-semibold">{ariaLabel || t('components.skillTag.ariaAdd')}</label>
-      <div className="flex items-start gap-2">
+      <label htmlFor={inputId} className={tileLayout ? 'sr-only' : 'mt-3 mb-2 block text-sm font-semibold'}>{ariaLabel || t('components.skillTag.ariaAdd')}</label>
+      <div className={tileLayout ? 'mt-4 flex items-start gap-2' : 'flex items-start gap-2'}>
         <EscoSuggestInput
           value={input}
           onChange={setInput}

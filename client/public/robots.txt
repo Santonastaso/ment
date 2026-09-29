@@ -1,0 +1,9 @@
+User-agent: *
+Disallow: /
+Allow: /welcome$
+Allow: /request-access$
+Allow: /terms$
+Allow: /privacy$
+Allow: /sitemap.xml$
+
+Sitemap: https://www.ment-labs.com/sitemap.xml

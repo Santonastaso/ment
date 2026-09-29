@@ -1,6 +1,6 @@
 ﻿import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronRight, LogOut, LifeBuoy, User } from 'lucide-react';
+import { LogOut, LifeBuoy, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useT } from '../i18n/index.jsx';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -75,7 +75,7 @@ export default function UserMenu({ compact = false, placement = 'topbar' }) {
         <div
           role="menu"
           className={cn(
-            'absolute z-50 w-60 rounded-2xl border border-border bg-popover p-1.5 text-popover-foreground shadow-[var(--shadow-overlay)]',
+            'user-menu-panel absolute z-50 w-60 rounded-2xl border border-border bg-popover p-1.5 text-popover-foreground shadow-[var(--shadow-overlay)]',
             placement === 'sidebar'
               ? compact ? 'bottom-0 left-full ml-2' : 'bottom-full left-0 mb-2'
               : 'right-0 top-full mt-1'
@@ -89,7 +89,6 @@ export default function UserMenu({ compact = false, placement = 'topbar' }) {
               <p className="truncate text-sm font-medium">{user?.name}</p>
               <p className="truncate text-xs text-muted-foreground">{email}</p>
             </div>
-            <ChevronRight className="size-4 text-muted-foreground" strokeWidth={2.2} />
           </div>
           <button
             type="button"

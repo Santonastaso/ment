@@ -10,9 +10,9 @@ const EXAMPLE_LIMIT = 80;
 // Edits an array of { skill, example_project } pairs. Used for "what you can
 // teach" where the spec calls for an optional example project per skill.
 // ESCO autocomplete is suggestive: confirm a custom string with Enter to skip.
-// Visual language: hairline row list; clicking a row opens a popup where the
-// example project can be edited and the skill removed.
-export default function TeachSkillsEditor({ value = [], onChange, placeholder, lang, ariaLabel }) {
+// Profile uses compact tiles; onboarding keeps the row list. Both open the
+// same editor for examples and removal.
+export default function TeachSkillsEditor({ value = [], onChange, placeholder, lang, ariaLabel, tileLayout = false }) {
   const { t } = useT();
   const [skillInput, setSkillInput] = useState('');
   const [editingIdx, setEditingIdx] = useState(null);
@@ -67,29 +67,28 @@ export default function TeachSkillsEditor({ value = [], onChange, placeholder, l
       {error && <p role="alert" className="mb-2 text-sm text-destructive">{error}</p>}
       <fieldset disabled={busy} className="min-w-0">
       {value.length > 0 && (
-        <div className="grid gap-0.5">
+        <div className={tileLayout ? 'profile-skill-grid' : 'grid gap-0.5'}>
           {value.map((entry, i) => (
             <button
               key={i}
               type="button"
               onClick={() => { setDraft(entry.example_project || ''); setEditingIdx(i); setError(''); }}
               aria-haspopup="dialog"
-              className="flex w-full items-center justify-between gap-3 rounded-full px-3 py-2 text-left hover:bg-[var(--control-surface)]"
+              title={tileLayout ? t('components.teachSkills.editExample') : undefined}
+              className={tileLayout ? 'profile-skill-tile is-teaching' : 'flex w-full items-center justify-between gap-3 rounded-full px-3 py-2 text-left hover:bg-[var(--control-surface)]'}
             >
               <span className="min-w-0">
                 <span className="block text-sm font-semibold text-foreground">{entry.skill}</span>
-                <span className="block truncate text-xs text-muted-foreground">{entry.example_project || t('components.teachSkills.giveExample')}</span>
+                {(entry.example_project || !tileLayout) && <span className={tileLayout ? 'profile-skill-example block text-xs text-muted-foreground' : 'block truncate text-xs text-muted-foreground'}>{entry.example_project || t('components.teachSkills.giveExample')}</span>}
               </span>
-              <span className="flex shrink-0 items-center gap-2.5">
-                <ChevronRight className="size-3.5 text-muted-foreground" aria-hidden="true" />
-              </span>
+              {!tileLayout && <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />}
             </button>
           ))}
         </div>
       )}
 
-      <label htmlFor={inputId} className="mt-3 mb-2 block text-sm font-semibold">{ariaLabel || t('components.teachSkills.ariaAdd')}</label>
-      <div className="flex items-start gap-2">
+      <label htmlFor={inputId} className={tileLayout ? 'sr-only' : 'mt-3 mb-2 block text-sm font-semibold'}>{ariaLabel || t('components.teachSkills.ariaAdd')}</label>
+      <div className={tileLayout ? 'mt-4 flex items-start gap-2' : 'flex items-start gap-2'}>
         <EscoSuggestInput
           value={skillInput}
           onChange={setSkillInput}

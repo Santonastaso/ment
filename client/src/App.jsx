@@ -1,13 +1,13 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useT } from './i18n/index.jsx';
 
 const LandingPage = lazy(() => import('./pages/LandingPage.jsx'));
 const Login = lazy(() => import('./pages/Login.jsx'));
 const RequestAccess = lazy(() => import('./pages/RequestAccess.jsx'));
 const AcceptInvitation = lazy(() => import('./pages/AcceptInvitation.jsx'));
-const SignUp = lazy(() => import('./pages/SignUp.jsx'));
 const ForcePasswordChange = lazy(() => import('./pages/ForcePasswordChange.jsx'));
 const Onboarding = lazy(() => import('./pages/Onboarding.jsx'));
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
@@ -21,9 +21,68 @@ const KnowledgeGraph = lazy(() => import('./pages/KnowledgeGraph.jsx'));
 const LegalPage = lazy(() => import('./pages/LegalPage.jsx'));
 const CalendarCallback = lazy(() => import('./pages/CalendarCallback.jsx'));
 const AppLayout = lazy(() => import('./components/AppLayout.jsx'));
+const NotFound = lazy(() => import('./pages/NotFound.jsx'));
 
-function page(node) {
-  return <Suspense fallback={<LoadingScreen />}>{node}</Suspense>;
+const PUBLIC_META = {
+  '/welcome': ['landing.hero.title', 'landing.hero.subtitle'],
+  '/login': ['auth.login.title', 'auth.login.description'],
+  '/request-access': ['auth.requestAccess.title', 'auth.requestAccess.description'],
+  '/terms': ['legal.terms.title', 'legal.terms.intro'],
+  '/privacy': ['legal.privacy.title', 'legal.privacy.intro'],
+};
+
+const APP_TITLES = {
+  '/': 'nav.home', '/explorer': 'nav.explorer', '/conversations': 'nav.messages',
+  '/groups': 'nav.groups', '/profile': 'nav.myProfile', '/admin': 'nav.admin',
+  '/admin/ops': 'nav.platformOps', '/admin/graph': 'nav.knowledgeGraph',
+};
+
+function updateMeta(selector, attribute, value) {
+  let element = document.head.querySelector(selector);
+  if (!element) {
+    element = document.createElement('meta');
+    document.head.append(element);
+  }
+  element.setAttribute(attribute, value);
+}
+
+function PageMetadata() {
+  const { pathname } = useLocation();
+  const { t, lang } = useT();
+
+  useEffect(() => {
+    const routeMeta = PUBLIC_META[pathname];
+    const titleKey = routeMeta?.[0] || APP_TITLES[pathname]
+      || (pathname.startsWith('/profile/') ? 'nav.myProfile' : null);
+    const title = titleKey ? `${t(titleKey)} | Ment` : 'Ment';
+    const description = routeMeta ? t(routeMeta[1]) : '';
+    const indexable = ['/welcome', '/request-access', '/terms', '/privacy'].includes(pathname);
+
+    document.title = title;
+    document.documentElement.lang = lang;
+    updateMeta('meta[name="robots"]', 'name', indexable ? 'index,follow' : 'noindex,nofollow');
+    if (description) updateMeta('meta[name="description"]', 'name', description);
+    else document.head.querySelector('meta[name="description"]')?.remove();
+    updateMeta('meta[property="og:title"]', 'property', title);
+    updateMeta('meta[property="og:description"]', 'property', description || title);
+    updateMeta('meta[property="og:type"]', 'property', 'website');
+    updateMeta('meta[property="og:url"]', 'property', `${window.location.origin}${pathname}`);
+  }, [lang, pathname, t]);
+
+  return null;
+}
+
+function page(node, animate = true) {
+  return (
+    <Suspense fallback={<LoadingScreen />}>
+      {animate ? <PageTransition>{node}</PageTransition> : node}
+    </Suspense>
+  );
+}
+
+function PageTransition({ children }) {
+  const { pathname } = useLocation();
+  return <div key={pathname} className="page-transition">{children}</div>;
 }
 
 function LoadingScreen() {
@@ -84,7 +143,7 @@ function ProtectedRoute() {
   if (!user) return <Navigate to="/login" state={{ from: location }} replace />;
   const gate = authGatePath(user);
   if (gate) return <Navigate to={gate} state={{ returnTo: `${location.pathname}${location.search}${location.hash}` }} replace />;
-  return page(<AppLayout />);
+  return page(<AppLayout />, false);
 }
 
 function ChangePasswordRoute() {
@@ -139,10 +198,12 @@ function UserRoute({ children }) {
 
 export default function App() {
   return (
+    <>
+    <PageMetadata />
     <Routes>
       <Route path="/welcome" element={page(<LandingPage />)} />
       <Route path="/login" element={<LoginRoute />} />
-      <Route path="/sign-up" element={page(<SignUp />)} />
+      <Route path="/sign-up" element={<Navigate to="/request-access" replace />} />
       <Route path="/request-access" element={page(<RequestAccess />)} />
       <Route path="/invite/:token" element={page(<AcceptInvitation />)} />
       <Route path="/terms" element={page(<LegalPage type="terms" />)} />
@@ -162,7 +223,8 @@ export default function App() {
         <Route path="/admin/ops" element={<PlatformAdminRoute>{page(<AdminOps />)}</PlatformAdminRoute>} />
         <Route path="/admin/graph" element={<AdminRoute>{page(<KnowledgeGraph />)}</AdminRoute>} />
       </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={page(<NotFound />)} />
     </Routes>
+    </>
   );
 }

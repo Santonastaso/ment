@@ -60,7 +60,6 @@ function shapeProfile(row, viewerId) {
     ...row,
     current_role: row.job_title, // legacy alias
     must_change_password: isSelf ? row.must_change_password : undefined,
-    deactivated_at: isSelf ? row.deactivated_at : row.deactivated_at,
   };
 }
 
@@ -858,6 +857,7 @@ async function post(url, body = {}, opts = {}) {
     const id = Number(url.split('/')[2]);
     const { error } = await supabase.rpc('join_group', { p_group_id: id });
     if (error) throw new ApiError(error.message);
+    await supabase.rpc('mark_group_read', { p_group_id: id });
     return ok({ ok: true });
   }
 
@@ -866,6 +866,12 @@ async function post(url, body = {}, opts = {}) {
     const { data, error } = await supabase.rpc('send_group_message', { p_group_id: id, p_body: body.body });
     if (error) throw new ApiError(error.message, 403);
     return ok(data, 201);
+  }
+  if (/^\/groups\/\d+\/read$/.test(url)) {
+    const id = Number(url.split('/')[2]);
+    const { error } = await supabase.rpc('mark_group_read', { p_group_id: id });
+    if (error) throw new ApiError(error.message, 403);
+    return ok({ id, read: true });
   }
 
   if (url === '/feedback') {

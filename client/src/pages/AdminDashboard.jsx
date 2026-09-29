@@ -72,10 +72,6 @@ async function downloadBlob(apiPath, filename) {
   URL.revokeObjectURL(url);
 }
 
-function formatDate(value) {
-  return formatAdminDate(value);
-}
-
 export default function AdminDashboard() {
   const { user } = useAuth();
   const { t: translate } = useT();
@@ -484,6 +480,7 @@ export default function AdminDashboard() {
         )}
       </nav>
 
+      <div key={tab} className="admin-tab-content">
       {tab === 'overview' && (
         <>
           {/* Weekly reflection broadcast — demo trigger */}
@@ -963,7 +960,7 @@ export default function AdminDashboard() {
                             </>
                           )}
                           <span className="text-muted-foreground">·</span>
-                          <span className="text-muted-foreground">{formatDate(item.created_at)}</span>
+                          <span className="text-muted-foreground">{formatAdminDate(item.created_at)}</span>
                           <span className="rounded-full bg-muted px-2 py-0.5 font-medium text-muted-foreground">{t(`admin.pm.delivery.${item.delivery?.status || 'demo'}`)}</span>
                         </div>
                         <p className="mt-2 whitespace-pre-wrap text-sm text-foreground">{item.message}</p>
@@ -1055,6 +1052,7 @@ export default function AdminDashboard() {
         </DialogContent>
       </Dialog>
 
+      </div>
     </PageShell>
   );
 }

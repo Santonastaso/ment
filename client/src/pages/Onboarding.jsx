@@ -210,7 +210,7 @@ export default function Onboarding({ returnTo }) {
           ))}
         </div>
 
-        <div className="card p-6 space-y-6">
+        <div key={step} className="onboarding-step-content card p-6 space-y-6">
           <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="note">
             {t('onboarding.import.reviewNotice')}
           </p>

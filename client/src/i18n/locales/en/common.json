@@ -15,8 +15,13 @@
   "nav.explorer": "Explorer",
   "nav.messages": "Messages",
   "nav.groups": "Groups",
+  "nav.unreadConversations": "{count} unread conversations",
+  "nav.unreadGroups": "{count} groups with unread messages",
   "nav.myProfile": "My profile",
   "nav.admin": "Admin",
   "nav.knowledgeGraph": "Knowledge graph",
-  "nav.platformOps": "Platform ops"
+  "nav.platformOps": "Platform ops",
+  "common.notFound.title": "Page not found",
+  "common.notFound.description": "This link may be outdated, or the page may have moved.",
+  "common.notFound.back": "Back to Ment"
 }

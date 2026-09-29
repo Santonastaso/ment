@@ -112,7 +112,7 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 p-4">
+    <div className="session-request-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/20 p-4">
       <div className="session-request-modal flex max-h-[calc(100vh-2rem)] w-full max-w-[560px] flex-col overflow-hidden rounded-[18px] border border-[var(--border)] bg-card [box-shadow:var(--shadow-overlay)]">
         <div className="flex-shrink-0 border-b border-[var(--border-subtle)] px-6 py-5">
           <div className="flex items-center justify-between">
@@ -122,7 +122,7 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
           <p className="text-sm text-muted-foreground mt-1">{t('components.sessionRequest.subtitle', { name: mentor.name, department: mentor.department })}</p>
         </div>
 
-        <div ref={bodyRef} className="session-modal-scroll min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-5">
+        <div key={step} ref={bodyRef} className="session-modal-scroll session-step-content min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-5">
           {/* Step indicator */}
           <p className="text-xs font-medium tabular-nums text-muted-foreground">{step} / {TOTAL_STEPS}</p>
 

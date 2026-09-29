@@ -15,7 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MapPin } from 'lucide-react';
+import { MapPin, Plus, X } from 'lucide-react';
 import api from '../api/index.js';
 import { useT } from '../i18n/index.jsx';
 
@@ -442,6 +442,7 @@ export default function Profile() {
         </nav>
       )}
 
+      <div key={tab} className="profile-tab-content">
       {tab === 'overview' && (
       <>
       <Surface className="profile-overview-header">
@@ -628,11 +629,11 @@ export default function Profile() {
 
       {isOwnProfile && tab === 'skills' && (
         <Surface className="overflow-visible bg-transparent">
-          <SurfaceHeader className="px-0 pt-1 sm:px-0" title={t('profile.manageSkills.title')} description={t('profile.manageSkills.desc')} />
-          <SurfaceBody className="grid gap-8 px-0 pt-4 sm:px-0 lg:grid-cols-2 lg:gap-10">
-          <div className="min-w-0">
+          <SurfaceBody className="grid items-start gap-5 px-0 pt-0 sm:px-0 lg:grid-cols-2">
+          <div className="min-w-0 rounded-[var(--panel-radius)] border border-[var(--border-subtle)] bg-[var(--surface)] p-4 sm:p-5">
             <h3 className="mb-3 text-base font-bold text-foreground">{t('profile.manageSkills.canTeach')}</h3>
             <TeachSkillsEditor
+              tileLayout
               value={teachEditorValue}
               onChange={handleTeachSkillsChange}
               placeholder={t('profile.skillInput.placeholder')}
@@ -640,9 +641,10 @@ export default function Profile() {
             />
           </div>
 
-          <div className="min-w-0">
+          <div className="min-w-0 rounded-[var(--panel-radius)] border border-[var(--border-subtle)] bg-[var(--surface)] p-4 sm:p-5">
             <h3 className="mb-3 text-base font-bold text-foreground">{t('profile.manageSkills.wantsToLearn')}</h3>
             <SkillTagInput
+              tileLayout
               value={wantsToLearn}
               onChange={handleWantsToLearnChange}
               placeholder={t('profile.skillInput.placeholder')}
@@ -656,9 +658,7 @@ export default function Profile() {
       {isOwnProfile && tab === 'availability' && (
         <Surface className="overflow-visible bg-transparent">
           <SurfaceHeader
-            className="px-0 pt-1 sm:px-0"
-            title={t('profile.availability.title')}
-            description={t('profile.availability.capacityDesc')}
+            className="px-0 pb-0 pt-0 sm:px-0"
             action={
               <Button
                 type="button"
@@ -730,8 +730,17 @@ export default function Profile() {
           title={t('profile.career.title')}
           action={
             isOwnProfile ? (
-              <Button variant="outline" size="sm" onClick={() => setShowAddCareer(!showAddCareer)}>
-                {showAddCareer ? t('profile.btn.cancel') : t('profile.career.addEntry')}
+              <Button
+                type="button"
+                variant={showAddCareer ? 'outline' : 'default'}
+                size="icon"
+                className="size-12 rounded-xl"
+                aria-label={showAddCareer ? t('profile.btn.cancel') : t('profile.career.addEntry')}
+                title={showAddCareer ? t('profile.btn.cancel') : t('profile.career.addEntry')}
+                aria-expanded={showAddCareer}
+                onClick={() => setShowAddCareer(!showAddCareer)}
+              >
+                {showAddCareer ? <X className="size-6" /> : <Plus className="size-6" />}
               </Button>
             ) : null
           }
@@ -906,6 +915,7 @@ export default function Profile() {
           </SurfaceBody>
         </Surface>
       )}
+      </div>
 
       {showModal && (
         <SessionRequestModal

@@ -5,13 +5,14 @@ import { formatMessageTime } from '../lib/utils.js';
 import { PageShell } from '../components/PageShell.jsx';
 import { Surface, SurfaceBody, SurfaceHeader } from '../components/Surface.jsx';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Plus, Send, Users } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { supabase } from '../lib/supabase.js';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog.jsx';
 
 export default function Groups() {
-  const { user } = useAuth();
+  const { user, refreshUnreadCounts } = useAuth();
   const { t } = useT();
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -43,7 +44,11 @@ export default function Groups() {
     if (!selectedGroup?.joined) { setMessages([]); return undefined; }
     let active = true;
     const refresh = () => api.get(`/groups/${selectedGroup.id}/messages`)
-      .then(({ data }) => { if (active) setMessages(data || []); })
+      .then(({ data }) => {
+        if (!active) return;
+        setMessages(data || []);
+        return api.post(`/groups/${selectedGroup.id}/read`, {}).then(refreshUnreadCounts);
+      })
       .catch(() => { if (active) setError(t('groups.error.load')); });
     refresh();
     const channel = supabase.channel(`group-${selectedGroup.id}`)
@@ -98,16 +103,29 @@ export default function Groups() {
   }
 
   return (
-    <PageShell title={t('groups.pageTitle')} description={t('groups.pageDescription')} action={<Button type="button" size="icon" className="size-12 rounded-xl" aria-label={t('groups.create.title')} title={t('groups.create.title')} onClick={() => { setError(''); setCreateOpen(true); }}><Plus className="size-6" /></Button>}>
+    <PageShell>
+      <h1 className="sr-only">{t('groups.pageTitle')}</h1>
       <Surface className="group-list-card overflow-visible rounded-none border-x-0 border-b-0 bg-transparent">
-        <SurfaceHeader className="px-0 sm:px-0" title={t('groups.list.title')} />
-        <SurfaceBody className="px-0 pt-4 sm:px-0">
-          {loading ? (
-            <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
+        <SurfaceHeader
+          className="items-center px-0 pb-2 pt-0 sm:px-0"
+          title={t('groups.list.title')}
+          action={<Button type="button" size="icon" className="size-12 rounded-xl" aria-label={t('groups.create.title')} title={t('groups.create.title')} onClick={() => { setError(''); setCreateOpen(true); }}><Plus className="size-6" /></Button>}
+        />
+        <SurfaceBody className="px-0 pt-2 sm:px-0">
+          {loading && groups.length === 0 ? (
+            <div role="status" aria-label={t('common.loading')} className="space-y-2">
+              {[0, 1, 2].map(index => (
+                <div key={index} className="flex items-center gap-3 px-3 py-4">
+                  <Skeleton className="size-10 shrink-0 rounded-full" />
+                  <div className="flex-1 space-y-2"><Skeleton className="h-4 w-36" /><Skeleton className="h-3 w-52 max-w-full" /></div>
+                  <Skeleton className="h-8 w-20 rounded-full" />
+                </div>
+              ))}
+            </div>
           ) : groups.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t('groups.list.empty')}</p>
           ) : (
-            <div>
+            <div aria-busy={loading}>
               {groups.map((group) => (
                 <article key={group.id} className={`person-row ${selectedGroup?.id === group.id ? 'is-selected' : ''}`}>
                   <span className="person-row-avatar group-row-mark" aria-hidden="true">

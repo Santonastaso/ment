@@ -399,8 +399,7 @@ export default function DiscoveryFlow() {
       const continues = renderedTurns[index - 1]?.role === 'assistant';
       return <div className={`discovery-chat-turn is-assistant ${turn.kind === 'error' ? 'is-error' : ''}`} key={`${turn.at || index}-${index}`}>{continues ? <span className="discovery-agent-mark-spacer" aria-hidden="true" /> : <span className="discovery-agent-mark" aria-label="Ment">M</span>}<p className="discovery-assistant-bubble">{renderInline(response)}</p></div>;
     })}</div>
-    {stage === 'matching' && <div className="discovery-chat-turn is-assistant is-working"><span className="discovery-agent-mark" aria-label="Ment">M</span><p className="discovery-assistant-bubble">{copy.finding}<span className="discovery-ellipsis">...</span></p></div>}
-    {stage === 'drafting' && <div className="discovery-chat-turn is-assistant is-working"><span className="discovery-agent-mark" aria-label="Ment">M</span><p className="discovery-assistant-bubble">{copy.drafting}<span className="discovery-ellipsis">...</span></p></div>}
+    {(stage === 'matching' || stage === 'drafting') && <div className="discovery-chat-turn is-assistant is-working" role="status" aria-live="polite"><span className="discovery-agent-mark" aria-label="Ment">M</span><p className="discovery-assistant-bubble">{stage === 'matching' ? copy.finding : copy.drafting}<span className="discovery-typing" aria-hidden="true"><i /><i /><i /></span></p></div>}
     {stage === 'choose' && <div className="discovery-reveal"><div className="discovery-match-grid" role="radiogroup" aria-label="Choose a person">{matches.map((match, index) => <MatchCard key={match.person.id} match={match} index={index} selected={selected?.person.id === match.person.id} onSelect={choose} copy={copy} />)}</div><div className="discovery-result-actions" role="group" aria-label={copy.useful}>
       <button type="button" className="discovery-result-icon" aria-label={`${copy.useful} ${copy.yes}`} title={copy.yes} aria-pressed={matchFeedback === true} onClick={() => saveMatchFeedback(true)}><ThumbsUp /></button>
       <button type="button" className="discovery-result-icon" aria-label={`${copy.useful} ${copy.no}`} title={copy.no} aria-pressed={matchFeedback === false} onClick={() => saveMatchFeedback(false)}><ThumbsDown /></button>
@@ -409,7 +408,7 @@ export default function DiscoveryFlow() {
       <Link to="/explorer?mode=directory" className="discovery-result-icon" aria-label={copy.browse} title={copy.browse}><Search /></Link>
       {matchFeedback !== null && <span className="sr-only" role="status">{copy.feedbackSaved}</span>}
     </div></div>}
-    {stage === 'empty' && <div className="discovery-empty"><button type="button" onClick={reset}>{copy.retry}</button></div>}
+    {stage === 'empty' && <div className="discovery-empty"><button type="button" onClick={reset}><RefreshCw size={15} aria-hidden="true" />{copy.retry}</button></div>}
     {(stage === 'reachout' || stage === 'sent') && selected && (
       <div className="discovery-reachout discovery-reveal">
         <div className="discovery-assistant-message">

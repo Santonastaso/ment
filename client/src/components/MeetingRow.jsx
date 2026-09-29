@@ -65,7 +65,7 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
   const dateLabel = hasDate ? date.toLocaleDateString(lang, { year: 'numeric', month: 'short', day: 'numeric' }) : null;
   const timeLabel = hasDate ? date.toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' }) : '';
   const relative = hasDate
-    ? (mode === 'upcoming' ? upcomingRelative(date, t) : pastRelative(date, t))
+    ? relativeMeetingTime(date, t, mode)
     : null;
   const awaitingMark = mode === 'past' && session.status === 'scheduled';
 
@@ -343,38 +343,36 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
   );
 }
 
-// Helpers — produce short, human-friendly relative time strings.
-function pastRelative(date, t) {
-  const ms = Date.now() - date.getTime();
-  if (ms < 0) return null;
-  const days = Math.floor(ms / 86400000);
-  if (days === 0) return t('components.meeting.relToday');
-  if (days === 1) return t('components.meeting.relYesterday');
-  if (days < 7) return t('components.meeting.relDaysAgo', { count: days });
-  if (days < 30) {
-    const weeks = Math.floor(days / 7);
-    return weeks === 1
-      ? t('components.meeting.relWeekAgo', { count: weeks })
-      : t('components.meeting.relWeeksAgo', { count: weeks });
+// Keep upcoming and past labels in one place so their ranges stay consistent.
+function relativeMeetingTime(date, t, mode) {
+  const delta = date.getTime() - Date.now();
+  if (mode === 'past') {
+    if (delta > 0) return null;
+    const days = Math.floor(-delta / 86400000);
+    if (days === 0) return t('components.meeting.relToday');
+    if (days === 1) return t('components.meeting.relYesterday');
+    if (days < 7) return t('components.meeting.relDaysAgo', { count: days });
+    if (days < 30) return relativeMeetingWeeks(days, t, 'past');
+    return null;
   }
-  return null;
-}
-function upcomingRelative(date, t) {
-  const ms = date.getTime() - Date.now();
-  if (ms < 0) return null;
-  const minutes = Math.floor(ms / 60000);
+
+  if (delta < 0) return null;
+  const minutes = Math.floor(delta / 60000);
   if (minutes < 60) return minutes <= 1 ? t('components.meeting.relInMinLt1') : t('components.meeting.relInMin', { count: minutes });
-  const hours = Math.floor(ms / 3600000);
+  const hours = Math.floor(delta / 3600000);
   if (hours < 24) return hours === 1 ? t('components.meeting.relInHour', { count: hours }) : t('components.meeting.relInHours', { count: hours });
-  const days = Math.floor(ms / 86400000);
+  const days = Math.floor(delta / 86400000);
   if (days === 0) return t('components.meeting.relToday');
   if (days === 1) return t('components.meeting.relTomorrow');
   if (days < 7) return t('components.meeting.relInDays', { count: days });
-  if (days < 30) {
-    const weeks = Math.floor(days / 7);
-    return weeks === 1
-      ? t('components.meeting.relInWeek', { count: weeks })
-      : t('components.meeting.relInWeeks', { count: weeks });
-  }
+  if (days < 30) return relativeMeetingWeeks(days, t, 'upcoming');
   return null;
+}
+
+function relativeMeetingWeeks(days, t, mode) {
+  const weeks = Math.floor(days / 7);
+  const key = mode === 'past'
+    ? (weeks === 1 ? 'relWeekAgo' : 'relWeeksAgo')
+    : (weeks === 1 ? 'relInWeek' : 'relInWeeks');
+  return t(`components.meeting.${key}`, { count: weeks });
 }

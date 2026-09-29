@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import SessionRequestModal from '../components/SessionRequestModal.jsx';
+import DirectoryFilter from '../components/DirectoryFilter.jsx';
 import { PageShell } from '../components/PageShell.jsx';
 import { Surface, SurfaceBody } from '../components/Surface.jsx';
 import { Button } from '@/components/ui/button';
@@ -25,6 +26,7 @@ export default function Explorer() {
   const location = searchParams.get('location') || '';
   const language = searchParams.get('language') || '';
   const page = Number.isSafeInteger(Number(searchParams.get('page'))) && Number(searchParams.get('page')) > 0 ? Number(searchParams.get('page')) : 1;
+  const requestKey = JSON.stringify([query, persona, program, cohort, location, language, page]);
 
   const [inputValue, setInputValue] = useState(query);
   const [dirError, setDirError] = useState(false);
@@ -68,7 +70,7 @@ export default function Explorer() {
     api.get(`/directory?${params.toString()}`)
       .then(res => {
         if (cancelled) return;
-        setDirData(res.data);
+        setDirData({ ...res.data, requestKey });
         const lastPage = Math.max(1, Math.ceil(res.data.total / PAGE_SIZE));
         if (page > lastPage) setSearchParams(previous => {
           const next = new URLSearchParams(previous);
@@ -94,51 +96,35 @@ export default function Explorer() {
   const from = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const to = Math.min(page * PAGE_SIZE, total);
   const pageCount = Math.max(Math.ceil(total / PAGE_SIZE), 1);
+  const updatingResults = dirLoading || Boolean(dirData && dirData.requestKey !== requestKey);
 
   return (
-    <PageShell title={t('explorer.title')} description={t('explorer.entryTitle')} className="gap-6">
+    <PageShell title={t('explorer.title')} hideTitle className="gap-6">
 
-              <div className="directory-rail grid min-w-0 gap-3">
+              <div className="directory-rail directory-search-panel grid min-w-0 gap-3">
                   <form onSubmit={submitSearch} className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-2">
                     <Input aria-label={t('explorer.searchLabel')} placeholder={t('explorer.searchLabel')} value={inputValue} onChange={e => setInputValue(e.target.value)} />
                     <Button type="submit">{t('explorer.searchButton')}</Button>
                   </form>
                 <div className="grid w-full min-w-0 grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-                  <select className="input w-full" value={persona} onChange={e => setParam('persona', e.target.value)} aria-label={t('explorer.filterPersona')}>
-                    <option value="">{t('explorer.personaAny')}</option>
-                    <option value="student">{t('explorer.personaStudent')}</option>
-                    <option value="alumnus">{t('explorer.personaAlumnus')}</option>
-                  </select>
-                  <select className="input w-full" value={program} onChange={e => setParam('program', e.target.value)} aria-label={t('explorer.filterProgram')}>
-                    <option value="">{t('explorer.allPrograms')}</option>
-                    {(facets.programs || []).map(p => <option key={p} value={p}>{p}</option>)}
-                  </select>
-                  <select className="input w-full" value={cohort} onChange={e => setParam('cohort', e.target.value)} aria-label={t('explorer.filterCohort')}>
-                    <option value="">{t('explorer.allCohorts')}</option>
-                    {(facets.cohortYears || []).map(y => <option key={y} value={String(y)}>{t('explorer.classOf', { year: y })}</option>)}
-                  </select>
-                  <select className="input w-full" value={location} onChange={e => setParam('location', e.target.value)} aria-label={t('explorer.filterLocation')}>
-                    <option value="">{t('explorer.allLocations')}</option>
-                    {(facets.locations || []).map(l => <option key={l} value={l}>{l}</option>)}
-                  </select>
-                  <select className="input w-full" value={language} onChange={e => setParam('language', e.target.value)} aria-label={t('explorer.filterLanguage')}>
-                    <option value="">{t('explorer.allLanguages')}</option>
-                    {languageOptions(facets.languages, lang).map(option => (
-                      <option key={option.code} value={option.code}>{option.label}</option>
-                    ))}
-                  </select>
+                  <DirectoryFilter label={t('explorer.filterPersona')} value={persona} onChange={value => setParam('persona', value)} options={[{ value: '', label: t('explorer.personaAny') }, { value: 'student', label: t('explorer.personaStudent') }, { value: 'alumnus', label: t('explorer.personaAlumnus') }]} />
+                  <DirectoryFilter label={t('explorer.filterProgram')} value={program} onChange={value => setParam('program', value)} options={[{ value: '', label: t('explorer.allPrograms') }, ...(facets.programs || []).map(p => ({ value: p, label: p }))]} />
+                  <DirectoryFilter label={t('explorer.filterCohort')} value={cohort} onChange={value => setParam('cohort', value)} options={[{ value: '', label: t('explorer.allCohorts') }, ...(facets.cohortYears || []).map(y => ({ value: String(y), label: t('explorer.classOf', { year: y }) }))]} />
+                  <DirectoryFilter label={t('explorer.filterLocation')} value={location} onChange={value => setParam('location', value)} options={[{ value: '', label: t('explorer.allLocations') }, ...(facets.locations || []).map(l => ({ value: l, label: l }))]} />
+                  <DirectoryFilter label={t('explorer.filterLanguage')} value={language} onChange={value => setParam('language', value)} options={[{ value: '', label: t('explorer.allLanguages') }, ...languageOptions(facets.languages, lang).map(option => ({ value: option.code, label: option.label }))]} />
                 </div>
                 <div>
                   <Button type="button" size="sm" variant="ghost" onClick={() => { setInputValue(''); setSearchParams({}); }}>{t('explorer.clearFilters')}</Button>
                 </div>
               </div>
 
+              <div key={dirError ? 'error' : dirData?.requestKey || 'initial'} className="directory-results" data-loading={updatingResults && !!dirData} aria-busy={updatingResults} inert={updatingResults && !!dirData ? '' : undefined}>
               {dirError ? (
                 <Surface><SurfaceBody className="space-y-3" role="alert">
                   <p role="alert">{t('explorer.directoryError')}</p>
                   <Button onClick={() => setRetry(n => n + 1)}>{t('explorer.retry')}</Button>
                 </SurfaceBody></Surface>
-              ) : dirLoading ? (
+              ) : dirLoading && !dirData ? (
                 <div className="grid gap-1">
                   {[1, 2, 3, 4, 5, 6].map(i => <Skeleton key={i} className="my-3 h-20 rounded-lg" />)}
                 </div>
@@ -151,14 +137,14 @@ export default function Explorer() {
                 </Surface>
               ) : (
                 <>
-                  <div className="directory-rail flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
-                    <span>{t('explorer.showing', { from, to, total })}</span>
+                  <div className="directory-rail directory-pagination flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
+                    {updatingResults ? <Skeleton className="h-4 w-28" /> : <span>{t('explorer.showing', { from, to, total })}</span>}
                     <div className="flex items-center gap-2">
-                      <Button type="button" size="sm" variant="outline" disabled={page <= 1} onClick={() => setParam('page', String(page - 1))}>
+                      <Button type="button" size="sm" variant="outline" disabled={updatingResults || page <= 1} onClick={() => setParam('page', String(page - 1))}>
                         {t('explorer.prev')}
                       </Button>
                       <span className="tabular-nums">{page}/{pageCount}</span>
-                      <Button type="button" size="sm" variant="outline" disabled={page >= pageCount} onClick={() => setParam('page', String(page + 1))}>
+                      <Button type="button" size="sm" variant="outline" disabled={updatingResults || page >= pageCount} onClick={() => setParam('page', String(page + 1))}>
                         {t('explorer.next')}
                       </Button>
                     </div>
@@ -170,6 +156,7 @@ export default function Explorer() {
                   </div>
                 </>
               )}
+              </div>
 
       {requestingMentor && (
         <SessionRequestModal

@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import UserMenu from './UserMenu.jsx';
 
 export default function Sidebar({ collapsed = false, onNavigate, onToggle }) {
-  const { user, pendingAcceptanceCount } = useAuth();
+  const { user, pendingAcceptanceCount, unreadCounts } = useAuth();
   const { t } = useT();
   const location = useLocation();
 
@@ -46,7 +46,9 @@ export default function Sidebar({ collapsed = false, onNavigate, onToggle }) {
             ? item.match(location.pathname, user?.id)
             : location.pathname === item.to;
           const Icon = item.icon;
-          const showBadge = item.to === '/conversations' && pendingAcceptanceCount > 0;
+          const badgeCount = item.to === '/conversations'
+            ? Math.max(pendingAcceptanceCount, unreadCounts.sessions)
+            : item.to === '/groups' ? unreadCounts.groups : 0;
           return (
             <Link
               key={item.to}
@@ -65,13 +67,15 @@ export default function Sidebar({ collapsed = false, onNavigate, onToggle }) {
             >
               <Icon className="size-5 shrink-0" strokeWidth={2.05} />
               {!collapsed && <span className="flex-1">{item.label}</span>}
-              {showBadge && (
+              {badgeCount > 0 && (
                 <span
-                  data-testid="home-pending-badge"
+                  data-testid={item.to === '/groups' ? 'nav-groups-unread-badge' : 'nav-messages-unread-badge'}
                   className={cn('inline-flex items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground', collapsed ? 'absolute right-1 top-1 size-4' : 'ml-auto h-5 min-w-[1.25rem] px-1.5')}
-                  aria-label={`${pendingAcceptanceCount} pending acceptance${pendingAcceptanceCount === 1 ? '' : 's'}`}
+                  aria-label={item.to === '/groups'
+                    ? t('nav.unreadGroups', { count: badgeCount })
+                    : t('nav.unreadConversations', { count: badgeCount })}
                 >
-                  {pendingAcceptanceCount}
+                  {badgeCount > 99 ? '99+' : badgeCount}
                 </span>
               )}
             </Link>
