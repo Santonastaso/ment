@@ -62,6 +62,7 @@ function stateLabel(session, state, t) {
 const FILTERS = [
   { key: 'all', label: 'conversations.filter.all', match: () => true, groups: true },
   { key: 'needs', label: 'conversations.filter.needsYou', match: s => s === 'needs' },
+  { key: 'waiting', label: 'conversations.filter.waiting', match: s => s === 'waiting' },
   { key: 'scheduled', label: 'conversations.filter.scheduled', match: s => s === 'scheduled' },
   { key: 'past', label: 'conversations.filter.past', match: s => s === 'past' || s === 'closed' },
   { key: 'groups', label: 'nav.groups', match: () => false, groups: true },
@@ -353,6 +354,7 @@ export default function Conversations() {
             })}
           </div>
         )}
+        <div className="conversation-list-scroll">
         {sessions.length === 0 && groups.length === 0 ? (
           <div className="conversation-empty">
             <MessageCircle />
@@ -385,7 +387,6 @@ export default function Conversations() {
             <span className="min-w-0">
               <span className="conversation-list-top">
                 <strong>{group.name}</strong>
-                <em className="conversation-state is-group">{t('nav.groups')}</em>
               </span>
               <small>{group.description || t('nav.groups')}</small>
             </span>
@@ -395,6 +396,7 @@ export default function Conversations() {
           <p className="conversation-list-empty">{t('conversations.filter.empty')}</p>
         )}
         </>}
+        </div>
       </aside>
 
       <div key={selectedGroup ? `group-${selectedGroup.id}` : selected ? `session-${selected.id}` : 'empty'} className="conversation-thread">
@@ -420,7 +422,7 @@ export default function Conversations() {
               </div>
             )}
             {selected?.status === 'pending' && !isExpired(selected) && selected.isMentee && <div className="conversation-waiting">
-              <span>{t('conversations.waiting', { name: person?.name?.split(' ')[0] })}</span>
+            <span>{t('conversations.requestSent')}</span>
               {selected.request_expires_at && <span>{t('conversations.expires', { date: formatMessageTime(selected.request_expires_at) })}</span>}
               <Button type="button" size="sm" variant="ghost" onClick={withdrawRequest}>{t('conversations.withdraw')}</Button>
             </div>}
@@ -450,7 +452,7 @@ export default function Conversations() {
             )}
 
             <div className="conversation-messages" ref={messagesRef}>
-              <div className="conversation-context">{selected ? <><span>{statusLabel(selected, t)}</span><h2>{selected.title}</h2>{selected.topics?.length > 0 && <p>{selected.topics.join(' · ')}</p>}</> : <><span>{t('nav.groups')}</span><h2>{selectedGroup.name}</h2></>}</div>
+              {selected && <div className="conversation-context"><span>{statusLabel(selected, t)}</span><p>{selected.title}{selected.topics?.length > 0 && ` · ${selected.topics.join(' · ')}`}</p></div>}
               {hasOlder && <button type="button" className="conversation-load-older" disabled={loadingOlder} onClick={loadOlderMessages}>{t('conversations.loadOlder')}</button>}
               {messages.map((message) => message.kind === 'system' || message.kind === 'schedule' ? (
                 <div className="conversation-system" key={message.id}>{message.body}</div>

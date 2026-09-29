@@ -4,6 +4,7 @@ import EscoSuggestInput from './EscoSuggestInput.jsx';
 import { Button } from './ui/button.jsx';
 import { useModalA11y } from '../lib/useModalA11y.js';
 import { useT } from '../i18n/index.jsx';
+import Portal from './ui/portal.jsx';
 
 const EXAMPLE_LIMIT = 80;
 
@@ -107,8 +108,9 @@ export default function TeachSkillsEditor({ value = [], onChange, placeholder, l
 
       {/* Popup — edit the example project / remove the skill. */}
       {editing && (
+        <Portal>
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          className="app-modal-overlay bg-black/50"
           onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) setEditingIdx(null); }}
         >
           <div
@@ -116,7 +118,7 @@ export default function TeachSkillsEditor({ value = [], onChange, placeholder, l
             role="dialog"
             aria-modal="true"
             aria-labelledby={`teach-skill-title-${editingIdx}`}
-            className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-[10px] border border-[var(--border)] bg-card [box-shadow:var(--shadow-overlay)]"
+            className="app-modal-panel w-full max-w-md overflow-y-auto rounded-[10px] border border-[var(--border)] bg-card [box-shadow:var(--shadow-overlay)]"
           >
             <div className="flex items-start justify-between gap-3 border-b border-[var(--border-subtle)] p-5">
               <h2 id={`teach-skill-title-${editingIdx}`} className="text-base font-medium leading-snug text-foreground">
@@ -176,6 +178,7 @@ export default function TeachSkillsEditor({ value = [], onChange, placeholder, l
             </div>
           </div>
         </div>
+        </Portal>
       )}
     </div>
   );

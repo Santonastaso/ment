@@ -41,7 +41,6 @@ Deno.serve(async (req) => {
     email: invitation.email,
     password,
     email_confirm: true,
-    app_metadata: { organization_id: invitation.organization_id, admin_scope: 'none' },
     user_metadata: {
       name: profile.name || invitation.email.split('@')[0],
     },
@@ -52,9 +51,19 @@ Deno.serve(async (req) => {
   }
 
   const userId = created.user.id;
-  const { error: profileError } = await sb.from('profiles').update({
+  const { error: metadataError } = await sb.auth.admin.updateUserById(userId, {
+    app_metadata: { organization_id: invitation.organization_id, admin_scope: 'none' },
+  });
+  if (metadataError) {
+    await sb.auth.admin.deleteUser(userId);
+    return jsonError('account_create_failed', 500);
+  }
+  const { error: profileError } = await sb.from('profiles').insert({
+    id: userId,
     name: profile.name || invitation.email.split('@')[0],
     organization_id: invitation.organization_id,
+    admin_scope: 'none',
+    is_admin: false,
     program: profile.program || '',
     cohort_year: profile.cohort_year || null,
     role: profile.role || 'student',
@@ -68,7 +77,7 @@ Deno.serve(async (req) => {
     source_synced_at: profile.external_source ? new Date().toISOString() : null,
     onboarding_complete: false,
     must_change_password: false,
-  }).eq('id', userId);
+  });
   if (profileError) {
     await sb.auth.admin.deleteUser(userId);
     return jsonError('profile_create_failed', 500);

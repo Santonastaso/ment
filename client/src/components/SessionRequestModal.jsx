@@ -4,11 +4,14 @@ import { useEffect, useRef } from 'react';
 import { homeCopy } from './demo/homeCopy.js';
 import { useT } from '../i18n/index.jsx';
 import { Button } from './ui/button.jsx';
+import Portal from './ui/portal.jsx';
+import { useModalA11y } from '../lib/useModalA11y.js';
 
 const TOTAL_STEPS = 4;
 
 export default function SessionRequestModal({ mentor, onClose, onSuccess, initialQuestion = '', initialIntent = 'one_off' }) {
   const { t, lang } = useT();
+  const dialogRef = useModalA11y(true);
   const copy = homeCopy(lang);
   const [step, setStep] = useState(1);
   const [selectedTopics, setSelectedTopics] = useState([]);
@@ -25,6 +28,14 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
   const [submitting, setSubmitting] = useState(false);
   const [generatingDraft, setGeneratingDraft] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    function handleEscape(event) {
+      if (event.key === 'Escape' && !submitting) onClose();
+    }
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [onClose, submitting]);
 
   useEffect(() => {
     bodyRef.current?.scrollTo({ top: 0 });
@@ -112,11 +123,12 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
   }
 
   return (
-    <div className="session-request-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/20 p-4">
-      <div className="session-request-modal flex max-h-[calc(100vh-2rem)] w-full max-w-[560px] flex-col overflow-hidden rounded-[18px] border border-[var(--border)] bg-card [box-shadow:var(--shadow-overlay)]">
+    <Portal>
+    <div className="app-modal-overlay session-request-backdrop bg-black/20">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="session-request-title" className="app-modal-panel session-request-modal flex w-full max-w-[560px] flex-col overflow-hidden rounded-[18px] border border-[var(--border)] bg-card [box-shadow:var(--shadow-overlay)]">
         <div className="flex-shrink-0 border-b border-[var(--border-subtle)] px-6 py-5">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold tracking-[-0.02em] text-foreground">{t('components.sessionRequest.title')}</h2>
+            <h2 id="session-request-title" className="text-xl font-semibold tracking-[-0.02em] text-foreground">{t('components.sessionRequest.title')}</h2>
             <button disabled={submitting} aria-label={copy.close} onClick={onClose} className="grid size-9 place-items-center rounded-lg text-2xl leading-none text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">&times;</button>
           </div>
           <p className="text-sm text-muted-foreground mt-1">{t('components.sessionRequest.subtitle', { name: mentor.name, department: mentor.department })}</p>
@@ -274,5 +286,6 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
         </div>
       </div>
     </div>
+    </Portal>
   );
 }

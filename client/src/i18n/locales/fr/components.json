@@ -326,5 +326,10 @@
   "components.ics.summary": "Échange avec {name}",
   "components.ics.notConfigured": "La synchronisation du calendrier n’est pas encore configurée. Téléchargez le fichier .ics.",
   "components.ics.reconnect": "Reconnectez votre calendrier et réessayez.",
-  "components.ics.connectFailed": "Service de calendrier injoignable. Réessayez dans un instant."
+  "components.ics.connectFailed": "Service de calendrier injoignable. Réessayez dans un instant.",
+  "components.calendarCallback.title": "Connexion de l'agenda",
+  "components.calendarCallback.progress": "Finalisation de la connexion sécurisée…",
+  "components.calendarCallback.invalidResponse": "La réponse d'autorisation de l'agenda est invalide.",
+  "components.calendarCallback.error": "Impossible de connecter l'agenda. Veuillez réessayer.",
+  "components.calendarCallback.return": "Retour aux messages"
 }

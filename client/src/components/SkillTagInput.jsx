@@ -4,6 +4,7 @@ import EscoSuggestInput from './EscoSuggestInput.jsx';
 import { Button } from './ui/button.jsx';
 import { useModalA11y } from '../lib/useModalA11y.js';
 import { useT } from '../i18n/index.jsx';
+import Portal from './ui/portal.jsx';
 
 // Tagged-input for plain skill strings. Each entry is just a string in the
 // `value` array. ESCO autocomplete is suggestive: the user can still confirm
@@ -102,8 +103,9 @@ export default function SkillTagInput({ value = [], onChange, placeholder, lang,
 
       {/* Popup — remove the skill. */}
       {openIdx !== null && (
+        <Portal>
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          className="app-modal-overlay bg-black/50"
           onMouseDown={(e) => { if (e.target === e.currentTarget) setOpenIdx(null); }}
         >
           <div
@@ -111,7 +113,7 @@ export default function SkillTagInput({ value = [], onChange, placeholder, lang,
             role="dialog"
             aria-modal="true"
             aria-labelledby={`skill-tag-title-${openIdx}`}
-            className="w-full max-w-md rounded-[10px] border border-[var(--border)] bg-card [box-shadow:var(--shadow-overlay)]"
+            className="app-modal-panel w-full max-w-md overflow-hidden rounded-[10px] border border-[var(--border)] bg-card [box-shadow:var(--shadow-overlay)]"
           >
             <div className="flex items-start justify-between gap-3 border-b border-[var(--border-subtle)] p-5">
               <h2 id={`skill-tag-title-${openIdx}`} className="text-base font-medium leading-snug text-foreground">
@@ -144,6 +146,7 @@ export default function SkillTagInput({ value = [], onChange, placeholder, lang,
             </div>
           </div>
         </div>
+        </Portal>
       )}
     </div>
   );

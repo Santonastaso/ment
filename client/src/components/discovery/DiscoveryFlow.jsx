@@ -83,7 +83,7 @@ function visibleTurns(storedTurns) {
   });
 }
 
-function MatchCard({ match, index, selected, onSelect, copy }) {
+function MatchCard({ match, index, selected, onSelect, copy, style }) {
   const person = match.person;
   const jobTitle = person.job_title || person.current_role;
   const role = [jobTitle, person.department].filter(Boolean).join(' · ');
@@ -98,7 +98,7 @@ function MatchCard({ match, index, selected, onSelect, copy }) {
   const background = [person.program, person.cohort_year].filter(Boolean).join(' · ') || '';
 
   return (
-    <article role="radio" aria-checked={selected} className={`person-row discovery-match-card ${selected ? 'is-selected' : ''}`}>
+    <article role="radio" aria-checked={selected} style={style} className={`person-row discovery-match-card ${selected ? 'is-selected' : ''}`}>
       <span className="discovery-avatar person-row-avatar" style={{ backgroundColor: avatarTints[index % avatarTints.length] }}>
         {initials(person.name)}
         {selected && <span className="discovery-selected-mark"><Check /></span>}
@@ -408,7 +408,7 @@ export default function DiscoveryFlow() {
       return <div className={`discovery-chat-turn is-assistant ${turn.kind === 'error' ? 'is-error' : ''}`} key={`${turn.at || index}-${index}`}>{continues ? <span className="discovery-agent-mark-spacer" aria-hidden="true" /> : <span className="discovery-agent-mark" aria-label="Ment">M</span>}<p className="discovery-assistant-bubble">{renderInline(response)}</p></div>;
     })}</div>
     {(stage === 'matching' || stage === 'drafting') && <div className="discovery-chat-turn is-assistant is-working" role="status" aria-live="polite"><span className="discovery-agent-mark" aria-label="Ment">M</span><p className="discovery-assistant-bubble">{stage === 'matching' ? copy.finding : copy.drafting}<span className="discovery-typing" aria-hidden="true"><i /><i /><i /></span></p></div>}
-    {stage === 'choose' && <div className="discovery-reveal"><div className="discovery-match-grid" role="radiogroup" aria-label="Choose a person">{matches.map((match, index) => <MatchCard key={match.person.id} match={match} index={index} selected={selected?.person.id === match.person.id} onSelect={choose} copy={copy} />)}</div><div className="discovery-result-actions" role="group" aria-label={copy.useful}>
+    {stage === 'choose' && <div className="discovery-reveal"><div className="discovery-match-grid" role="radiogroup" aria-label="Choose a person">{matches.map((match, index) => <MatchCard key={match.person.id} match={match} index={index} selected={selected?.person.id === match.person.id} onSelect={choose} copy={copy} style={{ animationDelay: `${Math.min(index, 6) * 65}ms` }} />)}</div><div className="discovery-result-actions" role="group" aria-label={copy.useful}>
       <button type="button" className="discovery-result-icon" aria-label={`${copy.useful} ${copy.yes}`} title={copy.yes} aria-pressed={matchFeedback === true} onClick={() => saveMatchFeedback(true)}><ThumbsUp /></button>
       <button type="button" className="discovery-result-icon" aria-label={`${copy.useful} ${copy.no}`} title={copy.no} aria-pressed={matchFeedback === false} onClick={() => saveMatchFeedback(false)}><ThumbsDown /></button>
       <span className="discovery-result-separator" aria-hidden="true" />

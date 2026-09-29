@@ -4,6 +4,7 @@ import { useT } from '../i18n/index.jsx';
 import { Button } from './ui/button.jsx';
 import { ChevronRight, X } from 'lucide-react';
 import { useModalA11y } from '../lib/useModalA11y.js';
+import Portal from './ui/portal.jsx';
 
 // Draft ownership stays in Profile so changing tabs does not discard an answer.
 // `open`/`onOpenChange` let Profile drive the check-in from its header row, so
@@ -183,8 +184,9 @@ function ReflectionReview({ entry, busy, onApply, lang }) {
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 p-4" onMouseDown={event => { if (event.target === event.currentTarget) setOpen(false); }}>
-          <article ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={`reflection-${entry.id}`} className="flex max-h-[80vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-card shadow-[var(--shadow-overlay)]">
+        <Portal>
+        <div className="app-modal-overlay bg-black/20" onMouseDown={event => { if (event.target === event.currentTarget) setOpen(false); }}>
+          <article ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={`reflection-${entry.id}`} className="app-modal-panel flex w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-card shadow-[var(--shadow-overlay)]">
             <header className="flex items-center justify-between gap-3 px-5 pb-2 pt-5">
               <div>
                 <h2 id={`reflection-${entry.id}`} className="text-base font-medium">{t('components.reflection.weeklyCheckIn')}</h2>
@@ -216,6 +218,7 @@ function ReflectionReview({ entry, busy, onApply, lang }) {
             <footer className="flex justify-end px-5 pb-5"><Button type="button" size="sm" onClick={() => setOpen(false)}>{t('components.popup.done')}</Button></footer>
           </article>
         </div>
+        </Portal>
       )}
     </>
   );

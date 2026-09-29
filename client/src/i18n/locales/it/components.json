@@ -326,5 +326,10 @@
   "components.ics.summary": "Conversazione con {name}",
   "components.ics.notConfigured": "La sincronizzazione del calendario non è ancora configurata. Scarica il file .ics.",
   "components.ics.reconnect": "Ricollega il calendario e riprova.",
-  "components.ics.connectFailed": "Servizio calendario non raggiungibile. Riprova tra poco."
+  "components.ics.connectFailed": "Servizio calendario non raggiungibile. Riprova tra poco.",
+  "components.calendarCallback.title": "Connessione del calendario",
+  "components.calendarCallback.progress": "Completamento della connessione sicura…",
+  "components.calendarCallback.invalidResponse": "La risposta di autorizzazione del calendario non è valida.",
+  "components.calendarCallback.error": "Impossibile connettere il calendario. Riprova.",
+  "components.calendarCallback.return": "Torna ai messaggi"
 }

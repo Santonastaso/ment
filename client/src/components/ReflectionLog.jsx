@@ -4,6 +4,7 @@ import api from '../api/index.js';
 import { useT } from '../i18n/index.jsx';
 import { Button } from './ui/button.jsx';
 import { useModalA11y } from '../lib/useModalA11y.js';
+import Portal from './ui/portal.jsx';
 
 // Demo synonym fixtures suggest skills; users explicitly apply them to their profile.
 
@@ -354,8 +355,9 @@ function Entry({ entry, onApply, onDelete, onReclassify, timeAgo }) {
 
       {/* Popup with the full entry: answers, skill signals, actions. */}
       {open && (
+        <Portal>
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          className="app-modal-overlay bg-black/50"
           onMouseDown={(e) => { if (e.target === e.currentTarget) setOpen(false); }}
         >
           <div
@@ -363,7 +365,7 @@ function Entry({ entry, onApply, onDelete, onReclassify, timeAgo }) {
             role="dialog"
             aria-modal="true"
             aria-labelledby={`reflection-modal-title-${entry.id}`}
-            className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-[10px] border border-[var(--border)] bg-card [box-shadow:var(--shadow-overlay)]"
+            className="app-modal-panel flex w-full max-w-lg flex-col overflow-hidden rounded-[10px] border border-[var(--border)] bg-card [box-shadow:var(--shadow-overlay)]"
           >
             <div className="flex items-start justify-between gap-3 border-b border-[var(--border-subtle)] p-5">
               <div>
@@ -383,7 +385,7 @@ function Entry({ entry, onApply, onDelete, onReclassify, timeAgo }) {
               </Button>
             </div>
 
-            <div className="flex-1 space-y-4 overflow-y-auto p-5">
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
               {rawSource === 'demo' && (
                 <p className="text-sm text-muted-foreground">{t('components.reflection.demo.suggestions')}</p>
               )}
@@ -470,6 +472,7 @@ function Entry({ entry, onApply, onDelete, onReclassify, timeAgo }) {
             </div>
           </div>
         </div>
+        </Portal>
       )}
     </>
   );

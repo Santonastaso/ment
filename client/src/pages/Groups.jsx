@@ -1,18 +1,16 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../api/index.js';
 import { useT } from '../i18n/index.jsx';
-import { formatMessageTime } from '../lib/utils.js';
 import { PageShell } from '../components/PageShell.jsx';
 import { Surface, SurfaceBody, SurfaceHeader } from '../components/Surface.jsx';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Send, Users } from 'lucide-react';
-import { useAuth } from '../context/AuthContext.jsx';
-import { supabase } from '../lib/supabase.js';
+import { Plus, Users } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog.jsx';
 
 export default function Groups() {
-  const { user, refreshUnreadCounts } = useAuth();
+  const navigate = useNavigate();
   const { t } = useT();
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -20,9 +18,6 @@ export default function Groups() {
   const [description, setDescription] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [selectedGroup, setSelectedGroup] = useState(null);
-  const [messages, setMessages] = useState([]);
-  const [draft, setDraft] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
 
   async function load() {
@@ -39,37 +34,6 @@ export default function Groups() {
   }
 
   useEffect(() => { load(); }, []);
-
-  useEffect(() => {
-    if (!selectedGroup?.joined) { setMessages([]); return undefined; }
-    let active = true;
-    const refresh = () => api.get(`/groups/${selectedGroup.id}/messages`)
-      .then(({ data }) => {
-        if (!active) return;
-        setMessages(data || []);
-        return api.post(`/groups/${selectedGroup.id}/read`, {}).then(refreshUnreadCounts);
-      })
-      .catch(() => { if (active) setError(t('groups.error.load')); });
-    refresh();
-    const channel = supabase.channel(`group-${selectedGroup.id}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_messages', filter: `group_id=eq.${selectedGroup.id}` }, refresh)
-      .subscribe();
-    return () => { active = false; supabase.removeChannel(channel); };
-  }, [selectedGroup?.id, selectedGroup?.joined]);
-
-  async function sendMessage(event) {
-    event.preventDefault();
-    const body = draft.trim();
-    if (!body || !selectedGroup) return;
-    setSaving(true); setError('');
-    try {
-      const { data } = await api.post(`/groups/${selectedGroup.id}/messages`, { body });
-      setMessages((items) => items.some((item) => item.id === data.id) ? items : [...items, data]);
-      setDraft('');
-    } catch (requestError) {
-      setError(requestError?.response?.data?.error || t('groups.error.save'));
-    } finally { setSaving(false); }
-  }
 
   async function createGroup() {
     if (!name.trim()) return;
@@ -92,8 +56,9 @@ export default function Groups() {
     setSaving(true);
     setError('');
     try {
-      if (group.joined) await api.delete(`/groups/${group.id}/membership`);
-      else await api.post(`/groups/${group.id}/join`, {});
+      if (group.joined) {
+        await api.delete(`/groups/${group.id}/membership`);
+      } else await api.post(`/groups/${group.id}/join`, {});
       await load();
     } catch (e) {
       setError(e?.response?.data?.error || t('groups.error.save'));
@@ -127,7 +92,7 @@ export default function Groups() {
           ) : (
             <div aria-busy={loading}>
               {groups.map((group) => (
-                <article key={group.id} className={`person-row ${selectedGroup?.id === group.id ? 'is-selected' : ''}`}>
+                <article key={group.id} className="person-row">
                   <span className="person-row-avatar group-row-mark" aria-hidden="true">
                     <Users className="size-4" />
                   </span>
@@ -144,8 +109,8 @@ export default function Groups() {
                     {group.joined && (
                       <button
                         type="button"
-                        className={`person-row-action ${selectedGroup?.id === group.id ? 'is-selected' : ''}`}
-                        onClick={() => setSelectedGroup(group)}
+                        className="person-row-action"
+                        onClick={() => navigate(`/conversations?group=${group.id}`)}
                       >
                         {t('groups.chat')}
                       </button>
@@ -166,29 +131,6 @@ export default function Groups() {
         </SurfaceBody>
       </Surface>
 
-      {selectedGroup?.joined && <Surface>
-        <SurfaceHeader title={selectedGroup.name} description={selectedGroup.description || t('groups.chatSubtitle')} />
-        <SurfaceBody className="pt-4">
-          <div className="flex min-h-80 flex-col gap-2 rounded-2xl bg-muted/40 p-4">
-            {messages.length === 0 && <p className="m-auto text-sm text-muted-foreground">{t('groups.chatEmpty')}</p>}
-            {/* Same bubbles as the Messages tab and the discovery transcript. */}
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`conversation-message ${message.sender_id === user?.id ? 'is-mine' : 'is-theirs'}`}
-              >
-                {message.sender_id !== user?.id && <strong>{message.sender_name}</strong>}
-                <p>{message.body}</p>
-                <time>{formatMessageTime(message.created_at)}</time>
-              </div>
-            ))}
-          </div>
-          <form className="mt-3 flex gap-2" onSubmit={sendMessage}>
-            <input className="input flex-1" value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={6000} placeholder={t('groups.chatPlaceholder')} aria-label={t('groups.chatPlaceholder')} />
-            <Button type="submit" disabled={!draft.trim() || saving} aria-label={t('groups.chatSend')}><Send className="size-4" /></Button>
-          </form>
-        </SurfaceBody>
-      </Surface>}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
           <DialogHeader>

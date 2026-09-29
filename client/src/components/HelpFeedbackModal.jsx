@@ -3,6 +3,7 @@ import api from '../api/index.js';
 import { useModalA11y } from '../lib/useModalA11y.js';
 import { useT } from '../i18n/index.jsx';
 import { Button } from './ui/button.jsx';
+import Portal from './ui/portal.jsx';
 
 const CATEGORIES = [
   { value: 'general', labelKey: 'components.help.categoryGeneral' },
@@ -53,8 +54,9 @@ export default function HelpFeedbackModal({ onClose }) {
   }
 
   return (
+    <Portal>
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className="app-modal-overlay bg-black/50"
       onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose?.(); }}
     >
       <div
@@ -62,7 +64,7 @@ export default function HelpFeedbackModal({ onClose }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="help-modal-title"
-        className="card w-full max-w-md flex flex-col [box-shadow:var(--shadow-overlay)]"
+        className="app-modal-panel card flex w-full max-w-md flex-col overflow-hidden [box-shadow:var(--shadow-overlay)]"
       >
         <div className="p-6 border-b border-[var(--border-subtle)]">
           <div className="flex items-center justify-between gap-3">
@@ -84,7 +86,7 @@ export default function HelpFeedbackModal({ onClose }) {
           </p>
         </div>
 
-        <div className="p-6 space-y-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-6">
           {sentAt ? (
             <div className="rounded-lg border border-[var(--border)] bg-muted/40 p-4 text-sm text-foreground">
               <p className="font-medium">{t('components.help.thanksTitle')}</p>
@@ -159,5 +161,6 @@ export default function HelpFeedbackModal({ onClose }) {
         </div>
       </div>
     </div>
+    </Portal>
   );
 }

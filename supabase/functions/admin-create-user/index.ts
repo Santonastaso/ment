@@ -132,7 +132,6 @@ Deno.serve(async (req) => {
         email,
         password: tempPassword,
         email_confirm: true,
-        app_metadata: { organization_id: adminOrgId, admin_scope: 'none', must_change_password: true },
         user_metadata: {
           name, department, seniority, job_title, tenure_years, location,
         },
@@ -144,16 +143,27 @@ Deno.serve(async (req) => {
         continue;
       }
       userId = data.user.id;
-      // Trigger seeded basic columns; upsert the rest in case metadata path differs.
-      const { error: profileError } = await ctx.sb.from('profiles').update({
+      const { error: metadataError } = await ctx.sb.auth.admin.updateUserById(userId, {
+        app_metadata: { organization_id: adminOrgId, admin_scope: 'none', must_change_password: true },
+      });
+      if (metadataError) {
+        await ctx.sb.auth.admin.deleteUser(userId);
+        failures.push({ row: rowIndex + 2, email, error: 'trusted_metadata_update_failed' });
+        skipped++;
+        continue;
+      }
+      const { error: profileError } = await ctx.sb.from('profiles').insert({
+        id: userId,
         name, department, seniority, job_title, program, cohort_year, role: persona,
         tenure_years, location, linkedin_url, linkedin_headline,
         external_source: external_source || null, external_id: external_id || null,
         source_synced_at: external_source ? new Date().toISOString() : null,
         onboarding_complete: true,
         organization_id: adminOrgId,
-      }).eq('id', userId);
+        admin_scope: 'none', is_admin: false, must_change_password: true,
+      });
       if (profileError) {
+        await ctx.sb.auth.admin.deleteUser(userId);
         failures.push({ row: rowIndex + 2, email, error: profileError.message });
         skipped++;
         continue;

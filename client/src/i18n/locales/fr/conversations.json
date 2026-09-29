@@ -9,6 +9,7 @@
   "conversations.accept": "Accepter",
   "conversations.decline": "Refuser",
   "conversations.waiting": "En attente de la réponse de {name}",
+  "conversations.requestSent": "Demande envoyée",
   "conversations.expires": "La demande expire le {date}",
   "conversations.withdraw": "Retirer la demande",
   "conversations.pickTime": "Choisir un horaire",
@@ -29,12 +30,13 @@
   "conversations.filter.label": "Filtrer les conversations",
   "conversations.filter.all": "Toutes",
   "conversations.filter.needsYou": "À traiter",
+  "conversations.filter.waiting": "En attente",
   "conversations.filter.scheduled": "Programmées",
   "conversations.filter.past": "Passées",
   "conversations.filter.empty": "Rien ici pour le moment.",
   "conversations.state.reply": "Répondre",
   "conversations.state.confirmTime": "Confirmer l’horaire",
   "conversations.state.markComplete": "Marquer terminée",
-  "conversations.state.awaitingReply": "En attente de réponse",
+  "conversations.state.awaitingReply": "En attente",
   "conversations.newTime": "Nouvel horaire"
 }

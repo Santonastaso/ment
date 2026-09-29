@@ -9,6 +9,7 @@
   "conversations.accept": "Accept",
   "conversations.decline": "Decline",
   "conversations.waiting": "Waiting for {name} to respond",
+  "conversations.requestSent": "Request sent",
   "conversations.expires": "Request expires {date}",
   "conversations.withdraw": "Withdraw request",
   "conversations.pickTime": "Choose a time",
@@ -29,12 +30,13 @@
   "conversations.filter.label": "Filter conversations",
   "conversations.filter.all": "All",
   "conversations.filter.needsYou": "Needs you",
+  "conversations.filter.waiting": "Waiting",
   "conversations.filter.scheduled": "Scheduled",
   "conversations.filter.past": "Past",
   "conversations.filter.empty": "Nothing here right now.",
   "conversations.state.reply": "Reply",
   "conversations.state.confirmTime": "Confirm time",
   "conversations.state.markComplete": "Mark complete",
-  "conversations.state.awaitingReply": "Awaiting reply",
+  "conversations.state.awaitingReply": "Waiting",
   "conversations.newTime": "New time"
 }

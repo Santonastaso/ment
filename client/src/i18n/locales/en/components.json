@@ -342,5 +342,10 @@
   "components.ics.summary": "Chat with {name}",
   "components.ics.notConfigured": "Calendar sync is not set up yet. Download the .ics file instead.",
   "components.ics.reconnect": "Reconnect your calendar and try again.",
-  "components.ics.connectFailed": "Could not reach the calendar service. Try again shortly."
+  "components.ics.connectFailed": "Could not reach the calendar service. Try again shortly.",
+  "components.calendarCallback.title": "Connecting calendar",
+  "components.calendarCallback.progress": "Finishing the secure connection…",
+  "components.calendarCallback.invalidResponse": "The calendar authorization response is invalid.",
+  "components.calendarCallback.error": "Could not connect the calendar. Please try again.",
+  "components.calendarCallback.return": "Return to messages"
 }

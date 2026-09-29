@@ -4,6 +4,7 @@ import api from '../api/index.js';
 import { useModalA11y } from '../lib/useModalA11y.js';
 import { useT } from '../i18n/index.jsx';
 import { Button } from './ui/button.jsx';
+import Portal from './ui/portal.jsx';
 
 // Popup the mentee sees on their next dashboard load after a mentor accepts
 // one or more session requests. Lists each pending acceptance with:
@@ -112,8 +113,9 @@ export default function AcceptanceModal({ sessions, onAcknowledged, onClose }) {
   }
 
   return (
+    <Portal>
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className="app-modal-overlay bg-black/50"
       onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose?.(); }}
     >
       <div
@@ -121,7 +123,7 @@ export default function AcceptanceModal({ sessions, onAcknowledged, onClose }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="acceptance-modal-title"
-        className="flex max-h-[85vh] w-full max-w-xl flex-col rounded-[10px] border border-[var(--border)] bg-card [box-shadow:var(--shadow-overlay)]"
+        className="app-modal-panel flex w-full max-w-xl flex-col overflow-hidden rounded-[10px] border border-[var(--border)] bg-card [box-shadow:var(--shadow-overlay)]"
       >
         <div className="p-6 border-b border-[var(--border-subtle)] flex-shrink-0">
           <div className="flex items-center justify-between gap-3">
@@ -142,7 +144,7 @@ export default function AcceptanceModal({ sessions, onAcknowledged, onClose }) {
           </p>
         </div>
 
-        <div className="p-6 space-y-4 overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto p-6 space-y-4">
           {localSessions.map((session) => {
             const scheduled = formatScheduled(session.scheduled_at, lang);
             const isEditing = editingDateFor === session.id;
@@ -240,5 +242,6 @@ export default function AcceptanceModal({ sessions, onAcknowledged, onClose }) {
         </div>
       </div>
     </div>
+    </Portal>
   );
 }
