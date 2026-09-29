@@ -39,16 +39,16 @@ SUPABASE_URL = env("SUPABASE_URL")
 ANON = env("SUPABASE_ANON_KEY")
 SRK = env("SUPABASE_SERVICE_ROLE_KEY")
 if not SUPABASE_URL or not ANON:
-    print("Skipping RLS smoke test: SUPABASE_URL / SUPABASE_ANON_KEY not set.")
-    sys.exit(0)
+    print("RLS smoke test requires SUPABASE_URL and SUPABASE_ANON_KEY.")
+    sys.exit(1)
 
-EMP = {"email": os.environ.get("MENT_EMP_EMAIL", ""),
-       "password": os.environ.get("MENT_EMP_PASSWORD", "")}
-ADMIN = {"email": os.environ.get("MENT_ADMIN_EMAIL", ""),
-         "password": os.environ.get("MENT_ADMIN_PASSWORD", "")}
+EMP = {"email": env("MENT_EMP_EMAIL"),
+       "password": env("MENT_EMP_PASSWORD")}
+ADMIN = {"email": env("MENT_ADMIN_EMAIL"),
+         "password": env("MENT_ADMIN_PASSWORD")}
 if not all(EMP.values()) or not all(ADMIN.values()):
-    print("Skipping RLS smoke test: provide dedicated MENT_EMP_* and MENT_ADMIN_* test credentials.")
-    sys.exit(0)
+    print("RLS smoke test requires dedicated MENT_EMP_* and MENT_ADMIN_* test credentials.")
+    sys.exit(1)
 
 cases: list[dict] = []
 
@@ -115,8 +115,8 @@ def main() -> int:
         bob = sign_in(EMP["email"], EMP["password"])
         alice = sign_in(ADMIN["email"], ADMIN["password"])
     except (urllib.error.HTTPError, urllib.error.URLError) as e:
-        print(f"Skipping RLS smoke test: could not sign in seed users ({e}).")
-        return 0
+        print(f"RLS smoke test could not sign in test users ({e}).")
+        return 1
 
     # Resolve ids dynamically instead of hardcoding seed UUIDs.
     _, bob_profile = rest("POST", "rpc/my_profile", bob, body={})

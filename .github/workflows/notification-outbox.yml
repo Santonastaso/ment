@@ -1,0 +1,27 @@
+name: notification-outbox
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+jobs:
+  send:
+    if: github.event_name == 'workflow_dispatch' || vars.NOTIFICATIONS_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send queued notifications
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo '::error::Configure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.'
+            exit 1
+          fi
+          curl --silent --show-error --fail-with-body \
+            --request POST \
+            --header "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            --header 'Content-Type: application/json' \
+            "$SUPABASE_URL/functions/v1/send-notification-outbox"

@@ -1,12 +1,6 @@
 name: supabase-functions
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'supabase/functions/**'
-      - 'supabase/config.toml'
-      - '.github/workflows/supabase-functions.yml'
   workflow_dispatch:
 
 concurrency:
@@ -17,6 +11,7 @@ jobs:
   deploy:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - uses: actions/checkout@v4
 
@@ -34,7 +29,8 @@ jobs:
             echo "can_deploy=true" >> "$GITHUB_OUTPUT"
           else
             echo "can_deploy=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::Skipping Supabase Edge Function deploy because SUPABASE_ACCESS_TOKEN or SUPABASE_PROJECT_REF is not configured."
+            echo "::error::SUPABASE_ACCESS_TOKEN and SUPABASE_PROJECT_REF are required to deploy Edge Functions."
+            exit 1
           fi
 
       - name: Deploy Edge Functions

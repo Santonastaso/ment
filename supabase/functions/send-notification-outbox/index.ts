@@ -1,9 +1,11 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { isDeliverable, messageFor } from '../_shared/notification-content.mjs';
 
 const url = Deno.env.get('SUPABASE_URL')!;
 const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const resendKey = Deno.env.get('RESEND_API_KEY');
-const from = Deno.env.get('NOTIFICATION_FROM_EMAIL') || 'MENT <notifications@example.com>';
+const from = Deno.env.get('NOTIFICATION_FROM_EMAIL');
+const appOrigin = Deno.env.get('APP_ORIGIN');
 const sb = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
 function json(payload: unknown, status = 200) {
@@ -28,6 +30,12 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
   if (!hasServiceRole(req)) return json({ error: 'service_role_required' }, 403);
   if (!resendKey) return json({ error: 'RESEND_API_KEY_not_configured' }, 503);
+  if (!from || !appOrigin || !/^https:\/\/[^/]+$/i.test(appOrigin)) {
+    return json({ error: 'notification_sender_not_configured' }, 503);
+  }
+
+  const { error: reminderError } = await sb.rpc('enqueue_meeting_reminders');
+  if (reminderError) return json({ error: 'meeting_reminder_queue_failed' }, 500);
 
   // Recover jobs left mid-send if the worker was interrupted.
   await sb
@@ -38,7 +46,7 @@ Deno.serve(async (req) => {
 
   const { data: rows, error } = await sb
     .from('notification_outbox')
-    .select('id, user_id, topic, payload')
+    .select('id, user_id, topic, payload, created_at, idempotency_key, attempts')
     .eq('status', 'queued')
     .order('created_at')
     .limit(50);
@@ -49,12 +57,28 @@ Deno.serve(async (req) => {
   for (const row of rows || []) {
     const { data: claim } = await sb
       .from('notification_outbox')
-      .update({ status: 'sending', claimed_at: new Date().toISOString() })
+      .update({ status: 'sending', claimed_at: new Date().toISOString(), attempts: row.attempts + 1 })
       .eq('id', row.id)
       .eq('status', 'queued')
       .select('id')
       .maybeSingle();
     if (!claim) continue;
+
+    const payload = row.payload && typeof row.payload === 'object' && !Array.isArray(row.payload)
+      ? row.payload as Record<string, unknown> : {};
+    const content = messageFor(row.topic, payload, appOrigin);
+    let session = null;
+    if (content && row.topic !== 'reflection_reminder') {
+      const sessionId = Number(payload.session_id);
+      const { data } = await sb.from('sessions')
+        .select('mentor_id, mentee_id, status, scheduled_at').eq('id', sessionId).maybeSingle();
+      session = data;
+    }
+    if (!content || !isDeliverable({ ...row, payload }, session)) {
+      failed++;
+      await sb.from('notification_outbox').update({ status: 'failed', claimed_at: null }).eq('id', row.id).eq('status', 'sending');
+      continue;
+    }
 
     // Where the member asked to be written to, falling back to the address
     // they sign in with. The two differ whenever the login is a placeholder or
@@ -72,12 +96,16 @@ Deno.serve(async (req) => {
 
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
-      headers: { authorization: `Bearer ${resendKey}`, 'content-type': 'application/json' },
+      headers: {
+        authorization: `Bearer ${resendKey}`,
+        'content-type': 'application/json',
+        'Idempotency-Key': row.idempotency_key,
+      },
       body: JSON.stringify({
         from,
         to: [email],
-        subject: 'Your MENT reflection is ready',
-        text: 'Take two minutes to reflect on what you need support with and what went well this week.',
+        subject: content!.subject,
+        text: content!.text,
       }),
     });
     if (response.ok) {
@@ -85,8 +113,11 @@ Deno.serve(async (req) => {
       await sb.from('notification_outbox').update({ status: 'sent', claimed_at: null, sent_at: new Date().toISOString() }).eq('id', row.id).eq('status', 'sending');
     } else {
       failed++;
-      await sb.from('notification_outbox').update({ status: 'failed', claimed_at: null }).eq('id', row.id).eq('status', 'sending');
+      const retry = ([409, 429].includes(response.status) || response.status >= 500) && row.attempts < 2;
+      await sb.from('notification_outbox')
+        .update({ status: retry ? 'queued' : 'failed', claimed_at: null })
+        .eq('id', row.id).eq('status', 'sending');
     }
   }
-  return json({ sent, failed });
+  return json({ sent, failed }, failed ? 502 : 200);
 });

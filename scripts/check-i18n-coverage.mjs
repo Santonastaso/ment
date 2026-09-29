@@ -2,7 +2,7 @@
 // Audits the i18n catalogs and reports any key present in one locale but
 // missing in another. Exit code 1 if gaps are found (suitable for CI).
 //
-// Usage: node scripts/check-i18n-coverage.mjs [--fix-empty]
+// Usage: node scripts/check-i18n-coverage.mjs [--fix-empty] [--strict-translations]
 // With --fix-empty, missing keys are inserted into the target locale as empty
 // strings so a human can later fill them in (still exits 1 to flag).
 import fs from 'node:fs';
@@ -18,6 +18,7 @@ const LOCALES = fs.readdirSync(LOCALES_DIR, { withFileTypes: true })
   .map((d) => d.name)
   .sort((a, b) => (a === REFERENCE_LOCALE ? -1 : b === REFERENCE_LOCALE ? 1 : a.localeCompare(b)));
 const FIX_EMPTY = process.argv.includes('--fix-empty');
+const STRICT_TRANSLATIONS = process.argv.includes('--strict-translations');
 
 function loadLocaleNamespace(locale, ns) {
   const file = path.join(LOCALES_DIR, locale, `${ns}.json`);
@@ -113,24 +114,33 @@ if (dangling.length) {
 }
 
 let formatGaps = 0;
+let untranslated = 0;
 const placeholders = (value) => [...value.matchAll(/(?<!\{)\{(\w+)\}(?!\})/g)]
   .map((match) => match[1]).sort().join(',');
 for (const ns of namespaces) {
   const reference = loadLocaleNamespace(REFERENCE_LOCALE, ns);
   for (const locale of LOCALES.filter((name) => name !== REFERENCE_LOCALE)) {
     const catalog = loadLocaleNamespace(locale, ns);
+    const carryovers = [];
     for (const [key, source] of Object.entries(reference)) {
       const translated = catalog[key];
       if (typeof source !== 'string' || typeof translated !== 'string') continue;
+      if (!translated.trim() || (source.length > 15 && translated === source)) carryovers.push(key);
       if (/\{\{\w+\}\}/.test(translated) || placeholders(source) !== placeholders(translated)) {
         console.error(`Invalid interpolation in ${locale}/${ns}.json: ${key}`);
         formatGaps++;
       }
     }
+    if (carryovers.length) {
+      untranslated += carryovers.length;
+      console.log(`${locale}/${ns}.json: ${carryovers.length} blank or unchanged English values`);
+      if (STRICT_TRANSLATIONS) console.log(`  ${carryovers.join(', ')}`);
+    }
   }
 }
 
-if (totalGaps === 0 && usageGaps === 0 && formatGaps === 0) {
+if (untranslated) console.log(`${untranslated} translations need human review (some unchanged proper names may be intentional).`);
+if (totalGaps === 0 && usageGaps === 0 && formatGaps === 0 && (!STRICT_TRANSLATIONS || untranslated === 0)) {
   process.exit(0);
 }
 process.exit(1);

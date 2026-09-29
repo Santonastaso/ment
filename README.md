@@ -128,13 +128,10 @@ Production hosting is **Vercel**. Build is driven by [`vercel.json`](./vercel.js
 1. Vercel → Project → Settings → Environment Variables:
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
-2. Add the deployed origin (e.g. `https://ment-steel.vercel.app`) to Supabase Auth allow list:
-   ```bash
-   curl -X PATCH -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
-     -H "Content-Type: application/json" \
-     -d '{"site_url":"https://ment-steel.vercel.app","uri_allow_list":"http://localhost:3000,https://ment-steel.vercel.app,https://*-asantonastaso.vercel.app"}' \
-     https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/config/auth
-   ```
+2. Set the Supabase Auth site URL to the actual canonical production origin
+   (currently `https://www.ment-labs.com` if the apex redirects there), and
+   allow its `/reset-password` callback. Add only the staging and localhost
+   callback URLs actually used by the team.
 
 Preview deployments are automatic on every PR.
 
@@ -143,6 +140,13 @@ GitHub Actions expects these repository secrets for Supabase checks and function
 - `SUPABASE_ACCESS_TOKEN`
 - `SUPABASE_PROJECT_REF`
 - `SUPABASE_DB_URL` (optional, used for DB lint without linking)
+- `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and dedicated `MENT_EMP_*` / `MENT_ADMIN_*`
+  credentials for the RLS smoke test
+- `SUPABASE_SERVICE_ROLE_KEY` for the scheduled notification dispatcher
+
+Database migrations and Edge Functions are promoted separately from `main` via
+the manual `deploy-database` and `supabase-functions` workflows. Follow the
+[client pilot release gate](./docs/CLIENT_RELEASE.md) before enabling clients.
 
 CI also runs a full-history Gitleaks scan from the official CLI container with redacted output. Keep `actions/checkout` at `fetch-depth: 0` for that job so a secret committed and then removed still fails the PR.
 
@@ -152,7 +156,7 @@ CI also runs a full-history Gitleaks scan from the official CLI container with r
 
 Seed/test users are managed in Supabase Auth. Admin-created users receive a one-time temporary password from the admin import/reset flows and must rotate it on first login.
 
-`alice.chen@ment.io` is the admin.
+Use dedicated test accounts, not production member identities, for smoke checks.
 
 ---
 

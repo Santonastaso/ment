@@ -47,6 +47,10 @@ jobs:
           VITE_SUPABASE_URL: https://example.supabase.co
           VITE_SUPABASE_ANON_KEY: build_only_placeholder
 
+      - run: npm run check:i18n
+      - run: npm run check:migrations
+      - run: npm test
+
       - run: npm audit --omit=dev --audit-level=high
       - run: npm audit --prefix client --omit=dev --audit-level=high
 
@@ -73,12 +77,12 @@ jobs:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
-            echo "Skipping Supabase DB lint: SUPABASE_ACCESS_TOKEN is not configured."
-            exit 0
+            echo "::error::SUPABASE_ACCESS_TOKEN is required for production DB lint."
+            exit 1
           fi
           if [ -z "$SUPABASE_DB_URL" ] && [ -z "$SUPABASE_PROJECT_REF" ]; then
-            echo "Skipping Supabase DB lint: set SUPABASE_DB_URL or SUPABASE_PROJECT_REF."
-            exit 0
+            echo "::error::Set SUPABASE_DB_URL or SUPABASE_PROJECT_REF for production DB lint."
+            exit 1
           fi
           # The project reference is maintained by Supabase and avoids a
           # stale direct connection URL breaking CI after a password rotation.
