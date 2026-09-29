@@ -10,41 +10,55 @@ Shipped work is in the git log and not repeated here.
 
 ## 1. Blocked on credentials or a decision — not on code
 
-### 1.1 Nothing can email anyone — highest impact
+### 1.1 Notifications are produced but cannot be sent
 
-Two separate gaps, both verified against production on 26 Sep.
+Verified against production on 29 Sep. The plumbing is now built — what is
+missing is two secrets and a decision about the backlog.
 
-**Nothing drains the outbox.** `send-notification-outbox` exists, is correct, and
-now resolves the right recipient — but nothing invokes it. `RESEND_API_KEY` is
-unset, and no `pg_cron` job calls it. The six live jobs are `mt-expire-requests`,
-`mt-nightly-rematch`, `mt-rate-limit-cleanup`, `mt-reflection-email-outbox`,
-`mt-stale-matches`, `mt-weekly-checkin`; none of them sends.
+**Built and working:** `0048_session_notifications` enqueues session events, and
+`.github/workflows/notification-outbox.yml` invokes the worker every 15 minutes.
+`send-notification-outbox` resolves `profiles.notification_email` first, falling
+back to the sign-in address.
 
-`public.notification_outbox` currently holds **70 rows, all `queued`**. They
-accumulate every Monday and are never delivered.
+**Blocking:** `RESEND_API_KEY` and `NOTIFICATION_FROM` are not set as Supabase
+secrets. The worker cannot send, so nothing is delivered.
 
-**Almost nothing fills it either.** The only producer in the schema is
-`enqueue_reflection_email_reminders()`, the weekly reflection nudge. Session
-requests, acceptances and meeting reminders **enqueue nothing at all**.
+`public.notification_outbox` holds **195 rows, all `queued`** — up from 70 on
+26 Sep. Nothing is `sent` and nothing is `failed`; a failing worker would leave
+`failed` rows, so it is not running at all.
 
-So wiring up the sender is necessary but not sufficient. An alumnus would still
-not be told a student had asked for their time — that notification does not
-exist yet and has to be written.
+Two decisions before switching it on:
 
-To do, in order: add producers for the session lifecycle (request received,
-request accepted, meeting tomorrow); set `RESEND_API_KEY` and the sender domain;
-add a `pg_cron` entry invoking the worker on a short interval; then drain or
-discard the 70 stale rows before the first real send, since they are weeks old.
+1. **The backlog sends at once.** Some rows are weeks old. A tester receiving a
+   reminder about a meeting from May is a bad first impression. Decide whether to
+   deliver, discard, or mark the pre-cutover rows as sent.
+2. **`notification_email` is still unpopulated.** Until the pilot addresses are
+   filled in, every one of those 195 goes to a placeholder login address — and to
+   whoever owns those domains, if any are real. See 1.3.
 
-### 1.2 Calendar sync cannot work
+### 1.2 Calendar sync, including Meet and Teams links
 
-`calendar-provider` throws `calendar_provider_not_configured` because the OAuth
-apps do not exist. `docs/OWNER_ACTIONS.md` §2 has the full checklist: Google OAuth
-web app, Microsoft Entra app, `https://YOUR_DOMAIN/calendar/callback`, scopes, then
-`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `MICROSOFT_*` /
-`CALENDAR_TOKEN_ENCRYPTION_KEY` as Supabase secrets.
+**The code is complete**, including the video links. `calendar-provider` asks
+Google for a `hangoutsMeet` conference on event creation and reads back
+`hangoutLink`; for Microsoft it sets `isOnlineMeeting` with
+`onlineMeetingProvider: 'teamsForBusiness'` and reads `onlineMeeting.joinUrl`.
+Either way the link is written to `sessions.meeting_url` and shown in the thread.
 
-The UI now states this plainly and points at the `.ics` download, which works.
+So Meet and Teams are not separate work — they come with the OAuth setup and
+need nothing further once it is done.
+
+**Blocking:** every credential is missing. Verified on 29 Sep — all six of
+`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `MICROSOFT_CLIENT_ID`,
+`MICROSOFT_CLIENT_SECRET`, `MICROSOFT_TENANT_ID` and
+`CALENDAR_TOKEN_ENCRYPTION_KEY` are unset.
+
+`OWNER_ACTIONS.md` §2 has the checklist: create the Google OAuth web app and the
+Microsoft Entra app, register `https://YOUR_DOMAIN/calendar/callback`, approve
+the scopes (`Calendars.ReadWrite`, `OnlineMeetings.ReadWrite`, `User.Read`,
+`offline_access`), then set the secrets.
+
+Until then the UI says so plainly and points at the `.ics` download, which works
+and carries the meeting into any calendar — just without a generated video link.
 
 ### 1.3 Pilot notification addresses are not populated
 
@@ -122,8 +136,23 @@ Both are recovered verbatim from `schema_migrations.statements` and committed.
 The client calls both, so **a database rebuilt from this repo was missing a
 privacy boundary and a skills RPC**.
 
-The recovery is done; the cause is not. Someone has a workflow that writes to
-production without committing, and it will recur.
+The same happened with two source files on 29 Sep — inter-org identity redaction
+in `discovery-assistant` and a deactivated-account check in `requireUser` — both
+live and uncommitted. Those have since been committed by their author.
+
+**This is known and deliberate**: the CTO deploys directly. Recorded here only so
+nobody reads `main` as the source of truth for what is live, and because of the
+hazard below.
+
+`supabase-functions.yml` deploys all ten functions on any push under
+`supabase/functions/**`, and `npm run deploy:functions` deploys the same ten from
+whatever is checked out. Either one, run against a `main` that is behind
+production, silently reverts live code. Committing before deploying is the only
+thing that prevents it.
+
+As of 29 Sep the gap is closed: the deployed `discovery-assistant` is
+byte-identical to `main`, and `db push --dry-run` reports the database up to
+date.
 
 ### 3.2 A migration can be silently skipped
 
@@ -146,8 +175,12 @@ second-precision timestamp. A hand-written round timestamp is the hazard.
 `public-signup`, `send-notification-outbox` and `calendar-provider` were never
 deployed by CI, so committed changes to them never reached production.
 
-Fixed in `386b18f`. Worth checking whether anything was committed to those five
-in the past and is still not live.
+Fixed in `386b18f`, and since confirmed working: a push on 29 Sep deployed
+`discovery-assistant` automatically, and the deployed source now matches `main`
+exactly. CI deploys on push, so no manual step is needed for function changes.
+
+Still worth a look: whether anything committed to those five *before* the fix is
+still not live. A download-and-diff of each against `main` would settle it.
 
 ### 3.4 `profiles` has column-level allowlists for both SELECT and UPDATE
 
@@ -204,9 +237,9 @@ candidate's own job title always does, so every candidate passed it.
 
 ## 4. Suggested order
 
-1. **Notifications, end to end.** Producers for the session lifecycle, then key,
-   cron, sender domain and populated addresses. Nothing else compounds like this,
-   and it is more work than it looks — see 1.1.
+1. **Notifications.** Producers and scheduling are built. What remains is
+   `RESEND_API_KEY` and `NOTIFICATION_FROM`, the pilot addresses, and a decision
+   on the 195 queued rows — see 1.1. Nothing else compounds like this.
 2. **Discovery prompt** — let a later turn replace the goal; return none rather
    than padding. Both ship through CI.
 3. **Find out who is applying SQL directly to production** and route it through
