@@ -479,7 +479,9 @@ export default function KnowledgeGraph() {
               nodeVal={(n) => 1 + Math.min(degree.get(n.id) || 0, 10)}
               nodeLabel={(n) => (n.kind === 'person'
                 ? `${n.label}${n.department ? ` · ${n.department}` : ''}${n.program ? ` · ${n.program}` : ''}`
-                : n.label)}
+                : n.label).replace(/[&<>"']/g, (char) => ({
+                  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+                })[char])}
               onNodeHover={(n) => setHovered(n ? n.id : null)}
               onNodeClick={focusNode}
               onNodeDragEnd={(n) => { n.fx = n.x; n.fy = n.y; }}

@@ -123,10 +123,11 @@ Deno.serve(async (req) => {
       if (!session || ![session.mentor_id, session.mentee_id].includes(ctx.user.id)) return jsonError('not_found', 404);
       if (session.status !== 'scheduled' || !session.scheduled_at) return jsonError('session_not_scheduled', 409);
       const { data: existingEvent } = await ctx.sb.from('calendar_events').select('*').eq('session_id', session.id).eq('provider', provider).maybeSingle();
+      if (existingEvent && existingEvent.owner_id !== ctx.user.id) return jsonError('calendar_event_owner_only', 403);
       if (existingEvent?.scheduled_for && new Date(existingEvent.scheduled_for).getTime() === new Date(session.scheduled_at).getTime()) {
         return jsonOk({ provider, join_url: existingEvent.join_url, html_url: existingEvent.html_url, event_id: existingEvent.external_event_id, reused: true });
       }
-      const connectionOwnerId = existingEvent?.owner_id || ctx.user.id;
+      const connectionOwnerId = ctx.user.id;
       const { data: connection } = await ctx.sb.from('calendar_connections').select('*').eq('user_id', connectionOwnerId).eq('provider', provider).maybeSingle();
       if (!connection) return jsonError('calendar_not_connected', 409);
       const resolved = await accessToken(connection, provider);

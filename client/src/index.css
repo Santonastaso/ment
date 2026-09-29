@@ -13,7 +13,7 @@
     --control-surface: #ececea;
     --control-surface-hover: #e4e4e1;
     --control-radius: 999px;
-    --panel-radius: 24px;
+    --panel-radius: 12px;
     --card-foreground: #201e1b;
     --popover: #fbfaf7;
     --popover-foreground: #201e1b;
@@ -240,7 +240,7 @@
 .discovery-history-row button:last-child { width: 30px; height: 30px; border-radius: 999px; color: var(--ment-muted); }
 .discovery-history-row button:last-child:hover { background: var(--background); color: var(--ment-ink); }
 .discovery-ask-block h1 { margin: 0 0 1.65rem; text-align: center; font-size: clamp(25px, 2.2vw, 29px); font-weight: 500; letter-spacing: -.025em; }
-.discovery-composer, .discovery-draft { border: 1px solid transparent; border-radius: var(--control-radius); background: var(--control-surface); box-shadow: none; }
+.discovery-composer, .discovery-draft { border: 1px solid transparent; border-radius: var(--panel-radius); background: var(--control-surface); box-shadow: none; }
 .discovery-composer { display: flex; min-height: 58px; align-items: center; gap: 10px; padding: 8px 8px 8px 18px; }
 .discovery-composer textarea, .discovery-draft textarea { width: 100%; resize: none; border: 0; outline: 0; background: transparent; color: #201e1b; font: inherit; font-size: 15.5px; line-height: 1.55; }
 .discovery-composer textarea { min-height: 24px; max-height: 120px; overflow-y: auto; }
@@ -326,7 +326,7 @@ a.person-row-name:hover { color: var(--primary); text-decoration: underline; }
 .discovery-agent-mark { display: grid; width: 32px; height: 32px; place-items: center; border-radius: 50%; background: var(--primary); color: var(--primary-foreground); font-size: 12px; font-weight: 700; }
 .discovery-message-body { min-width: 0; color: #5e5951; font-size: 15px; line-height: 1.5; }
 .discovery-message-body > p { margin: .25rem 0 0; }
-.discovery-to-row { display: flex; align-items: center; gap: .75rem; margin-top: 1rem; border-radius: var(--control-radius); background: var(--control-surface); padding: .7rem 1rem; }
+.discovery-to-row { display: flex; align-items: center; gap: .75rem; margin-top: 1rem; border-radius: var(--panel-radius); background: var(--control-surface); padding: .7rem 1rem; }
 .discovery-to-row strong, .discovery-to-row small { display: block; }
 .discovery-to-row small { color: #7c7770; font-size: 12.5px; }
 /* The draft is edited by typing straight into it, so it carries its own
@@ -409,7 +409,7 @@ a.person-row-name:hover { color: var(--primary); text-decoration: underline; }
 .conversation-header > div span { color: var(--muted-foreground); font-size: 11.5px; }
 .conversation-header > a, .conversation-video-link { display: inline-flex; align-items: center; gap: 5px; border-radius: var(--control-radius); background: var(--control-surface); color: var(--foreground); padding: 8px 12px; font-size: 12.5px; font-weight: 600; }
 .conversation-back { display: none; border: 0; background: transparent; }
-.conversation-request-banner, .conversation-meeting { margin: 6px 22px 2px; border-radius: var(--control-radius); background: var(--control-surface); padding: 12px 14px; }
+.conversation-request-banner, .conversation-meeting { margin: 6px 22px 2px; border-radius: var(--panel-radius); background: var(--control-surface); padding: 12px 14px; }
 .conversation-request-banner, .conversation-meeting, .conversation-waiting { grid-row: 2; }
 .conversation-request-banner { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 .conversation-request-banner p { margin: 3px 0 0; color: var(--muted-foreground); font-size: 12.5px; }
@@ -440,6 +440,8 @@ a.person-row-name:hover { color: var(--primary); text-decoration: underline; }
 .conversation-context > span { display: inline-block; border-radius: 999px; background: var(--control-surface); color: var(--muted-foreground); padding: 4px 8px; font-size: 10px; }
 .conversation-context h2 { margin: 8px 0 3px; font-size: 18px; font-weight: 600; letter-spacing: -.02em; }
 .conversation-context p { margin: 0; color: var(--muted-foreground); font-size: 12px; }
+.conversation-load-older { display: block; margin: 0 auto 18px; border: 0; border-radius: var(--panel-radius); background: var(--control-surface); padding: 7px 12px; color: var(--foreground); font-size: 12px; }
+.conversation-load-older:disabled { opacity: .6; }
 /* Both sides get a bubble, as in the discovery transcript: same surface, told
    apart by which side they sit on and which corner is squared off. Only the
    sender's own messages used to be bubbles, which left a group thread — where
@@ -452,7 +454,7 @@ a.person-row-name:hover { color: var(--primary); text-decoration: underline; }
 .conversation-message p { margin: 0; white-space: pre-wrap; font-size: 14px; line-height: 1.5; }
 .conversation-message time { display: block; margin-top: 4px; color: var(--muted-foreground); font-size: 10.5px; }
 .conversation-system { width: fit-content; margin: 14px auto; border-radius: 999px; background: var(--control-surface); color: var(--muted-foreground); padding: 5px 9px; font-size: 10.5px; }
-.conversation-composer { grid-row: 4; display: flex; width: min(calc(100% - 48px), 720px); min-height: 54px; align-items: center; gap: 8px; margin: 8px auto 18px; border-radius: var(--control-radius); background: var(--control-surface); padding: 7px 8px 7px 16px; }
+.conversation-composer { grid-row: 4; display: flex; width: min(calc(100% - 48px), 720px); min-height: 54px; align-items: center; gap: 8px; margin: 8px auto 18px; border-radius: var(--panel-radius); background: var(--control-surface); padding: 7px 8px 7px 16px; }
 .conversation-placeholder { grid-row: 1 / -1; }
 .conversation-composer input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; font-size: 14px; }
 .conversation-composer button { display: grid; width: 36px; height: 36px; place-items: center; border: 0; border-radius: 50%; background: var(--primary); color: white; }
@@ -460,7 +462,7 @@ a.person-row-name:hover { color: var(--primary); text-decoration: underline; }
 .conversation-composer svg { width: 15px; }
 .conversation-error { position: absolute; right: 18px; bottom: 82px; border-radius: var(--control-radius); background: #fce8e5; color: #9f2d20; padding: 8px 12px; font-size: 12px; }
 .conversation-loading { display: grid; height: 100vh; place-items: center; color: var(--muted-foreground); font-size: 13px; }
-.group-row { border-radius: var(--control-radius); padding-inline: .75rem; transition: background .15s ease; }
+.group-row { border-radius: var(--panel-radius); padding-inline: .75rem; transition: background .15s ease; }
 .group-row:hover { background: var(--control-surface); }
 .profile-tabs { scrollbar-width: none; }
 .profile-tabs::-webkit-scrollbar { display: none; }

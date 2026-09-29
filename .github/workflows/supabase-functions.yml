@@ -15,6 +15,7 @@ concurrency:
 
 jobs:
   deploy:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -48,5 +49,5 @@ jobs:
           supabase functions deploy \
             admin-create-user admin-reset-password admin-create-invitation accept-invitation \
             discovery-assistant profile-ingest reflection-classify public-signup \
-            send-notification-outbox calendar-provider \
+            send-notification-outbox calendar-provider request-access complete-password-change \
             --project-ref "$SUPABASE_PROJECT_REF"

@@ -24,10 +24,10 @@ export default function ForcePasswordChange() {
     if (next !== confirm) { setError(t('auth.forcePassword.error.mismatch')); return; }
     setLoading(true);
     try {
-      const { error: updErr } = await supabase.auth.updateUser({ password: next });
-      if (updErr) throw updErr;
-      const { error: rpcErr } = await supabase.rpc('complete_password_change');
-      if (rpcErr) throw rpcErr;
+      const { error: changeError } = await supabase.functions.invoke('complete-password-change', {
+        body: { password: next },
+      });
+      if (changeError) throw changeError;
       await refreshProfile();
       // ChangePasswordRoute will navigate away once must_change_password = false.
     } catch (err) {

@@ -29,6 +29,8 @@ Deno.serve(async (req) => {
   }
   const organizationId = ctx.profile?.organization_id;
   if (!organizationId) return jsonError('organization_required', 403);
+  const appOrigin = String(Deno.env.get('APP_ORIGIN') || '').replace(/\/$/, '');
+  if (!appOrigin) return jsonError('app_origin_not_configured', 503);
 
   const body = await req.json().catch(() => ({}));
   const email = String(body.email || '').trim().toLowerCase();
@@ -69,6 +71,5 @@ Deno.serve(async (req) => {
   }).select('id,email,expires_at,created_at').single();
   if (error) return jsonError(`invitation_create_failed: ${error.message}`, 500);
 
-  const appOrigin = String(body.app_origin || Deno.env.get('APP_ORIGIN') || '').replace(/\/$/, '');
   return jsonOk({ ...data, invitation_url: `${appOrigin}/invite/${token}` }, 201);
 });

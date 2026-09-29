@@ -7,7 +7,6 @@
 import { supabase } from '../lib/supabase.js';
 import { browserLanguage } from '../lib/esco.js';
 import { firstPersonize } from '../lib/utils.js';
-import { translate } from '../i18n/index.jsx';
 
 class ApiError extends Error {
   constructor(message, status = 500) {
@@ -46,14 +45,7 @@ async function getViewerId() {
 }
 
 async function getViewer() {
-  const id = await getViewerId();
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('id, name, department, seniority, job_title, is_admin, admin_scope, organization_id')
-    .eq('id', id)
-    .single();
-  if (error) throw new ApiError(error.message);
-  return data;
+  return { id: await getViewerId() };
 }
 
 // ============================================================
@@ -96,49 +88,6 @@ function shapeCareer(rows) {
 function shapeUser(u) {
   if (!u) return null;
   return { ...u, current_role: u.job_title ?? u.current_role };
-}
-
-// ============================================================
-// Match-reason rendering (port of server/utils/matching.js renderReasons)
-// ============================================================
-
-function renderReasons(structured, viewer, other, opts = {}) {
-  if (!Array.isArray(structured)) return [];
-  const mentorOnly = opts.mentorOnly === true;
-  const them = (other.name || '').split(' ')[0] || other.name || 'They';
-  const out = [];
-  for (const r of structured) {
-    if (!r || typeof r !== 'object') continue;
-    if (r.type === 'teach_overlap') {
-      const skills = (r.skills || []).slice(0, 3).join(', ');
-      if (r.teacher_id === other.id) {
-        out.push(translate('components.matchReason.teachOverlapThem', { them, skills }));
-      } else if (r.teacher_id === viewer.id) {
-        if (mentorOnly) continue;
-        out.push(translate('components.matchReason.teachOverlapYou', { them, skills }));
-      }
-    } else if (r.type === 'career_bridge') {
-      if (r.who_id === other.id) {
-        out.push(translate('components.matchReason.careerBridgeThem', { them, dept: r.into_dept }));
-      } else if (r.who_id === viewer.id) {
-        if (mentorOnly) continue;
-        out.push(translate('components.matchReason.careerBridgeYou', { them, dept: other.department }));
-      }
-    } else if (r.type === 'dept_diversity') {
-      const otherDept = r.a_id === other.id ? r.a_dept : r.b_dept;
-      const yourDept = r.a_id === viewer.id ? r.a_dept : r.b_dept;
-      out.push(translate('components.matchReason.deptDiversity', { them, otherDept, yourDept }));
-    }
-  }
-  return out;
-}
-
-// Server-side "extra reasons" arrive as structured tokens { type, dept } (0020)
-// so they can be localized client-side. Tolerate legacy plain strings too.
-function renderExtraReason(x) {
-  if (typeof x === 'string') return x;
-  if (!x || typeof x !== 'object' || !x.type) return null;
-  return translate(`components.matchReason.${x.type}`, { dept: x.dept });
 }
 
 // ============================================================
@@ -343,51 +292,6 @@ async function enrichSession(session, viewerId) {
 }
 
 // ============================================================
-// Match list (calls get_matches_for, renders reasons in JS)
-// ============================================================
-
-async function listMatches({ limit, role, includeDirectory = false } = {}) {
-  const viewer = await getViewer();
-  const rpcArgs = {
-    p_role: role ?? null,
-    p_limit: null, // we paginate after rendering reasons
-    p_offset: 0,
-  };
-  if (includeDirectory) rpcArgs.p_include_directory = true;
-  let { data, error } = await supabase.rpc('get_matches_for', rpcArgs);
-  if (error && includeDirectory && /get_matches_for|function/i.test(error.message || '')) {
-    ({ data, error } = await supabase.rpc('get_matches_for', {
-      p_role: role ?? null,
-      p_limit: null,
-      p_offset: 0,
-    }));
-  }
-  if (error) throw new ApiError(error.message);
-
-  const peers = await Promise.all((data?.matches || []).map((m) =>
-    supabase.rpc('peer_profile', { p_user_id: m.user.id }).then(({ data: peer }) => peer)
-  ));
-  const all = (data?.matches || []).map((m, index) => {
-    const candidate = peers[index] || m.user;
-    const renderedBase = renderReasons(m.structuredReasons, { id: viewer.id, name: viewer.name, department: viewer.department }, {
-      id: candidate.id, name: candidate.name, department: candidate.department,
-    }, { mentorOnly: role === 'mentor' });
-    const reasons = [...renderedBase, ...(m.extraReasons || []).map(renderExtraReason).filter(Boolean)];
-    return {
-      matchId: m.matchId,
-      score: m.score,
-      baseScore: m.baseScore,
-      adjustment: m.adjustment,
-      reasons,
-      user: shapeUser(candidate),
-    };
-  }).filter((match) => match.user.mentorship_available !== false);
-
-  const sliced = limit ? all.slice(0, Number(limit)) : all;
-  return { matches: sliced, total: data?.total ?? all.length };
-}
-
-// ============================================================
 // Directory browse (Wave 6): paginated, redacted, no scores.
 // Powers both Explorer modes — keyword search (chat-style) and
 // faceted browsing (directory-style).
@@ -514,15 +418,6 @@ async function get(url) {
     return ok(await loadProfile(id, viewer.id));
   }
 
-  if (url.startsWith('/matches')) {
-    const params = new URLSearchParams(url.split('?')[1] || '');
-    return ok(await listMatches({
-      limit: params.get('limit'),
-      role: params.get('role'),
-      includeDirectory: params.get('includeDirectory') === '1',
-    }));
-  }
-
   if (url.startsWith('/directory')) {
     const params = new URLSearchParams(url.split('?')[1] || '');
     return ok(await listDirectory({
@@ -555,11 +450,19 @@ async function get(url) {
     const enriched = await Promise.all((data || []).map((s) => enrichSession(s, viewer.id)));
     return ok(enriched);
   }
-  if (/^\/sessions\/\d+\/messages$/.test(url)) {
-    const id = Number(url.split('/')[2]);
-    const { data, error } = await supabase.rpc('my_session_messages', { p_session_id: id });
+  if (/^\/sessions\/\d+\/messages(?:\?.*)?$/.test(url)) {
+    const [path, query] = url.split('?');
+    const id = Number(path.split('/')[2]);
+    const before = new URLSearchParams(query || '').get('before');
+    let request = supabase.from('session_messages')
+      .select('id,session_id,sender_id,kind,body,created_at')
+      .eq('session_id', id)
+      .order('id', { ascending: false })
+      .limit(51);
+    if (before) request = request.lt('id', Number(before));
+    const { data, error } = await request;
     if (error) throw new ApiError(error.message, 404);
-    return ok(data || []);
+    return ok({ messages: (data || []).slice(0, 50).reverse(), hasMore: (data || []).length > 50 });
   }
 
   if (url === '/sessions/pending-acceptances') {
@@ -748,15 +651,10 @@ async function post(url, body = {}, opts = {}) {
     if (!EMAIL_RE.test(email)) throw new ApiError('invalid_email', 400);
     if (note.length > 2000) throw new ApiError('note_too_long', 400);
 
-    const { error } = await supabase.from('access_requests').insert({
-      name,
-      email,
-      company,
-      company_size: companySize,
-      role,
-      note,
+    const { error } = await supabase.functions.invoke('request-access', {
+      body: { name, email, company, company_size: companySize, role, note },
     });
-    if (error?.code === '23505') throw new ApiError('request_already_open', 409);
+    if (error?.message?.includes('request_already_open')) throw new ApiError('request_already_open', 409);
     if (error) throw new ApiError(error.message, 400);
     return ok({ ok: true }, 201);
   }
@@ -912,6 +810,15 @@ async function post(url, body = {}, opts = {}) {
     });
     if (error) throw new ApiError(error.message);
     return ok(data, 201);
+  }
+
+  if (url === '/users/me/skills/batch') {
+    const { error } = await supabase.rpc('save_my_skills', {
+      p_type: body.type,
+      p_skills: body.skills,
+    });
+    if (error) throw new ApiError(error.message);
+    return ok(null);
   }
 
   if (/^\/sessions\/\d+\/read$/.test(url)) {

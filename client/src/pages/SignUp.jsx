@@ -17,6 +17,7 @@ import LegalLinks from '../components/LegalLinks.jsx';
 
 function friendlyError(t, code) {
   switch (code) {
+    case 'signup_requires_invitation': return 'Organization signup is invitation-only. Request access to get started.';
     case 'company_name_required': return t('auth.signup.error.companyNameRequired');
     case 'admin_name_required': return t('auth.signup.error.adminNameRequired');
     case 'admin_email_invalid': return t('auth.signup.error.adminEmailInvalid');
@@ -176,6 +177,9 @@ export default function SignUp() {
               <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
+            )}
+            {error.includes('invitation-only') && (
+              <p className="text-center text-sm"><Link to="/request-access" className="text-primary underline">Request access</Link></p>
             )}
 
             <Button

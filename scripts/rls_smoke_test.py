@@ -42,10 +42,13 @@ if not SUPABASE_URL or not ANON:
     print("Skipping RLS smoke test: SUPABASE_URL / SUPABASE_ANON_KEY not set.")
     sys.exit(0)
 
-EMP = {"email": os.environ.get("MENT_EMP_EMAIL", "bob.taylor@ment.io"),
-       "password": os.environ.get("MENT_EMP_PASSWORD", "Password")}
-ADMIN = {"email": os.environ.get("MENT_ADMIN_EMAIL", "alice.chen@ment.io"),
-         "password": os.environ.get("MENT_ADMIN_PASSWORD", "Password")}
+EMP = {"email": os.environ.get("MENT_EMP_EMAIL", ""),
+       "password": os.environ.get("MENT_EMP_PASSWORD", "")}
+ADMIN = {"email": os.environ.get("MENT_ADMIN_EMAIL", ""),
+         "password": os.environ.get("MENT_ADMIN_PASSWORD", "")}
+if not all(EMP.values()) or not all(ADMIN.values()):
+    print("Skipping RLS smoke test: provide dedicated MENT_EMP_* and MENT_ADMIN_* test credentials.")
+    sys.exit(0)
 
 cases: list[dict] = []
 
@@ -92,8 +95,14 @@ def rest(method: str, path: str, tok: str, body=None, params=None):
             return e.code, body
 
 
-def is_denied(status: int) -> bool:
-    return status in (401, 403) or status >= 500
+def is_denied(status: int, body=None) -> bool:
+    if status in (401, 403):
+        return True
+    if status != 400 or not isinstance(body, dict):
+        return False
+    code = str(body.get("code", "")).upper()
+    message = str(body.get("message", "")).lower()
+    return code == "42501" or any(term in message for term in ("admin_only", "forbidden", "not_allowed"))
 
 
 def ok_status(status: int) -> bool:
@@ -129,18 +138,18 @@ def main() -> int:
     s, b = rest("GET", "profiles", bob,
                 params={"select": "id,shadow_role_response", "limit": "1"})
     case("profiles.shadow_role_response_blocked_for_self",
-         expect_denied=True, ok=ok_status(s),
+         expect_denied=True, ok=not is_denied(s, b),
          detail=f"GET profiles.shadow_role_response → status={s} (must be denied)")
     s, b = rest("GET", "profiles", bob,
                 params={"select": "shadow_role_response", "id": "neq.deadbeef"})
     case("profiles.shadow_role_response_blocked_for_peer",
-         expect_denied=True, ok=ok_status(s),
+         expect_denied=True, ok=not is_denied(s, b),
          detail=f"peer GET profiles.shadow_role_response → status={s}")
 
     # --- Column-level deny on sessions.reflection / rating ---
     for col in ("reflection", "mentor_reflection", "mentee_rating", "mentor_rating"):
         s, b = rest("GET", "sessions", bob, params={"select": f"id,{col}", "limit": "1"})
-        case(f"sessions.{col}_blocked", expect_denied=True, ok=ok_status(s),
+        case(f"sessions.{col}_blocked", expect_denied=True, ok=not is_denied(s, b),
              detail=f"GET sessions.{col} → status={s}")
 
     # --- Reflection_logs cross-user read ---
@@ -177,7 +186,7 @@ def main() -> int:
     # --- Direct UPDATE to escalate admin scope on own row should fail (guard trigger) ---
     s, b = rest("PATCH", "profiles", bob, body={"admin_scope": "platform"},
                 params={"id": f"eq.{BOB_ID}"})
-    case("profiles.escalate_admin_blocked", expect_denied=True, ok=ok_status(s),
+    case("profiles.escalate_admin_blocked", expect_denied=True, ok=not is_denied(s, b),
          detail=f"Bob attempts to set admin_scope=platform on self → status={s}")
 
     # --- mentorship_paused on someone else (e.g., Alice) ---
@@ -193,7 +202,7 @@ def main() -> int:
         "mentor_id": other_uid, "mentee_id": "852c6373-ecef-4023-85d1-79c738181b7e",
         "title": "RLS bypass attempt", "status": "scheduled",
     })
-    case("sessions.direct_insert_denied", expect_denied=True, ok=ok_status(s),
+    case("sessions.direct_insert_denied", expect_denied=True, ok=not is_denied(s, b),
          detail=f"Bob direct INSERT sessions → status={s}")
 
     # --- audit_logs SELECT denied for non-admin ---
@@ -212,7 +221,7 @@ def main() -> int:
 
     # --- list_feedback denied for non-admin via RPC ---
     s, b = rest("POST", "rpc/list_feedback", bob, body={"p_status": None})
-    case("rpc.list_feedback_denied_for_employee", expect_denied=True, ok=ok_status(s),
+    case("rpc.list_feedback_denied_for_employee", expect_denied=True, ok=not is_denied(s, b),
          detail=f"Bob calls list_feedback → status={s}")
 
     # --- list_feedback works for admin ---
@@ -265,7 +274,7 @@ def main() -> int:
     # --- role column cannot be self-escalated via direct PATCH (guard) ---
     s, b = rest("PATCH", "profiles", bob, body={"role": "team_lead"},
                 params={"id": f"eq.{BOB_ID}"})
-    case("profiles.escalate_role_blocked", expect_denied=True, ok=ok_status(s),
+    case("profiles.escalate_role_blocked", expect_denied=True, ok=not is_denied(s, b),
          detail=f"Bob sets role=team_lead on self → status={s} (must be denied)")
 
     # --- peer_profile must not leak private fields, and hides career ---
@@ -289,11 +298,11 @@ def main() -> int:
 
     # --- admin-only RPCs denied for an employee ---
     s, b = rest("POST", "rpc/admin_kpis", bob, body={"p_org": None})
-    case("rpc.admin_kpis_denied_for_employee", expect_denied=True, ok=ok_status(s),
+    case("rpc.admin_kpis_denied_for_employee", expect_denied=True, ok=not is_denied(s, b),
          detail=f"Bob calls admin_kpis → status={s}")
     if PEER_ID:
         s, b = rest("POST", "rpc/admin_set_role", bob, body={"p_user_id": PEER_ID, "p_role": "manager"})
-        case("rpc.admin_set_role_denied_for_employee", expect_denied=True, ok=ok_status(s),
+        case("rpc.admin_set_role_denied_for_employee", expect_denied=True, ok=not is_denied(s, b),
              detail=f"Bob calls admin_set_role → status={s}")
 
     # Summary

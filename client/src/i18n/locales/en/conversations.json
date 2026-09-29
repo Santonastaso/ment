@@ -16,6 +16,7 @@
   "conversations.join": "Join Teams",
   "conversations.messagePlaceholder": "Message",
   "conversations.send": "Send message",
+  "conversations.loadOlder": "Load earlier messages",
   "conversations.error": "Could not update this conversation.",
   "conversations.status.pending": "Requested",
   "conversations.status.scheduled": "Accepted",

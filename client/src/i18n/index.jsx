@@ -9,8 +9,6 @@ import React, { createContext, useContext, useEffect, useMemo, useState, useCall
 // keep prefixes distinct so Object.assign merge never collides.
 
 const enModules = import.meta.glob('./locales/en/*.json', { eager: true });
-const itModules = import.meta.glob('./locales/it/*.json', { eager: true });
-const frModules = import.meta.glob('./locales/fr/*.json', { eager: true });
 
 function mergeCatalog(modules) {
   const out = {};
@@ -21,11 +19,25 @@ function mergeCatalog(modules) {
   return out;
 }
 
-const CATALOG = {
-  en: mergeCatalog(enModules),
-  it: mergeCatalog(itModules),
-  fr: mergeCatalog(frModules),
+const CATALOG = { en: mergeCatalog(enModules) };
+const loaders = {
+  it: () => import('./locales/it.js'),
+  fr: () => import('./locales/fr.js'),
 };
+const pendingCatalogs = new Map();
+
+function loadCatalog(lang) {
+  if (CATALOG[lang]) return Promise.resolve();
+  if (!pendingCatalogs.has(lang)) {
+    pendingCatalogs.set(lang, loaders[lang]().then((module) => {
+      CATALOG[lang] = module.default;
+    }).catch((error) => {
+      pendingCatalogs.delete(lang);
+      throw error;
+    }));
+  }
+  return pendingCatalogs.get(lang);
+}
 
 const SUPPORTED = ['en', 'it', 'fr'];
 const STORAGE_KEY = 'ment.lang';
@@ -64,6 +76,15 @@ const LanguageContext = createContext(null);
 
 export function LanguageProvider({ children }) {
   const [lang, setLangState] = useState(detectInitial);
+  const [ready, setReady] = useState(() => Boolean(CATALOG[getLang()]));
+
+  useEffect(() => {
+    if (CATALOG[lang]) { setReady(true); return; }
+    let active = true;
+    loadCatalog(lang).catch(() => { if (active) setLangState('en'); })
+      .finally(() => { if (active) setReady(true); });
+    return () => { active = false; };
+  }, [lang]);
 
   useEffect(() => {
     try { localStorage.setItem(STORAGE_KEY, lang); } catch { /* ignore */ }
@@ -71,7 +92,7 @@ export function LanguageProvider({ children }) {
   }, [lang]);
 
   const setLang = useCallback((next) => {
-    if (SUPPORTED.includes(next)) setLangState(next);
+    if (SUPPORTED.includes(next)) loadCatalog(next).then(() => setLangState(next)).catch(() => {});
   }, []);
 
   const t = useCallback((key, vars) => {
@@ -81,7 +102,7 @@ export function LanguageProvider({ children }) {
   }, [lang]);
 
   const value = useMemo(() => ({ lang, setLang, t, supported: SUPPORTED }), [lang, setLang, t]);
-  return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
+  return ready ? <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider> : null;
 }
 
 export function useT() {

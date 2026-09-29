@@ -73,22 +73,23 @@ function formatRequestDraft(language: string, sender: string, recipient: string,
   return `Hi ${recipient},\n\n${body}\n\nThanks,\n${sender}`;
 }
 
-function publicCandidate(candidate: Candidate, ranked?: RankedMatch) {
-  const expertise = [...new Set([...(candidate.skills || []), candidate.job_title, candidate.department].filter(Boolean))].slice(0, 3);
+function publicCandidate(candidate: Candidate, ranked?: RankedMatch, redactIdentity = false) {
+  const expertise = [...new Set([...(candidate.skills || []), redactIdentity ? null : candidate.job_title, candidate.department].filter(Boolean))].slice(0, 3);
   const allowedExpertise = new Map(expertise.map((item) => [String(item).toLowerCase(), String(item)]));
   const matchedExpertise = Array.isArray(ranked?.matched_expertise)
     ? ranked.matched_expertise.map((item) => allowedExpertise.get(cleanText(item, 100).toLowerCase())).filter(Boolean).slice(0, 3)
     : [];
   return {
     id: candidate.id,
-    name: candidate.name,
-    job_title: candidate.job_title,
+    name: redactIdentity ? 'Network member' : candidate.name,
+    job_title: redactIdentity ? null : candidate.job_title,
     department: candidate.department,
     program: candidate.program,
     cohort_year: candidate.cohort_year,
-    linkedin_headline: candidate.linkedin_headline,
+    linkedin_headline: redactIdentity ? null : candidate.linkedin_headline,
     expertise: matchedExpertise.length ? matchedExpertise : expertise,
-    background: [candidate.program, candidate.department].filter(Boolean).join(' · ') || candidate.job_title || 'Professional experience',
+    background: [candidate.program, candidate.department].filter(Boolean).join(' · ')
+      || (redactIdentity ? 'Professional experience' : candidate.job_title || 'Professional experience'),
     reasons: Array.isArray(ranked?.reasons)
       ? ranked.reasons.map((reason) => cleanText(reason, 180)).filter(Boolean).slice(0, 2)
       : [],
@@ -171,6 +172,8 @@ Deno.serve(async (req) => {
     .eq('id', ctx.user.id)
     .single();
   if (callerError || !caller?.organization_id) return jsonError('profile_not_found', 404);
+  const { data: organization } = await ctx.sb.from('organizations').select('type').eq('id', caller.organization_id).maybeSingle();
+  const redactInterOrg = organization?.type === 'inter';
 
   if (action === 'chat') {
     let priorTurns: Array<Record<string, unknown>> = [];
@@ -228,11 +231,22 @@ Do not broaden explicit professions or domains into adjacent ones. For example, 
   const profileIds = (rows || []).map((row) => row.id);
   const [{ data: skills }, { data: relationships }, { data: activeSessions }] = await Promise.all([
     profileIds.length ? ctx.sb.from('skills').select('user_id,skill').in('user_id', profileIds).eq('type', 'can_teach') : Promise.resolve({ data: [] }),
-    ctx.sb.from('sessions').select('mentor_id,mentee_id,status').or(`mentor_id.eq.${ctx.user.id},mentee_id.eq.${ctx.user.id}`).in('status', ['pending', 'scheduled']),
+    ctx.sb.from('sessions').select('mentor_id,mentee_id,status').or(`mentor_id.eq.${ctx.user.id},mentee_id.eq.${ctx.user.id}`).in('status', ['pending', 'scheduled', 'completed']),
     profileIds.length ? ctx.sb.from('sessions').select('mentor_id,status,created_at,accepted_at,request_expires_at').in('mentor_id', profileIds).in('status', ['pending', 'scheduled', 'completed']) : Promise.resolve({ data: [] }),
   ]);
 
-  const related = new Set((relationships || []).map((session) => session.mentor_id === ctx.user.id ? session.mentee_id : session.mentor_id));
+  const related = new Set((relationships || [])
+    .filter((session) => session.status === 'pending' || session.status === 'scheduled')
+    .map((session) => session.mentor_id === ctx.user.id ? session.mentee_id : session.mentor_id));
+  const established = new Set((relationships || [])
+    .filter((session) => session.status === 'scheduled' || session.status === 'completed')
+    .map((session) => session.mentor_id === ctx.user.id ? session.mentee_id : session.mentor_id));
+  const { data: acceptedConnections } = await ctx.sb.from('connections')
+    .select('requester_id,addressee_id').eq('status', 'accepted')
+    .or(`requester_id.eq.${ctx.user.id},addressee_id.eq.${ctx.user.id}`);
+  for (const connection of acceptedConnections || []) {
+    established.add(connection.requester_id === ctx.user.id ? connection.addressee_id : connection.requester_id);
+  }
   const now = Date.now();
   const currentDate = new Date(now);
   const weekStart = new Date(currentDate);
@@ -256,7 +270,11 @@ Do not broaden explicit professions or domains into adjacent ones. For example, 
     if (row.mentorship_unavailable_until && new Date(row.mentorship_unavailable_until).getTime() > now) return false;
     const usage = activeByMentor.get(row.id) || { total: 0, week: 0 };
     return usage.total < row.monthly_meeting_limit && usage.week < row.weekly_meeting_limit;
-  }).map((row) => ({ ...row, skills: skillsByUser.get(row.id) || [] }));
+  }).map((row) => ({
+    ...row,
+    linkedin_headline: !redactInterOrg || established.has(row.id) ? row.linkedin_headline : null,
+    skills: skillsByUser.get(row.id) || [],
+  }));
 
   if (action === 'draft') {
     const selected = candidates.find((candidate) => candidate.id === body.person_id);
@@ -266,14 +284,15 @@ Do not broaden explicit professions or domains into adjacent ones. For example, 
       const result = await mistralJson<{ body?: string }>({
         feature: 'discovery_draft',
         system: `Write only the message body for a concise, warm invitation in ${language}. The sender is the requester; the recipient is the person being contacted. Write strictly in the sender's voice: "I" means the sender and "you" means the recipient. Do not speak as the recipient, introduce the recipient as yourself, greet anyone, use either person's name, or add a sign-off; the application adds those parts with the correct names. Mention why the recipient's verified experience is relevant. Use only the supplied facts and never invent credentials, employers, skills, or relationships. Return JSON with one string field named body. Keep it under 80 words.`,
-        user: JSON.stringify({ sender: { name: caller.name }, request: query, recipient: publicCandidate(selected), variant: Number(body.variant) || 0 }),
+        user: JSON.stringify({ sender: { name: caller.name }, request: query, recipient: publicCandidate(selected, undefined, redactInterOrg && !established.has(selected.id)), variant: Number(body.variant) || 0 }),
         temperature: Number(body.variant) ? 0.35 : 0.15,
         maxTokens: 350,
       });
       const draftBody = cleanText(result.value?.body, 1200);
       if (!draftBody) return jsonError('ai_invalid_response', 502);
       const firstName = (name: unknown) => cleanText(name, 120).split(/\s+/)[0];
-      const draft = formatRequestDraft(language, firstName(caller.name), firstName(selected.name), draftBody);
+      const recipientName = redactInterOrg && !established.has(selected.id) ? 'there' : firstName(selected.name);
+      const draft = formatRequestDraft(language, firstName(caller.name), recipientName, draftBody);
       await recordAiRun(ctx.sb, {
         userId: ctx.user.id,
         organizationId: caller.organization_id,
@@ -286,7 +305,7 @@ Do not broaden explicit professions or domains into adjacent ones. For example, 
         kind: 'draft',
         content: draft,
         search_request: query,
-        person: publicCandidate(selected),
+        person: publicCandidate(selected, undefined, redactInterOrg && !established.has(selected.id)),
       }, selected.id);
       return jsonOk({ draft, model: result.model, thread_id: threadId });
     } catch (error) {
@@ -322,7 +341,7 @@ Return exactly one of these JSON shapes:
 {"outcome":"no_match","clarification":"","no_match_reason":"one concise explanation that the current network has no relevant profile","matches":[]}
 
 For matches, confidence must be at least 0.75 and matched_expertise must copy an exact supplied skill, job title, department, program, or LinkedIn headline. Return at most three matches in best-first order. Never output an ID not present in candidates. Keep each reason under 24 words.`,
-      user: JSON.stringify({ request: requestForMatch, candidates: candidates.map(publicCandidate) }),
+      user: JSON.stringify({ request: requestForMatch, candidates: candidates.map((candidate) => publicCandidate(candidate, undefined, redactInterOrg && !established.has(candidate.id))) }),
       temperature: 0,
       maxTokens: 700,
     });
@@ -336,7 +355,7 @@ For matches, confidence must be at least 0.75 and matched_expertise must copy an
       const confidence = Number(item?.confidence);
       if (!candidate || seen.has(id) || !Number.isFinite(confidence) || confidence < 0.75 || !hasGroundedExpertise(candidate, item)) return [];
       seen.add(id);
-      return [publicCandidate(candidate, item)];
+      return [publicCandidate(candidate, item, redactInterOrg && !established.has(candidate.id))];
     }).slice(0, 3);
     await recordAiRun(ctx.sb, {
       userId: ctx.user.id,

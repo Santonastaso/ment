@@ -275,46 +275,17 @@ export default function Profile() {
       return (!old || (old.example_project || '') !== (n.example_project || '')) && (n.example_project || '').length > 80;
     })) throw new Error('evidence_too_long');
 
-    // Removals: prev had id but next doesn't
-    for (const p of prev) {
-      if (!next.some(n => n.id === p.id)) {
-        await api.delete(`/users/me/skills/${p.id}`);
-      }
-    }
-    // Additions: entries without an id
-    for (const n of next) {
-      if (!n.id) {
-        await api.post('/users/me/skills', { skill: n.skill, type: 'can_teach', example_project: n.example_project || '' });
-      }
-    }
-    // Example-project edits on existing skills
-    for (const n of next) {
-      if (n.id) {
-        const old = prev.find(p => p.id === n.id);
-        if (old && (old.example_project || '') !== (n.example_project || '')) {
-          await api.put(`/users/me/skills/${n.id}`, { example_project: n.example_project || '' });
-        }
-      }
-    }
+    await api.post('/users/me/skills/batch', { type: 'can_teach', skills: next });
     await refreshProfile();
     showToast(t('profile.toast.skillsUpdated'));
   }
 
   async function handleWantsToLearnChange(next) {
     const prev = (profile?.skills || []).filter(s => s.type === 'wants_to_learn');
-    const prevNames = prev.map(s => s.skill.toLowerCase());
-    const nextNames = next.map(s => s.toLowerCase());
-
-    for (const p of prev) {
-      if (!nextNames.includes(p.skill.toLowerCase())) {
-        await api.delete(`/users/me/skills/${p.id}`);
-      }
-    }
-    for (const skill of next) {
-      if (!prevNames.includes(skill.toLowerCase())) {
-        await api.post('/users/me/skills', { skill, type: 'wants_to_learn' });
-      }
-    }
+    await api.post('/users/me/skills/batch', {
+      type: 'wants_to_learn',
+      skills: next.map(skill => ({ skill, id: prev.find(p => p.skill.toLowerCase() === skill.toLowerCase())?.id })),
+    });
     await refreshProfile();
     showToast(t('profile.toast.skillsUpdated'));
   }

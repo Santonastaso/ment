@@ -34,6 +34,14 @@ export async function requireUser(req: Request) {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
+  const { data: profile, error: profileError } = await sb.from('profiles')
+    .select('deactivated_at').eq('id', data.user.id).maybeSingle();
+  if (profileError || !profile || profile.deactivated_at) {
+    throw new Response(JSON.stringify({ error: 'account_deactivated' }), {
+      status: 403,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
   return { user: data.user, sb };
 }
 

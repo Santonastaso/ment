@@ -2,7 +2,7 @@
 // 'imports' Storage bucket. Replaces the legacy /api/admin/upload route.
 //
 // Body: { storage_path: string, mode: 'insert' | 'update' | 'upsert' }
-// Returns: { imported, updated, skipped, total, tempPassword, matchesGenerated }
+// Returns one-time, per-user credentials for newly imported accounts.
 
 import { read as xlsxRead, utils as xlsxUtils } from 'npm:xlsx@0.18.5';
 import {
@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
   }
   if (!rows.length) return jsonError('empty_file', 400);
 
-  const tempPassword = generateTempPassword();
+  const tempPasswords: { email: string; password: string }[] = [];
   const adminOrgId = ctx.profile.organization_id;
   const isPlatformAdmin = ctx.profile.admin_scope === 'platform';
   let imported = 0;
@@ -127,13 +127,14 @@ Deno.serve(async (req) => {
       touchedIds.push(userId);
     } else {
       if (mode === 'update') { skipped++; continue; }
+      const tempPassword = generateTempPassword();
       const { data, error } = await ctx.sb.auth.admin.createUser({
         email,
         password: tempPassword,
         email_confirm: true,
+        app_metadata: { organization_id: adminOrgId, admin_scope: 'none', must_change_password: true },
         user_metadata: {
           name, department, seniority, job_title, tenure_years, location,
-          must_change_password: true, onboarding_complete: true, organization_id: adminOrgId,
         },
       });
       if (error || !data.user) {
@@ -158,6 +159,7 @@ Deno.serve(async (req) => {
         continue;
       }
       imported++;
+      tempPasswords.push({ email, password: tempPassword });
       touchedIds.push(userId);
       usersByEmail.set(email, { id: userId, email });
     }
@@ -222,7 +224,7 @@ Deno.serve(async (req) => {
     imported, updated, skipped,
     total: rows.length,
     matchesGenerated: matchCount ?? 0,
-    tempPassword: imported > 0 ? tempPassword : null,
+    tempPasswords,
     failures,
   });
 });

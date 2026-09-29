@@ -8,9 +8,9 @@ const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 
 const BASE = process.env.E2E_BASE || 'http://localhost:3000';
-const ADMIN = { email: 'alice.chen@ment.io', password: 'Password' };     // platform admin
-const MANAGER = { email: 'bob.taylor@ment.io', password: 'Password' };   // role=manager
-const EMP = { email: 'carol.smith@ment.io', password: 'Password' };      // role=employee
+const ADMIN = { email: process.env.MENT_ADMIN_EMAIL, password: process.env.MENT_ADMIN_PASSWORD };
+const MANAGER = { email: process.env.MENT_MANAGER_EMAIL, password: process.env.MENT_MANAGER_PASSWORD };
+const EMP = { email: process.env.MENT_EMP_EMAIL, password: process.env.MENT_EMP_PASSWORD };
 
 const results = [];
 function log(name, ok, detail = '') {
@@ -35,6 +35,9 @@ async function login(page, creds, tag) {
 }
 
 async function run() {
+  for (const [role, creds] of Object.entries({ ADMIN, MANAGER, EMP })) {
+    if (!creds.email || !creds.password) throw new Error(`Set MENT_${role}_EMAIL and MENT_${role}_PASSWORD`);
+  }
   const browser = await chromium.launch();
 
   // ---------- Admin (platform) ----------

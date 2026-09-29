@@ -41,11 +41,9 @@ Deno.serve(async (req) => {
     email: invitation.email,
     password,
     email_confirm: true,
+    app_metadata: { organization_id: invitation.organization_id, admin_scope: 'none' },
     user_metadata: {
       name: profile.name || invitation.email.split('@')[0],
-      organization_id: invitation.organization_id,
-      onboarding_complete: false,
-      must_change_password: false,
     },
   });
   if (createError || !created.user) {

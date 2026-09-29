@@ -18,7 +18,8 @@ function downloadTextFile(text, filename, type = 'text/csv') {
 }
 
 function csvEscape(value) {
-  const s = String(value ?? '');
+  const raw = String(value ?? '');
+  const s = /^[\s\u0000-\u001f]*[=+@-]/.test(raw) ? `'${raw}` : raw;
   return /[,"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 

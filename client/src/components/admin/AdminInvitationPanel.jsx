@@ -24,7 +24,7 @@ export default function AdminInvitationPanel() {
     setSaving(true); setError(''); setGeneratedUrl('');
     try {
       const { data, error: invokeError } = await supabase.functions.invoke('admin-create-invitation', {
-        body: { ...form, cohort_year: form.cohort_year || null, app_origin: window.location.origin },
+        body: { ...form, cohort_year: form.cohort_year || null },
       });
       if (invokeError) throw new Error(data?.error || invokeError.message);
       setGeneratedUrl(data.invitation_url);

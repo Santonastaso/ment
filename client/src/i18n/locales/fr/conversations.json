@@ -16,6 +16,7 @@
   "conversations.join": "Ouvrir Teams",
   "conversations.messagePlaceholder": "Message",
   "conversations.send": "Envoyer le message",
+  "conversations.loadOlder": "Charger les messages précédents",
   "conversations.error": "Impossible de mettre a jour cette conversation.",
   "conversations.status.pending": "Demandee",
   "conversations.status.scheduled": "Acceptee",

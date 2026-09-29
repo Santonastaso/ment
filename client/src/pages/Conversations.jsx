@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { CalendarDays, Check, ChevronLeft, MessageCircle, Send, UsersRound } from 'lucide-react';
 import api from '../api/index.js';
@@ -67,6 +67,10 @@ function localDateTime(value) {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 }
 
+function appendMessage(current, row) {
+  return current.some((item) => item.id === row.id) ? current : [...current, row].sort((a, b) => a.id - b.id);
+}
+
 export default function Conversations() {
   const { user, refreshPendingAcceptances } = useAuth();
   const { t } = useT();
@@ -84,6 +88,8 @@ export default function Conversations() {
 
   const [groups, setGroups] = useState([]);
   const [messages, setMessages] = useState([]);
+  const [hasOlder, setHasOlder] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [draft, setDraft] = useState('');
@@ -92,6 +98,11 @@ export default function Conversations() {
   const [scheduledAt, setScheduledAt] = useState('');
   const [savingSchedule, setSavingSchedule] = useState(false);
   const endRef = useRef(null);
+  const messagesRef = useRef(null);
+  const preserveScrollRef = useRef(null);
+  const senderNamesRef = useRef(new Map());
+  const activeSessionRef = useRef(selectedId);
+  activeSessionRef.current = selectedId;
 
   const selected = sessions.find((session) => session.id === selectedId) || null;
   const selectedGroup = groups.find((group) => group.id === selectedGroupId) || null;
@@ -111,10 +122,27 @@ export default function Conversations() {
     return next;
   }
 
-  async function loadMessages(id) {
-    if (!id) return;
-    const response = await api.get(`/sessions/${id}/messages`);
-    setMessages(response.data || []);
+  async function loadMessages(id, before = null) {
+    const query = before ? `?before=${before}` : '';
+    const { data } = await api.get(`/sessions/${id}/messages${query}`);
+    if (activeSessionRef.current !== id) return;
+    if (before) {
+      const box = messagesRef.current;
+      if (box) preserveScrollRef.current = { height: box.scrollHeight, top: box.scrollTop };
+      setMessages((current) => [...data.messages.filter((item) => !current.some((old) => old.id === item.id)), ...current]);
+    } else {
+      setMessages((current) => [...data.messages, ...current.filter((item) => !data.messages.some((loaded) => loaded.id === item.id))].sort((a, b) => a.id - b.id));
+    }
+    setHasOlder(data.hasMore);
+  }
+
+  async function loadOlderMessages() {
+    const oldest = messages[0]?.id;
+    if (!selectedId || !oldest || loadingOlder) return;
+    setLoadingOlder(true);
+    try { await loadMessages(selectedId, oldest); }
+    catch (requestError) { setError(requestError.response?.data?.error || t('conversations.error')); }
+    finally { setLoadingOlder(false); }
   }
 
   useEffect(() => {
@@ -153,29 +181,55 @@ export default function Conversations() {
     if (selectedGroupId) {
       let cancelled = false;
       setMessages([]);
+      setHasOlder(false);
       const refresh = () => api.get(`/groups/${selectedGroupId}/messages`)
-        .then(({ data }) => { if (!cancelled) setMessages(data || []); })
+        .then(({ data }) => {
+          if (cancelled) return;
+          (data || []).forEach((item) => senderNamesRef.current.set(item.sender_id, item.sender_name));
+          setMessages((current) => [...(data || []), ...current.filter((item) => !(data || []).some((loaded) => loaded.id === item.id))].sort((a, b) => a.id - b.id));
+        })
         .catch((requestError) => { if (!cancelled) setError(requestError.response?.data?.error || t('conversations.error')); });
       refresh();
       const channel = supabase.channel(`group-${selectedGroupId}`)
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_messages', filter: `group_id=eq.${selectedGroupId}` }, refresh)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_messages', filter: `group_id=eq.${selectedGroupId}` }, async ({ new: row }) => {
+          let name = row.sender_id === user?.id ? user.name : senderNamesRef.current.get(row.sender_id);
+          if (!cancelled) setMessages((current) => appendMessage(current, { ...row, sender_name: name || t('nav.groups') }));
+          if (!name) {
+            const { data } = await supabase.rpc('peer_profile', { p_user_id: row.sender_id });
+            name = data?.name || t('nav.groups');
+            senderNamesRef.current.set(row.sender_id, name);
+            if (!cancelled) setMessages((current) => current.map((item) => item.id === row.id ? { ...item, sender_name: name } : item));
+          }
+        })
         .subscribe();
       return () => { cancelled = true; supabase.removeChannel(channel); };
     }
-    if (!selectedId) { setMessages([]); return undefined; }
+    if (!selectedId) { setMessages([]); setHasOlder(false); return undefined; }
     let cancelled = false;
-    const refresh = () => Promise.all([loadMessages(selectedId), api.post(`/sessions/${selectedId}/read`, {})]).catch((requestError) => {
+    setMessages([]);
+    setHasOlder(false);
+    Promise.all([loadMessages(selectedId), api.post(`/sessions/${selectedId}/read`, {})]).catch((requestError) => {
       if (!cancelled) setError(requestError.response?.data?.error || t('conversations.error'));
     });
-    refresh();
     const channel = supabase.channel(`session-${selectedId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'session_messages', filter: `session_id=eq.${selectedId}` }, () => refresh())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'session_messages', filter: `session_id=eq.${selectedId}` }, ({ new: row }) => {
+        if (cancelled) return;
+        setMessages((current) => appendMessage(current, row));
+        if (row.sender_id !== user?.id) api.post(`/sessions/${selectedId}/read`, {}).catch(() => {});
+      })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'sessions', filter: `id=eq.${selectedId}` }, () => loadSessions())
       .subscribe();
     return () => { cancelled = true; supabase.removeChannel(channel); };
   }, [selectedId, selectedGroupId]);
 
-  useEffect(() => { endRef.current?.scrollIntoView({ block: 'end' }); }, [messages, selectedId, selectedGroupId]);
+  useLayoutEffect(() => {
+    const box = messagesRef.current;
+    if (box && preserveScrollRef.current) {
+      const { height, top } = preserveScrollRef.current;
+      box.scrollTop = top + box.scrollHeight - height;
+      preserveScrollRef.current = null;
+    } else endRef.current?.scrollIntoView({ block: 'end' });
+  }, [messages, selectedId, selectedGroupId]);
   useEffect(() => {
     if (selectedGroupId) return;
     setScheduleOpen(false);
@@ -194,7 +248,7 @@ export default function Conversations() {
     setError('');
     const response = await api.put(`/sessions/${selected.id}`, body);
     setSessions((items) => items.map((item) => item.id === selected.id ? response.data : item));
-    await Promise.all([loadSessions(), loadMessages(selected.id)]);
+    await loadSessions();
   }
 
   async function sendMessage(event) {
@@ -205,13 +259,13 @@ export default function Conversations() {
     try {
       if (selectedGroup) {
         const response = await api.post(`/groups/${selectedGroup.id}/messages`, { body });
-        setMessages((items) => items.some((item) => item.id === response.data.id) ? items : [...items, response.data]);
+        setMessages((items) => appendMessage(items, response.data));
         setDraft('');
         return;
       }
       if (!selected) return;
       const response = await api.post(`/sessions/${selected.id}/messages`, { body });
-      setMessages((items) => items.some((item) => item.id === response.data.id) ? items : [...items, response.data]);
+      setMessages((items) => appendMessage(items, response.data));
       setDraft('');
       await loadSessions();
     } catch (requestError) {
@@ -349,8 +403,9 @@ export default function Conversations() {
               </div>
             )}
 
-            <div className="conversation-messages">
+            <div className="conversation-messages" ref={messagesRef}>
               <div className="conversation-context">{selected ? <><span>{statusLabel(selected.status, t)}</span><h2>{selected.title}</h2>{selected.topics?.length > 0 && <p>{selected.topics.join(' · ')}</p>}</> : <><span>{t('nav.groups')}</span><h2>{selectedGroup.name}</h2></>}</div>
+              {hasOlder && <button type="button" className="conversation-load-older" disabled={loadingOlder} onClick={loadOlderMessages}>{t('conversations.loadOlder')}</button>}
               {messages.map((message) => message.kind === 'system' || message.kind === 'schedule' ? (
                 <div className="conversation-system" key={message.id}>{message.body}</div>
               ) : (

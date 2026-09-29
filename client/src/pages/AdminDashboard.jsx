@@ -783,9 +783,9 @@ export default function AdminDashboard() {
                     ? t('admin.import.importedUpdatedLine', { imported: uploadResult.imported, updated: uploadResult.updated, skipped: uploadResult.skipped })
                     : t('admin.import.importedLine', { imported: uploadResult.imported, skipped: uploadResult.skipped })}</li>
                   <li>✓“ {t('admin.import.matchesLine', { matches: uploadResult.matchesGenerated })}</li>
-                  {uploadResult.imported > 0 && (
-                    <li>✓“ {t('admin.import.tempPassword')} <code className="rounded bg-muted px-1 font-mono text-foreground">{uploadResult.tempPassword}</code></li>
-                  )}
+                  {uploadResult.tempPasswords?.map(({ email, password }) => (
+                    <li key={email} className="break-all">{email}: <code className="rounded bg-muted px-1 font-mono text-foreground">{password}</code></li>
+                  ))}
                 </ul>
               </div>
             )}
