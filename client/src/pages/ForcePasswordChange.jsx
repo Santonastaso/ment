@@ -1,4 +1,5 @@
-﻿import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useT } from '../i18n/index.jsx';
 import { supabase } from '../lib/supabase.js';
@@ -9,13 +10,45 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import LegalLinks from '../components/LegalLinks.jsx';
 
-export default function ForcePasswordChange() {
-  const { user, session, signOut, refreshProfile } = useAuth();
+export default function ForcePasswordChange({ recovery = false }) {
+  const { session, signOut, refreshProfile } = useAuth();
+  const navigate = useNavigate();
   const { t } = useT();
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [recoveryReady, setRecoveryReady] = useState(!recovery);
+  const [recoveryValid, setRecoveryValid] = useState(false);
+  const recoveryAttempt = useRef(null);
+
+  useEffect(() => {
+    if (!recovery) return;
+    let active = true;
+    if (!recoveryAttempt.current) {
+      recoveryAttempt.current = (async () => {
+        const params = new URLSearchParams(window.location.hash.slice(1));
+        const accessToken = params.get('access_token');
+        const refreshToken = params.get('refresh_token');
+        if (params.get('type') !== 'recovery' || !accessToken || !refreshToken) return false;
+        const { error: sessionError } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+        if (sessionError) return false;
+        window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+        return true;
+      })();
+    }
+    recoveryAttempt.current.then(valid => {
+      if (!active) return;
+      setRecoveryValid(valid);
+      if (!valid) setError(t('auth.recovery.invalidLink'));
+      setRecoveryReady(true);
+    }).catch(() => {
+      if (!active) return;
+      setError(t('auth.recovery.invalidLink'));
+      setRecoveryReady(true);
+    });
+    return () => { active = false; };
+  }, [recovery, t]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -24,14 +57,20 @@ export default function ForcePasswordChange() {
     if (next !== confirm) { setError(t('auth.forcePassword.error.mismatch')); return; }
     setLoading(true);
     try {
-      const { error: changeError } = await supabase.functions.invoke('complete-password-change', {
-        body: { password: next },
-      });
-      if (changeError) throw changeError;
-      await refreshProfile();
-      // ChangePasswordRoute will navigate away once must_change_password = false.
-    } catch (err) {
-      setError(err?.message || t('auth.forcePassword.error.generic'));
+      if (recovery) {
+        const { error: changeError } = await supabase.auth.updateUser({ password: next });
+        if (changeError) throw changeError;
+        await signOut();
+        navigate('/login', { replace: true });
+      } else {
+        const { error: changeError } = await supabase.functions.invoke('complete-password-change', {
+          body: { password: next },
+        });
+        if (changeError) throw changeError;
+        await refreshProfile();
+      }
+    } catch {
+      setError(t(recovery ? 'auth.recovery.updateError' : 'auth.forcePassword.error.generic'));
     } finally {
       setLoading(false);
     }
@@ -41,13 +80,13 @@ export default function ForcePasswordChange() {
     <div className="auth-shell flex min-h-screen flex-col items-center justify-center bg-background p-6">
       <Card className="w-full max-w-[400px]">
         <CardHeader>
-          <CardTitle className="text-lg font-medium">{t('auth.forcePassword.title')}</CardTitle>
+      <CardTitle className="text-lg font-medium">{t(recovery ? 'auth.recovery.title' : 'auth.forcePassword.title')}</CardTitle>
           <CardDescription>
-            {session?.user?.email && <>{t('auth.forcePassword.account', { email: session.user.email })}</>}
-            {t('auth.forcePassword.description')}
+            {recovery ? t('auth.recovery.description') : <>{session?.user?.email && <>{t('auth.forcePassword.account', { email: session.user.email })}</>}{t('auth.forcePassword.description')}</>}
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {recovery && !recoveryReady && <p className="mb-4 text-sm text-muted-foreground">{t('auth.recovery.restoring')}</p>}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="next">{t('auth.forcePassword.newPasswordLabel')}</Label>
@@ -58,9 +97,13 @@ export default function ForcePasswordChange() {
               <Input id="confirm" type="password" value={confirm} onChange={e => setConfirm(e.target.value)} required />
             </div>
             {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
-            <Button type="submit" className="w-full" disabled={loading}>{loading ? t('auth.forcePassword.submitting') : t('auth.forcePassword.submit')}</Button>
+            <Button type="submit" className="w-full" disabled={loading || (recovery && (!recoveryReady || !recoveryValid || !session?.user))}>
+              {loading ? t('auth.forcePassword.submitting') : t(recovery ? 'auth.recovery.submit' : 'auth.forcePassword.submit')}
+            </Button>
           </form>
-          <Button type="button" variant="ghost" className="mt-3 w-full" onClick={signOut}>{t('auth.forcePassword.signOut')}</Button>
+          <Button type="button" variant="ghost" className="mt-3 w-full" onClick={async () => { await signOut(); navigate('/login', { replace: true }); }}>
+            {t(recovery ? 'auth.recovery.backToSignIn' : 'auth.forcePassword.signOut')}
+          </Button>
         </CardContent>
       </Card>
       <LegalLinks className="mt-6" />

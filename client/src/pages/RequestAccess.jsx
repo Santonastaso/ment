@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import LegalLinks from '../components/LegalLinks.jsx';
 
-const COMPANY_SIZES = ['1-50', '51-200', '201-1000', '1000+'];
+const ORGANIZATION_SIZES = ['1-50', '51-200', '201-1000', '1000+'];
 
 function errorMessage(t, error) {
   const code = error?.response?.data?.error || error?.message;
@@ -64,10 +64,10 @@ export default function RequestAccess() {
 
   return (
     <div className="auth-shell flex min-h-screen flex-col items-center justify-center bg-background p-6">
-      <div className="mb-8 flex items-center gap-2">
+      <Link to="/welcome" className="mb-8 flex items-center gap-2" aria-label="MENT home">
         <span className="flex size-10 items-center justify-center rounded-full bg-primary text-base font-bold text-primary-foreground">M</span>
         <span className="text-xl font-semibold">MENT</span>
-      </div>
+      </Link>
 
       <Card className="w-full max-w-[520px]">
         <CardHeader>
@@ -123,7 +123,7 @@ export default function RequestAccess() {
                     required
                   >
                     <option value="">{t('auth.requestAccess.selectSize')}</option>
-                    {COMPANY_SIZES.map(size => <option key={size} value={size}>{size}</option>)}
+                    {ORGANIZATION_SIZES.map(size => <option key={size} value={size}>{size}</option>)}
                   </select>
                 </div>
               </div>

@@ -174,8 +174,8 @@ function Footer({ t }) {
       <div className="mx-auto flex max-w-5xl flex-col justify-between gap-3 px-5 py-5 text-xs text-muted-foreground sm:flex-row sm:items-center sm:px-6">
         <span>{t('landing.footer.copyright')}</span>
         <div className="flex items-center gap-4">
-          <Link to="/terms" className="hover:text-foreground">Terms</Link>
-          <Link to="/privacy" className="hover:text-foreground">Privacy</Link>
+          <Link to="/terms" className="hover:text-foreground">{t('common.terms')}</Link>
+          <Link to="/privacy" className="hover:text-foreground">{t('common.privacy')}</Link>
         </div>
       </div>
     </footer>

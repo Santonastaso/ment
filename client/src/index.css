@@ -464,8 +464,9 @@ a.person-row-name:hover { color: var(--primary); text-decoration: underline; }
 .conversation-loading { display: grid; height: 100vh; place-items: center; color: var(--muted-foreground); font-size: 13px; }
 .group-row { border-radius: var(--panel-radius); padding-inline: .75rem; transition: background .15s ease; }
 .group-row:hover { background: var(--control-surface); }
-.profile-tabs { scrollbar-width: none; }
-.profile-tabs::-webkit-scrollbar { display: none; }
+.profile-tabs { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.profile-tabs::-webkit-scrollbar { height: 4px; }
+.profile-tabs::-webkit-scrollbar-thumb { border-radius: 4px; background: var(--border); }
 @keyframes discoveryEllipsis { 50% { opacity: .35; } }
 @media (prefers-reduced-motion: reduce) { .discovery-ellipsis, .discovery-skeletons span { animation: none; } }
 @media (max-width: 700px) { .discovery-flow { padding-inline: 1rem; } .discovery-ask-block { padding-top: 22vh; } .person-row { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "avatar identity" ". detail" ". meta" ". actions"; gap: .5rem .65rem; padding: 14px 10px; } .person-row-actions { justify-content: flex-start; padding-top: .15rem; } .discovery-user-bubble { max-width: 88%; } .discovery-actions { align-items: flex-start; flex-direction: column; } .discovery-assistant-message { grid-template-columns: 28px minmax(0, 1fr); gap: .55rem; } .discovery-agent-mark { width: 28px; height: 28px; } .discovery-connections { flex-wrap: wrap; gap: 8px 12px; } .discovery-connections-link { margin-left: 0; } }

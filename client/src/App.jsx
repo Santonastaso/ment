@@ -1,5 +1,5 @@
 import React, { Suspense, lazy } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -46,16 +46,29 @@ function homePath(user) {
   return user.role === 'alumnus' ? '/conversations' : '/';
 }
 
+function returnPath(location) {
+  const from = location?.state?.from;
+  const path = typeof from === 'string'
+    ? from
+    : from && `${from.pathname || ''}${from.search || ''}${from.hash || ''}`;
+  return typeof path === 'string' && path.startsWith('/') && !path.startsWith('//') && !path.includes('\\')
+    ? path
+    : null;
+}
+
 // `/login` lives outside the protected tree. Once the user signs in we need an
 // explicit guard to push them to wherever the protected tree would have sent
 // them — change-password / onboarding / home / admin — instead of leaving them
 // on the form.
 function LoginRoute() {
   const { user, loading } = useAuth();
+  const location = useLocation();
+  const destination = returnPath(location);
   if (loading) return <LoadingScreen />;
   if (user) {
     const gate = authGatePath(user);
-    if (gate) return <Navigate to={gate} replace />;
+    if (gate) return <Navigate to={gate} state={{ returnTo: destination }} replace />;
+    if (destination) return <Navigate to={destination} replace />;
     // Students arrive to find someone, so they land in the discovery chat.
     // Alumni never search — they respond — so they land in Messages. This is
     // the landing route only; both keep the same sidebar and can reach either.
@@ -66,31 +79,40 @@ function LoginRoute() {
 
 function ProtectedRoute() {
   const { user, loading } = useAuth();
+  const location = useLocation();
   if (loading) return <LoadingScreen />;
-  if (!user) return <Navigate to="/welcome" replace />;
+  if (!user) return <Navigate to="/login" state={{ from: location }} replace />;
   const gate = authGatePath(user);
-  if (gate) return <Navigate to={gate} replace />;
+  if (gate) return <Navigate to={gate} state={{ returnTo: `${location.pathname}${location.search}${location.hash}` }} replace />;
   return page(<AppLayout />);
 }
 
 function ChangePasswordRoute() {
   const { user, loading } = useAuth();
+  const location = useLocation();
+  const destination = location.state?.returnTo;
   if (loading) return <LoadingScreen />;
   if (!user) return <Navigate to="/login" replace />;
-  if (!user.must_change_password) return <Navigate to={homePath(user)} replace />;
+  if (!user.must_change_password) return <Navigate to={destination || homePath(user)} replace />;
   return page(<ForcePasswordChange />);
+}
+
+function PasswordRecoveryRoute() {
+  return page(<ForcePasswordChange recovery />);
 }
 
 function OnboardingRoute() {
   const { user, loading } = useAuth();
+  const location = useLocation();
+  const destination = location.state?.returnTo;
   if (loading) return <LoadingScreen />;
   if (!user) return <Navigate to="/login" replace />;
   if (user.must_change_password) return <Navigate to={authGatePath(user)} replace />;
-  if (user.onboarding_complete || user.is_admin) return <Navigate to={homePath(user)} replace />;
+  if (user.onboarding_complete || user.is_admin) return <Navigate to={destination || homePath(user)} replace />;
   return page(
     <div className="min-h-screen bg-background">
       <main className="mx-auto max-w-2xl px-4 py-10">
-        <Onboarding />
+        <Onboarding returnTo={destination} />
       </main>
     </div>
   );
@@ -127,6 +149,7 @@ export default function App() {
       <Route path="/privacy" element={page(<LegalPage type="privacy" />)} />
       <Route path="/calendar/callback" element={page(<CalendarCallback />)} />
       <Route path="/change-password" element={<ChangePasswordRoute />} />
+      <Route path="/reset-password" element={<PasswordRecoveryRoute />} />
       <Route path="/onboarding" element={<OnboardingRoute />} />
       <Route element={<ProtectedRoute />}>
         <Route path="/" element={<UserRoute>{page(<Dashboard />)}</UserRoute>} />

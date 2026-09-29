@@ -17,7 +17,7 @@ import LegalLinks from '../components/LegalLinks.jsx';
 
 function friendlyError(t, code) {
   switch (code) {
-    case 'signup_requires_invitation': return 'Organization signup is invitation-only. Request access to get started.';
+    case 'signup_requires_invitation': return t('auth.signup.error.invitationOnly');
     case 'company_name_required': return t('auth.signup.error.companyNameRequired');
     case 'admin_name_required': return t('auth.signup.error.adminNameRequired');
     case 'admin_email_invalid': return t('auth.signup.error.adminEmailInvalid');
@@ -41,6 +41,7 @@ export default function SignUp() {
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [invitationOnly, setInvitationOnly] = useState(false);
   // Synchronous guard: setSubmitting is async, so a fast double-click could
   // fire two requests before the disabled state lands. This ref blocks the
   // second call immediately.
@@ -55,6 +56,7 @@ export default function SignUp() {
     if (inFlight.current) return;
     inFlight.current = true;
     setError('');
+    setInvitationOnly(false);
     setSubmitting(true);
     try {
       const { data, error: invokeError } = await supabase.functions.invoke('public-signup', {
@@ -71,17 +73,21 @@ export default function SignUp() {
           }
         } catch { /* ignore */ }
         setError(friendlyError(t, code));
+        setInvitationOnly(code === 'signup_requires_invitation');
         return;
       }
       if (!data?.organization) {
         setError(friendlyError(t, data?.error));
+        setInvitationOnly(data?.error === 'signup_requires_invitation');
         return;
       }
       // Sign the new admin in immediately.
       await signIn(form.admin_email, form.admin_password);
       navigate('/');
     } catch (err) {
-      setError(friendlyError(t, err?.response?.data?.error || err?.message));
+      const code = err?.response?.data?.error || err?.message;
+      setError(friendlyError(t, code));
+      setInvitationOnly(code === 'signup_requires_invitation');
     } finally {
       setSubmitting(false);
       inFlight.current = false;
@@ -178,8 +184,8 @@ export default function SignUp() {
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
-            {error.includes('invitation-only') && (
-              <p className="text-center text-sm"><Link to="/request-access" className="text-primary underline">Request access</Link></p>
+            {invitationOnly && (
+              <p className="text-center text-sm"><Link to="/request-access" className="text-primary underline">{t('auth.signup.requestAccessLink')}</Link></p>
             )}
 
             <Button

@@ -21,7 +21,7 @@ function monthYearToPicker(year, month) {
   return `${year}-${String(m).padStart(2, '0')}`;
 }
 
-export default function Onboarding() {
+export default function Onboarding({ returnTo }) {
   const { user, updateUser } = useAuth();
   const navigate = useNavigate();
   const { t } = useT();
@@ -174,7 +174,7 @@ export default function Onboarding() {
         linkedin_headline: linkedinHeadline,
       });
       updateUser(res.data);
-      navigate('/');
+      navigate(returnTo || '/');
     } catch (e) {
       setError(e.response?.data?.error || t('onboarding.error.generic'));
     } finally {

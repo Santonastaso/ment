@@ -2,6 +2,7 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useT } from '../i18n/index.jsx';
+import { supabase } from '../lib/supabase.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,6 +16,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [recoverySent, setRecoverySent] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -30,12 +32,33 @@ export default function Login() {
     }
   }
 
+  async function handlePasswordReset() {
+    setError('');
+    setRecoverySent(false);
+    if (!email.trim()) {
+      setError(t('auth.login.resetEmailRequired'));
+      return;
+    }
+    setLoading(true);
+    try {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (resetError) throw resetError;
+      setRecoverySent(true);
+    } catch {
+      setError(t('auth.login.resetError'));
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="auth-shell flex min-h-screen flex-col items-center justify-center bg-background p-6">
-      <div className="mb-8 flex items-center gap-2">
+      <Link to="/welcome" className="mb-8 flex items-center gap-2" aria-label="MENT home">
         <span className="flex size-10 items-center justify-center rounded-full bg-primary text-base font-bold text-primary-foreground">M</span>
         <span className="text-xl font-semibold">MENT</span>
-      </div>
+      </Link>
       <div className="w-full max-w-[360px]">
         <h1 className="text-xl font-semibold tracking-[-0.025em]">{t('auth.login.title')}</h1>
         <p className="mt-1.5 text-sm leading-6 text-muted-foreground">{t('auth.login.description')}</p>
@@ -48,6 +71,12 @@ export default function Login() {
               <Label htmlFor="password">{t('auth.login.passwordLabel')}</Label>
               <Input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} autoComplete="current-password" required />
             </div>
+            <div className="-mt-2 flex justify-end">
+              <button type="button" className="text-sm text-primary underline-offset-4 hover:underline" onClick={handlePasswordReset} disabled={loading}>
+                {t('auth.login.forgotPassword')}
+              </button>
+            </div>
+            {recoverySent && <Alert><AlertDescription>{t('auth.login.resetSent')}</AlertDescription></Alert>}
             {error && (
               <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>
