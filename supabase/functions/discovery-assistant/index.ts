@@ -91,6 +91,22 @@ function candidateForModel(candidate: Candidate, redactIdentity: boolean) {
   return lean;
 }
 
+// ministral-3b returns reasons and matched_expertise as a bare string about as
+// readily as the documented array, especially when the prompt asks for "one
+// sentence". A string is truthy, so (value || []) does not rescue it and .some
+// throws. Normalise once here so the guard and the card both see one shape.
+function normalizeRanked(item: RankedMatch | null | undefined): RankedMatch {
+  const toArray = (value: unknown): string[] => {
+    if (Array.isArray(value)) return value.filter((entry): entry is string => typeof entry === 'string');
+    return typeof value === 'string' && value.trim() ? [value] : [];
+  };
+  return {
+    ...(item || {}),
+    reasons: toArray(item?.reasons),
+    matched_expertise: toArray(item?.matched_expertise),
+  };
+}
+
 function publicCandidate(candidate: Candidate, ranked?: RankedMatch, redactIdentity = false) {
   const pool = [...new Set([...(candidate.skills || []), redactIdentity ? null : candidate.job_title, candidate.department].filter(Boolean))].slice(0, EXPERTISE_POOL);
   const allowedExpertise = new Map(pool.map((item) => [String(item).toLowerCase(), String(item)]));
@@ -403,7 +419,9 @@ Return exactly one of these JSON shapes:
 {"outcome":"matches","clarification":"","no_match_reason":"","matches":[{"profile_id":"candidate id","confidence":0.0,"matched_expertise":["exact supplied candidate field"],"reasons":["one concrete reason tied directly to the request"]}]}
 {"outcome":"no_match","clarification":"","no_match_reason":"one concise explanation that the current network has no relevant profile","matches":[]}
 
-Each reason is printed on that person's card and read by the user, so write about the person, never about the matching. Name the concrete thing that makes them worth contacting for this request: what they actually do, and the specific expertise they supplied. One plain sentence, under 20 words, no trailing period needed.
+"reasons" is always a JSON array of strings, never a bare string, even when it holds a single entry. The same applies to "matched_expertise".
+
+Each reason is printed on that person's card and read by the user, so write about the person, never about the matching. Name the concrete thing that makes them worth contacting for this request: what they actually do, and the specific expertise they supplied. Give one entry only: a single plain sentence under 20 words.
 
 Never state that a title, department, field or profile "matches" the request. Never mention the request, the search, criteria, requirements, scores or the network. Do not pad with seniority, cohort year or location when they are not what the user asked for.
 Bad: "Direct job title matches Finance/Operations/Consulting request"
@@ -420,7 +438,8 @@ For matches, confidence must be at least 0.75 and matched_expertise must copy an
     const noMatchReason = cleanText(result.value?.no_match_reason, 240);
     const ranked = Array.isArray(result.value?.matches) ? result.value.matches : [];
     const seen = new Set<string>();
-    const matches = ranked.flatMap((item) => {
+    const matches = ranked.flatMap((raw) => {
+      const item = normalizeRanked(raw);
       const id = cleanText(item?.profile_id, 100);
       const candidate = candidates.find((entry) => entry.id === id);
       const confidence = Number(item?.confidence);
