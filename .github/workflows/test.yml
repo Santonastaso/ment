@@ -101,9 +101,9 @@ jobs:
             exit 1
           fi
           supabase link --project-ref "$project_ref"
-          supabase db lint --linked --fail-on error
           supabase db push --linked --dry-run
           supabase db push --linked --yes
+          supabase db lint --linked --fail-on error
           supabase functions deploy --project-ref "$project_ref"
 
       - name: Verify production RLS policies
