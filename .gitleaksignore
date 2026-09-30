@@ -1,0 +1,2 @@
+# False positive: the `redactIdentity` variable beside `linkedin_headline` is not a LinkedIn client ID.
+2ba0f88cc089bf79551d087d1e05ad45d6593ddc:supabase/functions/discovery-assistant/index.ts:linkedin-client-id:89
