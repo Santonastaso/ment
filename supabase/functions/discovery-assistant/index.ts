@@ -78,8 +78,18 @@ function formatRequestDraft(language: string, sender: string, recipient: string,
 // A reason can only be as specific as the facts behind it. The ranking model is
 // sent the candidate's whole teachable vocabulary; the card still shows only the
 // few items the model actually matched on.
-const EXPERTISE_POOL = 8;
+const EXPERTISE_POOL = 6;
 const EXPERTISE_ON_CARD = 3;
+
+// The ranking model needs facts, not presentation. "background" only restates
+// program and department, "reasons" is always empty on the way in, and the
+// prompt forbids leaning on cohort year -- so all three inflated every request
+// for nothing.
+function candidateForModel(candidate: Candidate, redactIdentity: boolean) {
+  const { background: _background, reasons: _reasons, cohort_year: _cohortYear, ...lean } =
+    publicCandidate(candidate, undefined, redactIdentity);
+  return lean;
+}
 
 function publicCandidate(candidate: Candidate, ranked?: RankedMatch, redactIdentity = false) {
   const pool = [...new Set([...(candidate.skills || []), redactIdentity ? null : candidate.job_title, candidate.department].filter(Boolean))].slice(0, EXPERTISE_POOL);
@@ -366,7 +376,7 @@ Do not broaden explicit professions or domains into adjacent ones. For example, 
       await recordAiRun(ctx.sb, {
         userId: ctx.user.id, organizationId: caller.organization_id, feature: 'discovery_draft',
         promptVersion: PROMPT_VERSION, model: 'unknown', latencyMs: Date.now() - startedAt,
-        status: 'failed', errorCode: mapped.message,
+        status: 'failed', errorCode: [mapped.message, mapped.detail].filter(Boolean).join(' | ').slice(0, 300),
       });
       return jsonError(mapped.message, mapped.status);
     }
@@ -402,7 +412,7 @@ Good: "Finance Director who teaches three-statement modelling and board reportin
 Good: "Runs pricing for a retail group and coaches on category management"
 
 For matches, confidence must be at least 0.75 and matched_expertise must copy an exact supplied skill, job title, department, program, or LinkedIn headline. Return at most three matches in best-first order. Never output an ID not present in candidates.`,
-      user: JSON.stringify({ request: requestForMatch, candidates: candidates.map((candidate) => publicCandidate(candidate, undefined, redactInterOrg && !established.has(candidate.id))) }),
+      user: JSON.stringify({ request: requestForMatch, candidates: candidates.map((candidate) => candidateForModel(candidate, redactInterOrg && !established.has(candidate.id))) }),
       temperature: 0,
       maxTokens: 700,
     });
@@ -443,7 +453,7 @@ For matches, confidence must be at least 0.75 and matched_expertise must copy an
     await recordAiRun(ctx.sb, {
       userId: ctx.user.id, organizationId: caller.organization_id, feature: 'discovery_match',
       promptVersion: PROMPT_VERSION, model: 'unknown', latencyMs: Date.now() - startedAt,
-      status: 'failed', errorCode: mapped.message,
+      status: 'failed', errorCode: [mapped.message, mapped.detail].filter(Boolean).join(' | ').slice(0, 300),
     });
     return jsonError(mapped.message, mapped.status);
   }

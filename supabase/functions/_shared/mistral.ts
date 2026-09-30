@@ -6,9 +6,14 @@ export class AiNotConfiguredError extends Error {
 
 export class AiProviderError extends Error {
   status: number;
-  constructor(message: string, status = 502) {
+  // The provider's own status/code/message. Edge function logs need the
+  // dashboard to read, so without this a 400 from Mistral is indistinguishable
+  // from any other failure to anyone working from SQL.
+  detail: string;
+  constructor(message: string, status = 502, detail = '') {
     super(message);
     this.status = status;
+    this.detail = detail;
   }
 }
 
@@ -30,12 +35,12 @@ function configuration(feature?: string) {
   return { apiKey, model };
 }
 
-function providerError(status: number) {
-  if (status === 401 || status === 403) return new AiProviderError('ai_provider_auth_failed', 502);
-  if (status === 404) return new AiProviderError('ai_model_not_found', 502);
-  if (status === 429) return new AiProviderError('ai_rate_limited', 503);
-  if (status >= 500) return new AiProviderError('ai_temporarily_unavailable', 503);
-  return new AiProviderError('ai_request_failed', 502);
+function providerError(status: number, detail = '') {
+  if (status === 401 || status === 403) return new AiProviderError('ai_provider_auth_failed', 502, detail);
+  if (status === 404) return new AiProviderError('ai_model_not_found', 502, detail);
+  if (status === 429) return new AiProviderError('ai_rate_limited', 503, detail);
+  if (status >= 500) return new AiProviderError('ai_temporarily_unavailable', 503, detail);
+  return new AiProviderError('ai_request_failed', 502, detail);
 }
 
 export async function mistralJson<T>(options: {
@@ -103,7 +108,7 @@ export async function mistralJson<T>(options: {
       retry_after: response.headers.get('retry-after'),
       rate_limit_remaining: response.headers.get('x-ratelimit-remaining'),
     }));
-    throw providerError(response.status);
+    throw providerError(response.status, [response.status, providerCode || providerType, providerMessage].filter(Boolean).join(' ').slice(0, 280));
   }
   const payload = await response.json().catch(() => null);
   const content = payload?.choices?.[0]?.message?.content;
@@ -120,7 +125,7 @@ export async function mistralJson<T>(options: {
 }
 
 export function aiErrorResponse(error: unknown) {
-  if (error instanceof AiNotConfiguredError) return { message: error.message, status: 503 };
-  if (error instanceof AiProviderError) return { message: error.message, status: error.status };
-  return { message: 'ai_request_failed', status: 502 };
+  if (error instanceof AiNotConfiguredError) return { message: error.message, status: 503, detail: '' };
+  if (error instanceof AiProviderError) return { message: error.message, status: error.status, detail: error.detail };
+  return { message: 'ai_request_failed', status: 502, detail: '' };
 }
