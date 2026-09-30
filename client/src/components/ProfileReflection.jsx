@@ -115,6 +115,15 @@ function ContinuationIntent() {
   const { t } = useT();
   const [saving, setSaving] = useState(false);
   const [answer, setAnswer] = useState('');
+  const [hasCompletedExchange, setHasCompletedExchange] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.get('/sessions').then(({ data }) => {
+      if (!cancelled) setHasCompletedExchange(Array.isArray(data) && data.some(session => session.status === 'completed'));
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   async function save(nextAnswer) {
     setSaving(true);
@@ -128,6 +137,8 @@ function ContinuationIntent() {
 
   // Question left, answers right — it reads as its own question rather than a
   // step of the check-in. The disclaimer drops to fine print underneath.
+  if (!hasCompletedExchange) return null;
+
   return (
     <section className="mt-1 border-t border-[var(--border-subtle)] pt-3">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">

@@ -47,8 +47,8 @@ export default function Sidebar({ collapsed = false, onNavigate, onToggle }) {
             : location.pathname === item.to;
           const Icon = item.icon;
           const badgeCount = item.to === '/conversations'
-            ? Math.max(pendingAcceptanceCount, unreadCounts.sessions)
-            : item.to === '/groups' ? unreadCounts.groups : 0;
+            ? Math.max(pendingAcceptanceCount, unreadCounts.sessions + unreadCounts.groups)
+            : 0;
           return (
             <Link
               key={item.to}
@@ -69,11 +69,9 @@ export default function Sidebar({ collapsed = false, onNavigate, onToggle }) {
               {!collapsed && <span className="flex-1">{item.label}</span>}
               {badgeCount > 0 && (
                 <span
-                  data-testid={item.to === '/groups' ? 'nav-groups-unread-badge' : 'nav-messages-unread-badge'}
+                  data-testid="nav-messages-unread-badge"
                   className={cn('inline-flex items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground', collapsed ? 'absolute right-1 top-1 size-4' : 'ml-auto h-5 min-w-[1.25rem] px-1.5')}
-                  aria-label={item.to === '/groups'
-                    ? t('nav.unreadGroups', { count: badgeCount })
-                    : t('nav.unreadConversations', { count: badgeCount })}
+                  aria-label={t('nav.unreadConversations', { count: badgeCount })}
                 >
                   {badgeCount > 99 ? '99+' : badgeCount}
                 </span>

@@ -25,6 +25,18 @@ function isExpired(session) {
   return !!session.expired_at || (session.status === 'pending' && !!session.request_expires_at && new Date(session.request_expires_at) <= new Date());
 }
 
+function expiryInDays(value) {
+  const remaining = new Date(value).getTime() - Date.now();
+  if (!Number.isFinite(remaining)) return 0;
+  return Math.max(0, Math.ceil(remaining / 86_400_000));
+}
+
+function expiryLabel(days, t) {
+  if (days === 0) return t('conversations.expiresToday');
+  if (days === 1) return t('conversations.expiresOneDay');
+  return t('conversations.expiresIn', { days });
+}
+
 function statusLabel(session, t) {
   return isExpired(session) ? t('conversations.status.expired') : t(`conversations.status.${session.status}`, session.status);
 }
@@ -79,7 +91,7 @@ function appendMessage(current, row) {
 }
 
 export default function Conversations() {
-  const { user, refreshPendingAcceptances, refreshUnreadCounts } = useAuth();
+  const { user, unreadCounts, refreshPendingAcceptances, refreshUnreadCounts } = useAuth();
   const { t } = useT();
   const [params, setParams] = useSearchParams();
   const selectedId = Number(params.get('session')) || null;
@@ -363,10 +375,11 @@ export default function Conversations() {
             <Link to="/explorer">{t('conversations.findPeople')}</Link>
           </div>
         ) : <>
-        {visibleSessions.map((session) => {
-          const peer = otherPerson(session, user?.id);
-          const state = rowState(session);
-          return (
+          {visibleSessions.map((session) => {
+            const peer = otherPerson(session, user?.id);
+            const state = rowState(session);
+            const unreadCount = unreadCounts.sessionMessages[session.id] || 0;
+            return (
             <button key={session.id} type="button" onClick={() => setParams({ session: String(session.id) })} className={cn('conversation-list-item', session.id === selectedId && 'is-active')}>
               <Avatar className="size-9"><AvatarFallback>{initials(peer?.name)}</AvatarFallback></Avatar>
               <span className="min-w-0">
@@ -378,6 +391,7 @@ export default function Conversations() {
                 {/* What they actually asked about. */}
                 <small>{session.title}</small>
               </span>
+              {unreadCount > 0 && <span className="conversation-unread-badge" aria-label={t('conversations.unreadCount', { count: unreadCount })}>{unreadCount > 99 ? '99+' : unreadCount}</span>}
             </button>
           );
         })}
@@ -388,9 +402,10 @@ export default function Conversations() {
               <span className="conversation-list-top">
                 <strong>{group.name}</strong>
               </span>
-              <small>{group.description || t('nav.groups')}</small>
-            </span>
-          </button>
+            <small>{group.description || t('nav.groups')}</small>
+          </span>
+          {(unreadCounts.groupMessages[group.id] || 0) > 0 && <span className="conversation-unread-badge" aria-label={t('conversations.unreadCount', { count: unreadCounts.groupMessages[group.id] })}>{unreadCounts.groupMessages[group.id] > 99 ? '99+' : unreadCounts.groupMessages[group.id]}</span>}
+        </button>
         ))}
         {!visibleSessions.length && !(showGroups && groups.length) && filter !== 'all' && (
           <p className="conversation-list-empty">{t('conversations.filter.empty')}</p>
@@ -423,7 +438,7 @@ export default function Conversations() {
             )}
             {selected?.status === 'pending' && !isExpired(selected) && selected.isMentee && <div className="conversation-waiting">
             <span>{t('conversations.requestSent')}</span>
-              {selected.request_expires_at && <span>{t('conversations.expires', { date: formatMessageTime(selected.request_expires_at) })}</span>}
+              {selected.request_expires_at && <span>{expiryLabel(expiryInDays(selected.request_expires_at), t)}</span>}
               <Button type="button" size="sm" variant="ghost" onClick={withdrawRequest}>{t('conversations.withdraw')}</Button>
             </div>}
 

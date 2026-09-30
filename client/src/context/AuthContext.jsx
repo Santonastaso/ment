@@ -28,7 +28,7 @@ export function AuthProvider({ children }) {
   // the mentee. Surfaced as a badge in the sidebar and used by the dashboard
   // to decide whether to render the AcceptanceModal.
   const [pendingAcceptanceCount, setPendingAcceptanceCount] = useState(0);
-  const [unreadCounts, setUnreadCounts] = useState({ sessions: 0, groups: 0 });
+  const [unreadCounts, setUnreadCounts] = useState({ sessions: 0, groups: 0, sessionMessages: {}, groupMessages: {} });
 
   useEffect(() => {
     let mounted = true;
@@ -119,10 +119,15 @@ export function AuthProvider({ children }) {
   }
 
   const refreshUnreadCounts = useCallback(async () => {
-    if (!session?.user?.id) { setUnreadCounts({ sessions: 0, groups: 0 }); return; }
+    if (!session?.user?.id) { setUnreadCounts({ sessions: 0, groups: 0, sessionMessages: {}, groupMessages: {} }); return; }
     try {
       const { data, error } = await supabase.rpc('my_unread_message_counts');
-      if (!error && data) setUnreadCounts({ sessions: data.sessions || 0, groups: data.groups || 0 });
+      if (!error && data) setUnreadCounts({
+        sessions: data.sessions || 0,
+        groups: data.groups || 0,
+        sessionMessages: data.session_unread || {},
+        groupMessages: data.group_unread || {},
+      });
     } catch { /* Keep the last known badge state during a transient network error. */ }
   }, [session?.user?.id]);
 
@@ -134,7 +139,7 @@ export function AuthProvider({ children }) {
   }, [session?.user?.id]);
 
   useEffect(() => {
-    if (!session?.user?.id) { setUnreadCounts({ sessions: 0, groups: 0 }); return undefined; }
+    if (!session?.user?.id) { setUnreadCounts({ sessions: 0, groups: 0, sessionMessages: {}, groupMessages: {} }); return undefined; }
     refreshUnreadCounts();
     const channel = supabase.channel(`unread-messages:${session.user.id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'session_messages' }, refreshUnreadCounts)
