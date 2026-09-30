@@ -13,6 +13,9 @@ type Candidate = {
   department?: string | null;
   program?: string | null;
   cohort_year?: number | null;
+  location?: string | null;
+  seniority?: string | null;
+  tenure_years?: number | null;
   bio?: string | null;
   linkedin_headline?: string | null;
   skills: string[];
@@ -121,6 +124,13 @@ function publicCandidate(candidate: Candidate, ranked?: RankedMatch, redactIdent
     program: candidate.program,
     cohort_year: candidate.cohort_year,
     linkedin_headline: redactIdentity ? null : candidate.linkedin_headline,
+    // Filters, not expertise: the clarify step stops asking about location and
+    // seniority, so the matcher has to be able to honour them when the user
+    // does supply them. Kept for redacted candidates, at the same granularity
+    // as department, which redaction already keeps.
+    location: candidate.location,
+    seniority: candidate.seniority,
+    tenure_years: candidate.tenure_years,
     expertise: ranked ? (matchedExpertise.length ? matchedExpertise : pool.slice(0, EXPERTISE_ON_CARD)) : pool,
     background: [candidate.program, candidate.department].filter(Boolean).join(' · ')
       || (redactIdentity ? 'Professional experience' : candidate.job_title || 'Professional experience'),
@@ -246,7 +256,17 @@ Deno.serve(async (req) => {
 
 You are given "coverage": the departments, programs, job titles and skills that exist in this network. It is the whole of what can ever be matched, and it is private. Use it to decide, never to explain. Never quote it, list it, or refer to job titles, departments, programs, skills, fields, records, lists or what the network contains in anything the user will read. Before anything else, judge whether any of it could plausibly satisfy the request. If none of it could, return decision "no_match" with a short no_match_reason saying in plain words who this network has nobody for — do not ask a question first.
 
-Otherwise prefer decision "ready", with one concise search_request that preserves the user's intent. search_request is read only by the matching step and is never shown to the user, so write it for a search, not for a person. Return decision "clarify" only when the request is too vague to search at all AND the coverage holds more than one genuinely different direction it could mean. Searching and showing people beats asking: an imperfect result the user can react to is more useful than another question. Ask at most ONE question in the entire conversation — if any earlier assistant turn asked one, you must return "ready" or "no_match". Never ask the user to confirm or approve your understanding, and never repeat their request back to them.
+Otherwise always produce one concise search_request that preserves the user's intent. search_request is read only by the matching step and is never shown to the user, so write it for a search, not for a person.
+
+Then decide whether to ask one question first. Apply these rules in order and stop at the first that fits. Where a rule says ask, return decision "clarify" and put the question in "question"; where it says search, return decision "ready":
+1. The request says nothing about what the person does — no field, no skill, no programme. Ask. Location, seniority, years of experience and employer narrow a set but cannot define one, so a request carrying only those still means ask.
+2. The request names a specific skill or a specific role. Do not ask, search. Precision beats breadth: an exact request needs no narrowing.
+3. The request names only a broad field or department and nothing else. Ask.
+4. Anything else. Do not ask, search.
+
+Never ask which company or employer someone worked at: that is not recorded, so no answer could change the result. Only ask about something the coverage actually varies on, and prefer the question that would narrow the pool most.
+
+Ask at most ONE question in the entire conversation — if any earlier assistant turn asked one, you must return "ready" or "no_match". Never ask the user to confirm or approve your understanding, and never repeat their request back to them.
 
 "question" is shown to the user word for word, so write it as one short, natural sentence a helpful person would say out loud: under 20 words, no preamble, no quoted terms, no explanation of how the search works.
 
@@ -298,7 +318,7 @@ Do not broaden explicit professions or domains into adjacent ones. For example, 
   }
 
   const { data: rows, error: candidateError } = await ctx.sb.from('profiles')
-    .select('id,name,job_title,department,program,cohort_year,bio,linkedin_headline,mentorship_paused,mentorship_unavailable_until,weekly_meeting_limit,monthly_meeting_limit')
+    .select('id,name,job_title,department,program,cohort_year,location,seniority,tenure_years,bio,linkedin_headline,mentorship_paused,mentorship_unavailable_until,weekly_meeting_limit,monthly_meeting_limit')
     .eq('organization_id', caller.organization_id)
     .eq('admin_scope', 'none')
     .eq('onboarding_complete', true)
@@ -412,6 +432,8 @@ Do not broaden explicit professions or domains into adjacent ones. For example, 
 Choose exactly one outcome:
 1. "matches": only when at least one candidate has direct, explicit evidence for the clarified request.
 2. "no_match": when no candidate has direct evidence for the clarified request.
+
+Each candidate also carries location, seniority and tenure_years. These are filters, never evidence of expertise: apply one only when the request actually asks for it, and never let it stand in for the profession, function or skill being sought. They must never appear in matched_expertise.
 
 An explicit profession or domain is not ambiguous. If the user asks for a medical professional and no candidate has supplied medical or clinical credentials, return no_match. Do not ask whether they mean doctor, nurse, or another adjacent role. Do not substitute transferable skills, location, general seniority, or a merely adjacent profession. If your reason needs a caveat like "no direct experience, but...", that person is not a match. False positives are worse than returning no match.
 
