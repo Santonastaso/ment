@@ -163,6 +163,8 @@ export default function Onboarding({ returnTo }) {
         await api.post(`/profile/ingest/${draftId}/accept`, { accepted_json: accepted });
       }
       const res = await api.post('/users/me/onboarding', {
+        name, seniority: user?.seniority ?? null,
+        shadow_role_response: user?.shadow_role_response ?? null,
         department, current_role: currentRole, location, bio,
         career: validCareer,
         can_teach: canTeach,

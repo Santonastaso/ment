@@ -736,11 +736,12 @@ async function post(url, body = {}, opts = {}) {
 
   if (url === '/users/me/onboarding') {
     const { error } = await supabase.rpc('save_onboarding', {
-      p_name: body.name,
+      p_name: body.name ?? null,
       p_department: body.department,
-      p_seniority: body.seniority,
+      p_seniority: body.seniority ?? null,
       p_job_title: body.current_role || body.job_title || '',
       p_bio: body.bio || '',
+      p_shadow_role_response: body.shadow_role_response ?? null,
       p_tenure_years: parseInt(body.tenure_years || 0, 10),
       p_location: body.location || '',
       p_career: (body.career || []).map((c) => ({

@@ -162,16 +162,13 @@ def main() -> int:
 
     # --- feedback_messages owner only via SELECT, but Bob can submit via RPC ---
     s, b = rest("GET", "feedback_messages", bob,
-                params={"select": "id,message", "limit": "5"})
+                params={"select": "id,message,user_id", "limit": "5"})
     rows = (b if isinstance(b, list) else []) if ok_status(s) else []
     # All returned rows should belong to Bob if any are returned (RLS-based isolation)
-    leaked = []
-    if rows:
-        bob_id_row = next((r for r in rows if r.get("user_id") and r["user_id"] != BOB_ID), None)
-        if bob_id_row:
-            leaked.append(bob_id_row)
+    leaked = [row for row in rows if row.get("user_id") != BOB_ID]
     case("feedback_isolated_select", expect_denied=False,
-         ok=len(leaked) == 0, detail=f"Bob SELECT on feedback_messages: {len(rows)} rows, {len(leaked)} cross-user")
+         ok=ok_status(s) and len(leaked) == 0,
+         detail=f"Bob SELECT on feedback_messages: status={s}, {len(rows)} rows, {len(leaked)} cross-user")
 
     # --- Profile UPDATE attempts ---
     other_uid = ALICE_ID
