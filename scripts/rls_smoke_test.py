@@ -9,8 +9,8 @@ through.
 Usage:
   python3 scripts/rls_smoke_test.py
 
-You need .env at the repo root with SUPABASE_URL, SUPABASE_ANON_KEY,
-SUPABASE_SERVICE_ROLE_KEY, SUPABASE_PAT, SUPABASE_PROJECT_REF.
+Set SUPABASE_URL, SUPABASE_ANON_KEY, MENT_EMP_EMAIL, MENT_EMP_PASSWORD,
+MENT_ADMIN_EMAIL, and MENT_ADMIN_PASSWORD in .env or the environment.
 """
 from __future__ import annotations
 import json
@@ -37,7 +37,6 @@ def env(key: str, default: str = "") -> str:
 
 SUPABASE_URL = env("SUPABASE_URL")
 ANON = env("SUPABASE_ANON_KEY")
-SRK = env("SUPABASE_SERVICE_ROLE_KEY")
 if not SUPABASE_URL or not ANON:
     print("RLS smoke test requires SUPABASE_URL and SUPABASE_ANON_KEY.")
     sys.exit(1)
@@ -141,7 +140,7 @@ def main() -> int:
          expect_denied=True, ok=not is_denied(s, b),
          detail=f"GET profiles.shadow_role_response → status={s} (must be denied)")
     s, b = rest("GET", "profiles", bob,
-                params={"select": "shadow_role_response", "id": "neq.deadbeef"})
+                params={"select": "shadow_role_response", "id": f"eq.{ALICE_ID}"})
     case("profiles.shadow_role_response_blocked_for_peer",
          expect_denied=True, ok=not is_denied(s, b),
          detail=f"peer GET profiles.shadow_role_response → status={s}")
