@@ -127,5 +127,11 @@ export async function mistralJson<T>(options: {
 export function aiErrorResponse(error: unknown) {
   if (error instanceof AiNotConfiguredError) return { message: error.message, status: 503, detail: '' };
   if (error instanceof AiProviderError) return { message: error.message, status: error.status, detail: error.detail };
-  return { message: 'ai_request_failed', status: 502, detail: '' };
+  // Anything that is not an AiProviderError reached here by being thrown inside
+  // the caller's try block -- a bug in our own code, not a provider refusal.
+  // Without the name and message it is indistinguishable from a provider 400.
+  const detail = error instanceof Error
+    ? `${error.name}: ${error.message}`
+    : String(error);
+  return { message: 'ai_request_failed', status: 502, detail: detail.slice(0, 280) };
 }
