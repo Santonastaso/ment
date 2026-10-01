@@ -12,6 +12,7 @@ import { Skeleton } from '../components/ui/skeleton.jsx';
 import IcsDownloadButton from '../components/IcsDownloadButton.jsx';
 import { cn } from '@/lib/utils';
 import { supabase } from '../lib/supabase.js';
+import { CONVERSATION_FILTERS as FILTERS, conversationState as rowState, isExpired, requestText } from '../lib/conversations.mjs';
 
 function initials(name = '') {
   return name.split(' ').map((part) => part[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || '?';
@@ -19,10 +20,6 @@ function initials(name = '') {
 
 function otherPerson(session, viewerId) {
   return session.mentor_id === viewerId ? session.mentee : session.mentor;
-}
-
-function isExpired(session) {
-  return !!session.expired_at || (session.status === 'pending' && !!session.request_expires_at && new Date(session.request_expires_at) <= new Date());
 }
 
 function expiryInDays(value) {
@@ -41,21 +38,6 @@ function statusLabel(session, t) {
   return isExpired(session) ? t('conversations.status.expired') : t(`conversations.status.${session.status}`, session.status);
 }
 
-// A meeting is a state of a conversation, not a separate object, so the list
-// carries it. `needs` is what the viewer can act on right now — that is the
-// whole of an alumnus's job here, and the sidebar badge counts it.
-function rowState(session) {
-  if (isExpired(session)) return 'closed';
-  if (session.status === 'pending') return session.isMentor ? 'needs' : 'waiting';
-  if (session.status === 'scheduled') {
-    if (!session.scheduled_at) return 'needs';
-    if (new Date(session.scheduled_at) < new Date() && !session.viewer_completed) return 'needs';
-    return 'scheduled';
-  }
-  if (session.status === 'completed') return 'past';
-  return 'closed';
-}
-
 // Short enough to sit inline beside the name.
 function stateLabel(session, state, t) {
   if (state === 'needs') {
@@ -67,18 +49,6 @@ function stateLabel(session, state, t) {
   if (state === 'scheduled') return formatMessageTime(session.scheduled_at);
   return statusLabel(session, t);
 }
-
-// `match` selects sessions; `groups` says whether group threads belong in the
-// view. Groups reuses the nav label rather than inventing a second word for
-// the same thing.
-const FILTERS = [
-  { key: 'all', label: 'conversations.filter.all', match: () => true, groups: true },
-  { key: 'needs', label: 'conversations.filter.needsYou', match: s => s === 'needs' },
-  { key: 'waiting', label: 'conversations.filter.waiting', match: s => s === 'waiting' },
-  { key: 'scheduled', label: 'conversations.filter.scheduled', match: s => s === 'scheduled' },
-  { key: 'past', label: 'conversations.filter.past', match: s => s === 'past' || s === 'closed' },
-  { key: 'groups', label: 'nav.groups', match: () => false, groups: true },
-];
 
 function localDateTime(value) {
   if (!value) return '';
@@ -97,7 +67,13 @@ export default function Conversations() {
   const selectedId = Number(params.get('session')) || null;
   const selectedGroupId = Number(params.get('group')) || null;
   const [sessions, setSessions] = useState([]);
-  const [filter, setFilter] = useState('all');
+  const filter = FILTERS.some(option => option.key === params.get('filter')) ? params.get('filter') : 'all';
+  function selectThread(key, id) {
+    const next = new URLSearchParams(params);
+    next.delete('session'); next.delete('group');
+    next.set(key, String(id));
+    setParams(next);
+  }
   // Sessions the current filter admits, newest meeting first.
   const visibleSessions = useMemo(() => {
     const match = FILTERS.find(option => option.key === filter)?.match ?? (() => true);
@@ -172,6 +148,7 @@ export default function Conversations() {
         if (cancelled) return;
         if (selectedId && nextSessions.some((item) => item.id === selectedId)) return;
         if (selectedGroupId && nextGroups.some((item) => item.id === selectedGroupId)) return;
+        if (params.has('filter')) return;
         if (nextSessions[0]) setParams({ session: String(nextSessions[0].id) }, { replace: true });
         else if (nextGroups[0]) setParams({ group: String(nextGroups[0].id) }, { replace: true });
         else if (selectedId || selectedGroupId) setParams({}, { replace: true });
@@ -358,7 +335,7 @@ export default function Conversations() {
                   key={option.key}
                   type="button"
                   aria-pressed={filter === option.key}
-                  onClick={() => setFilter(option.key)}
+                  onClick={() => setParams({ filter: option.key })}
                 >
                   {t(option.label)}<span className="conversation-filter-count">{count}</span>
                 </button>
@@ -380,7 +357,7 @@ export default function Conversations() {
             const state = rowState(session);
             const unreadCount = unreadCounts.sessionMessages[session.id] || 0;
             return (
-            <button key={session.id} type="button" onClick={() => setParams({ session: String(session.id) })} className={cn('conversation-list-item', session.id === selectedId && 'is-active')}>
+            <button key={session.id} type="button" onClick={() => selectThread('session', session.id)} className={cn('conversation-list-item', session.id === selectedId && 'is-active')}>
               <Avatar className="size-9"><AvatarFallback>{initials(peer?.name)}</AvatarFallback></Avatar>
               <span className="min-w-0">
                 {/* Who, what state, when — the scannable line. */}
@@ -389,14 +366,14 @@ export default function Conversations() {
                   <em className={`conversation-state is-${state}`}>{stateLabel(session, state, t)}</em>
                 </span>
                 {/* What they actually asked about. */}
-                <small>{session.title}</small>
+                <small>{requestText(session.title, t('conversations.requestTitle'))}</small>
               </span>
               {unreadCount > 0 && <span className="conversation-unread-badge" aria-label={t('conversations.unreadCount', { count: unreadCount })}>{unreadCount > 99 ? '99+' : unreadCount}</span>}
             </button>
           );
         })}
         {showGroups && groups.map((group) => (
-          <button key={`group-${group.id}`} type="button" onClick={() => setParams({ group: String(group.id) })} className={cn('conversation-list-item', group.id === selectedGroupId && 'is-active')}>
+          <button key={`group-${group.id}`} type="button" onClick={() => selectThread('group', group.id)} className={cn('conversation-list-item', group.id === selectedGroupId && 'is-active')}>
             <Avatar className="size-9"><AvatarFallback><UsersRound className="size-4" /></AvatarFallback></Avatar>
             <span className="min-w-0">
               <span className="conversation-list-top">
@@ -432,7 +409,7 @@ export default function Conversations() {
 
             {selected?.status === 'pending' && !isExpired(selected) && selected.isMentor && (
               <div className="conversation-request-banner">
-                <div><strong>{t('conversations.requestTitle')}</strong><p>{selected.pre_session_question}</p></div>
+                <div><strong>{t('conversations.requestTitle')}</strong><p>{requestText(selected.pre_session_question, requestText(selected.title))}</p></div>
                 <div><Button size="sm" onClick={() => mutateSession({ status: 'scheduled' })}><Check />{t('conversations.accept')}</Button><Button size="sm" variant="outline" onClick={() => mutateSession({ status: 'declined' })}>{t('conversations.decline')}</Button></div>
               </div>
             )}
@@ -467,13 +444,13 @@ export default function Conversations() {
             )}
 
             <div className="conversation-messages" ref={messagesRef}>
-              {selected && <div className="conversation-context"><span>{statusLabel(selected, t)}</span><p>{selected.title}{selected.topics?.length > 0 && ` · ${selected.topics.join(' · ')}`}</p></div>}
+              {selected && <div className="conversation-context"><span>{statusLabel(selected, t)}</span><p>{requestText(selected.title, t('conversations.requestTitle'))}{selected.topics?.length > 0 && ` · ${selected.topics.join(' · ')}`}</p></div>}
               {hasOlder && <button type="button" className="conversation-load-older" disabled={loadingOlder} onClick={loadOlderMessages}>{t('conversations.loadOlder')}</button>}
               {messages.map((message) => message.kind === 'system' || message.kind === 'schedule' ? (
                 <div className="conversation-system" key={message.id}>{message.body}</div>
               ) : (
                 <div className={cn('conversation-message', (message.sender_id === user?.id || (message.kind === 'request' && selected.isMentee)) ? 'is-mine' : 'is-theirs')} key={message.id}>
-                  {selectedGroup && message.sender_id !== user?.id && <strong>{message.sender_name}</strong>}<p>{message.body}</p><time>{formatMessageTime(message.created_at)}</time>
+                  {selectedGroup && message.sender_id !== user?.id && <strong>{message.sender_name}</strong>}<p>{message.kind === 'request' ? requestText(message.body, t('conversations.requestTitle')) : message.body}</p><time>{formatMessageTime(message.created_at)}</time>
                 </div>
               ))}
               <div ref={endRef} />

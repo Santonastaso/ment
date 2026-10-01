@@ -6,24 +6,25 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { useT } from '../../i18n/index.jsx';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog.jsx';
 import { Button } from '../ui/button.jsx';
+import { CONVERSATION_FILTERS, conversationState, requestText, resumableSearch } from '../../lib/conversations.mjs';
 
 const COPY = {
   en: {
-    greeting: 'Hi {name}, who would you like to connect with?', placeholder: 'Ask Ment',
+    greeting: 'Hi {name}, who would you like to connect with?', placeholder: 'Describe who could help', resume: 'Resume search', needsReply: 'Hi {name}, you have conversations waiting for you.',
     finding: 'Thinking through your request', chooseLead: 'These profiles match your request.', chooseBold: 'Select one to prepare the request.',
     why: 'Why this match', choose: 'Choose', selected: 'Selected', different: 'Ask for different people', browse: 'browse the full directory', notRight: 'Not quite right?', or: 'or',
     to: 'To', intro: "Here's a suggested intro. Edit anything, then send when it feels like you.", suggested: 'Suggested draft', send: 'Send request', regenerate: 'Regenerate',
     sent: 'Request sent to {name}.', sentSubline: "The conversation is ready. Continue there when they reply.", openChat: 'Open chat', again: 'Ask about something else', newChat: 'New chat', recentSearches: 'Recent searches', deleteSearch: 'Delete search', confirmDeleteSearch: 'Delete this search and its saved conversation?', cancel: 'Keep search', retry: 'Start a new search', error: 'We could not complete that request. Please try again.', aiMissing: 'Matching is not configured yet. Ask an administrator to connect Mistral.', aiBusy: 'Matching is temporarily rate-limited. Please try again in a moment.', aiAdmin: 'Matching needs an administrator to check the Mistral connection.', noMatches: 'There is no relevant professional in the current network for this request.', snapshot: 'Your connections', upcoming: 'Upcoming', pending: 'Pending', completed: 'Completed', viewAll: 'View conversations', viewProfile: 'View profile', back: 'Back to matches', drafting: 'Preparing your request', useful: 'Were these matches useful?', yes: 'Yes', no: 'No', feedbackSaved: 'Thanks — this helps improve matching.',
   },
   it: {
-    greeting: 'Ciao {name}, con chi vorresti entrare in contatto?', placeholder: 'Chiedi a Ment',
+    greeting: 'Ciao {name}, con chi vorresti entrare in contatto?', placeholder: 'Descrivi chi potrebbe aiutarti', resume: 'Riprendi la ricerca', needsReply: 'Ciao {name}, alcune conversazioni aspettano una tua risposta.',
     finding: 'Sto valutando la richiesta', chooseLead: 'Questi profili corrispondono alla richiesta.', chooseBold: 'Selezionane uno per preparare il messaggio.',
     why: 'Perché è adatto', choose: 'Scegli', selected: 'Scelto', different: 'Mostra altre persone', browse: 'sfoglia la directory', notRight: 'Non è quello che cercavi?', or: 'oppure',
     to: 'A', intro: 'Ecco un messaggio proposto. Modifica tutto quello che vuoi, poi invialo quando ti sembra giusto.', suggested: 'Messaggio proposto', send: 'Invia richiesta', regenerate: 'Rigenera',
     sent: 'Richiesta inviata a {name}.', sentSubline: 'La conversazione è pronta. Continua da lì quando risponderà.', openChat: 'Apri chat', again: "Chiedi qualcos'altro", newChat: 'Nuova chat', recentSearches: 'Ricerche recenti', deleteSearch: 'Elimina ricerca', confirmDeleteSearch: 'Eliminare questa ricerca e la conversazione salvata?', cancel: 'Mantieni la ricerca', retry: 'Inizia una nuova ricerca', error: 'Non siamo riusciti a completare la richiesta. Riprova.', aiMissing: 'Il matching non è ancora configurato. Chiedi a un amministratore di collegare Mistral.', aiBusy: 'Il matching è temporaneamente limitato. Riprova tra poco.', aiAdmin: 'Un amministratore deve verificare la connessione a Mistral.', noMatches: 'Nella rete attuale non c’è un professionista pertinente per questa richiesta.', snapshot: 'Le tue connessioni', upcoming: 'In programma', pending: 'In attesa', completed: 'Completate', viewAll: 'Vedi conversazioni', viewProfile: 'Vedi profilo', back: 'Torna ai risultati', drafting: 'Preparo la richiesta', useful: 'Questi match sono utili?', yes: 'Sì', no: 'No', feedbackSaved: 'Grazie — ci aiuta a migliorare il matching.',
   },
   fr: {
-    greeting: 'Bonjour {name}, avec qui souhaitez-vous entrer en contact ?', placeholder: 'Demandez à Ment',
+    greeting: 'Bonjour {name}, avec qui souhaitez-vous entrer en contact ?', placeholder: 'Décrivez qui pourrait vous aider', resume: 'Reprendre la recherche', needsReply: 'Bonjour {name}, des conversations attendent votre réponse.',
     finding: 'J’analyse votre demande', chooseLead: 'Ces profils correspondent à votre demande.', chooseBold: 'Sélectionnez-en un pour préparer le message.',
     why: 'Pourquoi ce profil', choose: 'Choisir', selected: 'Sélectionné', different: 'Voir d’autres personnes', browse: 'parcourir l’annuaire', notRight: 'Pas tout à fait ?', or: 'ou',
     to: 'À', intro: 'Voici un message proposé. Modifiez ce que vous voulez, puis envoyez-le lorsqu’il vous convient.', suggested: 'Message proposé', send: 'Envoyer la demande', regenerate: 'Régénérer',
@@ -137,7 +138,7 @@ function MatchCard({ match, index, selected, onSelect, copy, style }) {
 
 export default function DiscoveryFlow() {
   const { user } = useAuth();
-  const { lang } = useT();
+  const { lang, t } = useT();
   const copy = COPY[lang] || COPY.en;
   const [stage, setStage] = useState('ask');
   const [query, setQuery] = useState('');
@@ -155,6 +156,7 @@ export default function DiscoveryFlow() {
   const [clarification, setClarification] = useState('');
   const [noMatchReason, setNoMatchReason] = useState('');
   const [history, setHistory] = useState([]);
+  const [resumeThread, setResumeThread] = useState(null);
   const [historyError, setHistoryError] = useState('');
   const [deleteTargetId, setDeleteTargetId] = useState(null);
   const [matchFeedback, setMatchFeedback] = useState(null);
@@ -173,36 +175,19 @@ export default function DiscoveryFlow() {
   async function refreshHistory() {
     const { data } = await api.get('/discovery/threads?limit=8');
     setHistory(data || []);
+    setResumeThread((data || []).find(resumableSearch) || null);
   }
 
   useEffect(() => { if (stage !== 'ask') threadEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); }, [stage, selected, turns.length]);
   useEffect(() => {
     if (!user?.id) return;
-    api.get('/discovery/threads/latest').then(({ data }) => {
-      if (!data?.id || !Array.isArray(data.turns) || !data.turns.length) return;
-      const lastAssistant = [...data.turns].reverse().find(turn => turn?.role === 'assistant');
-      const lastUser = [...data.turns].reverse().find(turn => turn?.role === 'user');
-      if (!lastAssistant || !lastUser?.content) return;
-      setThreadId(data.id);
-      setTurns(visibleTurns(data.turns));
-      setSubmittedQuery(lastAssistant.search_request || lastUser.content);
-      if (lastAssistant.kind === 'matches' && Array.isArray(lastAssistant.matches)) {
-        setMatches(lastAssistant.matches.map(person => ({ person, expertise: person.expertise || [], background: person.background || '', reasons: person.reasons || [] })));
-        setStage('choose');
-      } else if (lastAssistant.kind === 'clarification' && lastAssistant.content) {
-        setClarification(lastAssistant.content);
-        setStage('clarify');
-      } else if (lastAssistant.kind === 'no_match') {
-        setNoMatchReason(lastAssistant.content || '');
-        setStage('empty');
-      } else if (lastAssistant.kind === 'draft' && lastAssistant.person && lastAssistant.content) {
-        const person = lastAssistant.person;
-        setSelected({ person, expertise: person.expertise || [], background: person.background || '', reasons: person.reasons || [] });
-        setDraft(lastAssistant.content);
-        setStage('reachout');
-      }
+    let cancelled = false;
+    api.get('/discovery/threads?limit=8').then(({ data }) => {
+      if (cancelled) return;
+      setHistory(data || []);
+      setResumeThread((data || []).find(resumableSearch) || null);
     }).catch(() => {});
-    refreshHistory().catch(() => {});
+    return () => { cancelled = true; };
   }, [user?.id]);
   useEffect(() => { if (!user?.id || stage !== 'ask') return; api.get('/sessions').then(({ data }) => setConnections(data || [])).catch(() => {}); }, [stage, user?.id]);
 
@@ -225,7 +210,7 @@ export default function DiscoveryFlow() {
         setTurns(current => [...current, { role: 'assistant', kind: 'clarification', content: data.clarification, at: new Date().toISOString() }]);
         setStage('clarify');
       } else {
-        setSubmittedQuery(data.resolved_request || message);
+        setSubmittedQuery(requestText(data.resolved_request, message));
         setNoMatchReason(data.no_match_reason || '');
         setTurns(current => [...current, {
           role: 'assistant',
@@ -321,7 +306,7 @@ export default function DiscoveryFlow() {
         if (sentSession) {
           setSelected({ person: lastAssistant.person, expertise: lastAssistant.person.expertise || [], background: lastAssistant.person.background || '', reasons: lastAssistant.person.reasons || [] });
           setDraft(lastAssistant.content || '');
-          setSubmittedQuery(lastAssistant.search_request || lastUser.content);
+          setSubmittedQuery(requestText(lastAssistant.search_request, lastUser.content));
           setSessionId(sentSession.id);
           setThreadId(id);
           setStage('sent');
@@ -330,7 +315,7 @@ export default function DiscoveryFlow() {
       }
       await api.put(`/discovery/threads/${id}`, { archived: false });
       setThreadId(id);
-      setSubmittedQuery(lastAssistant.search_request || lastUser.content);
+      setSubmittedQuery(requestText(lastAssistant.search_request, lastUser.content));
       setQuery(''); setMatches([]); setSelected(null); setDraft(''); setClarification(''); setNoMatchReason('');
       if (lastAssistant.kind === 'matches' && Array.isArray(lastAssistant.matches)) {
         setMatches(lastAssistant.matches.map(person => ({ person, expertise: person.expertise || [], background: person.background || '', reasons: person.reasons || [] })));
@@ -358,6 +343,7 @@ export default function DiscoveryFlow() {
     try {
       await api.delete(`/discovery/threads/${id}`);
       setHistory(items => items.filter(item => item.id !== id));
+      if (resumeThread?.id === id) setResumeThread(null);
       if (threadId === id) reset();
       setDeleteTargetId(null);
     } catch {
@@ -377,6 +363,8 @@ export default function DiscoveryFlow() {
   }
 
   const firstName = user?.name?.split(' ')[0] || '';
+  const connectionFilters = CONVERSATION_FILTERS.filter(option => ['needs', 'waiting', 'scheduled', 'past'].includes(option.key));
+  const needsReply = connections.some(session => conversationState(session) === 'needs');
   const isConversation = stage !== 'ask';
   // The opening question names the thread, so the header says which search you are in.
   const threadTitle = turns.find(turn => turn.role === 'user')?.content || submittedQuery || copy.placeholder;
@@ -396,7 +384,37 @@ export default function DiscoveryFlow() {
     return out;
   }, [turns]);
   return <section className={`discovery-flow ${isConversation ? 'is-conversation' : ''}`} aria-label="Ment discovery"><div className="discovery-thread">
-    {stage === 'ask' && <div className="discovery-ask-block"><h1>{text(copy, 'greeting', { name: firstName })}</h1>{composer()}{history.length > 0 && <details className="discovery-history"><summary aria-label={copy.recentSearches} title={copy.recentSearches}><Clock3 aria-hidden="true" /></summary><div>{history.map(item => { const title = [...(item.turns || [])].reverse().find(turn => turn?.role === 'user')?.content || item.title || ''; return <div className="discovery-history-row" key={item.id}><button type="button" onClick={() => resumeSearch(item.id)}>{title}</button><button type="button" aria-label={copy.deleteSearch} onClick={() => { setHistoryError(''); setDeleteTargetId(item.id); }}>×</button></div>; })}</div>{historyError && <p role="alert">{historyError}</p>}</details>}{connections.length > 0 && <div className="discovery-connections"><div className="discovery-connection-people"><span className="discovery-connections-label">{copy.snapshot}</span><span className="discovery-avatars">{connections.slice(0, 3).map((session, index) => { const peer = session.mentor_id === user?.id ? session.mentee : session.mentor; return <span key={session.id} className="discovery-avatar" style={{ backgroundColor: avatarTints[index % avatarTints.length] }}>{initials(peer?.name)}</span>; })}</span></div><div className="discovery-connection-counts"><span>{copy.upcoming} <strong>{connections.filter(session => session.status === 'scheduled').length}</strong></span><span>{copy.pending} <strong>{connections.filter(session => session.status === 'pending').length}</strong></span><span>{copy.completed} <strong>{connections.filter(session => session.status === 'completed').length}</strong></span></div><Link to="/conversations" className="discovery-connections-link">{copy.viewAll}</Link></div>}{error && <p className="discovery-error" role="alert">{error}</p>}</div>}
+    {stage === 'ask' && (
+      <div className="discovery-ask-block">
+        <h1>{text(copy, needsReply ? 'needsReply' : 'greeting', { name: firstName })}</h1>
+        {composer()}
+        {resumeThread && <button className="discovery-resume" type="button" onClick={() => resumeSearch(resumeThread.id)}><Clock3 size={17} aria-hidden="true" />{copy.resume}<span>{requestText(resumeThread.title)}</span></button>}
+        {history.length > 0 && (
+          <details className="discovery-history">
+            <summary><Clock3 aria-hidden="true" /><span>{copy.recentSearches}</span></summary>
+            <div>{history.map(item => {
+              const title = [...(item.turns || [])].reverse().find(turn => turn?.role === 'user')?.content || requestText(item.title);
+              return <div className="discovery-history-row" key={item.id}><button type="button" onClick={() => resumeSearch(item.id)}>{title}</button><button type="button" aria-label={copy.deleteSearch} onClick={() => { setHistoryError(''); setDeleteTargetId(item.id); }}>×</button></div>;
+            })}</div>
+          </details>
+        )}
+        {historyError && <p role="alert">{historyError}</p>}
+        {connections.length > 0 && (
+          <div className="discovery-connections">
+            <div className="discovery-connection-people">
+              <span className="discovery-connections-label">{copy.snapshot}</span>
+              <span className="discovery-avatars">{connections.slice(0, 3).map((session, index) => {
+                const peer = session.mentor_id === user?.id ? session.mentee : session.mentor;
+                return <Link to={`/conversations?session=${session.id}`} aria-label={`${copy.openChat}: ${peer?.name || ''}`} key={session.id} className="discovery-avatar" style={{ backgroundColor: avatarTints[index % avatarTints.length] }}>{initials(peer?.name)}</Link>;
+              })}</span>
+            </div>
+            <div className="discovery-connection-counts">{connectionFilters.map(option => <Link key={option.key} to={`/conversations?filter=${option.key}`}>{t(option.label)} <strong>{connections.filter(session => option.match(conversationState(session))).length}</strong></Link>)}</div>
+            <Link to="/conversations" className="discovery-connections-link">{copy.viewAll}</Link>
+          </div>
+        )}
+        {error && <p className="discovery-error" role="alert">{error}</p>}
+      </div>
+    )}
     {isConversation && <div className="discovery-conversation"><div className="discovery-conversation-toolbar"><span className="discovery-thread-title"><strong>{threadTitle}</strong></span><button type="button" onClick={reset} disabled={sending}><Pencil />{copy.newChat}</button></div><div className="discovery-header-fade" aria-hidden="true" /><div className="discovery-chat-transcript">{renderedTurns.map((turn, index) => {
       if (turn.role === 'user') return <div className="discovery-chat-turn is-user" key={`${turn.at || index}-${index}`}><div className="discovery-user-bubble">{turn.content}</div></div>;
       if (turn.role !== 'assistant') return null;
