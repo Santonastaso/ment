@@ -34,3 +34,23 @@ export function resumableSearch(thread) {
   const turn = [...(thread.turns || [])].reverse().find(item => item?.role === 'assistant');
   return ['clarification', 'matches', 'draft'].includes(turn?.kind);
 }
+
+export function clearSentDraft(drafts, key, sentDraft) {
+  if (drafts[key] !== sentDraft) return drafts;
+  const next = { ...drafts };
+  delete next[key];
+  return next;
+}
+
+export function canCompleteMeeting(session, now = Date.now()) {
+  return session?.status === 'scheduled' && !session.viewer_completed
+    && !!session.scheduled_at && new Date(session.scheduled_at).getTime() <= now;
+}
+
+export function meetingFeedback(session, reflection, rating) {
+  return {
+    ...(!session.viewer_completed && session.status !== 'completed' ? { status: 'completed' } : {}),
+    [session.isMentor ? 'mentor_reflection' : 'reflection']: reflection.trim() || null,
+    [session.isMentor ? 'mentor_rating' : 'mentee_rating']: rating,
+  };
+}

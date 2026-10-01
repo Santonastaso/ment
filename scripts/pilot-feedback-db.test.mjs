@@ -149,5 +149,36 @@ test('pilot feedback migrations: group lifecycle, tenant boundaries, capacity an
     const saved = await one('select name, program, cohort_year, onboarding_complete from profiles where id = $1', [applicant]);
     assert.deepEqual(saved, { name: 'Alice Student', program: 'Masters & MSc', cohort_year: 2026, onboarding_complete: true });
     assert.equal((await one('select description from career_history where user_id = $1', [applicant])).description, 'Built a financial model');
+
+    await db.exec('alter table profiles add column linkedin_headline text');
+    await db.exec(await migration('20261001120000_0061_discovery_candidate_retrieval.sql'));
+    await db.exec(`
+      insert into auth.users select md5('candidate-' || n)::uuid from generate_series(1, 620) n;
+      insert into profiles(id, name, organization_id, onboarding_complete, job_title)
+        select md5('candidate-' || n)::uuid, 'Candidate ' || lpad(n::text, 4, '0'), '${organization}', true, 'General member'
+        from generate_series(1, 620) n;
+      insert into skills(user_id, skill, type) values(md5('candidate-620')::uuid, 'Accounting', 'can_teach');
+    `);
+    const pool = async (query = 'Accounting', selected = null) => (await one(
+      'select discovery_candidates($1, $2, $3, $4) value', [organization, applicant, query, selected])).value;
+    const target = (await one("select md5('candidate-620')::uuid id")).id;
+    assert.equal((await pool())[0].id, target, 'relevant member beyond the first 100 is ranked first');
+    assert.equal((await pool()).length, 100, 'only the ranked model payload is bounded');
+    assert.deepEqual((await pool('General member', target)).map(p => p.id), [target], 'draft selection bypasses ranking cutoff');
+    assert.deepEqual(await pool('Accounting', outsider), [], 'tenant boundary remains enforced');
+    const coverage = (await one('select discovery_network_coverage($1, $2) value', [organization, applicant])).value;
+    assert.equal(coverage.member_count, 621, 'coverage counts all members, not the first 500');
+    assert.ok(coverage.skills.includes('Accounting'), 'coverage includes skills beyond the first 500');
+    await db.query('update profiles set mentorship_paused = true where id = $1', [target]);
+    assert.equal((await pool()).some(p => p.id === target), false, 'availability is applied before limiting');
+    await db.query('update profiles set mentorship_paused = false where id = $1', [target]);
+    await db.query("insert into sessions(mentor_id, mentee_id, title, status, request_expires_at) values ($1, $2, 'Pending', 'pending', now() + interval '1 day')", [target, applicant]);
+    assert.equal((await pool()).some(p => p.id === target), false, 'active conversations are excluded');
+    await db.query("update sessions set request_expires_at = now() - interval '1 day' where mentor_id = $1", [target]);
+    assert.equal((await pool())[0].id, target, 'expired requests do not hide members');
+    for (const fn of ['discovery_candidates(uuid,uuid,text,uuid)', 'discovery_network_coverage(uuid,uuid)']) {
+      assert.equal((await one("select has_function_privilege('authenticated', $1, 'EXECUTE') value", [fn])).value, false);
+      assert.equal((await one("select has_function_privilege('service_role', $1, 'EXECUTE') value", [fn])).value, true);
+    }
   } finally { await db.close(); }
 });
