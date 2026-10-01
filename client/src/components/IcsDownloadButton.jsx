@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { CalendarDays } from 'lucide-react';
 import api, { invokeUserFunction } from '../api/index.js';
 import { buildSessionIcs, downloadIcs } from '../lib/ics.js';
 import { useT } from '../i18n/index.jsx';
@@ -21,7 +22,7 @@ async function providerErrorMessage(error, t) {
   return t('components.ics.connectFailed');
 }
 
-export default function IcsDownloadButton({ sessionId, session, className = '', label, meetingUrl, onReschedule }) {
+export default function IcsDownloadButton({ sessionId, session, className = '', label, meetingUrl, onReschedule, compact = false }) {
   const { t } = useT();
   const [connections, setConnections] = useState([]);
   const [providers, setProviders] = useState([]);
@@ -83,9 +84,13 @@ export default function IcsDownloadButton({ sessionId, session, className = '', 
   }
 
   const connected = new Set(connections.map((item) => item.provider));
+  const actionLabel = created ? t('components.ics.ready') : (label || t('components.ics.addToCalendar'));
+
   return <div className="calendar-action">
     <details className="calendar-more">
-      <summary className={className}>{created ? t('components.ics.ready') : (label || t('components.ics.addToCalendar'))}</summary>
+      <summary className={`${className}${compact ? ' calendar-more-compact' : ''}`} aria-label={compact ? actionLabel : undefined} title={compact ? actionLabel : undefined}>
+        {compact ? <CalendarDays aria-hidden="true" /> : actionLabel}
+      </summary>
       <div className="calendar-more-menu">
         {(created?.join_url || meetingUrl) && <a href={created?.join_url || meetingUrl} target="_blank" rel="noreferrer">{t('components.ics.join')}</a>}
         {onReschedule && <button type="button" onClick={onReschedule}>{t('components.ics.changeTime')}</button>}

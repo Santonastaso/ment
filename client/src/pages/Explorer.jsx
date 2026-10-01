@@ -108,16 +108,16 @@ export default function Explorer() {
                     <Input aria-label={t('explorer.searchLabel')} placeholder={t('explorer.searchLabel')} value={inputValue} onChange={e => setInputValue(e.target.value)} />
                     <Button type="submit">{t('explorer.searchButton')}</Button>
                   </form>
-                <div className="grid w-full min-w-0 grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+                <div className="grid w-full min-w-0 grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
                   <DirectoryFilter label={t('explorer.filterPersona')} value={persona} onChange={value => setParam('persona', value)} options={[{ value: '', label: t('explorer.personaAny') }, { value: 'student', label: t('explorer.personaStudent') }, { value: 'alumnus', label: t('explorer.personaAlumnus') }]} />
                   <DirectoryFilter label={t('explorer.filterProgram')} value={program} onChange={value => setParam('program', value)} options={[{ value: '', label: t('explorer.allPrograms') }, ...(facets.programs || []).map(p => ({ value: p, label: p }))]} />
                   <DirectoryFilter label={t('explorer.filterCohort')} value={cohort} onChange={value => setParam('cohort', value)} options={[{ value: '', label: t('explorer.allCohorts') }, ...(facets.cohortYears || []).map(y => ({ value: String(y), label: t('explorer.classOf', { year: y }) }))]} />
                   <DirectoryFilter label={t('explorer.filterLocation')} value={location} onChange={value => setParam('location', value)} options={[{ value: '', label: t('explorer.allLocations') }, ...(facets.locations || []).map(l => ({ value: l, label: l }))]} />
                   <DirectoryFilter label={t('explorer.filterLanguage')} value={language} onChange={value => setParam('language', value)} options={[{ value: '', label: t('explorer.allLanguages') }, ...languageOptions(facets.languages, lang).map(option => ({ value: option.code, label: option.label }))]} />
+                  <DirectoryFilter label={t('explorer.sortLabel')} value={sort} onChange={value => setParam('sort', value)} options={[{ value: 'relevance', label: t('explorer.sortRelevance') }, { value: 'name', label: t('explorer.sortName') }]} />
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <Button type="button" size="sm" variant="ghost" onClick={() => { setInputValue(''); setSearchParams({}); }}>{t('explorer.clearFilters')}</Button>
-                  <div className="flex flex-wrap items-center gap-3"><span className="text-xs text-muted-foreground">{sort === 'name' ? t('explorer.sortName') : t(query ? 'explorer.sortSearchHint' : 'explorer.sortSkillsHint')}</span><DirectoryFilter label={t('explorer.sortLabel')} value={sort} onChange={value => setParam('sort', value)} options={[{ value: 'relevance', label: t('explorer.sortRelevance') }, { value: 'name', label: t('explorer.sortName') }]} /></div>
                 </div>
               </div>
 

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Check, Pencil } from 'lucide-react';
 import api from '../api/index.js';
 import { useT } from '../i18n/index.jsx';
 import { canCompleteMeeting, meetingFeedback } from '../lib/conversations.mjs';
@@ -6,7 +7,7 @@ import RatingPicker from './RatingPicker.jsx';
 import { Button } from './ui/button.jsx';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from './ui/dialog.jsx';
 
-export default function MeetingFeedback({ session, onSaved }) {
+export default function MeetingFeedback({ session, onSaved, compact = false }) {
   const { t } = useT();
   const [open, setOpen] = useState(false);
   const [reflection, setReflection] = useState('');
@@ -37,8 +38,13 @@ export default function MeetingFeedback({ session, onSaved }) {
     } finally { setSaving(false); }
   }
 
+  const actionLabel = t(completed ? 'components.meeting.edit' : 'components.session.markCompleted');
+
   return <>
-    <Button size="sm" variant="outline" onClick={edit}>{t(completed ? 'components.meeting.edit' : 'components.session.markCompleted')}</Button>
+    <Button size={compact ? 'icon-sm' : 'sm'} variant={compact ? 'ghost' : 'outline'} className={compact ? 'conversation-icon-action' : undefined} onClick={edit} aria-label={compact ? actionLabel : undefined} title={compact ? actionLabel : undefined}>
+      {compact && (completed ? <Pencil aria-hidden="true" /> : <Check aria-hidden="true" />)}
+      {!compact && actionLabel}
+    </Button>
     <Dialog open={open} onOpenChange={value => { if (!saving) setOpen(value); }}>
       <DialogContent>
         <DialogTitle>{t(completed ? 'components.meeting.yourReflectionPrivate' : 'components.session.markCompleted')}</DialogTitle>
