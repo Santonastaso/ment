@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { CalendarDays, Check, ChevronLeft, MessageCircle, Send, UsersRound } from 'lucide-react';
+import { CalendarDays, Check, ChevronLeft, MessageCircle, Send, Undo2, UserRound, UsersRound } from 'lucide-react';
 import api from '../api/index.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useT } from '../i18n/index.jsx';
@@ -410,7 +410,7 @@ export default function Conversations() {
               <button className="conversation-back" type="button" onClick={() => setParams({})} aria-label={t('common.close')}><ChevronLeft /></button>
               <Avatar className="size-9"><AvatarFallback>{initials(person?.name)}</AvatarFallback></Avatar>
               <div><strong>{person?.name}</strong><span>{[person?.current_role, person?.department].filter(Boolean).join(' · ')}</span></div>
-              <Link to={`/profile/${person?.id}`}>{t('conversations.profile')}</Link>
+              <Link className="conversation-profile-link" to={`/profile/${person?.id}`} aria-label={t('conversations.profile')} title={t('conversations.profile')}><UserRound aria-hidden="true" /></Link>
             </header>}
 
             {selected?.status === 'pending' && !isExpired(selected) && selected.isMentor && (
@@ -420,19 +420,19 @@ export default function Conversations() {
               </div>
             )}
             {selected?.status === 'pending' && !isExpired(selected) && selected.isMentee && <div className="conversation-waiting">
-            <span>{t('conversations.requestSent')}</span>
-              {selected.request_expires_at && <span>{expiryLabel(expiryInDays(selected.request_expires_at), t)}</span>}
-              <Button type="button" size="sm" variant="ghost" onClick={withdrawRequest}>{t('conversations.withdraw')}</Button>
+              <span className="conversation-request-state"><span className="conversation-status-dot" aria-hidden="true" />{t('conversations.requestSent')}</span>
+              {selected.request_expires_at && <span className="conversation-request-expiry">{expiryLabel(expiryInDays(selected.request_expires_at), t)}</span>}
+              <Button className="conversation-icon-action" type="button" size="icon-sm" variant="ghost" onClick={withdrawRequest} aria-label={t('conversations.withdraw')} title={t('conversations.withdraw')}><Undo2 aria-hidden="true" /></Button>
             </div>}
 
             {selected?.status === 'scheduled' && (
               <div className="conversation-meeting">
                 <CalendarDays />
-                <div><strong>{selected.scheduled_at ? formatMessageTime(selected.scheduled_at) : t('conversations.pickTime')}</strong><span>{t('conversations.meetingSubline')}</span></div>
+                <div><strong>{selected.scheduled_at ? formatMessageTime(selected.scheduled_at) : t('conversations.pickTime')}</strong></div>
                 <div className="conversation-meeting-actions">
                   {!selected.scheduled_at && <Button size="sm" variant="outline" onClick={() => setScheduleOpen(true)}>{t('conversations.schedule')}</Button>}
-                  {selected.scheduled_at && <IcsDownloadButton sessionId={selected.id} session={selected} label="Meeting" meetingUrl={selected.meeting_url} onReschedule={() => setScheduleOpen(true)} />}
-                  <MeetingFeedback key={selected.id} session={selected} onSaved={loadSessions} />
+                  {selected.scheduled_at && <IcsDownloadButton sessionId={selected.id} session={selected} meetingUrl={selected.meeting_url} onReschedule={() => setScheduleOpen(true)} compact />}
+                  <MeetingFeedback key={selected.id} session={selected} onSaved={loadSessions} compact />
                 </div>
                 {scheduleOpen && (
                   <div className="conversation-scheduler">
@@ -450,7 +450,7 @@ export default function Conversations() {
               </div>
             )}
 
-            {selected?.status === 'completed' && <div className="conversation-meeting"><CalendarDays /><div><strong>{statusLabel(selected, t)}</strong></div><MeetingFeedback key={selected.id} session={selected} onSaved={loadSessions} /></div>}
+            {selected?.status === 'completed' && <div className="conversation-meeting"><CalendarDays /><div><strong>{statusLabel(selected, t)}</strong></div><MeetingFeedback key={selected.id} session={selected} onSaved={loadSessions} compact /></div>}
 
             <div className="conversation-messages" ref={messagesRef}>
               {selected && <div className="conversation-context"><span>{statusLabel(selected, t)}</span><p>{requestText(selected.title, t('conversations.requestTitle'))}{selected.topics?.length > 0 && ` · ${selected.topics.join(' · ')}`}</p></div>}

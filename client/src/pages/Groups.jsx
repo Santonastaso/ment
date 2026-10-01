@@ -10,6 +10,13 @@ import { Plus, Users } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog.jsx';
 import { supabase } from '../lib/supabase.js';
 
+function requestExpiryLabel(value, t) {
+  const days = Math.max(0, Math.ceil((new Date(value).getTime() - Date.now()) / 86_400_000));
+  if (days === 0) return t('conversations.expiresToday');
+  if (days === 1) return t('conversations.expiresOneDay');
+  return t('conversations.expiresIn', { days });
+}
+
 export default function Groups() {
   const navigate = useNavigate();
   const { t } = useT();
@@ -222,6 +229,7 @@ export default function Groups() {
           {reviewLoading ? <p role="status">{t('common.loading')}</p> : requests.length === 0 ? <p>{t('groups.noRequests')}</p> : requests.map(request => (
             <article key={request.user_id} className="grid gap-2 border-b py-3">
               <strong>{request.name}</strong><p className="whitespace-pre-wrap text-sm">{request.reason}</p>
+              <p className="text-xs text-muted-foreground">{requestExpiryLabel(request.expires_at, t)}</p>
               <div className="flex gap-2"><Button disabled={saving} onClick={() => reviewRequest(request, true)}>{t('groups.approve')}</Button><Button variant="outline" disabled={saving} onClick={() => reviewRequest(request, false)}>{t('groups.decline')}</Button></div>
             </article>
           ))}

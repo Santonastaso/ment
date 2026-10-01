@@ -351,7 +351,13 @@ async function loadSessionRelationships() {
 async function uploadToStorage(bucket, prefix, file) {
   const filename = `${Date.now()}-${(file.name || 'upload').replace(/[^a-zA-Z0-9._-]/g, '_')}`;
   const path = prefix ? `${prefix}/${filename}` : filename;
-  const { error } = await supabase.storage.from(bucket).upload(path, file, { upsert: false, contentType: file.type || undefined });
+  const upload = () => supabase.storage.from(bucket).upload(path, file, { upsert: false, contentType: file.type || undefined });
+  let { error } = await upload();
+  if (error && (String(error.statusCode) === '401' || /invalid token|invalid jwt|jwt expired/i.test(error.message || ''))) {
+    const { error: refreshError } = await supabase.auth.refreshSession();
+    if (refreshError) throw new ApiError('auth_required', 401);
+    ({ error } = await upload());
+  }
   if (error) throw new ApiError(error.message);
   return path;
 }
