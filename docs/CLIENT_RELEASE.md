@@ -38,8 +38,9 @@ member records.
 3. Test invitation, onboarding, discovery, request, acceptance, chat,
    scheduling, decline, capacity limits, and logout with dedicated accounts.
    Check both mobile and desktop, keyboard navigation, empty states, and error
-   recovery. The current repository has unit and RLS smoke checks, not an
-   automated full-journey test; record the results before promotion.
+   recovery. `npm run test:browser` automates the frontend journey using
+   isolated fixtures (see `TESTING.md`); this does not replace staging
+   verification with real Supabase auth and data. Record that result before promotion.
 4. Decide whether `.ics` calendar invites are enough for the pilot. Google and
    Microsoft sync require their OAuth applications, scopes, and secrets.
 

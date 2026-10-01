@@ -40,6 +40,8 @@ Thumbs.db
 
 # Test scratchpad
 /tmp/test-*.js
+test-results/
+playwright-report/
 
 # Python bytecode (from scripts/*.py dev tooling)
 __pycache__/

@@ -1,0 +1,117 @@
+import { test, expect } from './fixtures.mjs';
+
+test('onboarding to discovery, request, acceptance, chat and meeting', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => window.fixture.setUser({ ...window.fixture.user, onboarding_complete: false }));
+  await expect(page).toHaveURL(/\/onboarding$/);
+  await page.getByRole('button', { name: /^Skip/ }).click();
+  await page.getByRole('textbox', { name: 'Full name' }).fill('Viewer Student');
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.getByRole('button', { name: 'Finish & see my matches' }).click();
+  await expect(page).toHaveURL('http://127.0.0.1:3010/');
+  const composer = page.getByRole('textbox', { name: 'Describe who could help' });
+  await composer.fill('finance');
+  await composer.press('Enter');
+  await expect(page.getByText('Which finance skill would you like help with?')).toBeVisible();
+  await composer.fill('Financial modelling');
+  await composer.press('Enter');
+  await page.getByRole('button', { name: 'Choose Peer Mentor' }).click();
+  await page.getByRole('textbox', { name: 'Suggested draft' }).fill('Please help me with financial modelling.');
+  await page.getByRole('button', { name: 'Send request', exact: true }).click();
+  await page.getByRole('link', { name: 'Open chat', exact: true }).click();
+  await expect(page.getByText('Please help me with financial modelling.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Withdraw request' })).toBeVisible();
+  const student = await page.evaluate(() => window.fixture.user);
+  await page.evaluate(() => window.fixture.setUser({ ...window.fixture.peer, role: 'alumnus', onboarding_complete: true }));
+  await page.getByRole('link', { name: 'Groups', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Groups', exact: true })).toBeVisible();
+  await page.locator('nav').getByRole('link', { name: /^Messages/ }).click();
+  await page.getByRole('button', { name: /Viewer Student/ }).click();
+  await page.getByRole('button', { name: 'Accept', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Schedule', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Schedule', exact: true }).click();
+  const future = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 16);
+  const scheduledAt = await page.evaluate(value => new Date(value).toISOString(), future);
+  await page.getByLabel('New time', { exact: true }).fill(future);
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  const message = page.getByRole('textbox', { name: 'Message', exact: true });
+  await message.fill('Happy to help.');
+  await page.getByRole('button', { name: 'Send message', exact: true }).click();
+  await expect(page.getByText('Happy to help.', { exact: true })).toBeVisible();
+  await page.clock.setFixedTime(new Date(Date.now() + 3 * 86400000));
+  await page.evaluate(student => window.fixture.setUser(student), student);
+  await page.getByRole('link', { name: 'Groups', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Groups', exact: true })).toBeVisible();
+  await page.locator('nav').getByRole('link', { name: /^Messages/ }).click();
+  await page.getByRole('button', { name: /Peer Mentor/ }).click();
+  await page.getByRole('button', { name: 'Mark as completed' }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('textbox').fill('Useful conversation');
+  await dialog.getByRole('radio').nth(3).click();
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await expect(dialog.getByRole('textbox')).toHaveValue('Useful conversation');
+  await dialog.getByRole('textbox').fill('Updated reflection');
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+  const saves = await page.evaluate(() => window.fixture.calls.filter(c => c.method === 'put' && c.path === '/sessions/3').map(c => c.body));
+  expect(saves).toEqual([{ status: 'scheduled' }, { scheduled_at: scheduledAt }, { status: 'completed', reflection: 'Useful conversation', mentee_rating: 4 }, { reflection: 'Updated reflection', mentee_rating: 4 }]);
+});
+
+test('delayed direct and group sends cannot corrupt another thread', async ({ page }) => {
+  await page.goto('/conversations?session=1');
+  await page.evaluate(() => { window.fixture.delaySends = true; });
+  const composer = page.getByRole('textbox', { name: 'Message', exact: true });
+  for (const [thread, endpoint, body] of [['Peer 1', '/sessions/1/messages', 'Sent from A'], ['Test Group', '/groups/1/messages', 'Group message']]) {
+    await page.getByRole('button', { name: new RegExp(thread) }).click();
+    await expect(page.locator('.conversation-header strong')).toHaveText(thread);
+    await composer.fill(body);
+    await page.getByRole('button', { name: 'Send message', exact: true }).click();
+    await page.getByRole('button', { name: /Peer 2/ }).click();
+    await expect(page.locator('.conversation-header strong')).toHaveText('Peer 2');
+    await composer.fill('Draft for B');
+    await page.evaluate(() => window.fixture.pending.shift()());
+    await expect.poll(() => page.evaluate(endpoint => window.fixture.messages[endpoint]?.length, endpoint)).toBe(1);
+    await expect(composer).toHaveValue('Draft for B');
+    await expect(page.locator('.conversation-messages').getByText(body, { exact: true })).toHaveCount(0);
+  }
+});
+
+test('groups, unread badges and mobile back navigation', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/groups');
+  await page.getByRole('button', { name: 'Create a group', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('textbox', { name: 'Group name' }).fill('New Group');
+  await dialog.getByRole('textbox', { name: 'Description', exact: true }).fill('Fixture group');
+  await dialog.getByRole('button', { name: 'Create', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await page.locator('nav').getByRole('link', { name: /^Messages/ }).click();
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  const group = page.getByRole('button', { name: /Test Group/ });
+  await expect(group.getByLabel('2 unread messages')).toBeVisible();
+  await group.click();
+  await expect(page.locator('.conversation-header strong')).toHaveText('Test Group');
+  await expect(group.getByLabel('2 unread messages')).toHaveCount(0);
+  await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Mobile group message');
+  await page.getByRole('button', { name: 'Send message', exact: true }).click();
+  await expect(page.getByText('Mobile group message', { exact: true })).toBeVisible();
+  await expect(page.locator('.conversation-messages time')).toHaveText(/^\d{2}\/\d{2}\/\d{2} \d{2}:\d{2}$/);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(page.getByRole('button', { name: /New Group/ })).toBeVisible();
+});
+
+test('failed send preserves the draft and can be retried', async ({ page }) => {
+  await page.goto('/conversations?session=1');
+  await page.evaluate(() => { window.fixture.failNext = '/sessions/1/messages'; });
+  const composer = page.getByRole('textbox', { name: 'Message', exact: true });
+  await composer.fill('Keep my message');
+  await page.getByRole('button', { name: 'Send message', exact: true }).click();
+  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(composer).toHaveValue('Keep my message');
+  await page.getByRole('button', { name: 'Send message', exact: true }).click();
+  await expect(page.getByText('Keep my message', { exact: true })).toBeVisible();
+  await expect(composer).toHaveValue('');
+});
