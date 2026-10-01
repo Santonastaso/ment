@@ -9,6 +9,7 @@ jobs:
   send:
     if: github.event_name == 'workflow_dispatch' || vars.NOTIFICATIONS_ENABLED == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Send queued notifications
         env:
@@ -20,7 +21,8 @@ jobs:
             echo '::error::Configure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.'
             exit 1
           fi
-          curl --silent --show-error --fail-with-body \
+          curl --silent --show-error --fail-with-body --max-time 60 \
+            --retry 2 --retry-delay 5 --retry-all-errors \
             --request POST \
             --header "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
             --header 'Content-Type: application/json' \

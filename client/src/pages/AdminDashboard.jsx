@@ -20,6 +20,7 @@ import { Label } from '@/components/ui/label';
 import { formatAdminDate, pmTranslate } from '../components/admin/adminPm.js';
 import AdminPmKpis from '../components/admin/AdminPmKpis.jsx';
 import AdminInvitationPanel from '../components/admin/AdminInvitationPanel.jsx';
+import AdminProvisionUserPanel from '../components/admin/AdminProvisionUserPanel.jsx';
 import AdminAiRuns from '../components/admin/AdminAiRuns.jsx';
 
 function StatCard({ label, value, sub }) {
@@ -784,6 +785,11 @@ export default function AdminDashboard() {
                     <li key={email} className="break-all">{email}: <code className="rounded bg-muted px-1 font-mono text-foreground">{password}</code></li>
                   ))}
                 </ul>
+                {uploadResult.failures?.length > 0 && <div className="mt-3 border-t border-border pt-3 text-destructive">
+                  <p className="font-medium">{uploadResult.failures.length} row(s) need attention</p>
+                  <ul className="mt-1 space-y-1">{uploadResult.failures.map((failure, index) => <li key={`${failure.row}-${index}`}>Row {failure.row} ({failure.email || 'no email'}): {failure.error}</li>)}</ul>
+                </div>}
+                {uploadResult.warnings?.length > 0 && <p role="status" className="mt-3 text-amber-700">Some secondary tasks need attention: {uploadResult.warnings.join(', ')}</p>}
               </div>
             )}
 
@@ -832,6 +838,7 @@ export default function AdminDashboard() {
         <Surface>
           <SurfaceHeader title={t('admin.users.title')} />
           <SurfaceBody className="pt-5">
+          <AdminProvisionUserPanel />
           <AdminInvitationPanel />
           <form onSubmit={addExternalOutreachTarget} className="mb-5 flex flex-wrap items-end gap-3 rounded-lg border border-border bg-muted/30 p-3">
             <div className="min-w-56 flex-1">

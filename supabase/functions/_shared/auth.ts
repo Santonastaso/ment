@@ -52,7 +52,7 @@ export async function requireAdmin(req: Request) {
     .select('id, is_admin, admin_scope, organization_id')
     .eq('id', ctx.user.id)
     .single();
-  if (!profile?.is_admin && !['org', 'platform'].includes(profile?.admin_scope || '')) {
+  if (!profile || (!profile.is_admin && !['org', 'platform'].includes(profile.admin_scope || ''))) {
     throw new Response(JSON.stringify({ error: 'admin_only' }), {
       status: 403,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

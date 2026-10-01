@@ -16,9 +16,6 @@ permissions:
 jobs:
   changed-functions:
     runs-on: ubuntu-latest
-    outputs:
-      deploy_all: ${{ steps.detect.outputs.deploy_all }}
-      functions: ${{ steps.detect.outputs.functions }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -30,35 +27,20 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "$BASE_SHA" ] || [[ "$BASE_SHA" =~ ^0+$ ]]; then
-            echo 'deploy_all=true' >> "$GITHUB_OUTPUT"
-            echo 'functions=' >> "$GITHUB_OUTPUT"
+            echo '::warning::No base revision available; function removal validation was skipped.'
             exit 0
           fi
           git fetch --no-tags --depth=1 origin "$BASE_SHA"
           changed_files=$(git diff --name-only "$BASE_SHA" "$GITHUB_SHA")
-          if printf '%s\n' "$changed_files" | grep -Eq '^supabase/(config\.toml|functions/_shared/)'; then
-            echo 'deploy_all=true' >> "$GITHUB_OUTPUT"
-            echo 'functions=' >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          functions=()
           while IFS= read -r file; do
             [[ "$file" =~ ^supabase/functions/([^/]+)/ ]] || continue
             name="${BASH_REMATCH[1]}"
             [ "$name" = '_shared' ] && continue
-            if [[ ! "$name" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
-              echo "::error::Unexpected Edge Function name: $name"
-              exit 1
-            fi
             if [ ! -d "supabase/functions/$name" ]; then
               echo "::error::Function '$name' was removed. Delete it explicitly from Supabase before removing its source."
               exit 1
             fi
-            functions+=("$name")
           done <<< "$changed_files"
-          unique_functions=$(printf '%s\n' "${functions[@]}" | sort -u | paste -sd, -)
-          echo 'deploy_all=false' >> "$GITHUB_OUTPUT"
-          echo "functions=$unique_functions" >> "$GITHUB_OUTPUT"
 
   gitleaks:
     runs-on: ubuntu-latest
@@ -114,6 +96,19 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  edge-functions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: denoland/setup-deno@v2
+      - name: Type-check Supabase Edge Functions
+        run: |
+          set -euo pipefail
+          while IFS= read -r function; do
+            deno check --node-modules-dir=auto --no-lock "$function"
+          done < <(find supabase/functions -mindepth 2 -maxdepth 2 -name index.ts -print | sort)
+
   database:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -132,8 +127,9 @@ jobs:
 
   release-supabase:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [changed-functions, gitleaks, build, database]
+    needs: [changed-functions, gitleaks, build, edge-functions, database]
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     environment: production
     steps:
       - uses: actions/checkout@v5
@@ -162,8 +158,14 @@ jobs:
               exit 1
             fi
           done
+          project_ref=$(sed -n 's/^project_id = "\([^"]*\)"/\1/p' supabase/config.toml)
+          target_host=$(python3 -c 'from urllib.parse import urlparse; import os; print(urlparse(os.environ["SUPABASE_URL"]).hostname or "")')
+          if [ -z "$project_ref" ] || [ "$target_host" != "$project_ref.supabase.co" ]; then
+            echo "::error::SUPABASE_URL does not match project_id in supabase/config.toml."
+            exit 1
+          fi
 
-      - name: Apply migrations and deploy Edge Functions
+      - name: Apply migrations
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
@@ -177,27 +179,26 @@ jobs:
           supabase link --project-ref "$project_ref"
           supabase db push --linked --dry-run
           supabase db push --linked --yes
-          supabase db lint --linked --fail-on error
 
-      - name: Deploy changed Edge Functions
-        if: needs.changed-functions.outputs.deploy_all == 'true' || needs.changed-functions.outputs.functions != ''
+      - name: Deploy all Edge Functions
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-          DEPLOY_ALL: ${{ needs.changed-functions.outputs.deploy_all }}
-          FUNCTIONS: ${{ needs.changed-functions.outputs.functions }}
         run: |
           set -euo pipefail
           project_ref=$(sed -n 's/^project_id = "\([^"]*\)"/\1/p' supabase/config.toml)
           supabase link --project-ref "$project_ref"
-          if [ "$DEPLOY_ALL" = 'true' ]; then
-            supabase functions deploy --project-ref "$project_ref"
-          else
-            IFS=',' read -r -a functions <<< "$FUNCTIONS"
-            for function in "${functions[@]}"; do
-              supabase functions deploy "$function" --project-ref "$project_ref"
-            done
-          fi
+          supabase functions deploy --project-ref "$project_ref"
+
+      - name: Verify linked database
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          project_ref=$(sed -n 's/^project_id = "\([^"]*\)"/\1/p' supabase/config.toml)
+          supabase link --project-ref "$project_ref"
+          supabase db lint --linked --fail-on error
 
       - name: Verify production RLS policies
         env:
