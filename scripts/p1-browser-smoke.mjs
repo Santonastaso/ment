@@ -59,8 +59,9 @@ try {
   await page.goto(base + '/conversations?session=1');
   const composer = page.getByRole('textbox', { name: 'Message', exact: true });
   await composer.fill('Sent from A');
-  await page.getByRole('button', { name: 'Send', exact: true }).click();
+  await page.locator('.conversation-composer button[type="submit"]').click();
   await page.getByRole('button', { name: /Peer 2/ }).click();
+  await page.locator('.conversation-header strong').filter({ hasText: 'Peer 2' }).waitFor();
   assert.equal(await composer.inputValue(), '');
   await composer.fill('Draft for B');
   await page.evaluate(() => window.fixture.pending.shift()());
@@ -68,9 +69,11 @@ try {
   assert.equal(await composer.inputValue(), 'Draft for B');
   assert.equal(await page.locator('.conversation-messages').getByText('Sent from A', { exact: true }).count(), 0);
   await page.getByRole('button', { name: /Test Group/ }).click();
+  await page.locator('.conversation-header strong').filter({ hasText: 'Test Group' }).waitFor();
   await composer.fill('Group message');
-  await page.getByRole('button', { name: 'Send', exact: true }).click();
+  await page.locator('.conversation-composer button[type="submit"]').click();
   await page.getByRole('button', { name: /Peer 2/ }).click();
+  await page.locator('.conversation-header strong').filter({ hasText: 'Peer 2' }).waitFor();
   await page.evaluate(() => window.fixture.pending.shift()());
   assert.equal(await composer.inputValue(), 'Draft for B');
   assert.equal(await page.locator('.conversation-messages').getByText('Group message', { exact: true }).count(), 0);
