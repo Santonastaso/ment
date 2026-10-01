@@ -106,7 +106,7 @@ jobs:
         run: |
           set -euo pipefail
           while IFS= read -r function; do
-            deno check --no-lock "$function"
+            deno check --node-modules-dir=auto --no-lock "$function"
           done < <(find supabase/functions -mindepth 2 -maxdepth 2 -name index.ts -print | sort)
 
   database:
