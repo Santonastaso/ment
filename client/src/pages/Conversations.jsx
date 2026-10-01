@@ -10,9 +10,10 @@ import { Button } from '../components/ui/button.jsx';
 import { Avatar, AvatarFallback } from '../components/ui/avatar.jsx';
 import { Skeleton } from '../components/ui/skeleton.jsx';
 import IcsDownloadButton from '../components/IcsDownloadButton.jsx';
+import MeetingFeedback from '../components/MeetingFeedback.jsx';
 import { cn } from '@/lib/utils';
 import { supabase } from '../lib/supabase.js';
-import { CONVERSATION_FILTERS as FILTERS, conversationState as rowState, isExpired, requestText } from '../lib/conversations.mjs';
+import { CONVERSATION_FILTERS as FILTERS, conversationState as rowState, isExpired, requestText, clearSentDraft } from '../lib/conversations.mjs';
 
 function initials(name = '') {
   return name.split(' ').map((part) => part[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || '?';
@@ -87,8 +88,14 @@ export default function Conversations() {
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [draft, setDraft] = useState('');
-  const [sending, setSending] = useState(false);
+  const [drafts, setDrafts] = useState({});
+  const [sendingThreads, setSendingThreads] = useState({});
+  const pendingSends = useRef(new Set());
+  const threadKey = selectedGroupId ? `group:${selectedGroupId}` : selectedId ? `session:${selectedId}` : '';
+  const activeThreadRef = useRef(threadKey);
+  activeThreadRef.current = threadKey;
+  const draft = drafts[threadKey] || '';
+  const sending = !!sendingThreads[threadKey];
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [scheduledAt, setScheduledAt] = useState('');
   const [savingSchedule, setSavingSchedule] = useState(false);
@@ -96,8 +103,6 @@ export default function Conversations() {
   const messagesRef = useRef(null);
   const preserveScrollRef = useRef(null);
   const senderNamesRef = useRef(new Map());
-  const activeSessionRef = useRef(selectedId);
-  activeSessionRef.current = selectedId;
 
   const selected = sessions.find((session) => session.id === selectedId) || null;
   const selectedGroup = groups.find((group) => group.id === selectedGroupId) || null;
@@ -120,7 +125,7 @@ export default function Conversations() {
   async function loadMessages(id, before = null) {
     const query = before ? `?before=${before}` : '';
     const { data } = await api.get(`/sessions/${id}/messages${query}`);
-    if (activeSessionRef.current !== id) return;
+    if (activeThreadRef.current !== `session:${id}`) return;
     if (before) {
       const box = messagesRef.current;
       if (box) preserveScrollRef.current = { height: box.scrollHeight, top: box.scrollTop };
@@ -271,23 +276,24 @@ export default function Conversations() {
   async function sendMessage(event) {
     event.preventDefault();
     const body = draft.trim();
-    if (!body || sending) return;
-    setSending(true); setError('');
+    const key = threadKey;
+    const sentDraft = draft;
+    const endpoint = selectedGroup ? `/groups/${selectedGroup.id}/messages` : selected ? `/sessions/${selected.id}/messages` : null;
+    if (!body || !endpoint || pendingSends.current.has(key)) return;
+    pendingSends.current.add(key);
+    setSendingThreads(items => ({ ...items, [key]: true }));
+    setError('');
     try {
-      if (selectedGroup) {
-        const response = await api.post(`/groups/${selectedGroup.id}/messages`, { body });
-        setMessages((items) => appendMessage(items, response.data));
-        setDraft('');
-        return;
-      }
-      if (!selected) return;
-      const response = await api.post(`/sessions/${selected.id}/messages`, { body });
-      setMessages((items) => appendMessage(items, response.data));
-      setDraft('');
-      await loadSessions();
+      const response = await api.post(endpoint, { body });
+      if (activeThreadRef.current === key) setMessages(items => appendMessage(items, response.data));
+      setDrafts(items => clearSentDraft(items, key, sentDraft));
+      if (selected) await loadSessions();
     } catch (requestError) {
-      setError(requestError.response?.data?.error || t('conversations.error'));
-    } finally { setSending(false); }
+      if (activeThreadRef.current === key) setError(requestError.response?.data?.error || t('conversations.error'));
+    } finally {
+      pendingSends.current.delete(key);
+      setSendingThreads(items => { const next = { ...items }; delete next[key]; return next; });
+    }
   }
 
   async function saveSchedule() {
@@ -426,6 +432,7 @@ export default function Conversations() {
                 <div className="conversation-meeting-actions">
                   {!selected.scheduled_at && <Button size="sm" variant="outline" onClick={() => setScheduleOpen(true)}>{t('conversations.schedule')}</Button>}
                   {selected.scheduled_at && <IcsDownloadButton sessionId={selected.id} session={selected} label="Meeting" meetingUrl={selected.meeting_url} onReschedule={() => setScheduleOpen(true)} />}
+                  <MeetingFeedback key={selected.id} session={selected} onSaved={loadSessions} />
                 </div>
                 {scheduleOpen && (
                   <div className="conversation-scheduler">
@@ -443,6 +450,8 @@ export default function Conversations() {
               </div>
             )}
 
+            {selected?.status === 'completed' && <div className="conversation-meeting"><CalendarDays /><div><strong>{statusLabel(selected, t)}</strong></div><MeetingFeedback key={selected.id} session={selected} onSaved={loadSessions} /></div>}
+
             <div className="conversation-messages" ref={messagesRef}>
               {selected && <div className="conversation-context"><span>{statusLabel(selected, t)}</span><p>{requestText(selected.title, t('conversations.requestTitle'))}{selected.topics?.length > 0 && ` · ${selected.topics.join(' · ')}`}</p></div>}
               {hasOlder && <button type="button" className="conversation-load-older" disabled={loadingOlder} onClick={loadOlderMessages}>{t('conversations.loadOlder')}</button>}
@@ -457,7 +466,7 @@ export default function Conversations() {
             </div>
 
             <form className="conversation-composer" onSubmit={sendMessage}>
-              <input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={t('conversations.messagePlaceholder')} maxLength={6000} aria-label={t('conversations.messagePlaceholder')} />
+              <input value={draft} onChange={(event) => setDrafts(items => ({ ...items, [threadKey]: event.target.value }))} placeholder={t('conversations.messagePlaceholder')} maxLength={6000} aria-label={t('conversations.messagePlaceholder')} />
               <button type="submit" disabled={!draft.trim() || sending} aria-label={t('conversations.send')}><Send /></button>
             </form>
           </>

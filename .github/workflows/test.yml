@@ -56,9 +56,25 @@ jobs:
 
       - run: npm audit --prefix client --audit-level=high
 
+  database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.115.0
+      - name: Replay migrations on a fresh local database
+        run: supabase start -x studio,imgproxy,inbucket,logflare,vector,edge-runtime,supavisor
+      - name: Validate database functions
+        run: supabase db lint --local --fail-on error
+      - name: Stop local services
+        if: always()
+        run: supabase stop --no-backup
+
   release-supabase:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [gitleaks, build]
+    needs: [gitleaks, build, database]
     runs-on: ubuntu-latest
     environment: production
     steps:

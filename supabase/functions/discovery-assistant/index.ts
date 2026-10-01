@@ -146,27 +146,11 @@ function publicCandidate(candidate: Candidate, ranked?: RankedMatch, redactIdent
 // Without it the clarify step cannot tell that nobody works in the field being
 // asked about, and spends questions narrowing a search that cannot succeed.
 async function networkCoverage(ctx: Awaited<ReturnType<typeof requireUser>>, organizationId: string) {
-  const { data: people } = await ctx.sb.from('profiles')
-    .select('id,job_title,department,program')
-    .eq('organization_id', organizationId)
-    .eq('admin_scope', 'none')
-    .eq('onboarding_complete', true)
-    .is('deactivated_at', null)
-    .neq('id', ctx.user.id)
-    .limit(500);
-  const ids = (people || []).map((person) => person.id);
-  const { data: skillRows } = ids.length
-    ? await ctx.sb.from('skills').select('skill').in('user_id', ids).eq('type', 'can_teach')
-    : { data: [] };
-  const distinct = (values: Array<unknown>, cap: number) =>
-    [...new Set(values.map((value) => cleanText(value, 80)).filter(Boolean))].sort().slice(0, cap);
-  return {
-    member_count: ids.length,
-    departments: distinct((people || []).map((person) => person.department), 40),
-    programs: distinct((people || []).map((person) => person.program), 40),
-    job_titles: distinct((people || []).map((person) => person.job_title), 120),
-    skills: distinct((skillRows || []).map((row) => row.skill), 250),
-  };
+  const { data, error } = await ctx.sb.rpc('discovery_network_coverage', {
+    p_organization_id: organizationId, p_viewer_id: ctx.user.id,
+  });
+  if (error || !data) throw new Error('candidate_load_failed');
+  return data;
 }
 
 async function persistTurns(
@@ -250,9 +234,9 @@ Deno.serve(async (req) => {
     }
     const conversation = conversationFromTurns(priorTurns, query);
     const hasClarified = priorTurns.some((turn) => turn.role === 'assistant' && turn.kind === 'clarification');
-    const coverage = await networkCoverage(ctx, caller.organization_id);
     const startedAt = Date.now();
     try {
+      const coverage = await networkCoverage(ctx, caller.organization_id);
       const result = await mistralJson<ClarificationResult>({
         feature: 'discovery_clarify',
         system: `You are Ment, a university-network matching assistant. Respond in ${language}. Read all turns as separate messages. A later user turn can refine OR replace the earlier goal. If it changes topic, discard the old search criteria unless the user explicitly keeps them. Never combine abandoned goals. Never claim you searched or found people.
@@ -322,46 +306,29 @@ Do not broaden explicit professions or domains into adjacent ones. For example, 
     }
   }
 
-  const { data: rows, error: candidateError } = await ctx.sb.from('profiles')
-    .select('id,name,job_title,department,program,cohort_year,location,seniority,tenure_years,bio,linkedin_headline,mentorship_paused,mentorship_unavailable_until,weekly_meeting_limit,monthly_meeting_limit')
-    .eq('organization_id', caller.organization_id)
-    .eq('admin_scope', 'none')
-    .eq('onboarding_complete', true)
-    .is('deactivated_at', null)
-    .neq('id', ctx.user.id)
-    .limit(100);
+  const { data: rows, error: candidateError } = await ctx.sb.rpc('discovery_candidates', {
+    p_organization_id: caller.organization_id,
+    p_viewer_id: ctx.user.id,
+    p_query: requestForMatch,
+    p_selected_id: action === 'draft' ? body.person_id : null,
+  });
   if (candidateError) return jsonError('candidate_load_failed', 500);
 
-  const profileIds = (rows || []).map((row) => row.id);
-  const [skillResult, relationshipResult, availabilityResult] = await Promise.all([
-    profileIds.length ? ctx.sb.from('skills').select('user_id,skill').in('user_id', profileIds).eq('type', 'can_teach') : Promise.resolve({ data: [], error: null }),
-    ctx.sb.from('sessions').select('mentor_id,mentee_id,status,request_expires_at').or(`mentor_id.eq.${ctx.user.id},mentee_id.eq.${ctx.user.id}`).in('status', ['pending', 'scheduled', 'completed']),
-    profileIds.length ? ctx.sb.rpc('available_discovery_profiles', { p_organization_id: caller.organization_id, p_ids: profileIds }) : Promise.resolve({ data: [], error: null }),
+  const [relationshipResult, connectionResult] = await Promise.all([
+    ctx.sb.from('sessions').select('mentor_id,mentee_id,status').or(`mentor_id.eq.${ctx.user.id},mentee_id.eq.${ctx.user.id}`).in('status', ['scheduled', 'completed']),
+    ctx.sb.from('connections').select('requester_id,addressee_id').eq('status', 'accepted')
+      .or(`requester_id.eq.${ctx.user.id},addressee_id.eq.${ctx.user.id}`),
   ]);
-  if (skillResult.error || relationshipResult.error || availabilityResult.error) return jsonError('candidate_load_failed', 500);
-  const skills = skillResult.data;
+  if (relationshipResult.error || connectionResult.error) return jsonError('candidate_load_failed', 500);
   const relationships = relationshipResult.data;
-  const availableIds = new Set(availabilityResult.data || []);
-
-  const related = new Set((relationships || [])
-    .filter((session) => session.status === 'scheduled' || (session.status === 'pending' && (!session.request_expires_at || new Date(session.request_expires_at).getTime() > Date.now())))
-    .map((session) => session.mentor_id === ctx.user.id ? session.mentee_id : session.mentor_id));
   const established = new Set((relationships || [])
-    .filter((session) => session.status === 'scheduled' || session.status === 'completed')
     .map((session) => session.mentor_id === ctx.user.id ? session.mentee_id : session.mentor_id));
-  const { data: acceptedConnections } = await ctx.sb.from('connections')
-    .select('requester_id,addressee_id').eq('status', 'accepted')
-    .or(`requester_id.eq.${ctx.user.id},addressee_id.eq.${ctx.user.id}`);
-  for (const connection of acceptedConnections || []) {
+  for (const connection of connectionResult.data || []) {
     established.add(connection.requester_id === ctx.user.id ? connection.addressee_id : connection.requester_id);
   }
-  const skillsByUser = new Map<string, string[]>();
-  for (const skill of skills || []) skillsByUser.set(skill.user_id, [...(skillsByUser.get(skill.user_id) || []), skill.skill]);
-
-  const candidates: Candidate[] = (rows || []).filter((row) => !related.has(row.id) && availableIds.has(row.id)).map((row) => ({
+  const candidates: Candidate[] = (rows || []).map((row: Candidate) => ({
     ...row,
     linkedin_headline: !redactInterOrg || established.has(row.id) ? row.linkedin_headline : null,
-    skills: skillsByUser.get(row.id) || [],
   }));
 
   if (action === 'draft') {

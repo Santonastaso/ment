@@ -2,6 +2,9 @@
 -- Scheduled jobs (pg_cron). Idempotent: unschedule before re-creating.
 -- =====================================================================
 
+-- Fresh local projects do not have the dashboard-enabled extension installed.
+create extension if not exists pg_cron;
+
 do $$
 declare
   v_job record;

@@ -18,8 +18,9 @@ member records.
 - Populate real `profiles.notification_email` values for pilot identities using
   placeholder login addresses. Verify recipients before enabling dispatch.
 - Configure the GitHub `production` environment with required reviewers.
-  Vercel production deployment settings must be reviewed separately; the
-  repository cannot enforce them.
+  Vercel's production Deployment Check must require the GitHub
+  `release-supabase` job. This gate is configured on the Ment project;
+  preserve the job name so website promotion waits for database and RLS checks.
 - Leave the GitHub Actions variable `NOTIFICATIONS_ENABLED` unset until sender
   secrets and recipient addresses are verified. Set it to `true` only after a
   successful manual `notification-outbox` run to enable the 15-minute schedule.
@@ -47,9 +48,11 @@ member records.
 
 1. Require a green CI run and approved member-data/privacy sign-off. Verify
    Supabase Auth redirects include the production domain and reset route.
-2. Run `deploy-database` from `main`; confirm the new migration is recorded.
-3. Run `supabase-functions` from `main`; function deploy is intentionally
-   manual so code cannot arrive before its migration.
+2. Merge to `main`. CI runs secret scanning, build/tests, and a fresh local
+   Supabase migration replay and function lint before touching production.
+3. `release-supabase` applies migrations, deploys Edge Functions, and checks
+   production RLS. Vercel promotes the matching website deployment only after
+   that job succeeds. Check both systems report success for the same commit.
 4. Trigger `notification-outbox` once and inspect sent/failed counts. Rows older
    than two days (seven for reflections) are marked failed rather than mailed.
    Investigate the pre-existing stale queue before setting `NOTIFICATIONS_ENABLED=true`.
