@@ -3,6 +3,7 @@
 // Returns: { draft_id, proposed, classifier_source }
 
 import mammoth from 'npm:mammoth@1.9.0';
+import { Buffer } from 'node:buffer';
 // pdfjs-dist is the Deno-friendly PDF parser. Using legacy build to avoid worker setup.
 import { getDocument } from 'npm:pdfjs-dist@4.7.76/legacy/build/pdf.mjs';
 import {
@@ -63,7 +64,7 @@ async function extractText(buf: Uint8Array, filename: string): Promise<string> {
   }
   if (lower.endsWith('.docx')) {
     validateDocxArchive(buf);
-    const result = await mammoth.extractRawText({ buffer: buf });
+    const result = await mammoth.extractRawText({ buffer: Buffer.from(buf) });
     if (result.value.length > MAX_EXTRACTED_CHARS) throw new Error('document_text_too_large');
     return result.value || '';
   }
