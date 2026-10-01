@@ -301,6 +301,26 @@ def main() -> int:
         case("rpc.admin_set_role_denied_for_employee", expect_denied=True, ok=not is_denied(s, b),
              detail=f"Bob calls admin_set_role → status={s}")
 
+    # Read-only release contract checks: these must exist in PostgREST's schema cache.
+    s, b = rest("POST", "rpc/my_meeting_capacity", bob, body={})
+    case("pilot.capacity_contract", expect_denied=False,
+         ok=ok_status(s) and isinstance(b, dict) and "available" in b and "weekly_booked" in b,
+         detail=f"my_meeting_capacity status={s}")
+    s, b = rest("POST", "rpc/directory_browse", bob,
+                body={"p_limit": 1, "p_sort": "relevance"})
+    case("pilot.directory_relevance_contract", expect_denied=False,
+         ok=ok_status(s) and isinstance(b, dict) and "people" in b,
+         detail=f"directory_browse with p_sort status={s}")
+    s, b = rest("POST", "rpc/my_groups", bob, body={})
+    case("pilot.group_requests_contract", expect_denied=False,
+         ok=ok_status(s) and isinstance(b, list) and all("join_status" in row for row in b),
+         detail=f"my_groups with request state status={s}")
+    s, b = rest("POST", "rpc/available_discovery_profiles", bob,
+                body={"p_organization_id": bob_profile.get("organization_id"), "p_ids": []})
+    case("pilot.discovery_rpc_service_only", expect_denied=False,
+         ok=is_denied(s, b) or s == 404,
+         detail=f"service-only availability RPC status={s}")
+
     # Summary
     passed = sum(1 for c in cases if c["ok"])
     print(f"\n{passed}/{len(cases)} cases passed")

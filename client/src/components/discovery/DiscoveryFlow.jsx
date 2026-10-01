@@ -240,6 +240,7 @@ export default function DiscoveryFlow() {
 
   async function choose(match) {
     const version = flowVersion.current;
+    idempotencyKey.current = null;
     setSelected(match); setDraftVariant(0);
     setStage('drafting'); setError('');
     try {
@@ -272,7 +273,7 @@ export default function DiscoveryFlow() {
       const response = await api.post('/sessions', { mentor_id: selected.person.id, title: submittedQuery.slice(0, 80), pre_session_question: submittedQuery, message: draft.trim(), duration_minutes: 60, follow_up_intent: 'one_off', idempotency_key: idempotencyKey.current });
       setSessionId(response.data.id);
       setStage('sent');
-      if (threadId) await api.put(`/discovery/threads/${threadId}`, { archived: true, selected_person_id: selected.person.id });
+      if (threadId) await api.put(`/discovery/threads/${threadId}`, { archived: true, selected_person_id: selected.person.id }).catch(() => {});
       refreshHistory().catch(() => {});
     } catch (requestError) { setError(requestError.response?.data?.error || copy.error); }
     finally { setSending(false); }
@@ -301,7 +302,8 @@ export default function DiscoveryFlow() {
         const sentSession = (sessions || []).find(session =>
           session.mentee_id === user?.id &&
           session.mentor_id === lastAssistant.person.id &&
-          session.title === (lastAssistant.search_request || lastUser.content).slice(0, 80),
+          ['pending', 'scheduled'].includes(session.status) &&
+          session.title === requestText(lastAssistant.search_request, lastUser.content).slice(0, 80),
         );
         if (sentSession) {
           setSelected({ person: lastAssistant.person, expertise: lastAssistant.person.expertise || [], background: lastAssistant.person.background || '', reasons: lastAssistant.person.reasons || [] });
@@ -359,7 +361,7 @@ export default function DiscoveryFlow() {
   }
 
   function composer() {
-    return <form className="discovery-composer" onSubmit={submit}><textarea ref={composerInputRef} value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} maxLength={2000} rows={1} placeholder={copy.placeholder} aria-label={copy.placeholder} disabled={stage === 'matching' || sending} /><button className="discovery-send" type="submit" disabled={!query.trim() || stage === 'matching'} aria-label="Send message"><ArrowUp /></button></form>;
+    return <form className="discovery-composer" onSubmit={submit}><textarea ref={composerInputRef} value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} maxLength={2000} rows={1} placeholder={copy.placeholder} aria-label={copy.placeholder} disabled={stage === 'matching' || stage === 'drafting' || sending} /><button className="discovery-send" type="submit" disabled={!query.trim() || stage === 'matching' || stage === 'drafting' || sending} aria-label={t('conversations.send')}><ArrowUp /></button></form>;
   }
 
   const firstName = user?.name?.split(' ')[0] || '';

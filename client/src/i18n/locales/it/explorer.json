@@ -1,4 +1,9 @@
 {
+  "explorer.sortLabel": "Ordina per",
+  "explorer.sortRelevance": "Pertinenza",
+  "explorer.sortName": "Nome",
+  "explorer.sortSearchHint": "In base alla tua ricerca",
+  "explorer.sortSkillsHint": "Prima le competenze che vuoi imparare",
   "explorer.title": "Esplora",
   "explorer.entryStudent": "Uno studente",
   "explorer.entryAlumnus": "Un alunno",

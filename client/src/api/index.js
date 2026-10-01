@@ -36,7 +36,7 @@ async function edgeFunctionError(error, data, fallback) {
   );
 }
 
-async function invokeUserFunction(name, body) {
+export async function invokeUserFunction(name, body) {
   let result = await supabase.functions.invoke(name, { body });
   if (result.error?.context?.status === 401 || result.data?.error === 'invalid_token') {
     const { error } = await supabase.auth.refreshSession();
@@ -317,6 +317,7 @@ async function listDirectory(params = {}) {
     p_location: params.location || null,
     p_working_language: params.language || null,
     p_query: params.q && params.q.trim() ? params.q.trim() : null,
+    p_sort: params.sort === 'name' ? 'name' : 'relevance',
   };
   const [{ data, error }, relationships] = await Promise.all([
     supabase.rpc('directory_browse', rpcArgs),
@@ -439,6 +440,7 @@ async function get(url) {
       location: params.get('location'),
       language: params.get('language'),
       q: params.get('q'),
+      sort: params.get('sort'),
     }));
   }
 
@@ -451,6 +453,11 @@ async function get(url) {
     const id = Number(url.split('/')[2]);
     const { data, error } = await supabase.rpc('my_group_messages', { p_group_id: id, p_limit: 200 });
     if (error) throw new ApiError(error.message, 403);
+    return ok(data || []);
+  }
+  if (/^\/groups\/\d+\/requests$/.test(url)) {
+    const { data, error } = await supabase.rpc('pending_group_requests', { p_group_id: Number(url.split('/')[2]) });
+    if (error) throw new ApiError(error.message);
     return ok(data || []);
   }
 
@@ -685,12 +692,10 @@ async function post(url, body = {}, opts = {}) {
   }
 
   if (url === '/discovery/matches' || url === '/discovery/draft') {
-    const { data, error } = await supabase.functions.invoke('discovery-assistant', {
-      body: {
-        ...body,
-        lang: body.lang || getLang(),
-        action: url.endsWith('/draft') ? 'draft' : 'chat',
-      },
+    const { data, error } = await invokeUserFunction('discovery-assistant', {
+      ...body,
+      lang: body.lang || getLang(),
+      action: url.endsWith('/draft') ? 'draft' : 'chat',
     });
     if (error || data?.error) throw await edgeFunctionError(error, data, 'ai_request_failed');
     return ok(data);
@@ -792,9 +797,10 @@ async function post(url, body = {}, opts = {}) {
   }
 
   if (url === '/sessions') {
-    const { data, error } = await supabase.rpc('pm_request_session', {
+    const { data, error } = await supabase.rpc('request_conversation', {
       p_mentor_id: body.mentor_id,
       p_title: body.title,
+      p_message: body.message?.trim() || '',
       p_scheduled_at: body.scheduled_at || null,
       p_duration_minutes: body.duration_minutes || 60,
       p_pre_session_question: body.pre_session_question || '',
@@ -803,13 +809,6 @@ async function post(url, body = {}, opts = {}) {
       p_follow_up_intent: body.follow_up_intent || 'one_off',
     });
     if (error) throw new ApiError(error.message);
-    if (body.message?.trim()) {
-      const { error: messageError } = await supabase.rpc('pm_set_outbound_message', {
-        p_session_id: data.id,
-        p_message: body.message.trim(),
-      });
-      if (messageError) throw new ApiError(messageError.message);
-    }
     return ok(await enrichSession(data, viewer.id), 201);
   }
 
@@ -866,9 +865,13 @@ async function post(url, body = {}, opts = {}) {
 
   if (/^\/groups\/\d+\/join$/.test(url)) {
     const id = Number(url.split('/')[2]);
-    const { error } = await supabase.rpc('join_group', { p_group_id: id });
+    const { error } = await supabase.rpc('request_group_join', { p_group_id: id, p_reason: body.reason });
     if (error) throw new ApiError(error.message);
-    await supabase.rpc('mark_group_read', { p_group_id: id });
+    return ok({ ok: true });
+  }
+  if (/^\/groups\/\d+\/requests$/.test(url)) {
+    const { error } = await supabase.rpc('review_group_join', { p_group_id: Number(url.split('/')[2]), p_user_id: body.user_id, p_accept: body.accept });
+    if (error) throw new ApiError(error.message);
     return ok({ ok: true });
   }
 
@@ -1313,6 +1316,11 @@ async function del(url) {
   if (/^\/groups\/\d+\/membership$/.test(url)) {
     const id = Number(url.split('/')[2]);
     const { error } = await supabase.rpc('leave_group', { p_group_id: id });
+    if (error) throw new ApiError(error.message);
+    return ok({ ok: true });
+  }
+  if (/^\/groups\/\d+\/join$/.test(url)) {
+    const { error } = await supabase.rpc('withdraw_group_join', { p_group_id: Number(url.split('/')[2]) });
     if (error) throw new ApiError(error.message);
     return ok({ ok: true });
   }

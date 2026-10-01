@@ -3,7 +3,7 @@ import { Select } from '@base-ui/react/select';
 import { Check, ChevronDown } from 'lucide-react';
 
 export default function DirectoryFilter({ label, value, onChange, options }) {
-  return <Select.Root value={value} onValueChange={onChange}>
+  return <Select.Root value={value} onValueChange={onChange} items={options}>
     <Select.Trigger className="directory-filter" aria-label={label}>
       <Select.Value placeholder={options[0]?.label} />
       <Select.Icon><ChevronDown size={16} aria-hidden="true" /></Select.Icon>

@@ -10,3 +10,11 @@ export function hasGroundedExpertise(candidate, ranked) {
   );
   return ranked.matched_expertise.some((value) => supplied.has(String(value || '').trim().slice(0, 200).toLowerCase()));
 }
+
+export function canHelpWithCareerGoal(candidate, request) {
+  const careerGoal = /\b(internship|internships|stage|stages|tirocinio|tirocini|job search|job hunting|recherche d.emploi|cerc[oa] (?:un )?lavoro)\b/i.test(request);
+  const isIntern = /\b(intern|internship|stagiaire|stage|tirocinante)\b/i.test(candidate.job_title || '');
+  if (!careerGoal || !isIntern) return true;
+  // Being another applicant is not evidence of being able to help an applicant.
+  return (candidate.skills || []).some(skill => /\b(recruiting|recruitment|hiring|career coaching|interview preparation|recrutement|orientation professionnelle|selezione|colloqui)\b/i.test(skill));
+}

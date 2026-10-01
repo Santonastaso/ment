@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { supabase } from '../lib/supabase.js';
+import { invokeUserFunction } from '../api/index.js';
 import { useT } from '../i18n/index.jsx';
 
 export default function CalendarCallback() {
@@ -13,14 +13,17 @@ export default function CalendarCallback() {
     const state = params.get('state') || '';
     const code = params.get('code') || '';
     let provider = '';
+    let sessionId = null;
     try {
       const payload = state.split('.')[0].replaceAll('-', '+').replaceAll('_', '/');
-      provider = JSON.parse(atob(payload.padEnd(Math.ceil(payload.length / 4) * 4, '='))).provider;
+      const parsed = JSON.parse(atob(payload.padEnd(Math.ceil(payload.length / 4) * 4, '=')));
+      provider = parsed.provider;
+      sessionId = Number.isSafeInteger(parsed.sessionId) && parsed.sessionId > 0 ? parsed.sessionId : null;
     } catch { setError(t('components.calendarCallback.invalidResponse')); return; }
-    supabase.functions.invoke('calendar-provider', { body: { action: 'exchange', provider, code, state } })
+    invokeUserFunction('calendar-provider', { action: 'exchange', provider, code, state })
       .then(({ data, error: invokeError }) => {
         if (invokeError || data?.error) throw new Error(data?.error || invokeError.message);
-        navigate('/conversations', { replace: true });
+        navigate(sessionId ? `/conversations?session=${sessionId}` : '/conversations', { replace: true });
       })
       .catch(() => setError(t('components.calendarCallback.error')));
   }, [navigate, params, t]);

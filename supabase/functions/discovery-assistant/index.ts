@@ -2,9 +2,9 @@ import { corsHeaders, jsonError, jsonOk, requireUser } from '../_shared/index.ts
 import { recordAiRun } from '../_shared/ai-telemetry.ts';
 import { aiErrorResponse, mistralJson } from '../_shared/mistral.ts';
 import { enforceRateLimit } from '../_shared/rate-limit.ts';
-import { hasGroundedExpertise } from '../_shared/discovery-guards.mjs';
+import { canHelpWithCareerGoal, hasGroundedExpertise } from '../_shared/discovery-guards.mjs';
 
-const PROMPT_VERSION = 'discovery-v5';
+const PROMPT_VERSION = 'discovery-v6';
 
 type Candidate = {
   id: string;
@@ -179,11 +179,12 @@ async function persistTurns(
   const now = new Date().toISOString();
   let existing = null;
   if (typeof threadId === 'string' && threadId) {
-    const { data } = await ctx.sb.from('discovery_threads')
+    const { data, error } = await ctx.sb.from('discovery_threads')
       .select('id,turns')
       .eq('id', threadId)
       .eq('user_id', ctx.user.id)
       .maybeSingle();
+    if (error) throw new Error('conversation_save_failed');
     existing = data;
   }
   const nextTurns = assistant.kind === 'draft'
@@ -192,22 +193,24 @@ async function persistTurns(
   const turns = [
     ...(Array.isArray(existing?.turns) ? existing.turns : []),
     ...nextTurns,
-  ].slice(-40);
+  ];
   if (existing?.id) {
-    const { data } = await ctx.sb.from('discovery_threads').update({
+    const { data, error } = await ctx.sb.from('discovery_threads').update({
       turns,
       selected_person_id: selectedPersonId || null,
       updated_at: now,
     }).eq('id', existing.id).eq('user_id', ctx.user.id).select('id').single();
-    return data?.id || existing.id;
+    if (error || !data?.id) throw new Error('conversation_save_failed');
+    return data.id;
   }
-  const { data } = await ctx.sb.from('discovery_threads').insert({
+  const { data, error } = await ctx.sb.from('discovery_threads').insert({
     user_id: ctx.user.id,
     title: query.slice(0, 80),
     turns,
     selected_person_id: selectedPersonId || null,
   }).select('id').single();
-  return data?.id || null;
+  if (error || !data?.id) throw new Error('conversation_save_failed');
+  return data.id;
 }
 
 Deno.serve(async (req) => {
@@ -257,6 +260,8 @@ Deno.serve(async (req) => {
 You are given "coverage": the departments, programs, job titles and skills that exist in this network. It is the whole of what can ever be matched, and it is private. Use it to decide, never to explain. Never quote it, list it, or refer to job titles, departments, programs, skills, fields, records, lists or what the network contains in anything the user will read. Before anything else, judge whether any of it could plausibly satisfy the request. If none of it could, return decision "no_match" with a short no_match_reason saying in plain words who this network has nobody for — do not ask a question first.
 
 Otherwise always produce one concise search_request that preserves the user's intent. search_request is read only by the matching step and is never shown to the user, so write it for a search, not for a person.
+
+When someone seeks an internship or job, they want a person who can help them obtain it, not another applicant. Preserve the explicit industry, function and location. Look for professionals in that field or people with explicit hiring, recruitment or career-guidance expertise; never replace finance with luxury simply because both profiles mention internships. Do not assume a professional has a vacancy or hiring authority.
 
 Then decide whether to ask one question first. Apply these rules in order and stop at the first that fits. Where a rule says ask, return decision "clarify" and put the question in "question"; where it says search, return decision "ready":
 1. The request says nothing about what the person does — no field, no skill, no programme. Ask. Location, seniority, years of experience and employer narrow a set but cannot define one, so a request carrying only those still means ask.
@@ -328,14 +333,18 @@ Do not broaden explicit professions or domains into adjacent ones. For example, 
   if (candidateError) return jsonError('candidate_load_failed', 500);
 
   const profileIds = (rows || []).map((row) => row.id);
-  const [{ data: skills }, { data: relationships }, { data: activeSessions }] = await Promise.all([
-    profileIds.length ? ctx.sb.from('skills').select('user_id,skill').in('user_id', profileIds).eq('type', 'can_teach') : Promise.resolve({ data: [] }),
-    ctx.sb.from('sessions').select('mentor_id,mentee_id,status').or(`mentor_id.eq.${ctx.user.id},mentee_id.eq.${ctx.user.id}`).in('status', ['pending', 'scheduled', 'completed']),
-    profileIds.length ? ctx.sb.from('sessions').select('mentor_id,status,created_at,accepted_at,request_expires_at').in('mentor_id', profileIds).in('status', ['pending', 'scheduled', 'completed']) : Promise.resolve({ data: [] }),
+  const [skillResult, relationshipResult, availabilityResult] = await Promise.all([
+    profileIds.length ? ctx.sb.from('skills').select('user_id,skill').in('user_id', profileIds).eq('type', 'can_teach') : Promise.resolve({ data: [], error: null }),
+    ctx.sb.from('sessions').select('mentor_id,mentee_id,status,request_expires_at').or(`mentor_id.eq.${ctx.user.id},mentee_id.eq.${ctx.user.id}`).in('status', ['pending', 'scheduled', 'completed']),
+    profileIds.length ? ctx.sb.rpc('available_discovery_profiles', { p_organization_id: caller.organization_id, p_ids: profileIds }) : Promise.resolve({ data: [], error: null }),
   ]);
+  if (skillResult.error || relationshipResult.error || availabilityResult.error) return jsonError('candidate_load_failed', 500);
+  const skills = skillResult.data;
+  const relationships = relationshipResult.data;
+  const availableIds = new Set(availabilityResult.data || []);
 
   const related = new Set((relationships || [])
-    .filter((session) => session.status === 'pending' || session.status === 'scheduled')
+    .filter((session) => session.status === 'scheduled' || (session.status === 'pending' && (!session.request_expires_at || new Date(session.request_expires_at).getTime() > Date.now())))
     .map((session) => session.mentor_id === ctx.user.id ? session.mentee_id : session.mentor_id));
   const established = new Set((relationships || [])
     .filter((session) => session.status === 'scheduled' || session.status === 'completed')
@@ -346,30 +355,10 @@ Do not broaden explicit professions or domains into adjacent ones. For example, 
   for (const connection of acceptedConnections || []) {
     established.add(connection.requester_id === ctx.user.id ? connection.addressee_id : connection.requester_id);
   }
-  const now = Date.now();
-  const currentDate = new Date(now);
-  const weekStart = new Date(currentDate);
-  weekStart.setUTCHours(0, 0, 0, 0);
-  weekStart.setUTCDate(weekStart.getUTCDate() - ((weekStart.getUTCDay() + 6) % 7));
-  const monthStart = new Date(Date.UTC(currentDate.getUTCFullYear(), currentDate.getUTCMonth(), 1));
-  const activeByMentor = new Map<string, { total: number; week: number }>();
-  for (const session of activeSessions || []) {
-    if (session.status === 'pending' && session.request_expires_at && new Date(session.request_expires_at).getTime() <= now) continue;
-    const current = activeByMentor.get(session.mentor_id) || { total: 0, week: 0 };
-    const capacityDate = new Date(session.status === 'pending' ? session.created_at : session.accepted_at);
-    if (capacityDate.getTime() >= monthStart.getTime()) current.total += 1;
-    if (capacityDate.getTime() >= weekStart.getTime()) current.week += 1;
-    activeByMentor.set(session.mentor_id, current);
-  }
   const skillsByUser = new Map<string, string[]>();
   for (const skill of skills || []) skillsByUser.set(skill.user_id, [...(skillsByUser.get(skill.user_id) || []), skill.skill]);
 
-  const candidates: Candidate[] = (rows || []).filter((row) => {
-    if (related.has(row.id) || row.mentorship_paused) return false;
-    if (row.mentorship_unavailable_until && new Date(row.mentorship_unavailable_until).getTime() > now) return false;
-    const usage = activeByMentor.get(row.id) || { total: 0, week: 0 };
-    return usage.total < row.monthly_meeting_limit && usage.week < row.weekly_meeting_limit;
-  }).map((row) => ({
+  const candidates: Candidate[] = (rows || []).filter((row) => !related.has(row.id) && availableIds.has(row.id)).map((row) => ({
     ...row,
     linkedin_headline: !redactInterOrg || established.has(row.id) ? row.linkedin_headline : null,
     skills: skillsByUser.get(row.id) || [],
@@ -435,6 +424,8 @@ Choose exactly one outcome:
 
 Each candidate also carries location, seniority and tenure_years. These are filters, never evidence of expertise: apply one only when the request actually asks for it, and never let it stand in for the profession, function or skill being sought. They must never appear in matched_expertise.
 
+For an internship or job-search goal, select a person who can help with that goal in the explicit requested domain, not another intern merely because their title includes intern. A finance internship request requires explicit finance-related professional or recruitment expertise, not unrelated luxury or marketing experience. Never claim the person is hiring or has an opening unless supplied facts explicitly say so.
+
 An explicit profession or domain is not ambiguous. If the user asks for a medical professional and no candidate has supplied medical or clinical credentials, return no_match. Do not ask whether they mean doctor, nurse, or another adjacent role. Do not substitute transferable skills, location, general seniority, or a merely adjacent profession. If your reason needs a caveat like "no direct experience, but...", that person is not a match. False positives are worse than returning no match.
 
 Return exactly one of these JSON shapes:
@@ -465,7 +456,7 @@ For matches, confidence must be at least 0.75 and matched_expertise must copy an
       const id = cleanText(item?.profile_id, 100);
       const candidate = candidates.find((entry) => entry.id === id);
       const confidence = Number(item?.confidence);
-      if (!candidate || seen.has(id) || !Number.isFinite(confidence) || confidence < 0.75 || !hasGroundedExpertise(candidate, item)) return [];
+      if (!candidate || seen.has(id) || !Number.isFinite(confidence) || confidence < 0.75 || !hasGroundedExpertise(candidate, item) || !canHelpWithCareerGoal(candidate, requestForMatch)) return [];
       seen.add(id);
       return [publicCandidate(candidate, item, redactInterOrg && !established.has(candidate.id))];
     }).slice(0, 3);
@@ -478,7 +469,7 @@ For matches, confidence must be at least 0.75 and matched_expertise must copy an
       latencyMs: result.latencyMs,
     });
     if (outcome === 'no_match' || !matches.length) {
-      const reason = noMatchReason || 'No relevant profile is currently available in this network.';
+      const reason = noMatchReason || EMPTY_POOL_MESSAGES[language];
       const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'no_match', content: reason, search_request: requestForMatch });
       return jsonOk({ matches: [], clarification: '', no_match: true, no_match_reason: reason, resolved_request: requestForMatch, thread_id: threadId, model: result.model });
     }

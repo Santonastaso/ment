@@ -1,4 +1,9 @@
 {
+  "explorer.sortLabel": "Sort by",
+  "explorer.sortRelevance": "Relevance",
+  "explorer.sortName": "Name",
+  "explorer.sortSearchHint": "Based on your search",
+  "explorer.sortSkillsHint": "Skills you want to learn first",
   "explorer.title": "Explorer",
   "explorer.entryStudent": "A student",
   "explorer.entryAlumnus": "An alumnus",

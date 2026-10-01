@@ -25,8 +25,8 @@ async function decrypt(value: string) {
   return new TextDecoder().decode(clear);
 }
 
-async function signedState(userId: string, provider: Provider) {
-  const payload = btoa(JSON.stringify({ userId, provider, expires: Date.now() + 10 * 60_000 })).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
+async function signedState(userId: string, provider: Provider, sessionId: number | null) {
+  const payload = btoa(JSON.stringify({ userId, provider, sessionId, expires: Date.now() + 10 * 60_000 })).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
   const key = await crypto.subtle.importKey('raw', await keyMaterial(), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   const signature = new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payload)));
   return `${payload}.${btoa(String.fromCharCode(...signature)).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '')}`;
@@ -90,14 +90,20 @@ Deno.serve(async (req) => {
     const provider = body.provider;
 
     if (action === 'status') {
-      const { data } = await ctx.sb.from('calendar_connections').select('provider,provider_email,token_expires_at').eq('user_id', ctx.user.id);
-      return jsonOk({ connections: data || [] });
+      const { data, error } = await ctx.sb.from('calendar_connections').select('provider,provider_email,token_expires_at').eq('user_id', ctx.user.id);
+      if (error) return jsonError('calendar_status_failed', 500);
+      const providers = (['google', 'microsoft'] as Provider[]).filter(item => {
+        try { providerConfig(item); return !!appOrigin() && (Deno.env.get('CALENDAR_TOKEN_ENCRYPTION_KEY') || '').length >= 32; }
+        catch { return false; }
+      });
+      return jsonOk({ connections: data || [], providers });
     }
     if (!validProvider(provider)) return jsonError('calendar_provider_required');
 
     if (action === 'authorization_url') {
       const config = providerConfig(provider);
-      const state = await signedState(ctx.user.id, provider);
+      const sessionId = Number(body.session_id);
+      const state = await signedState(ctx.user.id, provider, Number.isSafeInteger(sessionId) && sessionId > 0 ? sessionId : null);
       const redirect = `${appOrigin()}/calendar/callback`;
       const url = provider === 'google'
         ? `https://accounts.google.com/o/oauth2/v2/auth?${new URLSearchParams({ client_id: config.clientId, redirect_uri: redirect, response_type: 'code', access_type: 'offline', prompt: 'consent', scope: 'openid email https://www.googleapis.com/auth/calendar.events', state })}`
@@ -123,10 +129,10 @@ Deno.serve(async (req) => {
       if (!session || ![session.mentor_id, session.mentee_id].includes(ctx.user.id)) return jsonError('not_found', 404);
       if (session.status !== 'scheduled' || !session.scheduled_at) return jsonError('session_not_scheduled', 409);
       const { data: existingEvent } = await ctx.sb.from('calendar_events').select('*').eq('session_id', session.id).eq('provider', provider).maybeSingle();
-      if (existingEvent && existingEvent.owner_id !== ctx.user.id) return jsonError('calendar_event_owner_only', 403);
       if (existingEvent?.scheduled_for && new Date(existingEvent.scheduled_for).getTime() === new Date(session.scheduled_at).getTime()) {
         return jsonOk({ provider, join_url: existingEvent.join_url, html_url: existingEvent.html_url, event_id: existingEvent.external_event_id, reused: true });
       }
+      if (existingEvent && existingEvent.owner_id !== ctx.user.id) return jsonError('calendar_event_owner_only', 403);
       const connectionOwnerId = ctx.user.id;
       const { data: connection } = await ctx.sb.from('calendar_connections').select('*').eq('user_id', connectionOwnerId).eq('provider', provider).maybeSingle();
       if (!connection) return jsonError('calendar_not_connected', 409);
@@ -150,8 +156,12 @@ Deno.serve(async (req) => {
         if (!response.ok) throw new Error('calendar_event_create_failed');
         const event = await response.json(); externalEventId = event.id; joinUrl = event.onlineMeeting?.joinUrl || ''; htmlUrl = event.webLink || '';
       }
-      await ctx.sb.from('calendar_events').upsert({ session_id: session.id, provider, owner_id: connectionOwnerId, external_event_id: externalEventId, join_url: joinUrl || null, html_url: htmlUrl || null, scheduled_for: session.scheduled_at, updated_at: new Date().toISOString() }, { onConflict: 'session_id,provider' });
-      if (joinUrl) await ctx.sb.from('sessions').update({ meeting_url: joinUrl }).eq('id', session.id);
+      const { error: saveError } = await ctx.sb.from('calendar_events').upsert({ session_id: session.id, provider, owner_id: connectionOwnerId, external_event_id: externalEventId, join_url: joinUrl || null, html_url: htmlUrl || null, scheduled_for: session.scheduled_at, updated_at: new Date().toISOString() }, { onConflict: 'session_id,provider' });
+      if (saveError) return jsonError('calendar_event_save_failed', 500);
+      if (joinUrl) {
+        const { error: linkError } = await ctx.sb.from('sessions').update({ meeting_url: joinUrl }).eq('id', session.id);
+        if (linkError) return jsonError('calendar_event_save_failed', 500);
+      }
       return jsonOk({ provider, join_url: joinUrl, html_url: htmlUrl, event_id: externalEventId }, 201);
     }
     return jsonError('unsupported_action', 400);

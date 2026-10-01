@@ -25,8 +25,9 @@ export default function Explorer() {
   const cohort = searchParams.get('cohort') || '';
   const location = searchParams.get('location') || '';
   const language = searchParams.get('language') || '';
+  const sort = searchParams.get('sort') === 'name' ? 'name' : 'relevance';
   const page = Number.isSafeInteger(Number(searchParams.get('page'))) && Number(searchParams.get('page')) > 0 ? Number(searchParams.get('page')) : 1;
-  const requestKey = JSON.stringify([query, persona, program, cohort, location, language, page]);
+  const requestKey = JSON.stringify([query, persona, program, cohort, location, language, sort, page]);
 
   const [inputValue, setInputValue] = useState(query);
   const [dirError, setDirError] = useState(false);
@@ -67,6 +68,7 @@ export default function Explorer() {
     if (cohort) params.set('cohort', cohort);
     if (location) params.set('location', location);
     if (language) params.set('language', language);
+    params.set('sort', sort);
     api.get(`/directory?${params.toString()}`)
       .then(res => {
         if (cancelled) return;
@@ -81,7 +83,7 @@ export default function Explorer() {
       .catch(() => { if (!cancelled) setDirError(true); })
       .finally(() => { if (!cancelled) setDirLoading(false); });
     return () => { cancelled = true; };
-  }, [query, persona, program, cohort, location, language, page, retry]);
+  }, [query, persona, program, cohort, location, language, sort, page, retry]);
 
   function submitSearch(e) {
     e?.preventDefault();
@@ -113,8 +115,9 @@ export default function Explorer() {
                   <DirectoryFilter label={t('explorer.filterLocation')} value={location} onChange={value => setParam('location', value)} options={[{ value: '', label: t('explorer.allLocations') }, ...(facets.locations || []).map(l => ({ value: l, label: l }))]} />
                   <DirectoryFilter label={t('explorer.filterLanguage')} value={language} onChange={value => setParam('language', value)} options={[{ value: '', label: t('explorer.allLanguages') }, ...languageOptions(facets.languages, lang).map(option => ({ value: option.code, label: option.label }))]} />
                 </div>
-                <div>
+                <div className="flex flex-wrap items-center justify-between gap-3">
                   <Button type="button" size="sm" variant="ghost" onClick={() => { setInputValue(''); setSearchParams({}); }}>{t('explorer.clearFilters')}</Button>
+                  <div className="flex flex-wrap items-center gap-3"><span className="text-xs text-muted-foreground">{sort === 'name' ? t('explorer.sortName') : t(query ? 'explorer.sortSearchHint' : 'explorer.sortSkillsHint')}</span><DirectoryFilter label={t('explorer.sortLabel')} value={sort} onChange={value => setParam('sort', value)} options={[{ value: 'relevance', label: t('explorer.sortRelevance') }, { value: 'name', label: t('explorer.sortName') }]} /></div>
                 </div>
               </div>
 

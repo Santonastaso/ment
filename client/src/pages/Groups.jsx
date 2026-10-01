@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Plus, Users } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog.jsx';
+import { supabase } from '../lib/supabase.js';
 
 export default function Groups() {
   const navigate = useNavigate();
@@ -19,6 +20,11 @@ export default function Groups() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
+  const [joinTarget, setJoinTarget] = useState(null);
+  const [reason, setReason] = useState('');
+  const [reviewTarget, setReviewTarget] = useState(null);
+  const [requests, setRequests] = useState([]);
+  const [reviewLoading, setReviewLoading] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -33,10 +39,19 @@ export default function Groups() {
     }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    const refresh = () => load();
+    window.addEventListener('focus', refresh);
+    const channel = supabase.channel('groups-membership')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'group_join_requests' }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members' }, refresh)
+      .subscribe();
+    return () => { window.removeEventListener('focus', refresh); supabase.removeChannel(channel); };
+  }, []);
 
   async function createGroup() {
-    if (!name.trim()) return;
+    if (name.trim().length < 2 || saving) return;
     setSaving(true);
     setError('');
     try {
@@ -46,25 +61,59 @@ export default function Groups() {
       await load();
       setCreateOpen(false);
     } catch (e) {
-      setError(e?.response?.data?.error || t('groups.error.save'));
+      setError(t('groups.error.save'));
     } finally {
       setSaving(false);
     }
   }
 
   async function toggleMembership(group) {
+    if (saving) return;
+    if (!group.joined && group.join_status !== 'pending') {
+      setError(''); setReason(''); setJoinTarget(group);
+      return;
+    }
     setSaving(true);
     setError('');
     try {
       if (group.joined) {
         await api.delete(`/groups/${group.id}/membership`);
-      } else await api.post(`/groups/${group.id}/join`, {});
+      } else await api.delete(`/groups/${group.id}/join`);
       await load();
     } catch (e) {
-      setError(e?.response?.data?.error || t('groups.error.save'));
+      setError(t('groups.error.save'));
     } finally {
       setSaving(false);
     }
+  }
+
+  async function requestJoin(event) {
+    event.preventDefault();
+    if (!reason.trim() || saving) return;
+    setSaving(true); setError('');
+    try {
+      await api.post(`/groups/${joinTarget.id}/join`, { reason: reason.trim() });
+      await load(); setJoinTarget(null);
+    } catch { setError(t('groups.error.save')); }
+    finally { setSaving(false); }
+  }
+
+  async function openReview(group) {
+    setReviewTarget(group); setRequests([]); setReviewLoading(true); setError('');
+    try { const { data } = await api.get(`/groups/${group.id}/requests`); setRequests(data || []); }
+    catch { setError(t('groups.error.load')); }
+    finally { setReviewLoading(false); }
+  }
+
+  async function reviewRequest(request, accept) {
+    if (saving) return;
+    setSaving(true); setError('');
+    try {
+      await api.post(`/groups/${reviewTarget.id}/requests`, { user_id: request.user_id, accept });
+      setRequests(current => current.filter(item => item.user_id !== request.user_id));
+      await load();
+    } catch { setError(t('groups.error.save')); }
+    finally { setSaving(false); }
   }
 
   return (
@@ -77,6 +126,7 @@ export default function Groups() {
           action={<Button type="button" size="icon" className="size-12 rounded-xl" aria-label={t('groups.create.title')} title={t('groups.create.title')} onClick={() => { setError(''); setCreateOpen(true); }}><Plus className="size-6" /></Button>}
         />
         <SurfaceBody className="px-0 pt-2 sm:px-0">
+          {error && !createOpen && !joinTarget && !reviewTarget && <p className="text-sm text-destructive" role="alert">{error}</p>}
           {loading && groups.length === 0 ? (
             <div role="status" aria-label={t('common.loading')} className="space-y-2">
               {[0, 1, 2].map(index => (
@@ -106,6 +156,7 @@ export default function Groups() {
                   </span>
 
                   <span className="person-row-actions">
+                    {group.is_owner && group.pending_count > 0 && <button type="button" className="person-row-action" onClick={() => openReview(group)}>{t('groups.requests', { count: group.pending_count })}</button>}
                     {group.joined && (
                       <button
                         type="button"
@@ -121,9 +172,10 @@ export default function Groups() {
                       disabled={saving}
                       onClick={() => toggleMembership(group)}
                     >
-                      {group.joined ? t('groups.leave') : t('groups.join')}
+                      {group.joined ? t('groups.leave') : group.join_status === 'pending' ? t('groups.withdraw') : t('groups.requestJoin')}
                     </button>
                   </span>
+                  {!group.joined && group.join_status && <span className="person-row-detail text-sm text-muted-foreground">{t(`groups.joinStatus.${group.join_status}`)}</span>}
                 </article>
               ))}
             </div>
@@ -131,7 +183,7 @@ export default function Groups() {
         </SurfaceBody>
       </Surface>
 
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+      <Dialog open={createOpen} onOpenChange={open => { if (!saving) setCreateOpen(open); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t('groups.create.title')}</DialogTitle>
@@ -148,9 +200,32 @@ export default function Groups() {
             </div>
             {error && <p className="text-sm text-rose-600" role="alert">{error}</p>}
             <div className="flex justify-end">
-              <Button type="submit" disabled={saving || !name.trim()}>{saving ? t('groups.saving') : t('groups.create.submit')}</Button>
+              <Button type="submit" disabled={saving || name.trim().length < 2}>{saving ? t('groups.saving') : t('groups.create.submit')}</Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={!!joinTarget} onOpenChange={open => { if (!open && !saving) setJoinTarget(null); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{t('groups.requestJoin')} · {joinTarget?.name}</DialogTitle><DialogDescription>{t('groups.joinDescription')}</DialogDescription></DialogHeader>
+          <form className="grid gap-4" onSubmit={requestJoin}>
+            <label htmlFor="group-reason" className="label">{t('groups.reason')}</label>
+            <textarea id="group-reason" autoFocus className="input min-h-24" value={reason} maxLength={500} onChange={event => setReason(event.target.value)} required />
+            {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+            <Button type="submit" disabled={saving || !reason.trim()}>{saving ? t('groups.saving') : t('groups.sendRequest')}</Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={!!reviewTarget} onOpenChange={open => { if (!open && !saving) setReviewTarget(null); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{reviewTarget?.name}</DialogTitle><DialogDescription>{t('groups.reviewDescription')}</DialogDescription></DialogHeader>
+          {reviewLoading ? <p role="status">{t('common.loading')}</p> : requests.length === 0 ? <p>{t('groups.noRequests')}</p> : requests.map(request => (
+            <article key={request.user_id} className="grid gap-2 border-b py-3">
+              <strong>{request.name}</strong><p className="whitespace-pre-wrap text-sm">{request.reason}</p>
+              <div className="flex gap-2"><Button disabled={saving} onClick={() => reviewRequest(request, true)}>{t('groups.approve')}</Button><Button variant="outline" disabled={saving} onClick={() => reviewRequest(request, false)}>{t('groups.decline')}</Button></div>
+            </article>
+          ))}
+          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         </DialogContent>
       </Dialog>
     </PageShell>

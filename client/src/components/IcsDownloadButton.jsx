@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import api from '../api/index.js';
+import api, { invokeUserFunction } from '../api/index.js';
 import { buildSessionIcs, downloadIcs } from '../lib/ics.js';
-import { supabase } from '../lib/supabase.js';
 import { useT } from '../i18n/index.jsx';
 
 
@@ -17,31 +16,38 @@ async function providerErrorMessage(error, t) {
   if (code === 'calendar_provider_not_configured' || code === 'calendar_not_configured') {
     return t('components.ics.notConfigured');
   }
-  if (code === 'calendar_not_connected') return t('components.ics.reconnect');
+  if (code === 'calendar_not_connected' || code === 'calendar_reconnect_required') return t('components.ics.reconnect');
+  if (code === 'calendar_event_owner_only') return t('components.ics.ownerOnly');
   return t('components.ics.connectFailed');
 }
 
 export default function IcsDownloadButton({ sessionId, session, className = '', label, meetingUrl, onReschedule }) {
   const { t } = useT();
   const [connections, setConnections] = useState([]);
+  const [providers, setProviders] = useState([]);
   const [loading, setLoading] = useState('');
   const [created, setCreated] = useState(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    supabase.functions.invoke('calendar-provider', { body: { action: 'status' } })
+    let cancelled = false;
+    setCreated(null); setError('');
+    invokeUserFunction('calendar-provider', { action: 'status' })
       .then(({ data, error: invokeError }) => {
-        if (invokeError || data?.error) throw new Error(data?.error || invokeError.message);
+        if (invokeError || data?.error) throw invokeError || new Error(data.error);
+        if (cancelled) return;
         setConnections(data.connections || []);
+        setProviders(data.providers || []);
       })
-      .catch(() => setConnections([]));
-  }, []);
+      .catch(() => { if (!cancelled) { setConnections([]); setProviders([]); } });
+    return () => { cancelled = true; };
+  }, [sessionId, session?.scheduled_at]);
 
   async function connect(provider) {
     setLoading(provider); setError('');
     try {
-      const { data, error: invokeError } = await supabase.functions.invoke('calendar-provider', { body: { action: 'authorization_url', provider } });
-      if (invokeError || data?.error) throw new Error(data?.error || invokeError.message);
+      const { data, error: invokeError } = await invokeUserFunction('calendar-provider', { action: 'authorization_url', provider, session_id: sessionId });
+      if (invokeError || data?.error) throw invokeError || new Error(data.error);
       window.location.assign(data.url);
     } catch (requestError) {
       setError(await providerErrorMessage(requestError, t));
@@ -52,8 +58,8 @@ export default function IcsDownloadButton({ sessionId, session, className = '', 
   async function createEvent(provider) {
     setLoading(provider); setError('');
     try {
-      const { data, error: invokeError } = await supabase.functions.invoke('calendar-provider', { body: { action: 'create_event', provider, session_id: sessionId } });
-      if (invokeError || data?.error) throw new Error(data?.error || invokeError.message);
+      const { data, error: invokeError } = await invokeUserFunction('calendar-provider', { action: 'create_event', provider, session_id: sessionId });
+      if (invokeError || data?.error) throw invokeError || new Error(data.error);
       setCreated(data);
     } catch (requestError) {
       setError(await providerErrorMessage(requestError, t));
@@ -72,21 +78,20 @@ export default function IcsDownloadButton({ sessionId, session, className = '', 
       const slug = (peer?.name || 'ment').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
       downloadIcs(`chat-with-${slug}.ics`, buildSessionIcs(current, current.mentor, current.mentee, { summary }));
     } catch {
-      setError('Could not download the calendar file.');
+      setError(t('components.ics.downloadFailed'));
     } finally { setLoading(''); }
   }
 
   const connected = new Set(connections.map((item) => item.provider));
   return <div className="calendar-action">
     <details className="calendar-more">
-      <summary className={className}>{created ? 'Meeting ready' : (label || t('components.ics.addToCalendar'))}</summary>
+      <summary className={className}>{created ? t('components.ics.ready') : (label || t('components.ics.addToCalendar'))}</summary>
       <div className="calendar-more-menu">
-        {(created?.join_url || meetingUrl) && <a href={created?.join_url || meetingUrl} target="_blank" rel="noreferrer">Join meeting</a>}
-        {onReschedule && <button type="button" onClick={onReschedule}>Change time</button>}
-        {connected.has('google') ? <button type="button" disabled={!!loading} onClick={() => createEvent('google')}>{loading === 'google' ? 'Adding…' : 'Add with Google'}</button> : <button type="button" disabled={!!loading} onClick={() => connect('google')}>Connect Google Calendar</button>}
-        {connected.has('microsoft') ? <button type="button" disabled={!!loading} onClick={() => createEvent('microsoft')}>{loading === 'microsoft' ? 'Adding…' : 'Add with Outlook'}</button> : <button type="button" disabled={!!loading} onClick={() => connect('microsoft')}>Connect Outlook</button>}
-        <button type="button" disabled={!!loading} onClick={download}>{loading === 'ics' ? 'Downloading…' : 'Download .ics'}</button>
-        {created?.html_url && <a href={created.html_url} target="_blank" rel="noreferrer">Open calendar event</a>}
+        {(created?.join_url || meetingUrl) && <a href={created?.join_url || meetingUrl} target="_blank" rel="noreferrer">{t('components.ics.join')}</a>}
+        {onReschedule && <button type="button" onClick={onReschedule}>{t('components.ics.changeTime')}</button>}
+        {providers.map(provider => <button key={provider} type="button" disabled={!!loading} onClick={() => connected.has(provider) ? createEvent(provider) : connect(provider)}>{loading === provider ? t('common.loading') : t(`components.ics.${connected.has(provider) ? 'add' : 'connect'}.${provider}`)}</button>)}
+        <button type="button" disabled={!!loading} onClick={download}>{loading === 'ics' ? t('components.ics.downloading') : t('components.ics.download')}</button>
+        {created?.html_url && <a href={created.html_url} target="_blank" rel="noreferrer">{t('components.ics.openEvent')}</a>}
       </div>
     </details>
     {error && <p className="w-full text-xs text-destructive" role="status" aria-live="polite">{error}</p>}
