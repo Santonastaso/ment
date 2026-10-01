@@ -3,12 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import SkillTagInput from '../components/SkillTagInput.jsx';
 import TeachSkillsEditor from '../components/TeachSkillsEditor.jsx';
-import MonthYearPicker from '../components/MonthYearPicker.jsx';
+import CareerEntryFields, { DEPARTMENTS } from '../components/CareerEntryFields.jsx';
+import { Field } from '../components/ui/field.jsx';
+import { hasPlaceholderName, onboardingErrorKey } from '../lib/onboarding.mjs';
+import { Check } from 'lucide-react';
 import api from '../api/index.js';
 import { useT } from '../i18n/index.jsx';
 import { Button } from '../components/ui/button.jsx';
-
-const DEPARTMENTS = ['Engineering', 'Finance', 'Marketing', 'Operations', 'HR', 'Legal', 'Product', 'Design', 'Sales', 'Other'];
 
 function SuggestedPill() {
   const { t } = useT();
@@ -36,10 +37,11 @@ export default function Onboarding({ returnTo }) {
   const [suggested, setSuggested] = useState(() => new Set());
 
   // Step 1 — Background
-  const [name] = useState(user?.name || ''); // read-only — users cannot change their name
-  const [persona, setPersona] = useState('student');
-  const [program, setProgram] = useState('');
-  const [cohortYear, setCohortYear] = useState('');
+  const nameLocked = !!user?.external_source && !hasPlaceholderName(user?.name, user?.email);
+  const [name, setName] = useState(hasPlaceholderName(user?.name, user?.email) ? '' : user?.name || '');
+  const [persona, setPersona] = useState(user?.role === 'alumnus' ? 'alumnus' : 'student');
+  const [program, setProgram] = useState(user?.program || '');
+  const [cohortYear, setCohortYear] = useState(user?.cohort_year || '');
   const [department, setDepartment] = useState(user?.department || '');
   const [currentRole, setCurrentRole] = useState(user?.current_role || '');
   const [location, setLocation] = useState(user?.location || '');
@@ -70,10 +72,6 @@ export default function Onboarding({ returnTo }) {
     };
   }
 
-  function updateCareer(idx, field, value) {
-    setCareer(career.map((c, i) => i === idx ? { ...c, [field]: value } : c));
-  }
-
   function removeCareer(idx) {
     setCareer(career.filter((_, i) => i !== idx));
   }
@@ -92,6 +90,7 @@ export default function Onboarding({ returnTo }) {
         role: ch.role || ch.role_title || '',
         department: ch.department || '',
         company: ch.company || '',
+        description: ch.description || '',
         start_date: monthYearToPicker(ch.start_year, ch.start_month),
         end_date: monthYearToPicker(ch.end_year, ch.end_month),
       })));
@@ -110,7 +109,11 @@ export default function Onboarding({ returnTo }) {
   }
 
   async function handleUpload(file) {
-    if (!file) return;
+    if (!file || uploading) return;
+    if (file.size > 10 * 1024 * 1024 || !/\.(pdf|docx|txt)$/i.test(file.name)) {
+      setError(t('onboarding.import.error'));
+      return;
+    }
     if (!aiConsent) {
       setError(t('onboarding.import.consentRequired'));
       return;
@@ -128,13 +131,15 @@ export default function Onboarding({ returnTo }) {
       applyProposed(res.data.proposed, res.data.classifier_source);
       setStep(1);
     } catch (e) {
-      setError(e.response?.data?.error || t('onboarding.import.error'));
+      setError(t(onboardingErrorKey(e, true)));
     } finally {
       setUploading(false);
     }
   }
 
   async function handleFinish() {
+    if (saving) return;
+    if (!name.trim()) { setError(t('onboarding.error.nameRequired')); setStep(1); return; }
     setSaving(true);
     setError('');
     try {
@@ -147,6 +152,7 @@ export default function Onboarding({ returnTo }) {
             role: c.role,
             department: c.department,
             company: c.company,
+            description: c.description || '',
             start_year: s.year,
             start_month: s.month,
             end_year: e.year,
@@ -178,7 +184,7 @@ export default function Onboarding({ returnTo }) {
       updateUser(res.data);
       navigate(returnTo || '/');
     } catch (e) {
-      setError(e.response?.data?.error || t('onboarding.error.generic'));
+      setError(t(onboardingErrorKey(e)));
     } finally {
       setSaving(false);
     }
@@ -201,7 +207,7 @@ export default function Onboarding({ returnTo }) {
             <React.Fragment key={s}>
               <div className={`flex items-center gap-1 shrink-0 ${step >= s ? 'text-foreground' : 'text-muted-foreground'}`}>
                 <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold border-2 ${step > s ? 'bg-primary border-primary text-white' : step === s ? 'border-primary text-foreground' : 'border-[var(--input)] text-muted-foreground'}`}>
-                  {step > s ? '✓“' : s + 1}
+                  {step > s ? <Check className="size-4" aria-hidden="true" /> : s + 1}
                 </div>
                 <span className="text-xs font-medium hidden md:block">
                   {s === 0 ? t('onboarding.steps.import') : s === 1 ? t('onboarding.steps.background') : s === 2 ? t('onboarding.steps.teach') : t('onboarding.steps.learn')}
@@ -213,9 +219,9 @@ export default function Onboarding({ returnTo }) {
         </div>
 
         <div key={step} className="onboarding-step-content card p-6 space-y-6">
-          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="note">
+          {draftId && <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="note">
             {t('onboarding.import.reviewNotice')}
-          </p>
+          </p>}
           {step === 0 && (
             <>
               <div>
@@ -262,10 +268,9 @@ export default function Onboarding({ returnTo }) {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="sm:col-span-2">
-                  <label className="label">{t('onboarding.fields.fullName')}</label>
-                  <input className="input" value={name} disabled readOnly />
-                  <p className="mt-1 text-xs text-muted-foreground">{t('onboarding.fields.nameLocked')}</p>
+                  <Field label={t('onboarding.fields.fullName')} value={name} onChange={event => setName(event.target.value)} readOnly={nameLocked} maxLength={160} hint={nameLocked ? t('onboarding.fields.nameLocked') : undefined} />
                 </div>
+                <h3 className="sm:col-span-2 text-base font-medium pt-3">{t('onboarding.background.academic')}</h3>
                 <div className="sm:col-span-2">
                   <label className="label">{t('onboarding.persona.title')}</label>
                   <div className="flex gap-2">
@@ -291,6 +296,7 @@ export default function Onboarding({ returnTo }) {
                   <input className="input" type="number" min="1900" max="2100" value={cohortYear} onChange={e => setCohortYear(e.target.value)} placeholder="2024" />
                 </div>
                 <div className="sm:col-span-2">
+                  <h3 className="text-base font-medium mt-5 mb-4">{t('onboarding.background.work')}</h3>
                   <label className="label">{t('onboarding.fields.department')}{suggested.has('department') && <SuggestedPill source={classifierSource} />}</label>
                   <select className="input" value={department} onChange={e => setDepartment(e.target.value)}>
                     <option value="">{t('onboarding.fields.selectDepartment')}</option>
@@ -326,24 +332,7 @@ export default function Onboarding({ returnTo }) {
                 <div className="space-y-3">
                   {career.map((c, i) => (
                     <div key={i} className="bg-muted rounded-lg p-3 space-y-2">
-                      <div className="grid grid-cols-2 gap-2">
-                        <input className="input text-sm" placeholder={t('onboarding.career.roleTitle')} value={c.role} onChange={e => updateCareer(i, 'role', e.target.value)} />
-                        <select className="input text-sm" value={c.department} onChange={e => updateCareer(i, 'department', e.target.value)}>
-                          <option value="">{t('onboarding.fields.department')}</option>
-                          {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
-                        </select>
-                        <input className="input text-sm" placeholder={t('onboarding.career.companyOptional')} value={c.company} onChange={e => updateCareer(i, 'company', e.target.value)} />
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="block text-[10px] text-ink-tertiary mb-1">{t('onboarding.career.from')}</label>
-                          <MonthYearPicker value={c.start_date} onChange={(v) => updateCareer(i, 'start_date', v)} />
-                        </div>
-                        <div>
-                          <label className="block text-[10px] text-ink-tertiary mb-1">{t('onboarding.career.to')} <span className="text-ink-tertiary/70">{t('onboarding.career.toHint')}</span></label>
-                          <MonthYearPicker value={c.end_date} onChange={(v) => updateCareer(i, 'end_date', v)} />
-                        </div>
-                      </div>
+                      <CareerEntryFields value={c} onChange={next => setCareer(current => current.map((entry, index) => index === i ? next : entry))} />
                       {career.length > 1 && (
                         <button type="button" onClick={() => removeCareer(i)} className="text-xs text-red-400 hover:text-red-600">{t('onboarding.career.remove')}</button>
                       )}
@@ -393,13 +382,13 @@ export default function Onboarding({ returnTo }) {
 
           <div className="flex justify-between pt-2">
             {step > 0 ? (
-              <Button onClick={() => setStep(s => s - 1)} variant="outline">{t('onboarding.nav.back')}</Button>
+              <Button onClick={() => { setError(''); setStep(s => s - 1); }} variant="outline" disabled={saving || uploading}>{t('onboarding.nav.back')}</Button>
             ) : <div />}
 
             {step === 0 ? (
-              <Button onClick={() => setStep(1)}>{t('onboarding.nav.skip')}</Button>
+              <Button onClick={() => { setError(''); setStep(1); }} disabled={uploading}>{t('onboarding.nav.skip')}</Button>
             ) : step < 3 ? (
-              <Button onClick={() => setStep(s => s + 1)}>
+              <Button onClick={() => { setError(''); setStep(s => s + 1); }}>
                 {t('onboarding.nav.continue')}
               </Button>
             ) : (

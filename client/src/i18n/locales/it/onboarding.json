@@ -1,4 +1,11 @@
 {
+  "onboarding.background.academic": "Percorso universitario",
+  "onboarding.background.work": "Esperienza professionale",
+  "onboarding.error.session": "La sessione è scaduta. Accedi di nuovo e riprova.",
+  "onboarding.error.unavailable": "Il salvataggio del profilo è temporaneamente indisponibile. I dati restano su questa pagina.",
+  "onboarding.error.busy": "Riprova tra un momento.",
+  "onboarding.error.nameRequired": "Inserisci il tuo nome completo prima di terminare.",
+  "onboarding.import.unavailable": "L'importazione è temporaneamente indisponibile. Puoi inserire i dati manualmente.",
   "onboarding.header.title": "Configura il tuo profilo",
   "onboarding.header.subtitle": "Pochi passaggi per abbinarti ai mentor giusti.",
   "onboarding.steps.import": "Importa",

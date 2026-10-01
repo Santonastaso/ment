@@ -7,7 +7,7 @@ import SkillCloud, { SkillCloudFilters } from '../components/SkillCloud.jsx';
 import { Field } from '../components/ui/field.jsx';
 import SessionRequestModal from '../components/SessionRequestModal.jsx';
 
-import MonthYearPicker from '../components/MonthYearPicker.jsx';
+import CareerEntryFields from '../components/CareerEntryFields.jsx';
 import ProfileReflection from '../components/ProfileReflection.jsx';
 import { PageShell } from '../components/PageShell.jsx';
 import { Surface, SurfaceBody, SurfaceHeader } from '../components/Surface.jsx';
@@ -749,51 +749,7 @@ export default function Profile() {
 
         {isOwnProfile && showAddCareer && (
           <div className="career-entry-form mb-5">
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              <Field
-                label={t('profile.career.roleTitle')}
-                value={newCareer.role}
-                onChange={e => setNewCareer(c => ({ ...c, role: e.target.value }))}
-              />
-              <Field
-                label={t('profile.career.department')}
-                as="select"
-                value={newCareer.department}
-                onChange={e => setNewCareer(c => ({ ...c, department: e.target.value }))}
-              >
-                <option value="">—</option>
-                {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
-              </Field>
-              <Field
-                label={t('profile.career.company')}
-                value={newCareer.company}
-                onChange={e => setNewCareer(c => ({ ...c, company: e.target.value }))}
-              />
-              <div className="career-period">
-                <span className="career-period-label">{t('profile.career.from')}</span>
-                <MonthYearPicker
-                  value={newCareer.start_date}
-                  onChange={(v) => setNewCareer(c => ({ ...c, start_date: v }))}
-                />
-              </div>
-              <div className="career-period sm:col-span-2 lg:col-span-1">
-                <span className="career-period-label">
-                  {t('profile.career.to')} <em>{t('profile.career.toHint')}</em>
-                </span>
-                <MonthYearPicker
-                  value={newCareer.end_date}
-                  onChange={(v) => setNewCareer(c => ({ ...c, end_date: v }))}
-                />
-              </div>
-              <Field
-                label={t('profile.career.description')}
-                as="textarea"
-                placeholder={t('profile.career.descPlaceholder')}
-                value={newCareer.description}
-                onChange={e => setNewCareer(c => ({ ...c, description: e.target.value }))}
-                className="sm:col-span-2 lg:col-span-3"
-              />
-            </div>
+            <CareerEntryFields value={newCareer} onChange={setNewCareer} />
             <Button size="sm" onClick={handleAddCareer}>{t('profile.career.add')}</Button>
           </div>
         )}
@@ -811,51 +767,7 @@ export default function Profile() {
             {group.entries.map(entry => (
               editingCareerId === entry.id && editCareerDraft ? (
                 <div key={entry.id} className="career-entry-form">
-                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                    <Field
-                      label={t('profile.career.roleTitle')}
-                      value={editCareerDraft.role}
-                      onChange={e => setEditCareerDraft(d => ({ ...d, role: e.target.value }))}
-                    />
-                    <Field
-                      label={t('profile.career.department')}
-                      as="select"
-                      value={editCareerDraft.department}
-                      onChange={e => setEditCareerDraft(d => ({ ...d, department: e.target.value }))}
-                    >
-                      <option value="">—</option>
-                      {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
-                    </Field>
-                    <Field
-                      label={t('profile.career.company')}
-                      value={editCareerDraft.company}
-                      onChange={e => setEditCareerDraft(d => ({ ...d, company: e.target.value }))}
-                    />
-                    <div className="career-period">
-                      <span className="career-period-label">{t('profile.career.from')}</span>
-                      <MonthYearPicker
-                        value={editCareerDraft.start_date}
-                        onChange={(v) => setEditCareerDraft(d => ({ ...d, start_date: v }))}
-                      />
-                    </div>
-                    <div className="career-period sm:col-span-2 lg:col-span-1">
-                      <span className="career-period-label">
-                        {t('profile.career.to')} <em>{t('profile.career.toHint')}</em>
-                      </span>
-                      <MonthYearPicker
-                        value={editCareerDraft.end_date}
-                        onChange={(v) => setEditCareerDraft(d => ({ ...d, end_date: v }))}
-                      />
-                    </div>
-                    <Field
-                      label={t('profile.career.description')}
-                      as="textarea"
-                      placeholder={t('profile.career.descPlaceholder')}
-                      value={editCareerDraft.description}
-                      onChange={e => setEditCareerDraft(d => ({ ...d, description: e.target.value }))}
-                      className="sm:col-span-2 lg:col-span-3"
-                    />
-                  </div>
+                  <CareerEntryFields value={editCareerDraft} onChange={setEditCareerDraft} />
                   <div className="flex gap-2">
                     <Button size="sm" onClick={handleSaveEditedCareer}>{t('profile.btn.save')}</Button>
                     <Button size="sm" variant="ghost" onClick={cancelEditCareer}>{t('profile.btn.cancel')}</Button>

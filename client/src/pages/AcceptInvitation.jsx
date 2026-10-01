@@ -25,7 +25,10 @@ export default function AcceptInvitation() {
     setSubmitting(true);
     try {
       const { data, error: invokeError } = await supabase.functions.invoke('accept-invitation', { body: { token, password } });
-      if (invokeError) throw new Error(data?.error || invokeError.message);
+      if (invokeError || data?.error) {
+        const details = data || await invokeError?.context?.clone().json().catch(() => null);
+        throw new Error(details?.error || invokeError?.message);
+      }
       const signIn = await supabase.auth.signInWithPassword({ email: data.email, password });
       if (signIn.error) throw signIn.error;
       navigate('/onboarding', { replace: true });

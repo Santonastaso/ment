@@ -36,6 +36,16 @@ async function edgeFunctionError(error, data, fallback) {
   );
 }
 
+async function invokeUserFunction(name, body) {
+  let result = await supabase.functions.invoke(name, { body });
+  if (result.error?.context?.status === 401 || result.data?.error === 'invalid_token') {
+    const { error } = await supabase.auth.refreshSession();
+    if (error) throw new ApiError('auth_required', 401);
+    result = await supabase.functions.invoke(name, { body });
+  }
+  return result;
+}
+
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 async function getViewerId() {
@@ -938,10 +948,11 @@ async function post(url, body = {}, opts = {}) {
     const kind = body.get('kind') || 'performance_review';
     if (!file) throw new ApiError('no_file', 400);
     const path = await uploadToStorage('profile-uploads', viewer.id, file);
-    const { data, error } = await supabase.functions.invoke('profile-ingest', {
-      body: { storage_path: path, kind, lang: browserLanguage() },
-    });
-    if (error || data?.error) throw await edgeFunctionError(error, data, 'profile_ingest_failed');
+    const { data, error } = await invokeUserFunction('profile-ingest', { storage_path: path, kind, lang: browserLanguage() });
+    if (error || data?.error) {
+      await supabase.storage.from('profile-uploads').remove([path]);
+      throw await edgeFunctionError(error, data, 'profile_ingest_failed');
+    }
     return ok(data);
   }
 

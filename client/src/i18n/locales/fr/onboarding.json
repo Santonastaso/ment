@@ -1,4 +1,11 @@
 {
+  "onboarding.background.academic": "Parcours universitaire",
+  "onboarding.background.work": "Expérience professionnelle",
+  "onboarding.error.session": "Votre session a expiré. Reconnectez-vous et réessayez.",
+  "onboarding.error.unavailable": "L'enregistrement du profil est temporairement indisponible. Vos informations sont conservées sur cette page.",
+  "onboarding.error.busy": "Veuillez réessayer dans un instant.",
+  "onboarding.error.nameRequired": "Saisissez votre nom complet avant de terminer.",
+  "onboarding.import.unavailable": "L'import est temporairement indisponible. Vous pouvez saisir vos informations manuellement.",
   "onboarding.header.title": "Set up your profile",
   "onboarding.header.subtitle": "A few steps so we can match you with mentors.",
   "onboarding.steps.import": "Import",
