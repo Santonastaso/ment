@@ -78,6 +78,7 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
 
@@ -97,6 +98,21 @@ jobs:
           VITE_SUPABASE_ANON_KEY: build_only_placeholder
 
       - run: npm audit --prefix client --audit-level=high
+
+      - name: Install test browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Verify user journeys with isolated fixtures
+        run: npm run test:browser
+
+      - name: Preserve browser failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-failures
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
 
   database:
     runs-on: ubuntu-latest

@@ -11,6 +11,9 @@
     "build": "npm run build --prefix client",
     "check": "npm run check:i18n && npm run check:migrations && npm test && npm run build",
     "test": "node --test scripts/*.test.mjs",
+    "test:browser": "playwright test",
+    "test:ai": "node --test scripts/discovery-agent.test.mjs",
+    "eval:ai": "node scripts/discovery-eval.mjs",
     "lint": "supabase db lint --linked",
     "deploy:functions": "supabase functions deploy",
     "check:i18n": "node scripts/check-i18n-coverage.mjs",
@@ -18,6 +21,7 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
+    "@playwright/test": "1.63.0",
     "supabase": "2.119.0"
   }
 }
