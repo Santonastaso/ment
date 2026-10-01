@@ -4,7 +4,7 @@ import { aiErrorResponse, mistralJson } from '../_shared/mistral.ts';
 import { enforceRateLimit } from '../_shared/rate-limit.ts';
 import { canHelpWithCareerGoal, hasGroundedExpertise } from '../_shared/discovery-guards.mjs';
 
-const PROMPT_VERSION = 'discovery-v6';
+const PROMPT_VERSION = 'discovery-v7';
 
 type Candidate = {
   id: string;
@@ -19,6 +19,8 @@ type Candidate = {
   bio?: string | null;
   linkedin_headline?: string | null;
   skills: string[];
+  experience: string[];
+  experience_facts: string[];
 };
 
 const cleanText = (value: unknown, max = 2000) => String(value || '').trim().slice(0, max);
@@ -110,9 +112,19 @@ function normalizeRanked(item: RankedMatch | null | undefined): RankedMatch {
   };
 }
 
+// The guard asks whether the model cited a fact the candidate actually supplied.
+// Past role titles and employers are such facts, so they belong in that set --
+// without them a correct citation of a previous role is discarded as ungrounded.
+function grounding(candidate: Candidate): Candidate {
+  return { ...candidate, skills: [...(candidate.skills || []), ...(candidate.experience_facts || [])] };
+}
+
 function publicCandidate(candidate: Candidate, ranked?: RankedMatch, redactIdentity = false) {
   const pool = [...new Set([...(candidate.skills || []), redactIdentity ? null : candidate.job_title, candidate.department].filter(Boolean))].slice(0, EXPERTISE_POOL);
-  const allowedExpertise = new Map(pool.map((item) => [String(item).toLowerCase(), String(item)]));
+  // Past roles and employers are citable evidence but are not "expertise", so
+  // they widen what matched_expertise may copy without widening what is shown.
+  const allowedExpertise = new Map([...pool, ...(redactIdentity ? [] : candidate.experience_facts || [])]
+    .map((item) => [String(item).toLowerCase(), String(item)]));
   const matchedExpertise = Array.isArray(ranked?.matched_expertise)
     ? ranked.matched_expertise.map((item) => allowedExpertise.get(cleanText(item, 100).toLowerCase())).filter(Boolean).slice(0, EXPERTISE_ON_CARD)
     : [];
@@ -128,6 +140,8 @@ function publicCandidate(candidate: Candidate, ranked?: RankedMatch, redactIdent
     // seniority, so the matcher has to be able to honour them when the user
     // does supply them. Kept for redacted candidates, at the same granularity
     // as department, which redaction already keeps.
+    // Employer plus role identifies a person, so redacted candidates keep none.
+    experience: redactIdentity ? [] : (candidate.experience || []),
     location: candidate.location,
     seniority: candidate.seniority,
     tenure_years: candidate.tenure_years,
@@ -389,6 +403,8 @@ Choose exactly one outcome:
 1. "matches": only when at least one candidate has direct, explicit evidence for the clarified request.
 2. "no_match": when no candidate has direct evidence for the clarified request.
 
+Each candidate may carry "experience": their past roles, employers and what they worked on, most recent first. Treat it as evidence equal to their current role, since someone who did the work earlier still did it. Never infer from it that they are hiring or have an opening.
+
 Each candidate also carries location, seniority and tenure_years. These are filters, never evidence of expertise: apply one only when the request actually asks for it, and never let it stand in for the profession, function or skill being sought. They must never appear in matched_expertise.
 
 For an internship or job-search goal, select a person who can help with that goal in the explicit requested domain, not another intern merely because their title includes intern. A finance internship request requires explicit finance-related professional or recruitment expertise, not unrelated luxury or marketing experience. Never claim the person is hiring or has an opening unless supplied facts explicitly say so.
@@ -409,7 +425,7 @@ Bad: "Department explicitly Finance; title matches Finance Director requirement"
 Good: "Finance Director who teaches three-statement modelling and board reporting"
 Good: "Runs pricing for a retail group and coaches on category management"
 
-For matches, confidence must be at least 0.75 and matched_expertise must copy an exact supplied skill, job title, department, program, or LinkedIn headline. Return at most three matches in best-first order. Never output an ID not present in candidates.`,
+For matches, confidence must be at least 0.75 and matched_expertise must copy an exact supplied skill, job title, department, program, LinkedIn headline, past role title, or employer name. Return at most three matches in best-first order. Never output an ID not present in candidates.`,
       user: JSON.stringify({ request: requestForMatch, candidates: candidates.map((candidate) => candidateForModel(candidate, redactInterOrg && !established.has(candidate.id))) }),
       temperature: 0,
       maxTokens: 700,
@@ -423,7 +439,7 @@ For matches, confidence must be at least 0.75 and matched_expertise must copy an
       const id = cleanText(item?.profile_id, 100);
       const candidate = candidates.find((entry) => entry.id === id);
       const confidence = Number(item?.confidence);
-      if (!candidate || seen.has(id) || !Number.isFinite(confidence) || confidence < 0.75 || !hasGroundedExpertise(candidate, item) || !canHelpWithCareerGoal(candidate, requestForMatch)) return [];
+      if (!candidate || seen.has(id) || !Number.isFinite(confidence) || confidence < 0.75 || !hasGroundedExpertise(grounding(candidate), item) || !canHelpWithCareerGoal(candidate, requestForMatch)) return [];
       seen.add(id);
       return [publicCandidate(candidate, item, redactInterOrg && !established.has(candidate.id))];
     }).slice(0, 3);

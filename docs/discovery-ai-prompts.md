@@ -63,7 +63,11 @@ Employer is never asked about: it is not a column on `profiles`, so no answer to
 
 ## Matching
 
-After clarification, the search request and eligible candidates are sent as JSON with `request` and `candidates`. Candidates are filtered before this model call: same organization, onboarded and active, not the requester, not already connected/requested, not paused or temporarily unavailable, and still within weekly and monthly meeting limits. The model receives each candidate's ID, name, role, department, program, LinkedIn headline, location, seniority, `tenure_years`, and their expertise items derived from skills, role and department. It does not receive profile bio text, `background` or `cohort_year`: the first two only restate fields already present, and the prompt forbids leaning on the third.
+After clarification, the search request and eligible candidates are sent as JSON with `request` and `candidates`.
+
+Retrieval happens in `public.discovery_candidates`, which ranks the eligible network by `ts_rank` over job title, department and skill vocabulary (weight A) and programme, location, bio and career history (weight B) before bounding the payload. The bound is 250, raised from 100: ranking made the cut sensible rather than arbitrary, but 100 against 216 eligible members still left a third of the network unreachable for any single query.
+
+Candidates carry `experience`: up to three past roles from `career_history`, each a compact line of role, employer, years and what they worked on, most recent first. The prompt treats it as evidence equal to the current role, and forbids inferring from it that anyone is hiring. `matched_expertise` may cite a past role title or employer, so `hasGroundedExpertise` is given those atoms via `grounding()` -- otherwise a correct citation of a previous role is discarded as ungrounded. Both are withheld from candidates redacted for inter-org browsing, since employer plus role identifies a person. Candidates are filtered before this model call: same organization, onboarded and active, not the requester, not already connected/requested, not paused or temporarily unavailable, and still within weekly and monthly meeting limits. The model receives each candidate's ID, name, role, department, program, LinkedIn headline, location, seniority, `tenure_years`, and their expertise items derived from skills, role and department. It does not receive profile bio text, `background` or `cohort_year`: the first two only restate fields already present, and the prompt forbids leaning on the third.
 
 `expertise` is capped at `EXPERTISE_POOL` (6) for the model and `EXPERTISE_ON_CARD` (3) for the rendered card. The two differ on purpose: a reason can only be as specific as the facts behind it, so the model is sent the whole vocabulary, while the card shows just the items it matched on. When the cap was 3 for both, the model frequently had nothing left to cite but the job title and wrote reasons about the matching rather than the person.
 
@@ -80,7 +84,11 @@ Choose exactly one outcome:
 1. "matches": only when at least one candidate has direct, explicit evidence for the clarified request.
 2. "no_match": when no candidate has direct evidence for the clarified request.
 
+Each candidate may carry "experience": their past roles, employers and what they worked on, most recent first. Treat it as evidence equal to their current role, since someone who did the work earlier still did it. Never infer from it that they are hiring or have an opening.
+
 Each candidate also carries location, seniority and tenure_years. These are filters, never evidence of expertise: apply one only when the request actually asks for it, and never let it stand in for the profession, function or skill being sought. They must never appear in matched_expertise.
+
+For an internship or job-search goal, select a person who can help with that goal in the explicit requested domain, not another intern merely because their title includes intern. A finance internship request requires explicit finance-related professional or recruitment expertise, not unrelated luxury or marketing experience. Never claim the person is hiring or has an opening unless supplied facts explicitly say so.
 
 An explicit profession or domain is not ambiguous. If the user asks for a medical professional and no candidate has supplied medical or clinical credentials, return no_match. Do not ask whether they mean doctor, nurse, or another adjacent role. Do not substitute transferable skills, location, general seniority, or a merely adjacent profession. If your reason needs a caveat like "no direct experience, but...", that person is not a match. False positives are worse than returning no match.
 
@@ -98,7 +106,7 @@ Bad: "Department explicitly Finance; title matches Finance Director requirement"
 Good: "Finance Director who teaches three-statement modelling and board reporting"
 Good: "Runs pricing for a retail group and coaches on category management"
 
-For matches, confidence must be at least 0.75 and matched_expertise must copy an exact supplied skill, job title, department, program, or LinkedIn headline. Return at most three matches in best-first order. Never output an ID not present in candidates.
+For matches, confidence must be at least 0.75 and matched_expertise must copy an exact supplied skill, job title, department, program, LinkedIn headline, past role title, or employer name. Return at most three matches in best-first order. Never output an ID not present in candidates.
 ```
 
 ## Drafting
