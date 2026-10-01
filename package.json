@@ -3,12 +3,13 @@
   "version": "2.0.0",
   "private": true,
   "engines": {
-    "node": ">=20"
+    "node": ">=24"
   },
   "scripts": {
     "postinstall": "npm ci --prefix client",
     "dev": "npm run dev --prefix client",
     "build": "npm run build --prefix client",
+    "check": "npm run check:i18n && npm run check:migrations && npm test && npm run build",
     "test": "node --test scripts/*.test.mjs",
     "lint": "supabase db lint --linked",
     "deploy:functions": "supabase functions deploy",

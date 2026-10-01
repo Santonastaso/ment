@@ -27,8 +27,7 @@ member records.
 
 ## 2. Staging verification
 
-1. Run `npm test`, `npm run check:migrations`, `npm run check:i18n`, and
-   `npm run build`. Resolve remaining untranslated strings before a French or
+1. Run `npm run check`. Resolve remaining untranslated strings before a French or
    Italian client rollout; `check:i18n -- --strict-translations` reports all
    unchanged English and blank values.
 2. Apply migrations to staging, deploy all Edge Functions, and trigger the
@@ -50,9 +49,10 @@ member records.
    Supabase Auth redirects include the production domain and reset route.
 2. Merge to `main`. CI runs secret scanning, build/tests, and a fresh local
    Supabase migration replay and function lint before touching production.
-3. `release-supabase` applies migrations, deploys Edge Functions, and checks
-   production RLS. Vercel promotes the matching website deployment only after
-   that job succeeds. Check both systems report success for the same commit.
+3. `release-supabase` applies migrations, deploys only changed Edge Functions
+   (all functions when shared code changes), and checks production RLS. Vercel
+   promotes the matching website deployment only after that job succeeds.
+   Check both systems report success for the same commit.
 4. Trigger `notification-outbox` once and inspect sent/failed counts. Rows older
    than two days (seven for reflections) are marked failed rather than mailed.
    Investigate the pre-existing stale queue before setting `NOTIFICATIONS_ENABLED=true`.

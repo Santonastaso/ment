@@ -56,7 +56,7 @@ No Express server. Browser code uses the Supabase anon key; service credentials 
 ## Quick start
 
 ### Prerequisites
-- Node.js 20+.
+- Node.js 24 (matches CI and the Vercel production runtime).
 - Supabase CLI, logged in with access to the project.
 - A Supabase project (free tier is enough). Create one with:
 
@@ -117,7 +117,7 @@ cost needs differ: `MISTRAL_MODEL_DISCOVERY_MATCH`,
 ### 4. Run the client
 
 ```bash
-npm install
+npm ci
 npm run dev      # http://localhost:3000
 ```
 
@@ -135,18 +135,25 @@ Production hosting is **Vercel**. Build is driven by [`vercel.json`](./vercel.js
 
 Preview deployments are automatic on every PR.
 
-GitHub Actions expects these repository secrets for Supabase checks and function deploys:
+GitHub Actions expects these secrets in its `production` environment for the
+release and RLS checks:
 
 - `SUPABASE_ACCESS_TOKEN`
-- `SUPABASE_PROJECT_REF`
-- `SUPABASE_DB_URL` (optional, used for DB lint without linking)
+- `SUPABASE_DB_PASSWORD`
 - `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and dedicated `MENT_EMP_*` / `MENT_ADMIN_*`
   credentials for the RLS smoke test
-- `SUPABASE_SERVICE_ROLE_KEY` for the scheduled notification dispatcher
 
-Database migrations and Edge Functions are promoted separately from `main` via
-the manual `deploy-database` and `supabase-functions` workflows. Follow the
-[client pilot release gate](./docs/CLIENT_RELEASE.md) before enabling clients.
+The Supabase project reference comes from `supabase/config.toml`; CI does not
+need a separate project-ref or direct database-URL secret.
+The scheduled notification dispatcher uses the repository secrets
+`SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`.
+
+Merging to `main` runs the guarded `release-supabase` job after secret scanning,
+the client build and tests, and a fresh local migration replay. It applies
+database migrations and deploys only changed Edge Functions; changes to shared
+function code deploy all functions. Vercel's production deployment check waits
+for `release-supabase`. Follow the [client pilot release gate](./docs/CLIENT_RELEASE.md)
+before enabling clients.
 
 CI also runs a full-history Gitleaks scan from the official CLI container with redacted output. Keep `actions/checkout` at `fetch-depth: 0` for that job so a secret committed and then removed still fails the PR.
 
