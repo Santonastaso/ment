@@ -1,5 +1,40 @@
 import { test, expect } from './fixtures.mjs';
 
+test('Quick reflection opens a card without shifting the profile and preserves drafts', async ({ page }) => {
+  await page.goto('/profile');
+  const trigger = page.getByRole('button', { name: 'Start check-in', exact: true, includeHidden: true });
+  await expect(trigger).toBeVisible();
+  await trigger.scrollIntoViewIfNeeded();
+  const before = await trigger.boundingBox();
+  await trigger.click();
+  const dialog = page.getByRole('dialog', { name: 'Weekly check-in' });
+  await expect(dialog).toBeVisible();
+  const after = await trigger.boundingBox();
+  expect(after.y).toBeCloseTo(before.y, 0);
+  const support = dialog.getByRole('textbox', { name: 'What did you feel you needed support on this week?' });
+  await support.fill('I would like help planning my next role.');
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await expect(trigger).toBeFocused();
+  await trigger.click();
+  await expect(support).toHaveValue('I would like help planning my next role.');
+  await page.evaluate(() => { window.fixture.failNext = '/reflections'; });
+  await dialog.getByRole('button', { name: 'Save reflection', exact: true }).click();
+  await expect(dialog.getByRole('alert')).toBeVisible();
+  await expect(support).toHaveValue('I would like help planning my next role.');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(dialog).toBeVisible();
+  const bounds = await dialog.boundingBox();
+  expect(bounds.width).toBeLessThanOrEqual(390);
+  await dialog.getByRole('button', { name: 'Save reflection', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await trigger.click();
+  await expect(support).toHaveValue('');
+  await page.screenshot({ path: test.info().outputPath('quick-reflection-card.png'), animations: 'disabled' });
+  await dialog.press('Escape');
+  await expect(dialog).toBeHidden();
+});
+
 test('Home categories expand into chat cards before opening a conversation', async ({ page }) => {
   await page.goto('/conversations?session=1');
   await page.evaluate(() => {

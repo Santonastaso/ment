@@ -436,7 +436,7 @@ export default function Conversations() {
             </header>}
 
             <div className="conversation-messages" ref={messagesRef}>
-              {hasOlder && <button type="button" className="conversation-load-older" disabled={loadingOlder} onClick={loadOlderMessages}>{t('conversations.loadOlder')}</button>}
+              {hasOlder && <Button type="button" variant="ghost" size="sm" className="mx-auto mb-4 flex" disabled={loadingOlder} onClick={loadOlderMessages}>{t('conversations.loadOlder')}</Button>}
               {messages.map((message) => message.kind === 'system' || message.kind === 'schedule' ? (
                 <div className="conversation-system" key={message.id}>{message.body}</div>
               ) : (
@@ -449,7 +449,7 @@ export default function Conversations() {
 
             <form className="conversation-composer" onSubmit={sendMessage}>
               <input value={draft} onChange={(event) => setDrafts(items => ({ ...items, [threadKey]: event.target.value }))} placeholder={t('conversations.messagePlaceholder')} maxLength={6000} aria-label={t('conversations.messagePlaceholder')} />
-              <button type="submit" disabled={!draft.trim() || sending} aria-label={t('conversations.send')}><Send /></button>
+              <Button type="submit" size="icon" disabled={!draft.trim() || sending} aria-label={t('conversations.send')}><Send /></Button>
             </form>
           </>
         )}
@@ -487,9 +487,9 @@ export default function Conversations() {
           </div>
           <DialogFooter className="conversation-overview-footer">
             <Button variant="ghost" size="sm" render={<Link to={`/profile/${person?.id}`} />}><UserRound aria-hidden="true" />{t('conversations.profile')}</Button>
-            {selected.status === 'pending' && !isExpired(selected) && selected.isMentee && <Button type="button" variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => { setOverviewOpen(false); setWithdrawOpen(true); }}>{t('conversations.withdraw')}</Button>}
+            {selected.status === 'pending' && !isExpired(selected) && selected.isMentee && <Button type="button" variant="danger" size="sm"  onClick={() => { setOverviewOpen(false); setWithdrawOpen(true); }}>{t('conversations.withdraw')}</Button>}
             {selected.status === 'pending' && !isExpired(selected) && selected.isMentor && <>
-              <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => mutateSession({ status: 'declined' }).catch(() => setError(t('conversations.error')))}>{t('conversations.decline')}</Button>
+              <Button size="sm" variant="danger"  onClick={() => mutateSession({ status: 'declined' }).catch(() => setError(t('conversations.error')))}>{t('conversations.decline')}</Button>
               <Button size="sm" onClick={() => mutateSession({ status: 'scheduled' }).catch(() => setError(t('conversations.error')))}><Check aria-hidden="true" />{t('conversations.accept')}</Button>
             </>}
           </DialogFooter>
@@ -504,7 +504,7 @@ export default function Conversations() {
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           <DialogFooter className="conversation-overview-footer">
             <Button type="button" size="sm" variant="ghost" disabled={withdrawing} onClick={() => setWithdrawOpen(false)}>{t('conversations.keepRequest')}</Button>
-            <Button type="button" size="sm" variant="ghost" className="text-destructive hover:text-destructive" disabled={withdrawing} onClick={withdrawRequest}>{t('conversations.withdraw')}</Button>
+            <Button type="button" size="sm" variant="danger"  disabled={withdrawing} onClick={withdrawRequest}>{t('conversations.withdraw')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -1,18 +1,21 @@
 import { Button as ButtonPrimitive } from "@base-ui/react/button"
 import { cva } from "class-variance-authority";
+import { forwardRef } from "react";
 
 import { cn } from "@/lib/utils"
 
+const quietButton = "bg-[var(--control-surface)] text-foreground hover:bg-[var(--control-surface-hover)] aria-expanded:bg-[var(--control-surface-hover)] aria-expanded:text-foreground";
+
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center rounded-full border border-transparent bg-clip-padding text-sm font-semibold whitespace-nowrap transition-[background-color,border-color,color,box-shadow,opacity] duration-200 ease-out outline-none select-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/button inline-flex shrink-0 items-center justify-center rounded-[var(--control-radius)] border border-transparent bg-clip-padding text-sm font-semibold whitespace-nowrap transition-[background-color,border-color,color,box-shadow,opacity] duration-200 ease-out outline-none select-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-[#97462e] [a]:hover:bg-primary/85",
-        outline:
-          "bg-[var(--control-surface)] text-foreground hover:bg-[var(--control-surface-hover)] aria-expanded:bg-[var(--control-surface-hover)] aria-expanded:text-foreground",
-        ghost:
-          "bg-[var(--control-surface)] text-foreground hover:bg-[var(--control-surface-hover)] aria-expanded:bg-[var(--control-surface-hover)] aria-expanded:text-foreground",
+        default: "bg-primary text-primary-foreground hover:bg-[var(--primary-hover)]",
+        outline: quietButton,
+        ghost: quietButton,
+        danger: `${quietButton} text-destructive hover:text-destructive`,
+        secondary: "bg-primary text-primary-foreground hover:bg-[var(--primary-hover)]",
         destructive:
           "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
         link: "text-primary underline-offset-4 hover:underline",
@@ -38,18 +41,19 @@ const buttonVariants = cva(
   }
 )
 
-function Button({
+const Button = forwardRef(function Button({
   className,
   variant = "default",
   size = "default",
   ...props
-}) {
+}, ref) {
   return (
     <ButtonPrimitive
+      ref={ref}
       data-slot="button"
       className={cn(buttonVariants({ variant, size, className }))}
       {...props} />
   );
-}
+});
 
 export { Button, buttonVariants }

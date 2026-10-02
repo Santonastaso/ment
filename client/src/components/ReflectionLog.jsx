@@ -365,7 +365,7 @@ function Entry({ entry, onApply, onDelete, onReclassify, timeAgo }) {
             role="dialog"
             aria-modal="true"
             aria-labelledby={`reflection-modal-title-${entry.id}`}
-            className="app-modal-panel flex w-full max-w-lg flex-col overflow-hidden rounded-[10px] border border-[var(--border)] bg-card [box-shadow:var(--shadow-overlay)]"
+            className="app-modal-panel flex w-full max-w-lg flex-col overflow-hidden rounded-[var(--dialog-radius)] border border-[var(--border)] bg-card [box-shadow:var(--shadow-overlay)]"
           >
             <div className="flex items-start justify-between gap-3 border-b border-[var(--border-subtle)] p-5">
               <div>

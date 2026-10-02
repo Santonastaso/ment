@@ -127,7 +127,7 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
   return (
     <Portal>
     <div className="app-modal-overlay session-request-backdrop bg-black/20">
-      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="session-request-title" className="app-modal-panel session-request-modal flex w-full max-w-[560px] flex-col overflow-hidden rounded-[18px] border border-[var(--border)] bg-card [box-shadow:var(--shadow-overlay)]">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="session-request-title" className="app-modal-panel session-request-modal flex w-full max-w-[560px] flex-col overflow-hidden rounded-[var(--dialog-radius)] border border-[var(--border)] bg-card [box-shadow:var(--shadow-overlay)]">
         <div className="flex-shrink-0 border-b border-[var(--border-subtle)] px-6 py-5">
           <div className="flex items-center justify-between">
             <h2 id="session-request-title" className="text-xl font-semibold tracking-[-0.02em] text-foreground">{t('components.sessionRequest.title')}</h2>

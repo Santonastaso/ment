@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 
 export function Surface({ className, children, ...props }) {
   return (
-    <Card className={cn('gap-0 rounded-[var(--panel-radius)] border-0 bg-[var(--surface)] py-0', className)} {...props}>
+    <Card className={cn('gap-0 border-0 bg-[var(--surface)] py-0', className)} {...props}>
       {children}
     </Card>
   );

@@ -118,7 +118,7 @@ export default function TeachSkillsEditor({ value = [], onChange, placeholder, l
             role="dialog"
             aria-modal="true"
             aria-labelledby={`teach-skill-title-${editingIdx}`}
-            className="app-modal-panel w-full max-w-md overflow-y-auto rounded-[10px] border border-[var(--border)] bg-card [box-shadow:var(--shadow-overlay)]"
+            className="app-modal-panel w-full max-w-md overflow-y-auto rounded-[var(--dialog-radius)] border border-[var(--border)] bg-card [box-shadow:var(--shadow-overlay)]"
           >
             <div className="flex items-start justify-between gap-3 border-b border-[var(--border-subtle)] p-5">
               <h2 id={`teach-skill-title-${editingIdx}`} className="text-base font-medium leading-snug text-foreground">

@@ -123,7 +123,7 @@ export default function AcceptanceModal({ sessions, onAcknowledged, onClose }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="acceptance-modal-title"
-        className="app-modal-panel flex w-full max-w-xl flex-col overflow-hidden rounded-[10px] border border-[var(--border)] bg-card [box-shadow:var(--shadow-overlay)]"
+        className="app-modal-panel flex w-full max-w-xl flex-col overflow-hidden rounded-[var(--dialog-radius)] border border-[var(--border)] bg-card [box-shadow:var(--shadow-overlay)]"
       >
         <div className="p-6 border-b border-[var(--border-subtle)] flex-shrink-0">
           <div className="flex items-center justify-between gap-3">
