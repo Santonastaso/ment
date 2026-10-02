@@ -105,6 +105,7 @@ export default function AcceptanceModal({ sessions, onAcknowledged, onClose }) {
       setLocalSessions(next);
       setEditingDateFor(null);
       setDraftDate('');
+      if (res?.data?.calendarSyncWarning) setError(t('conversations.calendarSyncWarning'));
     } catch (e) {
       setError(e?.response?.data?.error || t('components.acceptance.errorDate'));
     } finally {

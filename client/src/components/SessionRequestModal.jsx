@@ -55,11 +55,10 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
       try {
         const { data } = await api.post('/discovery/draft', { query: question.trim(), person_id: mentor.id, variant: 0 });
         setDraft(data.draft || '');
-      } catch (requestError) {
-        setError(requestError.response?.data?.error === 'ai_not_configured'
-          ? copy.aiUnavailable
-          : t('components.sessionRequest.errorGeneric'));
-        return;
+      } catch {
+        setDraft(question.trim());
+        setDraftEdited(true);
+        setError('');
       } finally {
         setGeneratingDraft(false);
       }

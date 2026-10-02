@@ -1,5 +1,7 @@
 {
   "conversations.title": "Messaggi",
+  "conversations.openList": "Mostra elenco messaggi",
+  "conversations.closeList": "Nascondi elenco messaggi",
   "conversations.emptyTitle": "Nessuna conversazione",
   "conversations.emptyBody": "Le richieste e le chat di mentoring appariranno qui.",
   "conversations.findPeople": "Trova una persona",
@@ -46,5 +48,6 @@
   "conversations.state.confirmTime": "Conferma orario",
   "conversations.state.markComplete": "Segna completata",
   "conversations.state.awaitingReply": "In attesa",
-  "conversations.newTime": "Nuovo orario"
+  "conversations.newTime": "Nuovo orario",
+  "conversations.calendarSyncWarning": "La sessione è cambiata, ma il calendario non è stato aggiornato. Controlla l'invito."
 }

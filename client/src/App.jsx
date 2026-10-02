@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useT } from './i18n/index.jsx';
+import { Button } from './components/ui/button.jsx';
 
 const LandingPage = lazy(() => import('./pages/LandingPage.jsx'));
 const Login = lazy(() => import('./pages/Login.jsx'));
@@ -94,6 +95,15 @@ function LoadingScreen() {
   );
 }
 
+function ProfileLoadError() {
+  const { refreshProfile } = useAuth();
+  const { t } = useT();
+  return <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-8 text-center">
+    <p>{t('auth.profileLoadError')}</p>
+    <Button onClick={refreshProfile}>{t('auth.profileRetry')}</Button>
+  </div>;
+}
+
 function authGatePath(user) {
   if (user?.must_change_password) return '/change-password';
   if (user && !user.onboarding_complete && !user.is_admin) return '/onboarding';
@@ -120,10 +130,11 @@ function returnPath(location) {
 // them — change-password / onboarding / home / admin — instead of leaving them
 // on the form.
 function LoginRoute() {
-  const { user, loading } = useAuth();
+  const { user, loading, profileError } = useAuth();
   const location = useLocation();
   const destination = returnPath(location);
   if (loading) return <LoadingScreen />;
+  if (profileError) return <ProfileLoadError />;
   if (user) {
     const gate = authGatePath(user);
     if (gate) return <Navigate to={gate} state={{ returnTo: destination }} replace />;
@@ -137,9 +148,10 @@ function LoginRoute() {
 }
 
 function ProtectedRoute() {
-  const { user, loading } = useAuth();
+  const { user, loading, profileError } = useAuth();
   const location = useLocation();
   if (loading) return <LoadingScreen />;
+  if (profileError && !user) return <ProfileLoadError />;
   if (!user) return <Navigate to="/login" state={{ from: location }} replace />;
   const gate = authGatePath(user);
   if (gate) return <Navigate to={gate} state={{ returnTo: `${location.pathname}${location.search}${location.hash}` }} replace />;
@@ -147,10 +159,11 @@ function ProtectedRoute() {
 }
 
 function ChangePasswordRoute() {
-  const { user, loading } = useAuth();
+  const { user, loading, profileError } = useAuth();
   const location = useLocation();
   const destination = location.state?.returnTo;
   if (loading) return <LoadingScreen />;
+  if (profileError && !user) return <ProfileLoadError />;
   if (!user) return <Navigate to="/login" replace />;
   if (!user.must_change_password) return <Navigate to={destination || homePath(user)} replace />;
   return page(<ForcePasswordChange />);
@@ -161,10 +174,11 @@ function PasswordRecoveryRoute() {
 }
 
 function OnboardingRoute() {
-  const { user, loading } = useAuth();
+  const { user, loading, profileError } = useAuth();
   const location = useLocation();
   const destination = location.state?.returnTo;
   if (loading) return <LoadingScreen />;
+  if (profileError && !user) return <ProfileLoadError />;
   if (!user) return <Navigate to="/login" replace />;
   if (user.must_change_password) return <Navigate to={authGatePath(user)} replace />;
   if (user.onboarding_complete || user.is_admin) return <Navigate to={destination || homePath(user)} replace />;

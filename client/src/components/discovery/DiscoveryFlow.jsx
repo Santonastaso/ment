@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, ArrowUp, ArrowUpRight, Check, Clock3, Pencil, RefreshCw, Search, Send, ThumbsDown, ThumbsUp, X } from 'lucide-react';
+import { ArrowLeft, ArrowUp, ArrowUpRight, Check, Clock3, Pencil, RefreshCw, Search, Send, ThumbsDown, ThumbsUp, Trash2, X } from 'lucide-react';
 import api from '../../api/index.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useT } from '../../i18n/index.jsx';
@@ -10,6 +10,7 @@ import { CONVERSATION_FILTERS, conversationState, requestText, resumableSearch }
 
 const COPY = {
   en: {
+    history: 'History',
     greeting: 'Hi {name}, who would you like to connect with?', placeholder: 'Describe who could help', resume: 'Resume search', needsReply: 'Hi {name}, you have conversations waiting for you.', requestWaiting: 'Hi {name}, {person} is waiting for your reply.', completedRecently: 'Hi {name}, how did your conversation with {person} go?',
     finding: 'Having a look', chooseLead: 'Here are the people who fit.', chooseBold: 'Pick one and I will write the message.',
     why: 'Why this match', choose: 'Choose', selected: 'Selected', different: 'Ask for different people', browse: 'browse the full directory', notRight: 'Not quite right?', or: 'or',
@@ -17,6 +18,7 @@ const COPY = {
     sent: 'Request sent to {name}.', sentSubline: "The conversation is ready. Continue there when they reply.", openChat: 'Open chat', again: 'Ask about something else', newChat: 'New chat', recentSearches: 'Recent searches', deleteSearch: 'Delete search', confirmDeleteSearch: 'Delete this search and its saved conversation?', cancel: 'Keep search', retry: 'Start a new search', error: 'We could not complete that request. Please try again.', aiMissing: 'Matching is not configured yet. Ask an administrator to connect Mistral.', aiBusy: 'Matching is temporarily rate-limited. Please try again in a moment.', aiAdmin: 'Matching needs an administrator to check the Mistral connection.', noMatches: 'There is no relevant professional in the current network for this request.', nearestLead: 'These are the closest I could find \u2014 pick one and I will write the message.', snapshot: 'Your connections', upcoming: 'Upcoming', pending: 'Pending', completed: 'Completed', viewAll: 'View conversations', viewProfile: 'View profile', back: 'Back to matches', drafting: 'Preparing your request', useful: 'Were these matches useful?', yes: 'Yes', no: 'No', feedbackSaved: 'Thanks — this helps improve matching.',
   },
   it: {
+    history: 'Cronologia',
     greeting: 'Ciao {name}, con chi vorresti entrare in contatto?', placeholder: 'Descrivi chi potrebbe aiutarti', resume: 'Riprendi la ricerca', needsReply: 'Ciao {name}, alcune conversazioni aspettano una tua risposta.', requestWaiting: 'Ciao {name}, {person} aspetta una tua risposta.', completedRecently: 'Ciao {name}, com’è andata la conversazione con {person}?',
     finding: 'Do un’occhiata', chooseLead: 'Ecco le persone adatte.', chooseBold: 'Scegline una e scrivo io il messaggio.',
     why: 'Perché è adatto', choose: 'Scegli', selected: 'Scelto', different: 'Mostra altre persone', browse: 'sfoglia la directory', notRight: 'Non è quello che cercavi?', or: 'oppure',
@@ -24,6 +26,7 @@ const COPY = {
     sent: 'Richiesta inviata a {name}.', sentSubline: 'La conversazione è pronta. Continua da lì quando risponderà.', openChat: 'Apri chat', again: "Chiedi qualcos'altro", newChat: 'Nuova chat', recentSearches: 'Ricerche recenti', deleteSearch: 'Elimina ricerca', confirmDeleteSearch: 'Eliminare questa ricerca e la conversazione salvata?', cancel: 'Mantieni la ricerca', retry: 'Inizia una nuova ricerca', error: 'Non siamo riusciti a completare la richiesta. Riprova.', aiMissing: 'Il matching non è ancora configurato. Chiedi a un amministratore di collegare Mistral.', aiBusy: 'Il matching è temporaneamente limitato. Riprova tra poco.', aiAdmin: 'Un amministratore deve verificare la connessione a Mistral.', noMatches: 'Nella rete attuale non c’è un professionista pertinente per questa richiesta.', nearestLead: 'Queste sono le più vicine che ho trovato: scegline una e scrivo io il messaggio.', snapshot: 'Le tue connessioni', upcoming: 'In programma', pending: 'In attesa', completed: 'Completate', viewAll: 'Vedi conversazioni', viewProfile: 'Vedi profilo', back: 'Torna ai risultati', drafting: 'Preparo la richiesta', useful: 'Questi match sono utili?', yes: 'Sì', no: 'No', feedbackSaved: 'Grazie — ci aiuta a migliorare il matching.',
   },
   fr: {
+    history: 'Historique',
     greeting: 'Bonjour {name}, avec qui souhaitez-vous entrer en contact ?', placeholder: 'Décrivez qui pourrait vous aider', resume: 'Reprendre la recherche', needsReply: 'Bonjour {name}, des conversations attendent votre réponse.', requestWaiting: 'Bonjour {name}, {person} attend votre réponse.', completedRecently: 'Bonjour {name}, comment s’est passée votre conversation avec {person} ?',
     finding: 'Je regarde', chooseLead: 'Voici les personnes qui conviennent.', chooseBold: 'Choisissez-en une et j’écris le message.',
     why: 'Pourquoi ce profil', choose: 'Choisir', selected: 'Sélectionné', different: 'Voir d’autres personnes', browse: 'parcourir l’annuaire', notRight: 'Pas tout à fait ?', or: 'ou',
@@ -417,10 +420,17 @@ export default function DiscoveryFlow() {
             {history.length > 0 && (
               <div className="discovery-recent-row">
                 <details className="discovery-history">
-                  <summary aria-label={copy.recentSearches} title={copy.recentSearches}><Clock3 aria-hidden="true" /><span className="sr-only">{copy.recentSearches}</span></summary>
-                  <div>{history.map(item => {
+                  <summary><span className="discovery-history-mark"><Clock3 aria-hidden="true" /></span><span>{copy.history}</span></summary>
+                  <div className="discovery-history-list" aria-label={copy.recentSearches}>{history.map(item => {
                     const title = [...(item.turns || [])].reverse().find(turn => turn?.role === 'user')?.content || requestText(item.title);
-                    return <div className="discovery-history-row" key={item.id}><button type="button" onClick={() => resumeSearch(item.id)}>{title}</button><button type="button" aria-label={copy.deleteSearch} onClick={() => { setHistoryError(''); setDeleteTargetId(item.id); }}>×</button></div>;
+                    const date = item.updated_at ? new Date(item.updated_at) : null;
+                    const dateLabel = date && !Number.isNaN(date.getTime()) ? date.toLocaleDateString(lang, { month: 'short', day: 'numeric' }) : '';
+                    return <div className="discovery-history-row" key={item.id}>
+                      <button type="button" className="discovery-history-open" onClick={() => resumeSearch(item.id)} aria-label={`${copy.resume}: ${title}`} title={title}>
+                        <span className="discovery-history-date">{dateLabel}</span><span className="discovery-history-title">{title}</span><span className="discovery-history-arrow"><ArrowUpRight aria-hidden="true" /></span>
+                      </button>
+                      <button type="button" className="discovery-history-delete" aria-label={`${copy.deleteSearch}: ${title}`} title={copy.deleteSearch} onClick={() => { setHistoryError(''); setDeleteTargetId(item.id); }}><Trash2 aria-hidden="true" /></button>
+                    </div>;
                   })}</div>
                 </details>
               </div>
@@ -435,12 +445,13 @@ export default function DiscoveryFlow() {
                       key={option.key}
                       id={`connection-category-${option.key}`}
                       type="button"
-                      variant={active ? 'default' : 'ghost'}
+                      variant="ghost"
                       className="discovery-connection-bubble"
+                      aria-label={`${t(option.label)} ${count}`}
                       aria-expanded={active}
                       aria-controls={active ? 'discovery-connection-chats' : undefined}
                       onClick={() => setConnectionCategory(current => current === option.key ? null : option.key)}
-                    ><span>{t(option.label)}</span><strong>{count}</strong></Button>;
+                    ><strong>{count}</strong><span>{t(option.label)}</span></Button>;
                   })}
                 </div>
                 {selectedConnectionFilter && <div id="discovery-connection-chats" className="discovery-connection-panel discovery-reveal" role="region" aria-labelledby={`connection-category-${connectionCategory}`}>

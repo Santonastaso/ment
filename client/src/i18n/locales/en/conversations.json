@@ -1,5 +1,7 @@
 {
   "conversations.title": "Messages",
+  "conversations.openList": "Show message list",
+  "conversations.closeList": "Hide message list",
   "conversations.emptyTitle": "No conversations yet",
   "conversations.emptyBody": "Requests and accepted mentoring chats will appear here.",
   "conversations.findPeople": "Find someone",
@@ -46,5 +48,6 @@
   "conversations.state.confirmTime": "Confirm time",
   "conversations.state.markComplete": "Mark complete",
   "conversations.state.awaitingReply": "Waiting",
-  "conversations.newTime": "New time"
+  "conversations.newTime": "New time",
+  "conversations.calendarSyncWarning": "The session changed, but the calendar could not update. Please check the invite."
 }

@@ -12,7 +12,7 @@ const en = {
   draft: 'Review and edit your message', recipient: 'Recipient', message: 'Your message', hello: 'Hello',
   ongoingDraft: 'I would like to explore ongoing support, if that works for you.', oneOffDraft: 'Would you be available for a one-off conversation?',
   proposedTime: 'Proposed time', flexibleDraft: 'We can agree on a time together.', emptyDraft: 'Enter the message you want to send.', close: 'Close', available: 'Available to request', unavailable: 'Currently unavailable',
-  preparing: 'Preparing…', aiUnavailable: 'Message drafting is not configured yet. Ask an administrator to connect Mistral.',
+  preparing: 'Preparing…',
 };
 const it = {
   badge: 'Ricerca guidata', title: 'Chi potrebbe aiutarti a fare un passo avanti?', intro: 'Racconta su cosa stai lavorando e ti proporremo persone rilevanti nella community Ment.',
@@ -27,7 +27,7 @@ const it = {
   draft: 'Rivedi e modifica il messaggio', recipient: 'Destinatario', message: 'Il tuo messaggio', hello: 'Ciao',
   ongoingDraft: 'Vorrei valutare un supporto continuativo, se per te va bene.', oneOffDraft: 'Ti andrebbe una conversazione singola?',
   proposedTime: 'Orario proposto', flexibleDraft: 'Possiamo concordare insieme un orario.', emptyDraft: 'Inserisci il messaggio da inviare.', close: 'Chiudi', available: 'Disponibile per una richiesta', unavailable: 'Al momento non disponibile',
-  preparing: 'Preparazione…', aiUnavailable: 'La generazione del messaggio non è configurata. Chiedi a un amministratore di collegare Mistral.',
+  preparing: 'Preparazione…',
 };
 const fr = {
   badge: 'Recherche guidée', title: 'Qui pourrait vous aider à avancer ?', intro: 'Expliquez votre besoin et nous vous proposerons des personnes pertinentes dans la communauté Ment.',
@@ -42,6 +42,6 @@ const fr = {
   draft: 'Relisez et modifiez votre message', recipient: 'Destinataire', message: 'Votre message', hello: 'Bonjour',
   ongoingDraft: 'Je souhaiterais envisager un accompagnement régulier, si cela vous convient.', oneOffDraft: 'Seriez-vous disponible pour une conversation ponctuelle ?',
   proposedTime: 'Horaire proposé', flexibleDraft: 'Nous pouvons convenir ensemble d’un horaire.', emptyDraft: 'Saisissez le message à envoyer.', close: 'Fermer', available: 'Disponible pour une demande', unavailable: 'Indisponible actuellement',
-  preparing: 'Préparation…', aiUnavailable: 'La rédaction des messages n’est pas configurée. Demandez à un administrateur de connecter Mistral.',
+  preparing: 'Préparation…',
 };
 export const homeCopy = lang => ({ en, it, fr }[lang] || en);
