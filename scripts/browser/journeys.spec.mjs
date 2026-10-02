@@ -1,5 +1,41 @@
 import { test, expect } from './fixtures.mjs';
 
+test('Home categories expand into chat cards before opening a conversation', async ({ page }) => {
+  await page.goto('/conversations?session=1');
+  await page.evaluate(() => {
+    const base = window.fixture.sessions[0];
+    window.fixture.sessions = [
+      { ...base, id: 1, status: 'scheduled', scheduled_at: new Date(Date.now() - 86400000).toISOString() },
+      { ...base, id: 2, status: 'pending', scheduled_at: null },
+      { ...base, id: 3, status: 'scheduled', scheduled_at: new Date(Date.now() + 86400000).toISOString() },
+      { ...base, id: 4, status: 'cancelled', scheduled_at: null },
+    ].map(session => ({ ...session, mentor_id: `peer-${session.id}`, mentor: { id: `peer-${session.id}`, name: `Peer ${session.id}` }, title: `Request ${session.id}` }));
+  });
+  await page.getByRole('link', { name: 'Home', exact: true }).click();
+  const categories = page.getByRole('group', { name: 'Your connections' });
+  await expect(categories.getByRole('button')).toHaveCount(4);
+  for (const [label, peer] of [['Needs you', 'Peer 1'], ['Waiting', 'Peer 2'], ['Scheduled', 'Peer 3'], ['Past', 'Peer 4']]) {
+    const bubble = categories.getByRole('button', { name: new RegExp(`^${label}.*1$`) });
+    await bubble.click();
+    await expect(bubble).toHaveAttribute('aria-expanded', 'true');
+    const panel = page.getByRole('region', { name: new RegExp(`^${label}`) });
+    await expect(panel.getByRole('link')).toHaveCount(1);
+    await expect(panel.getByRole('link', { name: `Open chat: ${peer}` })).toBeVisible();
+    await expect(page).toHaveURL('http://127.0.0.1:3010/');
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole('button', { name: 'Close sidebar', exact: true }).click();
+  await expect(page.getByRole('region', { name: /^Past/ })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  await categories.getByRole('button', { name: /^Past/ }).click();
+  await expect(page.getByRole('region', { name: /^Past/ })).toHaveCount(0);
+  await categories.getByRole('button', { name: /^Needs you/ }).click();
+  await page.screenshot({ path: test.info().outputPath('conversation-bubbles.png'), animations: 'disabled' });
+  await page.getByRole('link', { name: 'Open chat: Peer 1' }).click();
+  await expect(page).toHaveURL(/\/conversations\?filter=needs&session=1$/);
+  await expect(page.locator('.conversation-header strong')).toHaveText('Peer 1');
+});
+
 test('onboarding to discovery, request, acceptance, chat and meeting', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => window.fixture.setUser({ ...window.fixture.user, onboarding_complete: false }));
@@ -21,13 +57,23 @@ test('onboarding to discovery, request, acceptance, chat and meeting', async ({ 
   await page.getByRole('button', { name: 'Send request', exact: true }).click();
   await page.getByRole('link', { name: 'Open chat', exact: true }).click();
   await expect(page.getByText('Please help me with financial modelling.', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Withdraw request' })).toBeVisible();
+  await expect(page.locator('.conversation-header')).not.toContainText('Financial modelling');
+  await page.getByRole('button', { name: 'Request overview' }).click();
+  await expect(page.getByRole('dialog')).toContainText('Financial modelling');
+  await page.screenshot({ path: test.info().outputPath('request-overview.png'), animations: 'disabled' });
+  await page.getByRole('button', { name: 'Withdraw request' }).click();
+  const withdrawDialog = page.getByRole('dialog');
+  await expect(withdrawDialog.getByText('This will cancel the pending session request. You can start a new request later.')).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.fixture.calls.some(call => call.method === 'put' && call.path === '/sessions/3' && call.body.status === 'cancelled'))).toBe(false);
+  await withdrawDialog.getByRole('button', { name: 'Keep request' }).click();
+  await expect(withdrawDialog).toBeHidden();
   const student = await page.evaluate(() => window.fixture.user);
   await page.evaluate(() => window.fixture.setUser({ ...window.fixture.peer, role: 'alumnus', onboarding_complete: true }));
   await page.getByRole('link', { name: 'Groups', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Groups', exact: true })).toBeVisible();
   await page.locator('nav').getByRole('link', { name: /^Messages/ }).click();
   await page.getByRole('button', { name: /Viewer Student/ }).click();
+  await page.getByRole('button', { name: 'Request overview' }).click();
   await page.getByRole('button', { name: 'Accept', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Schedule', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Schedule', exact: true }).click();
@@ -35,6 +81,7 @@ test('onboarding to discovery, request, acceptance, chat and meeting', async ({ 
   const scheduledAt = await page.evaluate(value => new Date(value).toISOString(), future);
   await page.getByLabel('New time', { exact: true }).fill(future);
   await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
   const message = page.getByRole('textbox', { name: 'Message', exact: true });
   await message.fill('Happy to help.');
   await page.getByRole('button', { name: 'Send message', exact: true }).click();

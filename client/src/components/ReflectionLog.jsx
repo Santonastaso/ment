@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useRef, useState } from 'react';
-import { ChevronRight, X } from 'lucide-react';
+import { Info, X } from 'lucide-react';
 import api from '../api/index.js';
 import { useT } from '../i18n/index.jsx';
 import { Button } from './ui/button.jsx';
@@ -348,7 +348,7 @@ function Entry({ entry, onApply, onDelete, onReclassify, timeAgo }) {
           <span className="flex shrink-0 items-center gap-2.5 text-xs text-muted-foreground">
             {rawSource === 'demo' && <span>{t('components.reflection.demo.label')}</span>}
             {entry.applied && <span>{t('components.reflection.appliedToSkills')}</span>}
-            <ChevronRight className="size-3.5" aria-hidden="true" />
+            <span className="grid size-8 place-items-center rounded-full bg-[var(--control-surface)]"><Info className="size-4" aria-hidden="true" /></span>
           </span>
         </button>
       </div>

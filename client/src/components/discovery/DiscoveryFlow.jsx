@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, ArrowUp, Check, Clock3, Pencil, RefreshCw, Search, Send, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { ArrowLeft, ArrowUp, ArrowUpRight, Check, Clock3, Pencil, RefreshCw, Search, Send, ThumbsDown, ThumbsUp, X } from 'lucide-react';
 import api from '../../api/index.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useT } from '../../i18n/index.jsx';
@@ -151,6 +151,7 @@ export default function DiscoveryFlow() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [connections, setConnections] = useState([]);
+  const [connectionCategory, setConnectionCategory] = useState(null);
   const [sessionId, setSessionId] = useState(null);
   const [threadId, setThreadId] = useState(null);
   const [clarification, setClarification] = useState('');
@@ -362,6 +363,7 @@ export default function DiscoveryFlow() {
   async function reset() {
     flowVersion.current += 1;
     const currentThread = threadId;
+    setConnectionCategory(null);
     setStage('ask'); setQuery(''); setSubmittedQuery(''); setTurns([]); setMatches([]); setSelected(null); setDraft(''); setSending(false); setError(''); setSessionId(null); setThreadId(null); setClarification(''); setNoMatchReason(''); setMatchFeedback(null); idempotencyKey.current = null;
     if (currentThread) api.put(`/discovery/threads/${currentThread}`, { archived: true }).then(refreshHistory).catch(() => {});
   }
@@ -372,6 +374,8 @@ export default function DiscoveryFlow() {
 
   const firstName = user?.name?.split(' ')[0] || '';
   const connectionFilters = CONVERSATION_FILTERS.filter(option => ['needs', 'waiting', 'scheduled', 'past'].includes(option.key));
+  const selectedConnectionFilter = connectionFilters.find(option => option.key === connectionCategory);
+  const visibleConnections = selectedConnectionFilter ? connections.filter(session => selectedConnectionFilter.match(conversationState(session))) : [];
   const needsReply = connections.some(session => conversationState(session) === 'needs');
   const waitingRequest = connections.find(session => session.status === 'pending' && session.isMentor);
   const recentCompletion = connections.find(session => {
@@ -422,15 +426,38 @@ export default function DiscoveryFlow() {
             )}
             {connections.length > 0 && (
               <div className="discovery-connections">
-                <div className="discovery-connection-people">
-                  <span className="discovery-connections-label">{copy.snapshot}</span>
-                  <span className="discovery-avatars">{connections.slice(0, 3).map((session, index) => {
-                    const peer = session.mentor_id === user?.id ? session.mentee : session.mentor;
-                    return <Link to={`/conversations?session=${session.id}`} aria-label={`${copy.openChat}: ${peer?.name || ''}`} key={session.id} className="discovery-avatar" style={{ backgroundColor: avatarTints[index % avatarTints.length] }}>{initials(peer?.name)}</Link>;
-                  })}</span>
+                <div className="discovery-connection-bubbles" role="group" aria-label={copy.snapshot}>
+                  {connectionFilters.map(option => {
+                    const active = option.key === connectionCategory;
+                    const count = connections.filter(session => option.match(conversationState(session))).length;
+                    return <Button
+                      key={option.key}
+                      id={`connection-category-${option.key}`}
+                      type="button"
+                      variant={active ? 'default' : 'ghost'}
+                      className="discovery-connection-bubble"
+                      aria-expanded={active}
+                      aria-controls={active ? 'discovery-connection-chats' : undefined}
+                      onClick={() => setConnectionCategory(current => current === option.key ? null : option.key)}
+                    ><span>{t(option.label)}</span><strong>{count}</strong></Button>;
+                  })}
                 </div>
-                <div className="discovery-connection-counts">{connectionFilters.map(option => <Link key={option.key} to={`/conversations?filter=${option.key}`}>{t(option.label)} <strong>{connections.filter(session => option.match(conversationState(session))).length}</strong></Link>)}</div>
-                <Link to="/conversations" className="discovery-connections-link">{copy.viewAll}</Link>
+                {selectedConnectionFilter && <div id="discovery-connection-chats" className="discovery-connection-panel discovery-reveal" role="region" aria-labelledby={`connection-category-${connectionCategory}`}>
+                  <div className="discovery-connection-panel-header">
+                    <h2>{t(selectedConnectionFilter.label)}</h2>
+                    <Button type="button" variant="ghost" size="icon-sm" aria-label={t('common.close')} onClick={() => setConnectionCategory(null)}><X aria-hidden="true" /></Button>
+                  </div>
+                  {visibleConnections.length === 0 ? <p className="discovery-connection-empty">{t('conversations.filter.empty')}</p> : <div className="discovery-connection-cards">
+                    {visibleConnections.map((session, index) => {
+                      const peer = session.mentor_id === user?.id ? session.mentee : session.mentor;
+                      return <Link key={session.id} className="discovery-connection-card" to={`/conversations?filter=${connectionCategory}&session=${session.id}`} aria-label={`${copy.openChat}: ${peer?.name || ''}`}>
+                        <span className="discovery-avatar" style={{ backgroundColor: avatarTints[index % avatarTints.length] }} aria-hidden="true">{initials(peer?.name)}</span>
+                        <span><strong>{peer?.name}</strong><small>{requestText(session.title, t('conversations.requestTitle'))}</small></span>
+                        <ArrowUpRight aria-hidden="true" />
+                      </Link>;
+                    })}
+                  </div>}
+                </div>}
               </div>
             )}
           </div>

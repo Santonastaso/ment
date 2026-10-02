@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { CalendarDays, Check, ChevronLeft, MessageCircle, Send, Undo2, UserRound, UsersRound } from 'lucide-react';
+import { Check, ChevronLeft, Info, MessageCircle, Send, UserRound, UsersRound } from 'lucide-react';
 import api from '../api/index.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useT } from '../i18n/index.jsx';
@@ -11,9 +11,11 @@ import { Avatar, AvatarFallback } from '../components/ui/avatar.jsx';
 import { Skeleton } from '../components/ui/skeleton.jsx';
 import IcsDownloadButton from '../components/IcsDownloadButton.jsx';
 import MeetingFeedback from '../components/MeetingFeedback.jsx';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog.jsx';
 import { cn } from '@/lib/utils';
 import { supabase } from '../lib/supabase.js';
 import { CONVERSATION_FILTERS as FILTERS, conversationState as rowState, isExpired, requestText, clearSentDraft } from '../lib/conversations.mjs';
+import { homeCopy } from '../components/demo/homeCopy.js';
 
 function initials(name = '') {
   return name.split(' ').map((part) => part[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || '?';
@@ -63,7 +65,8 @@ function appendMessage(current, row) {
 
 export default function Conversations() {
   const { user, unreadCounts, refreshPendingAcceptances, refreshUnreadCounts } = useAuth();
-  const { t } = useT();
+  const { t, lang } = useT();
+  const copy = homeCopy(lang);
   const [params, setParams] = useSearchParams();
   const selectedId = Number(params.get('session')) || null;
   const selectedGroupId = Number(params.get('group')) || null;
@@ -97,6 +100,9 @@ export default function Conversations() {
   const draft = drafts[threadKey] || '';
   const sending = !!sendingThreads[threadKey];
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [overviewOpen, setOverviewOpen] = useState(false);
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [withdrawing, setWithdrawing] = useState(false);
   const [scheduledAt, setScheduledAt] = useState('');
   const [savingSchedule, setSavingSchedule] = useState(false);
   const endRef = useRef(null);
@@ -248,6 +254,10 @@ export default function Conversations() {
     } else endRef.current?.scrollIntoView({ block: 'end' });
   }, [messages, selectedId, selectedGroupId]);
   useEffect(() => {
+    setOverviewOpen(false);
+    setWithdrawOpen(false);
+  }, [threadKey]);
+  useEffect(() => {
     if (selectedGroupId) return;
     setScheduleOpen(false);
     setScheduledAt(localDateTime(selected?.scheduled_at));
@@ -269,8 +279,14 @@ export default function Conversations() {
   }
 
   async function withdrawRequest() {
-    try { await mutateSession({ status: 'cancelled' }); }
+    if (withdrawing) return;
+    setWithdrawing(true);
+    try {
+      await mutateSession({ status: 'cancelled' });
+      setWithdrawOpen(false);
+    }
     catch (requestError) { setError(requestError.response?.data?.error || t('conversations.error')); }
+    finally { setWithdrawing(false); }
   }
 
   async function sendMessage(event) {
@@ -337,14 +353,16 @@ export default function Conversations() {
                   ? groups.length
                   : sessions.filter(s => option.match(rowState(s))).length;
               return (
-                <button
+                <Button
                   key={option.key}
                   type="button"
+                  variant="ghost"
+                  size="sm"
                   aria-pressed={filter === option.key}
                   onClick={() => setParams({ filter: option.key })}
                 >
                   {t(option.label)}<span className="conversation-filter-count">{count}</span>
-                </button>
+                </Button>
               );
             })}
           </div>
@@ -409,51 +427,15 @@ export default function Conversations() {
             </header> : <header className="conversation-header">
               <button className="conversation-back" type="button" onClick={() => setParams({})} aria-label={t('common.close')}><ChevronLeft /></button>
               <Avatar className="size-9"><AvatarFallback>{initials(person?.name)}</AvatarFallback></Avatar>
-              <div><strong>{person?.name}</strong><span>{[person?.current_role, person?.department].filter(Boolean).join(' · ')}</span></div>
-              <Link className="conversation-profile-link" to={`/profile/${person?.id}`} aria-label={t('conversations.profile')} title={t('conversations.profile')}><UserRound aria-hidden="true" /></Link>
+              <div className="conversation-header-person"><strong>{person?.name}</strong><span>{selected.status === 'pending' && !isExpired(selected) && selected.isMentee ? t('conversations.requestSent') : stateLabel(selected, rowState(selected), t)}</span></div>
+              <div className="conversation-header-actions">
+                {selected.status === 'scheduled' && selected.scheduled_at && <IcsDownloadButton sessionId={selected.id} session={selected} meetingUrl={selected.meeting_url} onReschedule={() => { setOverviewOpen(true); setScheduleOpen(true); }} compact />}
+                {(selected.status === 'scheduled' || selected.status === 'completed') && <MeetingFeedback key={selected.id} session={selected} onSaved={loadSessions} compact />}
+                <Button type="button" variant="ghost" size="icon" onClick={() => setOverviewOpen(true)} aria-label={t('conversations.requestDetails')} title={t('conversations.requestDetails')} aria-haspopup="dialog"><Info aria-hidden="true" /></Button>
+              </div>
             </header>}
 
-            {selected?.status === 'pending' && !isExpired(selected) && selected.isMentor && (
-              <div className="conversation-request-banner">
-                <div><strong>{t('conversations.requestTitle')}</strong><p>{requestText(selected.pre_session_question, requestText(selected.title))}</p></div>
-                <div><Button size="sm" onClick={() => mutateSession({ status: 'scheduled' })}><Check />{t('conversations.accept')}</Button><Button size="sm" variant="outline" onClick={() => mutateSession({ status: 'declined' })}>{t('conversations.decline')}</Button></div>
-              </div>
-            )}
-            {selected?.status === 'pending' && !isExpired(selected) && selected.isMentee && <div className="conversation-waiting">
-              <span className="conversation-request-state"><span className="conversation-status-dot" aria-hidden="true" />{t('conversations.requestSent')}</span>
-              {selected.request_expires_at && <span className="conversation-request-expiry">{expiryLabel(expiryInDays(selected.request_expires_at), t)}</span>}
-              <Button className="conversation-icon-action" type="button" size="icon-sm" variant="ghost" onClick={withdrawRequest} aria-label={t('conversations.withdraw')} title={t('conversations.withdraw')}><Undo2 aria-hidden="true" /></Button>
-            </div>}
-
-            {selected?.status === 'scheduled' && (
-              <div className="conversation-meeting">
-                <CalendarDays />
-                <div><strong>{selected.scheduled_at ? formatMessageTime(selected.scheduled_at) : t('conversations.pickTime')}</strong></div>
-                <div className="conversation-meeting-actions">
-                  {!selected.scheduled_at && <Button size="sm" variant="outline" onClick={() => setScheduleOpen(true)}>{t('conversations.schedule')}</Button>}
-                  {selected.scheduled_at && <IcsDownloadButton sessionId={selected.id} session={selected} meetingUrl={selected.meeting_url} onReschedule={() => setScheduleOpen(true)} compact />}
-                  <MeetingFeedback key={selected.id} session={selected} onSaved={loadSessions} compact />
-                </div>
-                {scheduleOpen && (
-                  <div className="conversation-scheduler">
-                    <Field
-                      label={t('conversations.newTime')}
-                      type="datetime-local"
-                      value={scheduledAt}
-                      min={localDateTime(new Date(Date.now() + 3600000))}
-                      onChange={(event) => setScheduledAt(event.target.value)}
-                    />
-                    <Button size="sm" onClick={saveSchedule} disabled={!scheduledAt || savingSchedule}>{t('common.save')}</Button>
-                    <Button size="sm" variant="ghost" onClick={() => setScheduleOpen(false)}>{t('common.cancel', 'Cancel')}</Button>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {selected?.status === 'completed' && <div className="conversation-meeting"><CalendarDays /><div><strong>{statusLabel(selected, t)}</strong></div><MeetingFeedback key={selected.id} session={selected} onSaved={loadSessions} compact /></div>}
-
             <div className="conversation-messages" ref={messagesRef}>
-              {selected && <div className="conversation-context"><span>{statusLabel(selected, t)}</span><p>{requestText(selected.title, t('conversations.requestTitle'))}{selected.topics?.length > 0 && ` · ${selected.topics.join(' · ')}`}</p></div>}
               {hasOlder && <button type="button" className="conversation-load-older" disabled={loadingOlder} onClick={loadOlderMessages}>{t('conversations.loadOlder')}</button>}
               {messages.map((message) => message.kind === 'system' || message.kind === 'schedule' ? (
                 <div className="conversation-system" key={message.id}>{message.body}</div>
@@ -473,6 +455,59 @@ export default function Conversations() {
         )}
         {error && <p className="conversation-error" role="alert">{error}</p>}
       </div>
+      {selected && <Dialog open={overviewOpen} onOpenChange={value => { setOverviewOpen(value); if (!value) setScheduleOpen(false); }}>
+        <DialogContent className="conversation-overview sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t('conversations.requestDetails')}</DialogTitle>
+            <DialogDescription>{person?.name}</DialogDescription>
+          </DialogHeader>
+          <div className="conversation-overview-body">
+            <h2>{requestText(selected.title, t('conversations.requestTitle'))}</h2>
+            <div className="conversation-overview-pills">
+              <span>{statusLabel(selected, t)}</span>
+              {selected.follow_up_intent && <span>{selected.follow_up_intent === 'ongoing' ? copy.ongoing : copy.oneOff}</span>}
+            </div>
+            {selected.pre_session_question && selected.pre_session_question.trim() !== selected.title?.trim() && <p className="conversation-overview-question">{requestText(selected.pre_session_question)}</p>}
+            {selected.topics?.length > 0 && <div>
+              <p className="label-meta">{t('components.sessionRequest.reviewTopics')}</p>
+              <div className="conversation-overview-pills">{selected.topics.map(topic => <span key={topic}>{topic}</span>)}</div>
+            </div>}
+            {selected.status === 'pending' && !isExpired(selected) && selected.request_expires_at && <p className="text-sm text-muted-foreground">{expiryLabel(expiryInDays(selected.request_expires_at), t)}</p>}
+            <div>
+              <p className="label-meta">{t('components.sessionRequest.reviewWhen')}</p>
+              <p className="text-sm">{selected.scheduled_at ? formatMessageTime(selected.scheduled_at) : t('components.sessionRequest.reviewNoTime')}</p>
+              {selected.status === 'scheduled' && !scheduleOpen && <Button size="sm" variant="ghost" className="mt-3" onClick={() => setScheduleOpen(true)}>{t(selected.scheduled_at ? 'conversations.reschedule' : 'conversations.schedule')}</Button>}
+            </div>
+            {selected.status === 'scheduled' && scheduleOpen && <div className="conversation-scheduler">
+              <Field label={t('conversations.newTime')} type="datetime-local" value={scheduledAt} min={localDateTime(new Date(Date.now() + 3600000))} onChange={event => setScheduledAt(event.target.value)} />
+              <Button size="sm" onClick={saveSchedule} disabled={!scheduledAt || savingSchedule}>{t('common.save')}</Button>
+              <Button size="sm" variant="ghost" disabled={savingSchedule} onClick={() => setScheduleOpen(false)}>{t('common.cancel')}</Button>
+            </div>}
+            {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+          </div>
+          <DialogFooter className="conversation-overview-footer">
+            <Button variant="ghost" size="sm" render={<Link to={`/profile/${person?.id}`} />}><UserRound aria-hidden="true" />{t('conversations.profile')}</Button>
+            {selected.status === 'pending' && !isExpired(selected) && selected.isMentee && <Button type="button" variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => { setOverviewOpen(false); setWithdrawOpen(true); }}>{t('conversations.withdraw')}</Button>}
+            {selected.status === 'pending' && !isExpired(selected) && selected.isMentor && <>
+              <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => mutateSession({ status: 'declined' }).catch(() => setError(t('conversations.error')))}>{t('conversations.decline')}</Button>
+              <Button size="sm" onClick={() => mutateSession({ status: 'scheduled' }).catch(() => setError(t('conversations.error')))}><Check aria-hidden="true" />{t('conversations.accept')}</Button>
+            </>}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>}
+      <Dialog open={withdrawOpen} onOpenChange={value => { if (!withdrawing) setWithdrawOpen(value); }}>
+        <DialogContent className="conversation-overview" showCloseButton={!withdrawing}>
+          <DialogHeader>
+            <DialogTitle>{t('conversations.withdrawConfirmTitle')}</DialogTitle>
+            <DialogDescription>{t('conversations.withdrawConfirmBody')}</DialogDescription>
+          </DialogHeader>
+          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+          <DialogFooter className="conversation-overview-footer">
+            <Button type="button" size="sm" variant="ghost" disabled={withdrawing} onClick={() => setWithdrawOpen(false)}>{t('conversations.keepRequest')}</Button>
+            <Button type="button" size="sm" variant="ghost" className="text-destructive hover:text-destructive" disabled={withdrawing} onClick={withdrawRequest}>{t('conversations.withdraw')}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }
