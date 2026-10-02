@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { CircleUserRound, MessagesSquare, PanelLeftClose, PanelLeftOpen, Search, Server, Share2, Shield, SquarePen, UsersRound } from 'lucide-react';
+import { CircleUserRound, House, MessagesSquare, PanelLeft, Search, Server, Share2, Shield, UsersRound } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useT } from '../i18n/index.jsx';
 import { cn } from '@/lib/utils';
@@ -18,7 +18,7 @@ export default function Sidebar({ collapsed = false, onNavigate, onToggle }) {
         ...(user?.admin_scope === 'platform' ? [{ to: '/admin/ops', label: t('nav.platformOps'), icon: Server, testid: 'nav-platform-ops' }] : []),
       ]
     : [
-        { to: '/', label: t('nav.home'), icon: SquarePen },
+        { to: '/', label: t('nav.home'), icon: House },
         { to: '/explorer', label: t('nav.explorer'), icon: Search },
         { to: '/conversations', label: t('nav.messages'), icon: MessagesSquare },
         { to: '/groups', label: t('nav.groups'), icon: UsersRound },
@@ -30,13 +30,13 @@ export default function Sidebar({ collapsed = false, onNavigate, onToggle }) {
       <div className={cn('mb-6 flex h-11 items-center', collapsed ? 'justify-center' : 'justify-between')}>
         {collapsed ? <button type="button" onClick={onToggle} className="group grid size-11 place-items-center rounded-full outline-none hover:bg-[var(--sidebar-accent)] focus-visible:ring-3 focus-visible:ring-[var(--sidebar-ring)]" aria-label="Open sidebar" title="Open sidebar">
           <span className="grid size-8 place-items-center rounded-full bg-primary text-xs font-bold text-white group-hover:hidden">M</span>
-          <PanelLeftOpen className="hidden size-[22px] text-foreground group-hover:block" strokeWidth={2.3} />
+          <PanelLeft className="hidden size-[22px] text-foreground group-hover:block" strokeWidth={2.3} />
         </button> : <Link to={user?.is_admin ? '/admin' : '/'} onClick={onNavigate} className="flex h-11 items-center gap-2.5 px-2">
           <span className="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">M</span>
           <span className="text-[17px] font-semibold tracking-[-0.025em] text-foreground">MENT</span>
         </Link>}
         {!collapsed && onToggle && <button type="button" onClick={onToggle} className="grid size-10 place-items-center rounded-full text-muted-foreground outline-none hover:bg-[var(--sidebar-accent)] hover:text-foreground focus-visible:ring-3 focus-visible:ring-[var(--sidebar-ring)]" aria-label="Close sidebar" title="Close sidebar">
-          <PanelLeftClose className="size-[22px]" strokeWidth={2.3} />
+          <PanelLeft className="size-[22px]" strokeWidth={2.3} />
         </button>}
       </div>
 

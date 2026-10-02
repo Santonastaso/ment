@@ -241,6 +241,8 @@ export default function Profile() {
       updateUser(res.data);
       setEditing(false);
       showToast(t('profile.toast.profileUpdated'));
+    } catch {
+      showToast(t('components.sessionRequest.errorGeneric'));
     } finally {
       setSaving(false);
     }

@@ -227,11 +227,9 @@ async function loadProfile(userId, viewerId) {
 // Sessions
 // ============================================================
 
-const sessionUserCache = new Map();
-
-async function fetchSessionUser(userId, viewerId) {
+async function fetchSessionUser(userId, viewerId, cache) {
   const cacheKey = `${viewerId}:${userId}`;
-  if (sessionUserCache.has(cacheKey)) return sessionUserCache.get(cacheKey);
+  if (cache.has(cacheKey)) return cache.get(cacheKey);
   const request = (async () => {
     if (userId !== viewerId) {
       const { data } = await supabase.rpc('peer_profile', { p_user_id: userId });
@@ -245,16 +243,16 @@ async function fetchSessionUser(userId, viewerId) {
     if (!data) return null;
     return shapeUser(data);
   })();
-  sessionUserCache.set(cacheKey, request);
+  cache.set(cacheKey, request);
   return request;
 }
 
-async function enrichSession(session, viewerId) {
+async function enrichSession(session, viewerId, cache = new Map()) {
   const isMentor = session.mentor_id === viewerId;
   const isMentee = session.mentee_id === viewerId;
   const [mentor, mentee] = await Promise.all([
-    fetchSessionUser(session.mentor_id, viewerId),
-    fetchSessionUser(session.mentee_id, viewerId),
+    fetchSessionUser(session.mentor_id, viewerId, cache),
+    fetchSessionUser(session.mentee_id, viewerId, cache),
   ]);
   if (mentor?.deactivated_at) mentor.name = '[Former colleague]';
   if (mentee?.deactivated_at) mentee.name = '[Former colleague]';
@@ -455,11 +453,15 @@ async function get(url) {
     if (error) throw new ApiError(error.message);
     return ok(Array.isArray(data) ? data : []);
   }
-  if (/^\/groups\/\d+\/messages$/.test(url)) {
-    const id = Number(url.split('/')[2]);
-    const { data, error } = await supabase.rpc('my_group_messages', { p_group_id: id, p_limit: 200 });
+  if (/^\/groups\/\d+\/messages(?:\?.*)?$/.test(url)) {
+    const [path, query] = url.split('?');
+    const id = Number(path.split('/')[2]);
+    const before = new URLSearchParams(query || '').get('before');
+    const { data, error } = await supabase.rpc('my_group_messages', {
+      p_group_id: id, p_limit: 50, p_before: before ? Number(before) : null,
+    });
     if (error) throw new ApiError(error.message, 403);
-    return ok(data || []);
+    return ok(data || { messages: [], hasMore: false });
   }
   if (/^\/groups\/\d+\/requests$/.test(url)) {
     const { data, error } = await supabase.rpc('pending_group_requests', { p_group_id: Number(url.split('/')[2]) });
@@ -470,7 +472,8 @@ async function get(url) {
   if (url === '/sessions') {
     const { data, error } = await supabase.rpc('my_sessions');
     if (error) throw new ApiError(error.message);
-    const enriched = await Promise.all((data || []).map((s) => enrichSession(s, viewer.id)));
+    const cache = new Map();
+    const enriched = await Promise.all((data || []).map((s) => enrichSession(s, viewer.id, cache)));
     return ok(enriched);
   }
   if (/^\/sessions\/\d+\/messages(?:\?.*)?$/.test(url)) {
@@ -491,7 +494,8 @@ async function get(url) {
   if (url === '/sessions/pending-acceptances') {
     const { data, error } = await supabase.rpc('pending_acceptances');
     if (error) throw new ApiError(error.message);
-    const enriched = await Promise.all((data || []).map((s) => enrichSession(s, viewer.id)));
+    const cache = new Map();
+    const enriched = await Promise.all((data || []).map((s) => enrichSession(s, viewer.id, cache)));
     return ok(enriched);
   }
   if (url.startsWith('/sessions/') && !url.endsWith('/ics')) {
@@ -716,7 +720,6 @@ async function post(url, body = {}, opts = {}) {
       .select()
       .single();
     if (error) throw new ApiError(error.message);
-    await supabase.rpc('mark_matches_stale', { p_user_id: viewer.id });
     return ok(data, 201);
   }
 
@@ -751,7 +754,6 @@ async function post(url, body = {}, opts = {}) {
     };
     const { data, error } = await supabase.from('career_history').insert(payload).select().single();
     if (error) throw new ApiError(error.message);
-    await supabase.rpc('mark_matches_stale', { p_user_id: viewer.id });
     return ok({ ...data, role: data.role_title }, 201);
   }
 
@@ -814,7 +816,7 @@ async function post(url, body = {}, opts = {}) {
       p_idempotency_key: body.idempotency_key || crypto.randomUUID(),
       p_follow_up_intent: body.follow_up_intent || 'one_off',
     });
-    if (error) throw new ApiError(error.message);
+    if (error) throw new ApiError(error.message, error.code === 'P0001' || error.code === '23514' ? 400 : 500);
     return ok(await enrichSession(data, viewer.id), 201);
   }
 
@@ -1108,9 +1110,6 @@ async function put(url, body = {}) {
     if (Object.prototype.hasOwnProperty.call(body, 'current_role')) update.job_title = body.current_role;
     const { error } = await supabase.from('profiles').update(update).eq('id', viewer.id);
     if (error) throw new ApiError(error.message);
-    if (['department', 'seniority', 'program', 'cohort_year', 'current_role'].some((k) => Object.prototype.hasOwnProperty.call(body, k))) {
-      await supabase.rpc('mark_matches_stale', { p_user_id: viewer.id });
-    }
     return ok(await loadProfile(viewer.id, viewer.id));
   }
 
@@ -1145,7 +1144,6 @@ async function put(url, body = {}) {
       .select()
       .single();
     if (error) throw new ApiError(error.message);
-    await supabase.rpc('mark_matches_stale', { p_user_id: viewer.id });
     return ok({ ...data, role: data.role_title });
   }
 
@@ -1203,7 +1201,17 @@ async function put(url, body = {}) {
       if (error) throw new ApiError(error.message);
       session = data;
     }
-    return ok(await enrichSession(session, viewer.id));
+    let calendarSyncWarning = false;
+    if (body.scheduled_at !== undefined || ['scheduled', 'cancelled', 'declined'].includes(body.status)) {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const { data, error } = await invokeUserFunction('calendar-provider', { action: 'sync_session_events', session_id: id });
+          calendarSyncWarning = Boolean(error || data?.error);
+        } catch { calendarSyncWarning = true; }
+        if (!calendarSyncWarning) break;
+      }
+    }
+    return ok({ ...await enrichSession(session, viewer.id), calendarSyncWarning });
   }
 
   if (/^\/admin\/access-requests\/\d+$/.test(url)) {
@@ -1297,14 +1305,12 @@ async function del(url) {
     const id = Number(url.split('/')[4]);
     const { error } = await supabase.from('skills').delete().eq('id', id).eq('user_id', viewer.id);
     if (error) throw new ApiError(error.message);
-    await supabase.rpc('mark_matches_stale', { p_user_id: viewer.id });
     return ok({ ok: true });
   }
   if (/^\/users\/me\/career\/\d+$/.test(url)) {
     const id = Number(url.split('/')[4]);
     const { error } = await supabase.from('career_history').delete().eq('id', id).eq('user_id', viewer.id);
     if (error) throw new ApiError(error.message);
-    await supabase.rpc('mark_matches_stale', { p_user_id: viewer.id });
     return ok({ ok: true });
   }
   if (/^\/reflections\/\d+$/.test(url)) {

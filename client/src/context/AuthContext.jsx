@@ -4,26 +4,24 @@ import { supabase } from '../lib/supabase.js';
 const AuthContext = createContext(null);
 
 async function loadProfile(userId) {
-  try {
     // After migration 0012 the `profiles` table-level SELECT is restricted
     // to a column allowlist (it excludes `shadow_role_response`). Use the
     // security-definer `my_profile()` RPC so we still get every column on
     // our own row.
     const { data, error } = await supabase.rpc('my_profile');
-    if (error || !data) return null;
-    if (data.id !== userId) return null;
+    if (error) throw error;
+    if (!data) return null;
+    if (data.id !== userId) throw new Error('profile_mismatch');
 
     // Alias job_title -> current_role for legacy components.
     return { ...data, current_role: data.job_title };
-  } catch {
-    return null;
-  }
 }
 
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [profileError, setProfileError] = useState(false);
   // Number of scheduled-but-not-yet-acknowledged sessions where the viewer is
   // the mentee. Surfaced as a badge in the sidebar and used by the dashboard
   // to decide whether to render the AcceptanceModal.
@@ -34,6 +32,7 @@ export function AuthProvider({ children }) {
     let mounted = true;
     let lastUserId = null;
     let initialized = false;
+    let requestId = 0;
 
     async function hydrate(s) {
       if (!mounted) return;
@@ -43,18 +42,29 @@ export function AuthProvider({ children }) {
       // owns the loading flag — never clear it from a dedupe path.
       if (uid === lastUserId && initialized) return;
       lastUserId = uid;
+      const currentRequest = ++requestId;
       try {
         const next = uid ? await loadProfile(uid) : null;
-        if (mounted) setProfile(next);
+        if (mounted && currentRequest === requestId) {
+          setProfile(next);
+          setProfileError(false);
+        }
+      } catch {
+        if (mounted && currentRequest === requestId) {
+          lastUserId = null;
+          setProfileError(true);
+        }
       } finally {
-        if (mounted && !initialized) {
+        if (mounted && currentRequest === requestId && !initialized) {
           initialized = true;
           setLoading(false);
         }
       }
     }
 
-    supabase.auth.getSession().then(({ data: { session: s } }) => hydrate(s));
+    supabase.auth.getSession().then(({ data: { session: s } }) => hydrate(s)).catch(() => {
+      if (mounted) { setProfileError(true); setLoading(false); }
+    });
     // Keep the auth callback synchronous. Supabase invokes it while holding
     // its auth lock; profile hydration uses the same client and must run after
     // the callback returns.
@@ -75,7 +85,7 @@ export function AuthProvider({ children }) {
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${session.user.id}` },
-        (payload) => setProfile((p) => (p ? { ...p, ...payload.new } : p))
+        (payload) => setProfile((p) => (p ? { ...p, ...payload.new, current_role: payload.new.job_title ?? p.current_role } : p))
       )
       .subscribe();
     return () => { supabase.removeChannel(ch); };
@@ -94,8 +104,21 @@ export function AuthProvider({ children }) {
   }
 
   async function refreshProfile() {
-    if (!session?.user?.id) return;
-    setProfile(await loadProfile(session.user.id));
+    setLoading(true);
+    try {
+      const current = session || (await supabase.auth.getSession()).data.session;
+      if (!current?.user?.id) {
+        setProfileError(false);
+        return;
+      }
+      setSession(current);
+      setProfile(await loadProfile(current.user.id));
+      setProfileError(false);
+    } catch {
+      setProfileError(true);
+    } finally {
+      setLoading(false);
+    }
   }
 
   function updateProfileLocal(partial) {
@@ -158,6 +181,7 @@ export function AuthProvider({ children }) {
         session,
         user: profile, // app-level "user" = our profile row, mirrors legacy shape
         loading,
+        profileError,
         signIn,
         signOut,
         // Keep legacy names so existing components don't all need renaming.

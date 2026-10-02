@@ -9,6 +9,9 @@ jobs:
   send:
     if: github.event_name == 'workflow_dispatch' || vars.NOTIFICATIONS_ENABLED == 'true'
     runs-on: ubuntu-latest
+    concurrency:
+      group: notification-outbox-production
+      cancel-in-progress: false
     timeout-minutes: 5
     steps:
       - name: Send queued notifications

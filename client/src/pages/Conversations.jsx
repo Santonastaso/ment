@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Check, ChevronLeft, Info, MessageCircle, Send, UserRound, UsersRound } from 'lucide-react';
+import { Check, ChevronLeft, Info, ListFilter, MessageCircle, MessageSquareText, PanelLeft, Send, UserRound, UsersRound } from 'lucide-react';
 import api from '../api/index.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useT } from '../i18n/index.jsx';
@@ -63,6 +63,12 @@ function appendMessage(current, row) {
   return current.some((item) => item.id === row.id) ? current : [...current, row].sort((a, b) => a.id - b.id);
 }
 
+function mergeLatestMessages(current, latest) {
+  const existing = new Set(current.map((item) => item.id));
+  const missing = latest.filter((item) => !existing.has(item.id));
+  return missing.length ? [...current, ...missing].sort((a, b) => a.id - b.id) : current;
+}
+
 export default function Conversations() {
   const { user, unreadCounts, refreshPendingAcceptances, refreshUnreadCounts } = useAuth();
   const { t, lang } = useT();
@@ -71,13 +77,28 @@ export default function Conversations() {
   const selectedId = Number(params.get('session')) || null;
   const selectedGroupId = Number(params.get('group')) || null;
   const [sessions, setSessions] = useState([]);
+  const [railCollapsed, setRailCollapsed] = useState(false);
+  const [railMenu, setRailMenu] = useState(null);
+  const railRef = useRef(null);
   const filter = FILTERS.some(option => option.key === params.get('filter')) ? params.get('filter') : 'all';
   function selectThread(key, id) {
     const next = new URLSearchParams(params);
     next.delete('session'); next.delete('group');
     next.set(key, String(id));
     setParams(next);
+    setRailMenu(null);
   }
+  useEffect(() => {
+    if (!railMenu) return undefined;
+    const closeOnOutsideClick = event => { if (!railRef.current?.contains(event.target)) setRailMenu(null); };
+    const closeOnEscape = event => { if (event.key === 'Escape') setRailMenu(null); };
+    document.addEventListener('pointerdown', closeOnOutsideClick);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsideClick);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [railMenu]);
   // Sessions the current filter admits, newest meeting first.
   const visibleSessions = useMemo(() => {
     const match = FILTERS.find(option => option.key === filter)?.match ?? (() => true);
@@ -128,7 +149,7 @@ export default function Conversations() {
     return next;
   }
 
-  async function loadMessages(id, before = null) {
+  async function loadMessages(id, before = null, updatePagination = true) {
     const query = before ? `?before=${before}` : '';
     const { data } = await api.get(`/sessions/${id}/messages${query}`);
     if (activeThreadRef.current !== `session:${id}`) return;
@@ -137,16 +158,34 @@ export default function Conversations() {
       if (box) preserveScrollRef.current = { height: box.scrollHeight, top: box.scrollTop };
       setMessages((current) => [...data.messages.filter((item) => !current.some((old) => old.id === item.id)), ...current]);
     } else {
-      setMessages((current) => [...data.messages, ...current.filter((item) => !data.messages.some((loaded) => loaded.id === item.id))].sort((a, b) => a.id - b.id));
+      setMessages((current) => mergeLatestMessages(current, data.messages));
     }
-    setHasOlder(data.hasMore);
+    if (updatePagination) setHasOlder(data.hasMore);
+  }
+
+  async function loadGroupMessages(id, before = null, updatePagination = true) {
+    const query = before ? `?before=${before}` : '';
+    const { data } = await api.get(`/groups/${id}/messages${query}`);
+    if (activeThreadRef.current !== `group:${id}`) return;
+    data.messages.forEach((item) => senderNamesRef.current.set(item.sender_id, item.sender_name));
+    if (before) {
+      const box = messagesRef.current;
+      if (box) preserveScrollRef.current = { height: box.scrollHeight, top: box.scrollTop };
+      setMessages((current) => [...data.messages.filter((item) => !current.some((old) => old.id === item.id)), ...current]);
+    } else {
+      setMessages((current) => mergeLatestMessages(current, data.messages));
+    }
+    if (updatePagination) setHasOlder(data.hasMore);
   }
 
   async function loadOlderMessages() {
     const oldest = messages[0]?.id;
-    if (!selectedId || !oldest || loadingOlder) return;
+    if ((!selectedId && !selectedGroupId) || !oldest || loadingOlder) return;
     setLoadingOlder(true);
-    try { await loadMessages(selectedId, oldest); }
+    try {
+      if (selectedGroupId) await loadGroupMessages(selectedGroupId, oldest);
+      else await loadMessages(selectedId, oldest);
+    }
     catch (requestError) { setError(requestError.response?.data?.error || t('conversations.error')); }
     finally { setLoadingOlder(false); }
   }
@@ -203,15 +242,12 @@ export default function Conversations() {
       let cancelled = false;
       setMessages([]);
       setHasOlder(false);
-      const refresh = () => api.get(`/groups/${selectedGroupId}/messages`)
-        .then(({ data }) => {
-          if (cancelled) return;
-          (data || []).forEach((item) => senderNamesRef.current.set(item.sender_id, item.sender_name));
-          setMessages((current) => [...(data || []), ...current.filter((item) => !(data || []).some((loaded) => loaded.id === item.id))].sort((a, b) => a.id - b.id));
-          return api.post(`/groups/${selectedGroupId}/read`, {}).then(refreshUnreadCounts);
+      const refresh = (initial = false) => loadGroupMessages(selectedGroupId, null, initial)
+        .then(() => {
+          if (!cancelled) return api.post(`/groups/${selectedGroupId}/read`, {}).then(refreshUnreadCounts);
         })
         .catch((requestError) => { if (!cancelled) setError(requestError.response?.data?.error || t('conversations.error')); });
-      refresh();
+      refresh(true);
       const channel = supabase.channel(`group-${selectedGroupId}`)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_messages', filter: `group_id=eq.${selectedGroupId}` }, async ({ new: row }) => {
           let name = row.sender_id === user?.id ? user.name : senderNamesRef.current.get(row.sender_id);
@@ -224,16 +260,19 @@ export default function Conversations() {
           }
           if (row.sender_id !== user?.id) api.post(`/groups/${selectedGroupId}/read`, {}).then(refreshUnreadCounts).catch(() => {});
         })
-        .subscribe();
-      return () => { cancelled = true; supabase.removeChannel(channel); };
+        .subscribe((status) => { if (status === 'SUBSCRIBED') refresh(); });
+      const refreshOnFocus = () => refresh();
+      window.addEventListener('focus', refreshOnFocus);
+      return () => { cancelled = true; window.removeEventListener('focus', refreshOnFocus); supabase.removeChannel(channel); };
     }
     if (!selectedId) { setMessages([]); setHasOlder(false); return undefined; }
     let cancelled = false;
     setMessages([]);
     setHasOlder(false);
-    Promise.all([loadMessages(selectedId), api.post(`/sessions/${selectedId}/read`, {})]).then(refreshUnreadCounts).catch((requestError) => {
+    const refresh = (initial = false) => Promise.all([loadMessages(selectedId, null, initial), api.post(`/sessions/${selectedId}/read`, {})]).then(refreshUnreadCounts).catch((requestError) => {
       if (!cancelled) setError(requestError.response?.data?.error || t('conversations.error'));
     });
+    refresh(true);
     const channel = supabase.channel(`session-${selectedId}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'session_messages', filter: `session_id=eq.${selectedId}` }, ({ new: row }) => {
         if (cancelled) return;
@@ -241,8 +280,10 @@ export default function Conversations() {
         if (row.sender_id !== user?.id) api.post(`/sessions/${selectedId}/read`, {}).then(refreshUnreadCounts).catch(() => {});
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'sessions', filter: `id=eq.${selectedId}` }, () => loadSessions())
-      .subscribe();
-    return () => { cancelled = true; supabase.removeChannel(channel); };
+      .subscribe((status) => { if (status === 'SUBSCRIBED') refresh(); });
+    const refreshOnFocus = () => refresh();
+    window.addEventListener('focus', refreshOnFocus);
+    return () => { cancelled = true; window.removeEventListener('focus', refreshOnFocus); supabase.removeChannel(channel); };
   }, [selectedId, selectedGroupId]);
 
   useLayoutEffect(() => {
@@ -276,6 +317,7 @@ export default function Conversations() {
     const response = await api.put(`/sessions/${selected.id}`, body);
     setSessions((items) => items.map((item) => item.id === selected.id ? response.data : item));
     await loadSessions();
+    if (response.data.calendarSyncWarning) setError(t('conversations.calendarSyncWarning'));
   }
 
   async function withdrawRequest() {
@@ -341,11 +383,16 @@ export default function Conversations() {
   );
 
   return (
-    <section className={cn('conversations-shell', (selectedId || selectedGroupId) && 'has-selection')}>
-      <aside className="conversation-list" aria-label={t('conversations.title')}>
-        <header><h1>{t('conversations.title')}</h1><span>{sessions.length + groups.length}</span></header>
+    <section className={cn('conversations-shell', (selectedId || selectedGroupId) && 'has-selection', railCollapsed && 'is-list-collapsed')}>
+      <aside ref={railRef} className="conversation-list" aria-label={t('conversations.title')}>
+        <header><h1>{t('conversations.title')}</h1><span>{sessions.length + groups.length}</span><button type="button" className="conversation-list-toggle" onClick={() => { setRailCollapsed(current => !current); setRailMenu(null); }} aria-label={railCollapsed ? t('conversations.openList') : t('conversations.closeList')} title={railCollapsed ? t('conversations.openList') : t('conversations.closeList')}><PanelLeft aria-hidden="true" /></button></header>
+        {railCollapsed && <div className="conversation-rail-controls" role="group" aria-label={t('conversations.title')}>
+          <button type="button" aria-label={t('conversations.filter.label')} title={t('conversations.filter.label')} aria-expanded={railMenu === 'filters'} aria-controls="conversation-list-filters" onClick={() => setRailMenu(current => current === 'filters' ? null : 'filters')}><ListFilter aria-hidden="true" /></button>
+          <button type="button" aria-label={t('conversations.title')} title={t('conversations.title')} aria-expanded={railMenu === 'chats'} aria-controls="conversation-list-chats" onClick={() => setRailMenu(current => current === 'chats' ? null : 'chats')}><MessageSquareText aria-hidden="true" />{unreadCounts.sessions + unreadCounts.groups > 0 && <span className="conversation-rail-unread">{unreadCounts.sessions + unreadCounts.groups}</span>}</button>
+        </div>}
+        <div className={cn('conversation-list-content', railMenu && `menu-${railMenu}`)}>
         {(sessions.length > 0 || groups.length > 0) && (
-          <div className="conversation-filters" role="group" aria-label={t('conversations.filter.label')}>
+          <div id="conversation-list-filters" className="conversation-filters" role="group" aria-label={t('conversations.filter.label')}>
             {FILTERS.map(option => {
               const count = option.key === 'all'
                 ? sessions.length + groups.length
@@ -359,7 +406,7 @@ export default function Conversations() {
                   variant="ghost"
                   size="sm"
                   aria-pressed={filter === option.key}
-                  onClick={() => setParams({ filter: option.key })}
+                  onClick={() => { setParams({ filter: option.key }); if (railCollapsed) setRailMenu('chats'); }}
                 >
                   {t(option.label)}<span className="conversation-filter-count">{count}</span>
                 </Button>
@@ -367,7 +414,7 @@ export default function Conversations() {
             })}
           </div>
         )}
-        <div className="conversation-list-scroll">
+        <div id="conversation-list-chats" className="conversation-list-scroll">
         {sessions.length === 0 && groups.length === 0 ? (
           <div className="conversation-empty">
             <MessageCircle />
@@ -412,6 +459,7 @@ export default function Conversations() {
           <p className="conversation-list-empty">{t('conversations.filter.empty')}</p>
         )}
         </>}
+        </div>
         </div>
       </aside>
 
