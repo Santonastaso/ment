@@ -6,6 +6,7 @@ import { useT } from '../i18n/index.jsx';
 import { Button } from './ui/button.jsx';
 import Portal from './ui/portal.jsx';
 import { useModalA11y } from '../lib/useModalA11y.js';
+import { ChevronDown } from 'lucide-react';
 
 const TOTAL_STEPS = 4;
 
@@ -20,6 +21,7 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
   const [draft, setDraft] = useState('');
   const [draftEdited, setDraftEdited] = useState(false);
   const [requestTitle, setRequestTitle] = useState(initialQuestion.slice(0, 80));
+  const [reviewDetailsOpen, setReviewDetailsOpen] = useState(false);
   const idempotencyKey = useRef(crypto.randomUUID());
   const submitLock = useRef(false);
   const submittedPayload = useRef(null);
@@ -201,7 +203,29 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
                 autoFocus
               />
               <div className="text-right text-xs text-muted-foreground mt-1">{question.length}/4000</div>
-              <label className="mt-3 block text-sm">{copy.intent}<select className="input mt-1" value={intent} onChange={e => setIntent(e.target.value)}><option value="one_off">{copy.oneOff}</option><option value="ongoing">{copy.ongoing}</option></select></label>
+              <div className="mt-4">
+                <p className="label mb-2">{copy.intent}</p>
+                <div className="grid grid-cols-2 gap-2" role="group" aria-label={copy.intent}>
+                  {[
+                    { value: 'one_off', label: copy.oneOff },
+                    { value: 'ongoing', label: copy.ongoing },
+                  ].map(option => {
+                    const active = intent === option.value;
+                    return (
+                      <Button
+                        key={option.value}
+                        type="button"
+                        variant={active ? 'default' : 'outline'}
+                        aria-pressed={active}
+                        className="h-auto min-h-11 justify-start whitespace-normal rounded-xl px-4 py-3 text-left"
+                        onClick={() => setIntent(option.value)}
+                      >
+                        {option.label}
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
               {selectedTopics.length > 0 && (
                 <div className="mt-3 rounded-lg border border-[var(--border)] bg-muted/40 p-3">
                   <p className="text-[11px] uppercase tracking-wide text-foreground font-medium mb-1">{t('components.sessionRequest.step2TopicsPicked')}</p>
@@ -234,17 +258,27 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
 
           {step === 4 && (
             <div className="space-y-5 text-sm">
-              <div className="border-b border-border pb-4">
-                <p className="font-semibold text-foreground">{t('components.sessionRequest.reviewTitle')}</p>
-                <p className="mt-2"><span className="font-medium">{copy.recipient}:</span> {mentor.name}</p>
-              </div>
-              <p className="text-xs text-muted-foreground">{copy.draft}</p>
-              <label className="block">{t('components.sessionRequest.title')}<input className="input mt-1" value={requestTitle} maxLength={120} disabled={submitting || !!submittedPayload.current} onChange={e => setRequestTitle(e.target.value)} /></label>
+              <p className="font-semibold text-foreground">{t('components.sessionRequest.reviewTitle')}</p>
+              <label className="block">{t('components.sessionRequest.requestTitle')}<input className="input mt-1" value={requestTitle} maxLength={120} disabled={submitting || !!submittedPayload.current} onChange={e => setRequestTitle(e.target.value)} /></label>
               <label className="block">{copy.message}<textarea className="input mt-1 min-h-40 resize-none" value={draft} maxLength={6000} disabled={submitting || !!submittedPayload.current} onChange={e => { setDraft(e.target.value); setDraftEdited(true); }} /></label>
-              <p>{intent === 'ongoing' ? copy.ongoing : copy.oneOff}</p>
-              <div><span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('components.sessionRequest.reviewQuestion')}</span><p className="mt-1 text-foreground">{question}</p></div>
-              {selectedTopics.length > 0 && <div><span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('components.sessionRequest.reviewTopics')}</span><p className="mt-1 text-foreground">{selectedTopics.join(', ')}</p></div>}
-              <div><span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('components.sessionRequest.reviewWhen')}</span><p className="mt-1 text-foreground">{scheduledAt ? new Date(scheduledAt).toLocaleString(lang) : t('components.sessionRequest.reviewNoTime')}</p></div>
+              <div className="rounded-2xl border border-border p-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  aria-expanded={reviewDetailsOpen}
+                  aria-controls="session-request-review-details"
+                  className="w-full justify-between whitespace-normal text-left"
+                  onClick={() => setReviewDetailsOpen(open => !open)}
+                >
+                  <span>{t('components.sessionRequest.reviewDetails')}</span>
+                  <ChevronDown aria-hidden="true" className={`transition-transform duration-200 ${reviewDetailsOpen ? 'rotate-180' : ''}`} />
+                </Button>
+                {reviewDetailsOpen && <div id="session-request-review-details" className="mt-3 space-y-3 border-t border-border pt-3">
+                  {selectedTopics.length > 0 && <div><span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('components.sessionRequest.reviewTopics')}</span><p className="mt-1 text-foreground">{selectedTopics.join(', ')}</p></div>}
+                  <div><span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('components.sessionRequest.reviewWhen')}</span><p className="mt-1 text-foreground">{scheduledAt ? new Date(scheduledAt).toLocaleString(lang) : t('components.sessionRequest.reviewNoTime')}</p></div>
+                  <p className="text-foreground">{intent === 'ongoing' ? copy.ongoing : copy.oneOff}</p>
+                </div>}
+              </div>
               <p className="text-xs text-muted-foreground">{t('components.sessionRequest.reviewNotice')}</p>
             </div>
           )}

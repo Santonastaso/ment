@@ -2,7 +2,7 @@ import React, { useEffect, useId, useRef, useState } from 'react';
 import api from '../api/index.js';
 import { useT } from '../i18n/index.jsx';
 import { Button } from './ui/button.jsx';
-import { ChevronRight, X } from 'lucide-react';
+import { Info, X } from 'lucide-react';
 import { useModalA11y } from '../lib/useModalA11y.js';
 import Portal from './ui/portal.jsx';
 
@@ -190,7 +190,7 @@ function ReflectionReview({ entry, busy, onApply, lang }) {
         <span className="min-w-0 flex-1 truncate text-sm text-foreground">{summary}</span>
         <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
           {entry.applied ? t('components.reflection.appliedToSkills') : count > 0 ? t('components.reflection.reviewSuggestions') : null}
-          <ChevronRight className="size-4" aria-hidden="true" />
+          <span className="grid size-8 place-items-center rounded-full bg-[var(--control-surface)]"><Info className="size-4" aria-hidden="true" /></span>
         </span>
       </button>
 
