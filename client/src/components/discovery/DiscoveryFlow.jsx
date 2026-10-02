@@ -112,14 +112,13 @@ function MatchCard({ match, index, selected, onSelect, copy, style }) {
 
       <span className="person-row-actions">
         <Link className="person-row-link" to={`/profile/${person.id}`}>{copy.viewProfile}</Link>
-        <button
+        <Button variant={selected ? 'default' : 'ghost'} size="sm"
           type="button"
           aria-label={`${copy.choose} ${person.name}`}
           onClick={() => onSelect(match)}
-          className={`person-row-action ${selected ? 'is-selected' : ''}`}
         >
           {selected ? copy.selected : copy.choose}
-        </button>
+        </Button>
       </span>
 
       {match.reasons?.length > 0 && (
@@ -369,7 +368,7 @@ export default function DiscoveryFlow() {
   }
 
   function composer() {
-    return <form className="discovery-composer" onSubmit={submit}><textarea ref={composerInputRef} value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} maxLength={2000} rows={1} placeholder={copy.placeholder} aria-label={copy.placeholder} disabled={stage === 'matching' || stage === 'drafting' || sending} /><button className="discovery-send" type="submit" disabled={!query.trim() || stage === 'matching' || stage === 'drafting' || sending} aria-label={t('conversations.send')}><ArrowUp /></button></form>;
+    return <form className="discovery-composer" onSubmit={submit}><textarea ref={composerInputRef} value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} maxLength={2000} rows={1} placeholder={copy.placeholder} aria-label={copy.placeholder} disabled={stage === 'matching' || stage === 'drafting' || sending} /><Button size="icon" type="submit" disabled={!query.trim() || stage === 'matching' || stage === 'drafting' || sending} aria-label={t('conversations.send')}><ArrowUp /></Button></form>;
   }
 
   const firstName = user?.name?.split(' ')[0] || '';
@@ -466,7 +465,7 @@ export default function DiscoveryFlow() {
         {error && <p className="discovery-error" role="alert">{error}</p>}
       </div>
     )}
-    {isConversation && <div className="discovery-conversation"><div className="discovery-conversation-toolbar"><span className="discovery-thread-title"><strong>{threadTitle}</strong></span><button type="button" onClick={reset} disabled={sending}><Pencil />{copy.newChat}</button></div><div className="discovery-header-fade" aria-hidden="true" /><div className="discovery-chat-transcript">{renderedTurns.map((turn, index) => {
+    {isConversation && <div className="discovery-conversation"><div className="discovery-conversation-toolbar"><span className="discovery-thread-title"><strong>{threadTitle}</strong></span><Button type="button" variant="ghost" size="sm" onClick={reset} disabled={sending}><Pencil />{copy.newChat}</Button></div><div className="discovery-header-fade" aria-hidden="true" /><div className="discovery-chat-transcript">{renderedTurns.map((turn, index) => {
       if (turn.role === 'user') return <div className="discovery-chat-turn is-user" key={`${turn.at || index}-${index}`}><div className="discovery-user-bubble">{turn.content}</div></div>;
       if (turn.role !== 'assistant') return null;
       const response = turn.kind === 'matches' && turn.content === 'matches_ready'
@@ -485,7 +484,7 @@ export default function DiscoveryFlow() {
       <Link to={`/explorer?mode=directory&q=${encodeURIComponent(submittedQuery)}`} className="discovery-result-icon" aria-label={copy.browse} title={copy.browse}><Search /></Link>
       {matchFeedback !== null && <span className="sr-only" role="status">{copy.feedbackSaved}</span>}
     </div></div>}
-    {stage === 'empty' && <div className="discovery-empty"><button type="button" onClick={reset}><RefreshCw size={15} aria-hidden="true" />{copy.retry}</button></div>}
+    {stage === 'empty' && <div className="discovery-empty"><Button type="button" variant="ghost" size="sm" onClick={reset}><RefreshCw size={15} aria-hidden="true" />{copy.retry}</Button></div>}
     {(stage === 'reachout' || stage === 'sent') && selected && (
       <div className="discovery-reachout discovery-reveal">
         <div className="discovery-assistant-message">
@@ -507,16 +506,16 @@ export default function DiscoveryFlow() {
             {stage === 'reachout' ? (
               <div className="discovery-actions">
                 <div className="flex flex-wrap items-center gap-2">
-                  <button type="button" className="discovery-text-button" onClick={() => setStage('choose')}><ArrowLeft />{copy.back}</button>
-                  <button type="button" className="discovery-primary" onClick={sendRequest} disabled={sending || !draft.trim()}>{sending ? <RefreshCw className="animate-spin" /> : <Send />}{copy.send}</button>
-                  <button type="button" className="discovery-ghost" onClick={regenerate}><RefreshCw />{copy.regenerate}</button>
+                  <Button type="button" variant="link" onClick={() => setStage('choose')}><ArrowLeft />{copy.back}</Button>
+                  <Button type="button" onClick={sendRequest} disabled={sending || !draft.trim()}>{sending ? <RefreshCw className="animate-spin" /> : <Send />}{copy.send}</Button>
+                  <Button type="button" variant="ghost" onClick={regenerate}><RefreshCw />{copy.regenerate}</Button>
                 </div>
               </div>
             ) : (
               <>
                 <div className="discovery-confirmation"><Check /><div><strong>{text(copy, 'sent', { name: selected.person.name.split(' ')[0] })}</strong><p>{copy.sentSubline}</p></div></div>
-                {sessionId && <Link className="discovery-ghost mt-4" to={`/conversations?session=${sessionId}`}>{copy.openChat}</Link>}
-                <button type="button" className="discovery-again" onClick={reset}>{copy.again}</button>
+                {sessionId && <Button variant="ghost" className="mt-4" render={<Link to={`/conversations?session=${sessionId}`} />}>{copy.openChat}</Button>}
+                <Button type="button" variant="ghost" onClick={reset}>{copy.again}</Button>
               </>
             )}
             {error && <p className="discovery-error" role="alert">{error}</p>}

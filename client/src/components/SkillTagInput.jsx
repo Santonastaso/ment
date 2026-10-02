@@ -113,7 +113,7 @@ export default function SkillTagInput({ value = [], onChange, placeholder, lang,
             role="dialog"
             aria-modal="true"
             aria-labelledby={`skill-tag-title-${openIdx}`}
-            className="app-modal-panel w-full max-w-md overflow-hidden rounded-[10px] border border-[var(--border)] bg-card [box-shadow:var(--shadow-overlay)]"
+            className="app-modal-panel w-full max-w-md overflow-hidden rounded-[var(--dialog-radius)] border border-[var(--border)] bg-card [box-shadow:var(--shadow-overlay)]"
           >
             <div className="flex items-start justify-between gap-3 border-b border-[var(--border-subtle)] p-5">
               <h2 id={`skill-tag-title-${openIdx}`} className="text-base font-medium leading-snug text-foreground">

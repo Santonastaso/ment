@@ -10,6 +10,10 @@ function fixtureApi(state) {
     state.calls.push({ method, path, body });
     if (method === 'post' && state.failNext === path) { state.failNext = null; throw new Error('Fixture network failure'); }
     if (method === 'get') {
+      if (path === '/users/me') return { ...state.user, skills: [], career: [] };
+      if (path === '/users/me/skill-evidence') return [];
+      if (path === '/users/me/capacity') return {};
+      if (path === '/reflections') return { entries: state.reflections || [] };
       if (path === '/sessions') return state.sessions.map(payload);
       if (path === '/groups') return state.groups;
       if (path.startsWith('/discovery/threads')) return [];
@@ -20,6 +24,11 @@ function fixtureApi(state) {
       }
     }
     if (method === 'post') {
+      if (path === '/reflections') {
+        const entry = { ...body, id: 1, created_at: new Date().toISOString(), extracted_gaps: [], extracted_strengths: [] };
+        state.reflections = [entry];
+        return entry;
+      }
       if (path.endsWith('/read')) {
         const [, kind, id] = path.split('/');
         delete state.unread[kind === 'groups' ? 'groupMessages' : 'sessionMessages'][id];

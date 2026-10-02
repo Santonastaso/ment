@@ -163,24 +163,22 @@ export default function Groups() {
                   </span>
 
                   <span className="person-row-actions">
-                    {group.is_owner && group.pending_count > 0 && <button type="button" className="person-row-action" onClick={() => openReview(group)}>{t('groups.requests', { count: group.pending_count })}</button>}
+                    {group.is_owner && group.pending_count > 0 && <Button type="button" variant="ghost" size="sm" onClick={() => openReview(group)}>{t('groups.requests', { count: group.pending_count })}</Button>}
                     {group.joined && (
-                      <button
+                      <Button variant="ghost" size="sm"
                         type="button"
-                        className="person-row-action"
                         onClick={() => navigate(`/conversations?group=${group.id}`)}
                       >
                         {t('groups.chat')}
-                      </button>
+                      </Button>
                     )}
-                    <button
+                    <Button variant={group.joined ? 'link' : 'ghost'} size="sm"
                       type="button"
-                      className={group.joined ? 'person-row-link' : 'person-row-action'}
                       disabled={saving}
                       onClick={() => toggleMembership(group)}
                     >
                       {group.joined ? t('groups.leave') : group.join_status === 'pending' ? t('groups.withdraw') : t('groups.requestJoin')}
-                    </button>
+                    </Button>
                   </span>
                   {!group.joined && group.join_status && <span className="person-row-detail text-sm text-muted-foreground">{t(`groups.joinStatus.${group.join_status}`)}</span>}
                 </article>

@@ -2,6 +2,8 @@ import React, { useEffect, useId, useRef, useState } from 'react';
 import api from '../api/index.js';
 import { useT } from '../i18n/index.jsx';
 import { Button } from './ui/button.jsx';
+import { Textarea } from './ui/textarea.jsx';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog.jsx';
 import { Info, X } from 'lucide-react';
 import { useModalA11y } from '../lib/useModalA11y.js';
 import Portal from './ui/portal.jsx';
@@ -10,7 +12,7 @@ import Portal from './ui/portal.jsx';
 // `open`/`onOpenChange` let Profile drive the check-in from its header row, so
 // "Start check-in" can sit beside "View history" instead of below it. Left
 // uncontrolled, the component still renders its own start button.
-export default function ProfileReflection({ history = false, draft, onDraftChange, onSkillsApplied, open: openProp, onOpenChange }) {
+export default function ProfileReflection({ history = false, draft, onDraftChange, onSkillsApplied, open: openProp, onOpenChange, returnFocus }) {
   const { t, lang } = useT();
   const fieldId = useId();
   const [openInternal, setOpenInternal] = useState(false);
@@ -23,6 +25,7 @@ export default function ProfileReflection({ history = false, draft, onDraftChang
   const [busy, setBusy] = useState(false);
   const [reload, setReload] = useState(0);
   const lock = useRef(false);
+  const triggerRef = useRef(null);
 
   useEffect(() => {
     if (!history) return;
@@ -82,24 +85,33 @@ export default function ProfileReflection({ history = false, draft, onDraftChang
 
   return (
     <div className="space-y-3">
-      {!history && !open && !controlled && <Button type="button" onClick={() => setOpen(true)}>{t('components.reflection.startCheckIn')}</Button>}
-      {!history && open && (
+      {!history && !controlled && <Button ref={triggerRef} type="button" aria-haspopup="dialog" onClick={() => setOpen(true)}>{t('components.reflection.startCheckIn')}</Button>}
+      {!history && (
+        <Dialog open={open} onOpenChange={next => { if (!busy) { setOpen(next); setError(''); } }}>
+          <DialogContent className="sm:max-w-lg" showCloseButton={!busy} finalFocus={returnFocus || triggerRef}>
+            <DialogHeader>
+              <DialogTitle>{t('components.reflection.weeklyCheckIn')}</DialogTitle>
+              <DialogDescription>{t('components.reflection.formPlaceholder')}</DialogDescription>
+            </DialogHeader>
         <form onSubmit={submit} className="space-y-3">
           {['support_needed', 'managed_well'].map(key => (
             <div key={key}>
               <label htmlFor={fieldId + key} className="mb-1 block text-sm font-medium">{t(key === 'support_needed' ? 'components.reflection.promptSupportNeeded' : 'components.reflection.promptManagedWell')}</label>
-              <textarea id={fieldId + key} autoFocus={key === 'support_needed'} rows={2} className="input w-full resize-y" disabled={busy}
+              <Textarea id={fieldId + key} autoFocus={key === 'support_needed'} rows={2} className="resize-y" disabled={busy}
                 value={draft[key]} onChange={event => onDraftChange({ ...draft, [key]: event.target.value })}
                 placeholder={t('components.reflection.formPlaceholder')} />
             </div>
           ))}
+          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           <div className="flex flex-wrap justify-end gap-2">
             <Button type="button" variant="ghost" disabled={busy} onClick={() => { setOpen(false); setError(''); }}>{t('components.reflection.cancel')}</Button>
             <Button type="submit" disabled={busy}>{t(busy ? 'components.reflection.saving' : 'components.reflection.save')}</Button>
           </div>
         </form>
+          </DialogContent>
+        </Dialog>
       )}
-      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+      {error && (history || !open) && <p role="alert" className="text-sm text-destructive">{error}</p>}
       {history && error && <Button variant="outline" onClick={() => setReload(n => n + 1)}>{t('explorer.retry')}</Button>}
       {loading && <p role="status" className="text-sm">{t('components.reflection.loading')}</p>}
       {history && !loading && !error && entries.length === 0 && <p className="text-sm text-muted-foreground">{t('components.reflection.empty')}</p>}

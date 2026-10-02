@@ -133,6 +133,7 @@ export default function Profile() {
   const [toast, setToast] = useState('');
   const [reflectionDraft, setReflectionDraft] = useState({ support_needed: '', managed_well: '' });
   const [reflectionOpen, setReflectionOpen] = useState(false);
+  const reflectionTriggerRef = React.useRef(null);
   const [skillFilter, setSkillFilter] = useState('all');
   const [notifyEmail, setNotifyEmail] = useState('');
   const [notifySaving, setNotifySaving] = useState(false);
@@ -603,11 +604,9 @@ export default function Profile() {
                 <Button variant="outline" size="sm" onClick={() => setTab('reflections')}>
                   {t('profile.reflection.viewHistory')}
                 </Button>
-                {!reflectionOpen && (
-                  <Button size="sm" onClick={() => setReflectionOpen(true)}>
+                  <Button ref={reflectionTriggerRef} size="sm" aria-haspopup="dialog" onClick={() => setReflectionOpen(true)}>
                     {t('components.reflection.startCheckIn')}
                   </Button>
-                )}
               </div>
             }
           />
@@ -617,6 +616,7 @@ export default function Profile() {
               onDraftChange={setReflectionDraft}
               onSkillsApplied={refreshProfile}
               open={reflectionOpen}
+              returnFocus={reflectionTriggerRef}
               onOpenChange={setReflectionOpen}
             />
           </SurfaceBody>
@@ -790,7 +790,7 @@ export default function Profile() {
                   {isOwnProfile && (
                     <div className="flex shrink-0 items-center gap-2">
                       <Button variant="ghost" size="sm" onClick={() => startEditCareer(entry)}>{t('profile.career.edit')}</Button>
-                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDeleteCareer(entry.id)}>
+                      <Button variant="danger" size="sm"  onClick={() => handleDeleteCareer(entry.id)}>
                         {t('profile.career.remove')}
                       </Button>
                     </div>

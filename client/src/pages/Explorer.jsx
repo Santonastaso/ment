@@ -119,6 +119,20 @@ export default function Explorer() {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <Button type="button" size="sm" variant="ghost" onClick={() => { setInputValue(''); setSearchParams({}); }}>{t('explorer.clearFilters')}</Button>
                 </div>
+                {!dirError && total > 0 && (
+                  <div className="directory-pagination flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4 text-sm text-muted-foreground">
+                    {updatingResults ? <Skeleton className="h-4 w-28" /> : <span>{t('explorer.showing', { from, to, total })}</span>}
+                    <div className="flex items-center gap-2">
+                      <Button type="button" size="sm" variant="outline" disabled={updatingResults || page <= 1} onClick={() => setParam('page', String(page - 1))}>
+                        {t('explorer.prev')}
+                      </Button>
+                      <span className="tabular-nums">{page}/{pageCount}</span>
+                      <Button type="button" size="sm" variant="outline" disabled={updatingResults || page >= pageCount} onClick={() => setParam('page', String(page + 1))}>
+                        {t('explorer.next')}
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div key={dirError ? 'error' : dirData?.requestKey || 'initial'} className="directory-results" data-loading={updatingResults && !!dirData} aria-busy={updatingResults} inert={updatingResults && !!dirData ? '' : undefined}>
@@ -140,18 +154,6 @@ export default function Explorer() {
                 </Surface>
               ) : (
                 <>
-                  <div className="directory-rail directory-pagination flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
-                    {updatingResults ? <Skeleton className="h-4 w-28" /> : <span>{t('explorer.showing', { from, to, total })}</span>}
-                    <div className="flex items-center gap-2">
-                      <Button type="button" size="sm" variant="outline" disabled={updatingResults || page <= 1} onClick={() => setParam('page', String(page - 1))}>
-                        {t('explorer.prev')}
-                      </Button>
-                      <span className="tabular-nums">{page}/{pageCount}</span>
-                      <Button type="button" size="sm" variant="outline" disabled={updatingResults || page >= pageCount} onClick={() => setParam('page', String(page + 1))}>
-                        {t('explorer.next')}
-                      </Button>
-                    </div>
-                  </div>
                   <div className="directory-rail grid gap-1">
                     {dirData.people.map(person => (
                       <PersonCard key={person.id} person={person} onRequest={() => setRequestingMentor(person)} />
@@ -207,11 +209,11 @@ function PersonCard({ person, onRequest }) {
       <span className="person-row-actions">
         <Link to={`/profile/${person.id}`} className="person-row-link">{t('explorer.viewProfile')}</Link>
         {person.session_id ? (
-          <Link to={`/conversations?session=${person.session_id}`} className="person-row-action">
+          <Button variant="ghost" size="sm" render={<Link to={`/conversations?session=${person.session_id}`} />}>
             {t('explorer.openChat')}
-          </Link>
+          </Button>
         ) : (
-          <button type="button" className="person-row-action" onClick={onRequest}>{t('explorer.requestSession')}</button>
+          <Button type="button" variant="ghost" size="sm" onClick={onRequest}>{t('explorer.requestSession')}</Button>
         )}
       </span>
 
