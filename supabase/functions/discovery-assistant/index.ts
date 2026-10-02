@@ -4,7 +4,7 @@ import { aiErrorResponse, mistralJson } from '../_shared/mistral.ts';
 import { enforceRateLimit } from '../_shared/rate-limit.ts';
 import { canHelpWithCareerGoal, hasGroundedExpertise } from '../_shared/discovery-guards.mjs';
 
-const PROMPT_VERSION = 'discovery-v7';
+const PROMPT_VERSION = 'discovery-v8';
 
 type Candidate = {
   id: string;
@@ -53,7 +53,7 @@ type RankedMatch = {
 };
 
 type MatchResult = {
-  outcome?: 'matches' | 'clarification' | 'no_match';
+  outcome?: 'matches' | 'nearest' | 'clarification' | 'no_match';
   matches?: RankedMatch[];
   clarification?: string;
   no_match_reason?: string;
@@ -100,6 +100,32 @@ function candidateForModel(candidate: Candidate, redactIdentity: boolean) {
 // readily as the documented array, especially when the prompt asks for "one
 // sentence". A string is truthy, so (value || []) does not rescue it and .some
 // throws. Normalise once here so the guard and the card both see one shape.
+// A dead end is still a dead end even when politely worded. Naming what the
+// network is strongest in turns "no" into something the user can act on, and
+// costs nothing: it is counted from the candidates already in hand.
+const STRENGTH_SENTENCE: Record<string, (list: string) => string> = {
+  English: (list) => ` The network is strongest in ${list}.`,
+  Italian: (list) => ` La rete e piu forte in ${list}.`,
+  French: (list) => ` Le reseau est le plus fort en ${list}.`,
+};
+const STRENGTH_JOIN: Record<string, string> = { English: 'and', Italian: 'e', French: 'et' };
+
+function networkStrengths(list: Candidate[], language: string, limit = 3) {
+  const counts = new Map<string, number>();
+  for (const candidate of list) {
+    const department = cleanText(candidate.department, 80);
+    if (department) counts.set(department, (counts.get(department) || 0) + 1);
+  }
+  const top = [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, limit)
+    .map(([department]) => department);
+  if (!top.length) return '';
+  const join = STRENGTH_JOIN[language] || STRENGTH_JOIN.English;
+  const phrase = top.length === 1 ? top[0] : `${top.slice(0, -1).join(', ')} ${join} ${top[top.length - 1]}`;
+  return (STRENGTH_SENTENCE[language] || STRENGTH_SENTENCE.English)(phrase);
+}
+
 function normalizeRanked(item: RankedMatch | null | undefined): RankedMatch {
   const toArray = (value: unknown): string[] => {
     if (Array.isArray(value)) return value.filter((entry): entry is string => typeof entry === 'string');
@@ -228,6 +254,8 @@ Deno.serve(async (req) => {
   }
   const query = cleanText(body.query);
   let requestForMatch = query;
+  let nearestOnly = false;
+  let exactGapReason = '';
   const language = localeName(body.lang);
   if (!query || (action !== 'chat' && query.length < 3)) return jsonError('query_too_short');
 
@@ -283,23 +311,13 @@ Do not broaden explicit professions or domains into adjacent ones. For example, 
 
       // Nothing in the network could serve this. Say so now rather than
       // narrowing a search that has no possible answer.
+      // Nothing in the network does this exactly. That is worth saying, but it
+      // is not a reason to stop: the matcher still looks for the closest
+      // defensible people, and they are shown under that sentence rather than
+      // instead of it.
       if (decision === 'no_match') {
-        const reason = cleanText(result.value?.no_match_reason, 400)
-          || EMPTY_POOL_MESSAGES[language] || EMPTY_POOL_MESSAGES.English;
-        const threadId = await persistTurns(ctx, body.thread_id, query, {
-          kind: 'no_match',
-          content: reason,
-          search_request: cleanText(result.value?.search_request, 1000) || query,
-        });
-        return jsonOk({
-          matches: [],
-          clarification: '',
-          no_match: true,
-          no_match_reason: reason,
-          resolved_request: cleanText(result.value?.search_request, 1000) || query,
-          thread_id: threadId,
-          model: result.model,
-        });
+        nearestOnly = true;
+        exactGapReason = cleanText(result.value?.no_match_reason, 400);
       }
 
       const clarifiedRequest = cleanText(result.value?.search_request, 1000);
@@ -400,8 +418,19 @@ Do not broaden explicit professions or domains into adjacent ones. For example, 
       system: `Decide whether verified university-network profiles genuinely satisfy the user's request. Respond in ${language}. Use only supplied candidates and facts.
 
 Choose exactly one outcome:
-1. "matches": only when at least one candidate has direct, explicit evidence for the clarified request.
-2. "no_match": when no candidate has direct evidence for the clarified request.
+1. "matches": at least one candidate has direct, explicit evidence for the clarified request.
+2. "nearest": no candidate has direct evidence, but at least one is a defensible neighbour. Prefer this over "no_match" whenever an honest neighbour exists.
+3. "no_match": not even a defensible neighbour exists.
+
+A defensible neighbour is one of: the same function in a different industry; the same industry in a different function; a skill in the same family as the one asked for; someone who has managed or hired that function; someone who did that work earlier in their career, which "experience" will show. Nothing else qualifies.
+
+Never offer as nearest: an unrelated profession; anyone whose only link is location, seniority or cohort; "both work in business"; or a student presented as a mentor for a field they are only studying. If you cannot state the relationship in one clause without hedging -- "sort of", "might be able to", "could potentially" -- it is not a neighbour, so leave that person out. Returning two honest neighbours beats returning three with one invented.
+
+On "nearest", every reason must name the gap before the overlap, in the person's own terms: what they do not do, then what they do that is close. "Works in corporate finance rather than audit, and teaches financial reporting" is right. "Could help with audit" is not. The user is told plainly that these are not exact, so an honest reason costs nothing and a padded one costs their time.
+
+"no_match_reason" is required on both "nearest" and "no_match": one plain sentence naming what the network does not have. On "nearest" it is printed directly above the people, so write it as the opening of an offer, not a refusal: "Nobody here works in audit." Do not apologise and do not describe the search.
+
+"exact_unavailable" true means the clarify step already judged, from the whole network's vocabulary, that nothing matches exactly. Treat it as a strong prior for "nearest", but if you do find direct evidence in a candidate, "matches" still wins.
 
 Each candidate may carry "experience": their past roles, employers and what they worked on, most recent first. Treat it as evidence equal to their current role, since someone who did the work earlier still did it. Never infer from it that they are hiring or have an opening.
 
@@ -413,6 +442,7 @@ An explicit profession or domain is not ambiguous. If the user asks for a medica
 
 Return exactly one of these JSON shapes:
 {"outcome":"matches","clarification":"","no_match_reason":"","matches":[{"profile_id":"candidate id","confidence":0.0,"matched_expertise":["exact supplied candidate field"],"reasons":["one concrete reason tied directly to the request"]}]}
+{"outcome":"nearest","clarification":"","no_match_reason":"one plain sentence naming what the network does not have","matches":[{"profile_id":"candidate id","confidence":0.0,"matched_expertise":["exact supplied candidate field"],"reasons":["the gap, then the overlap"]}]}
 {"outcome":"no_match","clarification":"","no_match_reason":"one concise explanation that the current network has no relevant profile","matches":[]}
 
 "reasons" is always a JSON array of strings, never a bare string, even when it holds a single entry. The same applies to "matched_expertise".
@@ -425,8 +455,8 @@ Bad: "Department explicitly Finance; title matches Finance Director requirement"
 Good: "Finance Director who teaches three-statement modelling and board reporting"
 Good: "Runs pricing for a retail group and coaches on category management"
 
-For matches, confidence must be at least 0.75 and matched_expertise must copy an exact supplied skill, job title, department, program, LinkedIn headline, past role title, or employer name. Return at most three matches in best-first order. Never output an ID not present in candidates.`,
-      user: JSON.stringify({ request: requestForMatch, candidates: candidates.map((candidate) => candidateForModel(candidate, redactInterOrg && !established.has(candidate.id))) }),
+Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", and must reflect genuine proximity rather than a number chosen to clear the bar. matched_expertise must copy an exact supplied skill, job title, department, program, LinkedIn headline, past role title, or employer name. Return at most three matches in best-first order. Never output an ID not present in candidates.`,
+      user: JSON.stringify({ request: requestForMatch, exact_unavailable: nearestOnly, candidates: candidates.map((candidate) => candidateForModel(candidate, redactInterOrg && !established.has(candidate.id))) }),
       temperature: 0,
       maxTokens: 700,
     });
@@ -434,12 +464,18 @@ For matches, confidence must be at least 0.75 and matched_expertise must copy an
     const noMatchReason = cleanText(result.value?.no_match_reason, 240);
     const ranked = Array.isArray(result.value?.matches) ? result.value.matches : [];
     const seen = new Set<string>();
+    // The near tier is a separate channel, not a lower bar on the same one: it
+    // is shown under a sentence saying plainly that nothing matches exactly, so
+    // its reasons are allowed to name the gap and its floor is lower. The strict
+    // tier keeps the bar that stopped a Brand Director answering "accounting".
+    const nearest = outcome === 'nearest';
+    const confidenceFloor = nearest ? 0.35 : 0.75;
     const matches = ranked.flatMap((raw) => {
       const item = normalizeRanked(raw);
       const id = cleanText(item?.profile_id, 100);
       const candidate = candidates.find((entry) => entry.id === id);
       const confidence = Number(item?.confidence);
-      if (!candidate || seen.has(id) || !Number.isFinite(confidence) || confidence < 0.75 || !hasGroundedExpertise(grounding(candidate), item) || !canHelpWithCareerGoal(candidate, requestForMatch)) return [];
+      if (!candidate || seen.has(id) || !Number.isFinite(confidence) || confidence < confidenceFloor || !hasGroundedExpertise(grounding(candidate), item, { allowWeakReason: nearest }) || !canHelpWithCareerGoal(candidate, requestForMatch)) return [];
       seen.add(id);
       return [publicCandidate(candidate, item, redactInterOrg && !established.has(candidate.id))];
     }).slice(0, 3);
@@ -451,18 +487,24 @@ For matches, confidence must be at least 0.75 and matched_expertise must copy an
       model: result.model,
       latencyMs: result.latencyMs,
     });
-    if (outcome === 'no_match' || !matches.length) {
-      const reason = noMatchReason || EMPTY_POOL_MESSAGES[language];
+    if (!matches.length) {
+      // Even with nothing to offer, say what the network does have.
+      const base = noMatchReason || exactGapReason || EMPTY_POOL_MESSAGES[language];
+      const reason = `${base}${networkStrengths(candidates, language)}`.slice(0, 400);
       const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'no_match', content: reason, search_request: requestForMatch });
       return jsonOk({ matches: [], clarification: '', no_match: true, no_match_reason: reason, resolved_request: requestForMatch, thread_id: threadId, model: result.model });
     }
+    // A near result is still a result: the people render as cards, under the
+    // sentence that says nothing matched exactly.
+    const gap = nearest ? (noMatchReason || exactGapReason || EMPTY_POOL_MESSAGES[language]) : '';
     const threadId = await persistTurns(ctx, body.thread_id, query, {
       kind: 'matches',
-      content: 'matches_ready',
+      content: gap || 'matches_ready',
       search_request: requestForMatch,
       matches,
+      nearest,
     });
-    return jsonOk({ matches, clarification: '', resolved_request: requestForMatch, thread_id: threadId, model: result.model });
+    return jsonOk({ matches, clarification: '', nearest, no_match_reason: gap, resolved_request: requestForMatch, thread_id: threadId, model: result.model });
   } catch (error) {
     const mapped = aiErrorResponse(error);
     await recordAiRun(ctx.sb, {

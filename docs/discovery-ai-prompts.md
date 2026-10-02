@@ -30,6 +30,8 @@ You are given "coverage": the departments, programs, job titles and skills that 
 
 Otherwise always produce one concise search_request that preserves the user's intent. search_request is read only by the matching step and is never shown to the user, so write it for a search, not for a person.
 
+When someone seeks an internship or job, they want a person who can help them obtain it, not another applicant. Preserve the explicit industry, function and location. Look for professionals in that field or people with explicit hiring, recruitment or career-guidance expertise; never replace finance with luxury simply because both profiles mention internships. Do not assume a professional has a vacancy or hiring authority.
+
 Then decide whether to ask one question first. Apply these rules in order and stop at the first that fits. Where a rule says ask, return decision "clarify" and put the question in "question"; where it says search, return decision "ready":
 1. The request says nothing about what the person does — no field, no skill, no programme. Ask. Location, seniority, years of experience and employer narrow a set but cannot define one, so a request carrying only those still means ask.
 2. The request names a specific skill or a specific role. Do not ask, search. Precision beats breadth: an exact request needs no narrowing.
@@ -81,8 +83,19 @@ System prompt (`{language}` is English, Italian, or French):
 Decide whether verified university-network profiles genuinely satisfy the user's request. Respond in {language}. Use only supplied candidates and facts.
 
 Choose exactly one outcome:
-1. "matches": only when at least one candidate has direct, explicit evidence for the clarified request.
-2. "no_match": when no candidate has direct evidence for the clarified request.
+1. "matches": at least one candidate has direct, explicit evidence for the clarified request.
+2. "nearest": no candidate has direct evidence, but at least one is a defensible neighbour. Prefer this over "no_match" whenever an honest neighbour exists.
+3. "no_match": not even a defensible neighbour exists.
+
+A defensible neighbour is one of: the same function in a different industry; the same industry in a different function; a skill in the same family as the one asked for; someone who has managed or hired that function; someone who did that work earlier in their career, which "experience" will show. Nothing else qualifies.
+
+Never offer as nearest: an unrelated profession; anyone whose only link is location, seniority or cohort; "both work in business"; or a student presented as a mentor for a field they are only studying. If you cannot state the relationship in one clause without hedging -- "sort of", "might be able to", "could potentially" -- it is not a neighbour, so leave that person out. Returning two honest neighbours beats returning three with one invented.
+
+On "nearest", every reason must name the gap before the overlap, in the person's own terms: what they do not do, then what they do that is close. "Works in corporate finance rather than audit, and teaches financial reporting" is right. "Could help with audit" is not. The user is told plainly that these are not exact, so an honest reason costs nothing and a padded one costs their time.
+
+"no_match_reason" is required on both "nearest" and "no_match": one plain sentence naming what the network does not have. On "nearest" it is printed directly above the people, so write it as the opening of an offer, not a refusal: "Nobody here works in audit." Do not apologise and do not describe the search.
+
+"exact_unavailable" true means the clarify step already judged, from the whole network's vocabulary, that nothing matches exactly. Treat it as a strong prior for "nearest", but if you do find direct evidence in a candidate, "matches" still wins.
 
 Each candidate may carry "experience": their past roles, employers and what they worked on, most recent first. Treat it as evidence equal to their current role, since someone who did the work earlier still did it. Never infer from it that they are hiring or have an opening.
 
@@ -94,6 +107,7 @@ An explicit profession or domain is not ambiguous. If the user asks for a medica
 
 Return exactly one of these JSON shapes:
 {"outcome":"matches","clarification":"","no_match_reason":"","matches":[{"profile_id":"candidate id","confidence":0.0,"matched_expertise":["exact supplied candidate field"],"reasons":["one concrete reason tied directly to the request"]}]}
+{"outcome":"nearest","clarification":"","no_match_reason":"one plain sentence naming what the network does not have","matches":[{"profile_id":"candidate id","confidence":0.0,"matched_expertise":["exact supplied candidate field"],"reasons":["the gap, then the overlap"]}]}
 {"outcome":"no_match","clarification":"","no_match_reason":"one concise explanation that the current network has no relevant profile","matches":[]}
 
 "reasons" is always a JSON array of strings, never a bare string, even when it holds a single entry. The same applies to "matched_expertise".
@@ -106,8 +120,24 @@ Bad: "Department explicitly Finance; title matches Finance Director requirement"
 Good: "Finance Director who teaches three-statement modelling and board reporting"
 Good: "Runs pricing for a retail group and coaches on category management"
 
-For matches, confidence must be at least 0.75 and matched_expertise must copy an exact supplied skill, job title, department, program, LinkedIn headline, past role title, or employer name. Return at most three matches in best-first order. Never output an ID not present in candidates.
+Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", and must reflect genuine proximity rather than a number chosen to clear the bar. matched_expertise must copy an exact supplied skill, job title, department, program, LinkedIn headline, past role title, or employer name. Return at most three matches in best-first order. Never output an ID not present in candidates.
 ```
+
+### Always answering
+
+The assistant never dead-ends. Matching returns one of three outcomes:
+
+| Outcome | Bar | Shown as |
+|---|---|---|
+| `matches` | direct evidence, confidence >= 0.75, no hedged reasons | the cards, as before |
+| `nearest` | a defensible neighbour, confidence >= 0.35, reason must name the gap | the same cards under a sentence saying nothing matched exactly |
+| `no_match` | not even a neighbour | that sentence, plus what the network *is* strongest in |
+
+These are two channels, not one looser bar. The strict tier keeps the threshold that stopped a Brand Director answering "accounting"; the near tier is only ever shown beneath an explicit statement that it is not exact, so an honest reason costs nothing.
+
+`hasGroundedExpertise` takes `{ allowWeakReason }` for this. The `weakReason` regex rejects "adjacent", "transferable", "no direct" and similar -- exactly the words an honest near-match reason needs -- so without the flag the near tier would validate to empty and look like a no-op. The expertise check still applies to both tiers: a near match must cite something the person really has.
+
+On a true `no_match`, `networkStrengths()` appends the three departments with the most eligible members, counted from the candidates already in hand, so "no" still carries somewhere to go.
 
 ## Drafting
 
