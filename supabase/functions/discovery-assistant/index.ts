@@ -395,6 +395,7 @@ Deno.serve(async (req) => {
   let anchorTerms: string[] = [];
   let requiredDepartment = '';
   let constraintsOnly = false;
+  let gapSubject = '';
   let departmentFilterApplied = false;
   let exactGapReason = '';
   // Set when this message is the user's answer to a question we asked. Having
@@ -576,8 +577,8 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
       if (!locationMissing && subjectAbsent) {
         nearestOnly = true;
         nearestTerms = [...new Set([...proposed, ...suggested])].slice(0, 4);
-        exactGapReason = humanize(cleanText(result.value?.no_match_reason, 400))
-          || (SUBJECT_GAP[language] || SUBJECT_GAP.English)(namedSubject);
+        gapSubject = namedSubject;
+        exactGapReason = (SUBJECT_GAP[language] || SUBJECT_GAP.English)(namedSubject);
       }
 
       const clarifiedRequest = cleanText(result.value?.search_request, 1000);
@@ -833,7 +834,8 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
       : [];
     if (!matches.length && !fallback.length) {
       // Even with nothing to offer, say what the network does have.
-      const base = noMatchReason || exactGapReason || EMPTY_POOL_MESSAGES[language];
+      const base = (noMatchReason && (!gapSubject || wordsOf(gapSubject).some((word) => word.length >= 3 && wordsOf(noMatchReason).includes(word))) ? noMatchReason : '')
+        || exactGapReason || EMPTY_POOL_MESSAGES[language];
       const reason = `${base}${networkStrengths(networkCandidates, language)}`.slice(0, 400);
       const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'no_match', content: reason, search_request: requestForMatch });
       return jsonOk({ matches: [], clarification: '', no_match: true, no_match_reason: reason, resolved_request: requestForMatch, thread_id: threadId, model: result.model });
@@ -842,7 +844,13 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
     // sentence that says nothing matched exactly.
     const shown = matches.length ? matches : fallback;
     const isNear = constraintsMet ? false : (!matches.length || nearest || (nearestOnly && !locationFilterApplied));
-    const gap = isNear ? (noMatchReason || exactGapReason || EMPTY_POOL_MESSAGES[language]) : '';
+    // The model's sentence is used only when it is about what the user asked
+    // for. For "accounting" it once wrote that nobody here does financial
+    // analysis, beside a card for a financial analyst.
+    const aboutRequest = (text: string) => !gapSubject
+      || wordsOf(gapSubject).filter((word) => word.length >= 3).some((word) => wordsOf(text).includes(word));
+    const modelGap = noMatchReason && aboutRequest(noMatchReason) ? noMatchReason : '';
+    const gap = isNear ? (modelGap || exactGapReason || EMPTY_POOL_MESSAGES[language]) : '';
     const threadId = await persistTurns(ctx, body.thread_id, query, {
       kind: 'matches',
       content: gap || 'matches_ready',
