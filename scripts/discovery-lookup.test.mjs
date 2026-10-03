@@ -178,3 +178,34 @@ test('a department the model mislabels as a location still gets the department q
   const result = await say(fixture, 'finance', 'thread');
   assert.match(result.clarification, /What in finance would help most/);
 });
+
+// The sentences around the results: sized to the count, warm, and specific.
+test('a single exact match is never asked to "pick one"', async () => {
+  const fixture = discoveryFixture({ responses: [
+    { decision: 'ready', search_request: 'Financial modelling', named_subject: 'Financial modelling', matching_terms: [] }, directMatch,
+  ] });
+  const result = await chat(fixture, 'help with Financial modelling');
+  assert.equal(result.matches.length, 1);
+  assert.doesNotMatch(result.message, /pick/i);
+  assert.match(result.message, /someone/i);
+  assert.equal(fixture.thread.turns.at(-1).framed, true);
+});
+
+test('a close match names what is missing and what is close, in the singular', async () => {
+  const fixture = discoveryFixture({ responses: [
+    { decision: 'ready', search_request: 'audit', named_subject: 'audit', matching_terms: [], nearest_terms: ['Financial modelling'] },
+    { outcome: 'no_match', matches: [] },
+  ] });
+  const result = await chat(fixture, 'someone in audit');
+  assert.match(result.message, /^I couldn't find anyone working in audit here, but this person has a background in financial modelling/);
+});
+
+test('a no-match invites a more specific request instead of stopping', async () => {
+  const fixture = discoveryFixture({ responses: [
+    { decision: 'no_match', search_request: 'painter', named_subject: 'painter', matching_terms: [], nearest_terms: [] },
+    { outcome: 'no_match', matches: [] },
+  ] });
+  const result = await chat(fixture, 'I want to meet a painter');
+  assert.match(result.no_match_reason, /^I couldn't find anyone working as a painter here/);
+  assert.match(result.no_match_reason, /industry|role|job title|skill/);
+});

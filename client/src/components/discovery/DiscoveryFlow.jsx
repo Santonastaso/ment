@@ -218,8 +218,11 @@ export default function DiscoveryFlow() {
         setTurns(current => [...current, {
           role: 'assistant',
           kind: nextMatches.length ? 'matches' : 'no_match',
+          // The server now writes the whole sentence around the results, sized
+          // to how many people came back; older replies fall back to the copy.
+          framed: Boolean(data.message),
           content: nextMatches.length
-            ? (data.nearest && data.no_match_reason ? data.no_match_reason : 'matches_ready')
+            ? (data.message || (data.nearest && data.no_match_reason ? data.no_match_reason : 'matches_ready'))
             : (data.no_match_reason || copy.noMatches),
           at: new Date().toISOString(),
         }]);
@@ -482,9 +485,10 @@ export default function DiscoveryFlow() {
       if (turn.role === 'user') return <div className="discovery-chat-turn is-user" key={`${turn.at || index}-${index}`}><div className="discovery-user-bubble">{turn.content}</div></div>;
       if (turn.role !== 'assistant') return null;
       const response = turn.kind === 'matches'
-        ? (turn.content === 'matches_ready'
-          ? `${copy.chooseLead} ${copy.chooseBold}`
-          : `${turn.content} ${copy.nearestLead}`)
+        ? (turn.framed ? turn.content
+          : turn.content === 'matches_ready'
+            ? `${copy.chooseLead} ${copy.chooseBold}`
+            : `${turn.content} ${copy.nearestLead}`)
         : turn.content;
       // One agent mark per run of assistant turns.
       const continues = renderedTurns[index - 1]?.role === 'assistant';

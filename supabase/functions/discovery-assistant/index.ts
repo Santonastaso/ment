@@ -3,6 +3,7 @@ import { recordAiRun } from '../_shared/ai-telemetry.ts';
 import { aiErrorResponse, mistralJson } from '../_shared/mistral.ts';
 import { enforceRateLimit } from '../_shared/rate-limit.ts';
 import { canHelpWithCareerGoal, hasGroundedExpertise } from '../_shared/discovery-guards.mjs';
+import { frameNoMatch, frameResults, namesARole, NO_GAP, type Gap } from './framing.ts';
 
 const PROMPT_VERSION = 'discovery-v15';
 
@@ -129,6 +130,15 @@ const STRENGTH_SENTENCE: Record<string, (list: string) => string> = {
   French: (list) => ` Ici, la plupart des gens travaillent en ${list}.`,
 };
 const STRENGTH_JOIN: Record<string, string> = { English: 'and', Italian: 'e', French: 'et' };
+
+function topDepartments(list: Candidate[], limit = 3) {
+  const counts = new Map<string, number>();
+  for (const candidate of list) {
+    const department = cleanText(candidate.department, 80);
+    if (department) counts.set(department, (counts.get(department) || 0) + 1);
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, limit).map(([name]) => name);
+}
 
 function networkStrengths(list: Candidate[], language: string, limit = 3) {
   const counts = new Map<string, number>();
@@ -397,9 +407,10 @@ Deno.serve(async (req) => {
   let anchorTerms: string[] = [];
   let requiredDepartment = '';
   let constraintsOnly = false;
-  let gapSubject = '';
   let departmentFilterApplied = false;
   let exactGapReason = '';
+  // What is missing, for the sentence shown above or instead of results.
+  let gapState: Gap = NO_GAP;
   // Set when this message is the user's answer to a question we asked. Having
   // spent their one question, returning nothing is the worst possible outcome:
   // we made them work and gave back less than if we had never asked.
@@ -520,6 +531,7 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
       if (locationMissing) {
         nearestOnly = true;
         exactGapReason = (LOCATION_GAP[language] || LOCATION_GAP.English)(namedLocation);
+        gapState = { kind: 'place', value: namedLocation, role: false };
       } else if (namedLocation) {
         namedLocationFilter = namedLocation;
       }
@@ -579,8 +591,8 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
       if (!locationMissing && subjectAbsent) {
         nearestOnly = true;
         nearestTerms = [...new Set([...proposed, ...suggested])].slice(0, 4);
-        gapSubject = namedSubject;
         exactGapReason = (SUBJECT_GAP[language] || SUBJECT_GAP.English)(namedSubject);
+        gapState = { kind: 'subject', value: namedSubject, role: namesARole(language, userTurns.join(' '), namedSubject) };
       }
 
       const clarifiedRequest = cleanText(result.value?.search_request, 1000);
@@ -708,6 +720,7 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
     } else {
       nearestOnly = true;
       exactGapReason = (LOCATION_BUSY[language] || LOCATION_BUSY.English)(namedLocationFilter);
+      gapState = { kind: 'busy', value: namedLocationFilter, role: false };
     }
   }
 
@@ -731,6 +744,7 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
   }
 
   if (!candidates.length) {
+    // Nobody is available at all, so asking for more detail would not help.
     const reason = EMPTY_POOL_MESSAGES[language];
     const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'no_match', content: reason, search_request: requestForMatch });
     return jsonOk({ matches: [], clarification: '', no_match: true, no_match_reason: reason, resolved_request: requestForMatch, thread_id: threadId });
@@ -836,9 +850,7 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
       : [];
     if (!matches.length && !fallback.length) {
       // Even with nothing to offer, say what the network does have.
-      const base = (noMatchReason && (!gapSubject || wordsOf(gapSubject).some((word) => word.length >= 3 && wordsOf(noMatchReason).includes(word))) ? noMatchReason : '')
-        || exactGapReason || EMPTY_POOL_MESSAGES[language];
-      const reason = `${base}${networkStrengths(networkCandidates, language)}`.slice(0, 400);
+      const reason = frameNoMatch(language, gapState, topDepartments(networkCandidates));
       const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'no_match', content: reason, search_request: requestForMatch });
       return jsonOk({ matches: [], clarification: '', no_match: true, no_match_reason: reason, resolved_request: requestForMatch, thread_id: threadId, model: result.model });
     }
@@ -846,21 +858,16 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
     // sentence that says nothing matched exactly.
     const shown = matches.length ? matches : fallback;
     const isNear = constraintsMet ? false : (!matches.length || nearest || (nearestOnly && !locationFilterApplied));
-    // The model's sentence is used only when it is about what the user asked
-    // for. For "accounting" it once wrote that nobody here does financial
-    // analysis, beside a card for a financial analyst.
-    const aboutRequest = (text: string) => !gapSubject
-      || wordsOf(gapSubject).filter((word) => word.length >= 3).some((word) => wordsOf(text).includes(word));
-    const modelGap = noMatchReason && aboutRequest(noMatchReason) ? noMatchReason : '';
-    const gap = isNear ? (modelGap || exactGapReason || EMPTY_POOL_MESSAGES[language]) : '';
+    const message = frameResults(language, { near: isNear, count: shown.length, gap: gapState, closeTerms: nearestTerms });
     const threadId = await persistTurns(ctx, body.thread_id, query, {
       kind: 'matches',
-      content: gap || 'matches_ready',
+      content: message,
+      framed: true,
       search_request: requestForMatch,
       matches: shown,
       nearest: isNear,
     });
-    return jsonOk({ matches: shown, clarification: '', nearest: isNear, no_match_reason: gap, resolved_request: requestForMatch, thread_id: threadId, model: result.model });
+    return jsonOk({ matches: shown, clarification: '', nearest: isNear, message, no_match_reason: isNear ? message : '', resolved_request: requestForMatch, thread_id: threadId, model: result.model });
   } catch (error) {
     const mapped = aiErrorResponse(error);
     await recordAiRun(ctx.sb, {
