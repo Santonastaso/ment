@@ -168,14 +168,20 @@ Asking a question creates an obligation. Once the user has answered one, `must_a
 
 On a true `no_match` where no question was asked, `networkStrengths()` appends the three departments with the most eligible members, counted from the candidates already in hand, so "no" still carries somewhere to go.
 
-### What code decides outright
+### The question funnel
 
-Two decisions kept varying run to run when left to the model, so code makes them:
+Questions are asked by code, one level down per answer that narrows nothing, at most `MAX_QUESTIONS` (3) before searching:
 
-- **Whether to ask.** Exactly when it can change who comes back: the conversation names nothing at all ("I need help", "someone senior" -- filler words are in `LOOKUP_STOPWORDS`), or the latest message names a whole department and nothing else ("someone in finance"). Otherwise never. The model's question is used if it wrote one; otherwise code writes it.
-- **What results must carry.** Confirmed subject terms (`anchorTerms`) filter the candidates before matching, exactly like a named place. "Someone in finance" once returned HR people whose reasons said they hire finance professionals; they are now never offered to the matcher. If nobody carries the terms, nothing is filtered.
+| The latest message | Next question |
+|---|---|
+| names nothing ("I need help", "support") | What would you like help with -- for example finance, consulting or marketing? |
+| names a category ("industry", "a skill", "a role") | Which field...? / Which finance skill...? / Which kind of finance role...? |
+| names a department only ("finance") | What in finance would help most -- a specific skill, a type of role, or career advice? |
+| anything specific | none: search |
 
-A subject the model extracts from a vague request is ignored, which is how "I need help" briefly became a search for a subject called "help".
+The department chosen is stored on the clarification turn (`stage`, `department`) and becomes a **required** filter: "career advice" answered inside finance returns finance people, never any career coach. Other confirmed terms only narrow when no department was chosen. Threads older than the stored field recover the department from the user's earlier turns.
+
+A subject the model extracts from a vague request is ignored, which is how "I need help" briefly became a search for a subject called "help". The model's own questions are no longer used: they varied run to run, and the funnel's wording is fixed.
 
 ### Lookup and model check each other
 

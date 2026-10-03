@@ -109,3 +109,45 @@ test('after the answer, results must carry the subject: no HR people for finance
   assert.deepEqual(result.matches.map((m) => m.id), [finance.id]);
   assert.deepEqual(payload(fixture, 1).candidates.map((c) => c.id), [finance.id], 'HR is never even offered to the matcher');
 });
+
+// The funnel, walked turn by turn: support -> industry -> finance -> answer.
+const say = async (fixture, query, threadId) => (await run(fixture, { action: 'chat', query, lang: 'en', ...(threadId ? { thread_id: threadId } : {}) })).json();
+const clarify = (extra = {}) => ({ decision: 'ready', search_request: '', named_subject: '', ...extra });
+
+test('the funnel goes one level down per answer that narrows nothing', async () => {
+  const fixture = discoveryFixture({ candidates: [finance, hr], responses: [clarify(), clarify(), clarify({ named_subject: 'finance' })] });
+  const first = await say(fixture, 'I am looking for support');
+  assert.match(first.clarification, /What would you like help with/);
+  const second = await say(fixture, 'industry', first.thread_id);
+  assert.match(second.clarification, /Which field are you thinking of/);
+  const third = await say(fixture, 'finance', first.thread_id);
+  assert.match(third.clarification, /What in finance would help most/);
+  assert.equal(fixture.thread.turns.at(-1).department, 'Finance');
+});
+
+test('an answer inside a chosen department stays inside it', async () => {
+  const turns = [{ role: 'user', content: 'finance' }, { role: 'assistant', kind: 'clarification', content: 'What in finance would help most?', stage: 'department', department: 'Finance' }];
+  const hrMatch = { profile_id: hr.id, confidence: 0.9, reasons: ['Coaches careers.'], matched_expertise: ['talent acquisition'] };
+  const fixture = discoveryFixture({ candidates: [finance, hr], turns, responses: [
+    clarify({ search_request: 'career advice', named_subject: 'career advice', matching_terms: [] }),
+    { outcome: 'matches', matches: [hrMatch, directMatch.matches[0]] },
+  ] });
+  const result = await say(fixture, 'career advice', 'thread');
+  assert.deepEqual(result.matches.map((m) => m.id), [finance.id]);
+  assert.match(payload(fixture, 1).request, /Finance/);
+});
+
+test('a category answer inside a department asks for the specific thing', async () => {
+  const turns = [{ role: 'user', content: 'finance' }, { role: 'assistant', kind: 'clarification', content: 'What in finance would help most?', stage: 'department', department: 'Finance' }];
+  const fixture = discoveryFixture({ candidates: [finance, hr], turns, responses: [clarify()] });
+  const result = await say(fixture, 'a specific skill', 'thread');
+  assert.equal(result.clarification, 'Which finance skill would you like help with?');
+});
+
+test('the funnel stops after three questions and searches', async () => {
+  const q = (content) => ({ role: 'assistant', kind: 'clarification', content, stage: 'open' });
+  const turns = [{ role: 'user', content: 'help' }, q('1?'), { role: 'user', content: 'hmm' }, q('2?'), { role: 'user', content: 'not sure' }, q('3?')];
+  const fixture = discoveryFixture({ turns, responses: [clarify(), { outcome: 'no_match', matches: [], no_match_reason: 'Nothing yet.' }] });
+  const result = await say(fixture, 'anything', 'thread');
+  assert.equal(result.clarification, '');
+});

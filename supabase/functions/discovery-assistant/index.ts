@@ -4,7 +4,7 @@ import { aiErrorResponse, mistralJson } from '../_shared/mistral.ts';
 import { enforceRateLimit } from '../_shared/rate-limit.ts';
 import { canHelpWithCareerGoal, hasGroundedExpertise } from '../_shared/discovery-guards.mjs';
 
-const PROMPT_VERSION = 'discovery-v12';
+const PROMPT_VERSION = 'discovery-v13';
 
 // Written here rather than by the model, so the gap names the place the user
 // actually typed instead of drifting to a vaguer sentence about seniority.
@@ -166,7 +166,11 @@ const LOOKUP_STOPWORDS = new Set(['someone', 'somebody', 'person', 'people', 'lo
   'sort', 'some', 'any', 'good', 'great', 'guy', 'man', 'woman', 'helping', 'support', 'advice', 'mentor',
   'mentors', 'mentorship', 'mentoring', 'alumnus', 'alumni', 'alumna', 'student', 'students', 'professional',
   'professionals', 'contact', 'connect', 'anyone', 'everyone', 'anything', 'something', 'get', 'could', 'should',
-  'looking', 'search', 'searching', 'question', 'questions', 'just', 'also', 'more', 'other', 'there', 'their']);
+  'looking', 'search', 'searching', 'question', 'questions', 'just', 'also', 'more', 'other', 'there', 'their',
+  'industries', 'fields', 'sectors', 'areas', 'domain', 'domains', 'functions', 'skill', 'skills', 'specific',
+  'particular', 'job', 'jobs', 'position', 'positions', 'general', 'generally', 'yes', 'sure', 'okay',
+  'settore', 'settori', 'ambito', 'competenza', 'competenze', 'ruolo', 'ruoli', 'secteur', 'domaine',
+  'competence', 'competences', 'poste', 'postes', 'aiuto', 'aide']);
 const wordsOf = (value: string) => value.toLowerCase().split(/[^\p{L}\p{N}&]+/u).filter(Boolean);
 const contentWords = (value: string) => wordsOf(value).filter((word) => word.length >= 3 && !LOOKUP_STOPWORDS.has(word));
 
@@ -205,18 +209,51 @@ const BROAD_SENTENCE: Record<string, (field: string) => string> = {
   French: (field) => `Qu'est-ce qui vous aiderait le plus en ${field} \u2014 une competence precise, un type de poste ou un conseil de carriere ?`,
 };
 
-function broadQuestion(language: string, department: string) {
-  return (BROAD_SENTENCE[language] || BROAD_SENTENCE.English)(department.toLowerCase());
+// The funnel. A question is asked only while the answer so far narrows
+// nothing, and each one goes a level deeper: nothing named, then a category
+// ("industry", "a skill"), then a whole department, then specifics.
+const MAX_QUESTIONS = 3;
+const META_WORDS: Record<string, string[]> = {
+  skill: ['skill', 'skills', 'competenza', 'competenze', 'competence', 'competences'],
+  role: ['role', 'roles', 'job', 'jobs', 'position', 'positions', 'ruolo', 'ruoli', 'poste', 'postes'],
+  field: ['industry', 'industries', 'field', 'fields', 'sector', 'sectors', 'area', 'areas', 'domain', 'domains',
+    'function', 'functions', 'settore', 'settori', 'ambito', 'secteur', 'domaine'],
+};
+function metaKind(text: string) {
+  const words = new Set(wordsOf(text));
+  return (['skill', 'role', 'field'] as const).find((kind) => META_WORDS[kind].some((word) => words.has(word))) || '';
 }
+const FIELD_SENTENCE: Record<string, (list: string) => string> = {
+  English: (list) => `Which field are you thinking of${list ? ` \u2014 for example ${list}` : ''}?`,
+  Italian: (list) => `A quale settore stai pensando${list ? ` \u2014 per esempio ${list}` : ''}?`,
+  French: (list) => `A quel domaine pensez-vous${list ? ` \u2014 par exemple ${list}` : ''} ?`,
+};
+const SKILL_SENTENCE: Record<string, (field: string) => string> = {
+  English: (field) => field ? `Which ${field} skill would you like help with?` : 'Which skill would you like help with?',
+  Italian: (field) => field ? `Con quale competenza in ${field} ti serve aiuto?` : 'Con quale competenza ti serve aiuto?',
+  French: (field) => field ? `Sur quelle competence en ${field} aimeriez-vous de l'aide ?` : "Sur quelle competence aimeriez-vous de l'aide ?",
+};
+const ROLE_SENTENCE: Record<string, (field: string) => string> = {
+  English: (field) => field ? `Which kind of ${field} role are you interested in?` : 'Which kind of role are you interested in?',
+  Italian: (field) => field ? `Che tipo di ruolo in ${field} ti interessa?` : 'Che tipo di ruolo ti interessa?',
+  French: (field) => field ? `Quel type de poste en ${field} vous interesse ?` : 'Quel type de poste vous interesse ?',
+};
 
-function askTemplate(language: string, coverage: unknown) {
+function departmentExamples(language: string, coverage: unknown) {
   const departments: string[] = Array.isArray((coverage as { departments?: string[] })?.departments)
     ? (coverage as { departments: string[] }).departments : [];
   const chosen = [...ASK_PREFERRED.filter((name) => departments.includes(name)), ...departments]
     .filter((name, index, all) => all.indexOf(name) === index).slice(0, 3).map((name) => name.toLowerCase());
   const join = ASK_JOIN[language] || ASK_JOIN.English;
-  const list = chosen.length > 1 ? `${chosen.slice(0, -1).join(', ')} ${join} ${chosen[chosen.length - 1]}` : chosen.join('');
-  return (ASK_SENTENCE[language] || ASK_SENTENCE.English)(list);
+  return chosen.length > 1 ? `${chosen.slice(0, -1).join(', ')} ${join} ${chosen[chosen.length - 1]}` : chosen.join('');
+}
+
+function broadQuestion(language: string, department: string) {
+  return (BROAD_SENTENCE[language] || BROAD_SENTENCE.English)(department.toLowerCase());
+}
+
+function askTemplate(language: string, coverage: unknown) {
+  return (ASK_SENTENCE[language] || ASK_SENTENCE.English)(departmentExamples(language, coverage));
 }
 
 function normalizeRanked(item: RankedMatch | null | undefined): RankedMatch {
@@ -351,6 +388,7 @@ Deno.serve(async (req) => {
   let nearestTerms: string[] = [];
   let relatedTerms: string[] = [];
   let anchorTerms: string[] = [];
+  let requiredDepartment = '';
   let exactGapReason = '';
   // Set when this message is the user's answer to a question we asked. Having
   // spent their one question, returning nothing is the worst possible outcome:
@@ -468,25 +506,38 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
       const pick = (value: unknown, limit: number): string[] | null => Array.isArray(value)
         ? [...new Set(value.map((term) => inVocabulary.get(cleanText(term, 80).toLowerCase())).filter(Boolean) as string[])].slice(0, limit)
         : null;
-      // Decided in code, because the model's answer here varied run to run:
-      // "I need help" was once a question and once a subject called "help".
-      // vague: nothing in the conversation names a field at all.
-      // broadDepartment: the latest message names a department and nothing else.
+      // Funnel state is read from the turns, not inferred by the model. A
+      // department chosen earlier is stored on the question that followed it;
+      // older threads without that field recover it from the user's turns.
       const departments: string[] = Array.isArray((coverage as { departments?: string[] })?.departments)
         ? (coverage as { departments: string[] }).departments : [];
-      const latestContent = contentWords(userTurns.at(-1) || '');
-      const historyContent = contentWords(userTurns.join(' '));
-      const vague = !historyContent.length;
-      const departmentFor = (words: string[]) => words.length
+      const significant = (name: string) => wordsOf(name).filter((word) => word.length >= 3);
+      const pureDepartment = (words: string[]) => words.length
         ? departments.find((name) => words.every((word) => wordsOf(name).includes(word))) || '' : '';
-      const broadDepartment = departmentFor(latestContent.length ? latestContent : historyContent);
+      const mentionedDepartment = (words: string[]) => departments.find((name) => {
+        const parts = significant(name);
+        return parts.length > 0 && parts.every((word) => words.includes(word));
+      }) || '';
+      const latestRaw = userTurns.at(-1) || '';
+      const latestContent = contentWords(latestRaw);
+      const lastResults = priorTurns.map((turn) => turn.role === 'assistant' && (turn.kind === 'matches' || turn.kind === 'no_match')).lastIndexOf(true);
+      const questionsAsked = priorTurns.slice(lastResults + 1)
+        .filter((turn) => turn.role === 'assistant' && turn.kind === 'clarification').length;
+      const previous = priorTurns.at(-1);
+      const answering = previous?.role === 'assistant' && previous?.kind === 'clarification';
+      const earlierDepartment = answering
+        ? cleanText(previous?.department, 80) || userTurns.slice(0, -1).reverse().map((turn) => pureDepartment(contentWords(turn))).find(Boolean) || ''
+        : '';
+      const latestDepartment = pureDepartment(latestContent);
+      requiredDepartment = latestDepartment || mentionedDepartment(latestContent) || earlierDepartment;
+
+      const vague = !contentWords(userTurns.join(' ')).length;
       const rawSubject = cleanText(result.value?.named_subject, 80);
       const namedSubject = vague || !contentWords(rawSubject).length ? '' : rawSubject;
       const exactTerm = inVocabulary.get(namedSubject.toLowerCase());
       const confirmed = pick(result.value?.matching_terms, 8);
       const suggested = pick(result.value?.nearest_terms, 3) || [];
-      const matchingTerms = [...new Set([...(exactTerm ? [exactTerm] : []),
-        ...(broadDepartment ? [broadDepartment] : []), ...(confirmed ?? hits)])];
+      const matchingTerms = [...new Set([...(exactTerm ? [exactTerm] : []), ...(requiredDepartment ? [requiredDepartment] : []), ...(confirmed ?? hits)])];
       const subjectAbsent = Boolean(namedSubject) && !matchingTerms.length;
       if (!locationMissing && subjectAbsent) {
         nearestOnly = true;
@@ -497,30 +548,33 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
 
       const clarifiedRequest = cleanText(result.value?.search_request, 1000);
       requestForMatch = clarifiedRequest || query;
+      if (requiredDepartment && !requestForMatch.toLowerCase().includes(requiredDepartment.toLowerCase())) {
+        requestForMatch = `${requiredDepartment}: ${requestForMatch}`;
+      }
       // Retrieval is steered by terms the model confirmed or chose as nearest,
-      // never by raw lexical hits, and never by rewriting the request itself:
-      // "bookkeeping" finds nobody by its own words but finds financial
-      // reporting through its synonym, while the matcher still sees the goal.
+      // never by raw lexical hits, and never by rewriting the goal itself.
       relatedTerms = nearestOnly ? nearestTerms : (confirmed || []);
-      // What the results must actually carry. Without it, "someone in finance"
-      // returned HR people whose reasons said they hire finance professionals.
       anchorTerms = nearestOnly ? [] : matchingTerms;
-      // A request that names nothing cannot be searched, so it always gets one
-      // question, written here if the model did not write one.
-      // The question is asked exactly when it can change who comes back: the
-      // request names nothing, or names a whole department and nothing more.
-      const broadFieldAlone = Boolean(broadDepartment) && latestContent.length > 0 && !namedLocation;
-      const mustAsk = !hasClarified && !nearestOnly && (vague || broadFieldAlone);
-      const question = cleanText(result.value?.question, 400)
-        || (broadFieldAlone ? broadQuestion(language, broadDepartment) : askTemplate(language, coverage));
-      // One question per conversation, enforced here and not only in the prompt.
-      // A clarify decision with no question used to fall back to echoing
-      // search_request at the user; that text is written for the matching model
-      // and reads like a database query, so searching is always the better
-      // answer than showing it.
-      if (mustAsk && question) {
-        const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'clarification', content: question });
-        return jsonOk({ matches: [], clarification: question, thread_id: threadId });
+
+      // One level down the funnel per answer, while the answer narrows nothing.
+      let step: { stage: string; question: string; department?: string } | null = null;
+      if (questionsAsked < MAX_QUESTIONS && !locationMissing) {
+        const meta = metaKind(latestRaw);
+        if (latestDepartment && latestDepartment !== earlierDepartment) {
+          step = { stage: 'department', department: latestDepartment, question: broadQuestion(language, latestDepartment) };
+        } else if (!latestContent.length && meta === 'skill') {
+          step = { stage: 'skill', department: earlierDepartment, question: (SKILL_SENTENCE[language] || SKILL_SENTENCE.English)(earlierDepartment.toLowerCase()) };
+        } else if (!latestContent.length && meta === 'role') {
+          step = { stage: 'role', department: earlierDepartment, question: (ROLE_SENTENCE[language] || ROLE_SENTENCE.English)(earlierDepartment.toLowerCase()) };
+        } else if (!latestContent.length && !earlierDepartment) {
+          step = meta === 'field'
+            ? { stage: 'field', question: (FIELD_SENTENCE[language] || FIELD_SENTENCE.English)(departmentExamples(language, coverage)) }
+            : { stage: 'open', question: askTemplate(language, coverage) };
+        }
+      }
+      if (step) {
+        const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'clarification', content: step.question, stage: step.stage, department: step.department || '' });
+        return jsonOk({ matches: [], clarification: step.question, thread_id: threadId });
       }
     } catch (error) {
       const mapped = aiErrorResponse(error);
@@ -617,13 +671,17 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
 
   // A confirmed subject is a requirement, not a hint, exactly like a named
   // place. If nobody carries it, nothing is filtered and the tiers decide.
-  if (anchorTerms.length) {
-    const wanted = anchorTerms.map((term) => term.toLowerCase());
-    const carrying = candidates.filter((candidate) => {
-      const fields = [candidate.department, candidate.job_title, ...(candidate.skills || []), ...(candidate.experience_facts || [])]
-        .filter(Boolean).map((value) => String(value).toLowerCase());
-      return wanted.some((term) => fields.some((field) => field === term || field.includes(term)));
-    });
+  // A chosen department is a requirement on its own: "career advice" inside
+  // finance must still mean finance people, not any career coach. Other terms
+  // only narrow when no department was chosen.
+  const carries = (candidate: Candidate, terms: string[]) => {
+    const fields = [candidate.department, candidate.job_title, ...(candidate.skills || []), ...(candidate.experience_facts || [])]
+      .filter(Boolean).map((value) => String(value).toLowerCase());
+    return terms.some((term) => fields.some((field) => field === term.toLowerCase() || field.includes(term.toLowerCase())));
+  };
+  const required = requiredDepartment ? [requiredDepartment] : anchorTerms;
+  if (required.length) {
+    const carrying = candidates.filter((candidate) => carries(candidate, required));
     if (carrying.length) candidates = carrying;
   }
 
