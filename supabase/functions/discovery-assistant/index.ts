@@ -4,7 +4,7 @@ import { aiErrorResponse, mistralJson } from '../_shared/mistral.ts';
 import { enforceRateLimit } from '../_shared/rate-limit.ts';
 import { canHelpWithCareerGoal, hasGroundedExpertise } from '../_shared/discovery-guards.mjs';
 
-const PROMPT_VERSION = 'discovery-v13';
+const PROMPT_VERSION = 'discovery-v14';
 
 // Written here rather than by the model, so the gap names the place the user
 // actually typed instead of drifting to a vaguer sentence about seniority.
@@ -256,6 +256,11 @@ function askTemplate(language: string, coverage: unknown) {
   return (ASK_SENTENCE[language] || ASK_SENTENCE.English)(departmentExamples(language, coverage));
 }
 
+// The prompt bans these words and the small model uses them anyway.
+function humanize(text: string) {
+  return text.replace(/\b(explicitly|verified|currently)\s+/gi, '').replace(/\s{2,}/g, ' ').trim();
+}
+
 function normalizeRanked(item: RankedMatch | null | undefined): RankedMatch {
   const toArray = (value: unknown): string[] => {
     if (Array.isArray(value)) return value.filter((entry): entry is string => typeof entry === 'string');
@@ -389,6 +394,7 @@ Deno.serve(async (req) => {
   let relatedTerms: string[] = [];
   let anchorTerms: string[] = [];
   let requiredDepartment = '';
+  let constraintsOnly = false;
   let exactGapReason = '';
   // Set when this message is the user's answer to a question we asked. Having
   // spent their one question, returning nothing is the worst possible outcome:
@@ -468,7 +474,14 @@ Every term you return is checked against the coverage and anything not found the
 Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one concise question or empty string","search_request":"concise grounded request or empty string","no_match_reason":"one plain sentence, or empty string","named_subject":"as written, or empty string","matching_terms":["exact coverage term"],"nearest_terms":["exact coverage term"],"named_location":"as written, or empty string"}.`,
         user: JSON.stringify({ conversation, coverage, answered: hasClarified, lexical_hits: hits }),
         temperature: 0.1,
-        maxTokens: 350,
+        maxTokens: 800,
+      }).catch((error) => {
+        // The funnel and the lookups are decided in code, so a malformed reply
+        // from the model costs nuance, not the conversation.
+        if (error instanceof Error && error.message === 'ai_invalid_response') {
+          return { value: {} as ClarificationResult, model: 'none', latencyMs: 0 };
+        }
+        throw error;
       });
       const rawDecision = result.value?.decision;
       const decision = rawDecision === 'ready' ? 'ready' : rawDecision === 'no_match' ? 'no_match' : 'clarify';
@@ -536,6 +549,10 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
         : '';
       const latestDepartment = pureDepartment(latestContent);
       requiredDepartment = latestDepartment || mentionedDepartment(latestContent) || earlierDepartment;
+      // Nothing asked for beyond a department and a place: if the results carry
+      // both, they are exact, whatever label the matcher reaches for.
+      const constraintWords = new Set([...(requiredDepartment ? wordsOf(requiredDepartment) : []), ...(namedLocation ? wordsOf(namedLocation) : [])]);
+      constraintsOnly = Boolean(requiredDepartment || namedLocation) && latestContent.every((word) => constraintWords.has(word));
 
       const vague = !contentWords(userTurns.join(' ')).length;
       const rawSubject = cleanText(result.value?.named_subject, 80);
@@ -548,7 +565,7 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
       if (!locationMissing && subjectAbsent) {
         nearestOnly = true;
         nearestTerms = suggested;
-        exactGapReason = cleanText(result.value?.no_match_reason, 400)
+        exactGapReason = humanize(cleanText(result.value?.no_match_reason, 400))
           || (SUBJECT_GAP[language] || SUBJECT_GAP.English)(namedSubject);
       }
 
@@ -755,7 +772,7 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
       maxTokens: 700,
     });
     const outcome = result.value?.outcome;
-    const noMatchReason = cleanText(result.value?.no_match_reason, 240);
+    const noMatchReason = humanize(cleanText(result.value?.no_match_reason, 240));
     const ranked = Array.isArray(result.value?.matches) ? result.value.matches : [];
     const seen = new Set<string>();
     // The near tier is a separate channel, not a lower bar on the same one: it
@@ -800,7 +817,7 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
     // A near result is still a result: the people render as cards, under the
     // sentence that says nothing matched exactly.
     const shown = matches.length ? matches : fallback;
-    const isNear = nearest || (nearestOnly && !locationFilterApplied) || !matches.length;
+    const isNear = !matches.length || (!constraintsOnly && (nearest || (nearestOnly && !locationFilterApplied)));
     const gap = isNear ? (noMatchReason || exactGapReason || EMPTY_POOL_MESSAGES[language]) : '';
     const threadId = await persistTurns(ctx, body.thread_id, query, {
       kind: 'matches',

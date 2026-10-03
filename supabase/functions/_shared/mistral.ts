@@ -136,17 +136,23 @@ export async function mistralJson<T>(options: {
     }));
     throw providerError(response.status, [response.status, providerCode || providerType, providerMessage].filter(Boolean).join(' ').slice(0, 280));
   }
-  const payload = await response.json().catch(() => null);
-  const content = payload?.choices?.[0]?.message?.content;
-  if (typeof content !== 'string' || !content.trim()) throw new AiProviderError('ai_invalid_response');
-  try {
-    return {
-      value: JSON.parse(content) as T,
-      model: payload?.model || model,
-      latencyMs: performance.now() - startedAt,
-    };
-  } catch {
-    throw new AiProviderError('ai_invalid_response');
+  // Small models occasionally return truncated or malformed JSON. One fresh
+  // attempt recovers most of those; a second failure is reported as before.
+  for (let tries = 0; ; tries += 1) {
+    const payload = await response.json().catch(() => null);
+    const content = payload?.choices?.[0]?.message?.content;
+    try {
+      if (typeof content !== 'string' || !content.trim()) throw new Error('empty');
+      return {
+        value: JSON.parse(content) as T,
+        model: payload?.model || model,
+        latencyMs: performance.now() - startedAt,
+      };
+    } catch {
+      if (tries >= 1) throw new AiProviderError('ai_invalid_response');
+      response = await attempt(model);
+      if (!response.ok) throw new AiProviderError('ai_invalid_response');
+    }
   }
 }
 

@@ -24,6 +24,7 @@ const SCENARIOS = [
   { name: 'funnel: support -> industry -> finance -> career advice', turns: ['I am looking for support', 'industry', 'finance', 'career advice'],
     check: (t) => [/What would you like help with/.test(t[0].ask), /Which field/.test(t[1].ask), /What in finance/.test(t[2].ask),
       t[3].people.length > 0 && t[3].people.every(isFinance)] },
+  { name: 'department alone: marketing', turns: ['someone in marketing'], check: (t) => [/What in marketing/.test(t[0].ask)] },
   { name: 'vague: I need help', turns: ['I need help'], check: (t) => [/What would you like help with/.test(t[0].ask)] },
   { name: 'department then either works', turns: ['someone in finance', 'either works'],
     check: (t) => [/What in finance/.test(t[0].ask), t[1].people.length > 0 && t[1].people.every(isFinance)] },
@@ -33,7 +34,7 @@ const SCENARIOS = [
   { name: 'location: senior in London', turns: ['someone senior based in London'],
     check: (t) => [t[0].people.length > 0 && t[0].people.every((p) => p.location === 'London')] },
   { name: 'department + location: finance in Milan', turns: ['someone in finance in Milan'],
-    check: (t) => [!t[0].ask, t[0].people.every((p) => p.location === 'Milan' && isFinance(p)) || /Milan/.test(t[0].said)] },
+    check: (t) => [!t[0].ask, t[0].people.length > 0 && t[0].people.every((p) => p.location === 'Milan' && isFinance(p)), !t[0].near] },
   { name: 'near subject: accounting', turns: ['somebody who works in accounting'], check: (t) => [!t[0].ask, t[0].people.length > 0] },
   { name: 'synonym: bookkeeping', turns: ['someone who does bookkeeping'], check: (t) => [!t[0].ask, t[0].people.length > 0] },
 ];
