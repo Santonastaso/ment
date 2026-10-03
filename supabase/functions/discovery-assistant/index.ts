@@ -4,7 +4,7 @@ import { aiErrorResponse, mistralJson } from '../_shared/mistral.ts';
 import { enforceRateLimit } from '../_shared/rate-limit.ts';
 import { canHelpWithCareerGoal, hasGroundedExpertise } from '../_shared/discovery-guards.mjs';
 
-const PROMPT_VERSION = 'discovery-v11';
+const PROMPT_VERSION = 'discovery-v12';
 
 // Written here rather than by the model, so the gap names the place the user
 // actually typed instead of drifting to a vaguer sentence about seniority.
@@ -161,7 +161,14 @@ function overlapsRequest(candidate: Candidate, request: string) {
 const LOOKUP_STOPWORDS = new Set(['someone', 'somebody', 'person', 'people', 'looking', 'need', 'help',
   'want', 'with', 'works', 'work', 'working', 'find', 'about', 'talk', 'speak', 'meet', 'senior', 'junior',
   'based', 'actually', 'either', 'really', 'would', 'like', 'into', 'from', 'that', 'this', 'have',
-  'experience', 'expert', 'expertise', 'field', 'area', 'role', 'roles', 'who', 'the', 'and', 'for', 'can']);
+  'experience', 'expert', 'expertise', 'field', 'area', 'role', 'roles', 'who', 'the', 'and', 'for', 'can',
+  'please', 'thanks', 'thank', 'department', 'team', 'sector', 'industry', 'space', 'function', 'kind', 'type',
+  'sort', 'some', 'any', 'good', 'great', 'guy', 'man', 'woman', 'helping', 'support', 'advice', 'mentor',
+  'mentors', 'mentorship', 'mentoring', 'alumnus', 'alumni', 'alumna', 'student', 'students', 'professional',
+  'professionals', 'contact', 'connect', 'anyone', 'everyone', 'anything', 'something', 'get', 'could', 'should',
+  'looking', 'search', 'searching', 'question', 'questions', 'just', 'also', 'more', 'other', 'there', 'their']);
+const wordsOf = (value: string) => value.toLowerCase().split(/[^\p{L}\p{N}&]+/u).filter(Boolean);
+const contentWords = (value: string) => wordsOf(value).filter((word) => word.length >= 3 && !LOOKUP_STOPWORDS.has(word));
 
 function vocabularyOf(coverage: unknown): string[] {
   return ['departments', 'programs', 'job_titles', 'skills']
@@ -191,6 +198,16 @@ const ASK_SENTENCE: Record<string, (list: string) => string> = {
   Italian: (list) => `In cosa ti serve aiuto${list ? ` \u2014 per esempio ${list}` : ''}?`,
   French: (list) => `Sur quoi aimeriez-vous de l'aide${list ? ` \u2014 par exemple ${list}` : ''} ?`,
 };
+
+const BROAD_SENTENCE: Record<string, (field: string) => string> = {
+  English: (field) => `What in ${field} would help most \u2014 a specific skill, a type of role, or career advice?`,
+  Italian: (field) => `Cosa ti servirebbe di piu in ${field} \u2014 una competenza precisa, un tipo di ruolo o un consiglio di carriera?`,
+  French: (field) => `Qu'est-ce qui vous aiderait le plus en ${field} \u2014 une competence precise, un type de poste ou un conseil de carriere ?`,
+};
+
+function broadQuestion(language: string, department: string) {
+  return (BROAD_SENTENCE[language] || BROAD_SENTENCE.English)(department.toLowerCase());
+}
 
 function askTemplate(language: string, coverage: unknown) {
   const departments: string[] = Array.isArray((coverage as { departments?: string[] })?.departments)
@@ -333,6 +350,7 @@ Deno.serve(async (req) => {
   let nearestOnly = false;
   let nearestTerms: string[] = [];
   let relatedTerms: string[] = [];
+  let anchorTerms: string[] = [];
   let exactGapReason = '';
   // Set when this message is the user's answer to a question we asked. Having
   // spent their one question, returning nothing is the worst possible outcome:
@@ -450,11 +468,25 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
       const pick = (value: unknown, limit: number): string[] | null => Array.isArray(value)
         ? [...new Set(value.map((term) => inVocabulary.get(cleanText(term, 80).toLowerCase())).filter(Boolean) as string[])].slice(0, limit)
         : null;
-      const namedSubject = cleanText(result.value?.named_subject, 80);
+      // Decided in code, because the model's answer here varied run to run:
+      // "I need help" was once a question and once a subject called "help".
+      // vague: nothing in the conversation names a field at all.
+      // broadDepartment: the latest message names a department and nothing else.
+      const departments: string[] = Array.isArray((coverage as { departments?: string[] })?.departments)
+        ? (coverage as { departments: string[] }).departments : [];
+      const latestContent = contentWords(userTurns.at(-1) || '');
+      const historyContent = contentWords(userTurns.join(' '));
+      const vague = !historyContent.length;
+      const departmentFor = (words: string[]) => words.length
+        ? departments.find((name) => words.every((word) => wordsOf(name).includes(word))) || '' : '';
+      const broadDepartment = departmentFor(latestContent.length ? latestContent : historyContent);
+      const rawSubject = cleanText(result.value?.named_subject, 80);
+      const namedSubject = vague || !contentWords(rawSubject).length ? '' : rawSubject;
       const exactTerm = inVocabulary.get(namedSubject.toLowerCase());
       const confirmed = pick(result.value?.matching_terms, 8);
       const suggested = pick(result.value?.nearest_terms, 3) || [];
-      const matchingTerms = [...new Set([...(exactTerm ? [exactTerm] : []), ...(confirmed ?? hits)])];
+      const matchingTerms = [...new Set([...(exactTerm ? [exactTerm] : []),
+        ...(broadDepartment ? [broadDepartment] : []), ...(confirmed ?? hits)])];
       const subjectAbsent = Boolean(namedSubject) && !matchingTerms.length;
       if (!locationMissing && subjectAbsent) {
         nearestOnly = true;
@@ -470,16 +502,23 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
       // "bookkeeping" finds nobody by its own words but finds financial
       // reporting through its synonym, while the matcher still sees the goal.
       relatedTerms = nearestOnly ? nearestTerms : (confirmed || []);
+      // What the results must actually carry. Without it, "someone in finance"
+      // returned HR people whose reasons said they hire finance professionals.
+      anchorTerms = nearestOnly ? [] : matchingTerms;
       // A request that names nothing cannot be searched, so it always gets one
       // question, written here if the model did not write one.
-      const mustAsk = !hasClarified && !namedSubject && !hits.length && !nearestOnly;
-      const question = cleanText(result.value?.question, 400) || (mustAsk ? askTemplate(language, coverage) : '');
+      // The question is asked exactly when it can change who comes back: the
+      // request names nothing, or names a whole department and nothing more.
+      const broadFieldAlone = Boolean(broadDepartment) && latestContent.length > 0 && !namedLocation;
+      const mustAsk = !hasClarified && !nearestOnly && (vague || broadFieldAlone);
+      const question = cleanText(result.value?.question, 400)
+        || (broadFieldAlone ? broadQuestion(language, broadDepartment) : askTemplate(language, coverage));
       // One question per conversation, enforced here and not only in the prompt.
       // A clarify decision with no question used to fall back to echoing
       // search_request at the user; that text is written for the matching model
       // and reads like a database query, so searching is always the better
       // answer than showing it.
-      if ((decision === 'clarify' || mustAsk) && question && !hasClarified && !nearestOnly) {
+      if (mustAsk && question) {
         const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'clarification', content: question });
         return jsonOk({ matches: [], clarification: question, thread_id: threadId });
       }
@@ -560,6 +599,7 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
   // Honour a named place the network actually has. If nobody there is free,
   // say that plainly and fall back to everyone rather than silently returning
   // someone three countries away under the same sentence.
+  const networkCandidates = candidates;
   if (namedLocationFilter) {
     const wanted = namedLocationFilter.toLowerCase();
     const inPlace = candidates.filter((candidate) => {
@@ -573,6 +613,18 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
       nearestOnly = true;
       exactGapReason = (LOCATION_BUSY[language] || LOCATION_BUSY.English)(namedLocationFilter);
     }
+  }
+
+  // A confirmed subject is a requirement, not a hint, exactly like a named
+  // place. If nobody carries it, nothing is filtered and the tiers decide.
+  if (anchorTerms.length) {
+    const wanted = anchorTerms.map((term) => term.toLowerCase());
+    const carrying = candidates.filter((candidate) => {
+      const fields = [candidate.department, candidate.job_title, ...(candidate.skills || []), ...(candidate.experience_facts || [])]
+        .filter(Boolean).map((value) => String(value).toLowerCase());
+      return wanted.some((term) => fields.some((field) => field === term || field.includes(term)));
+    });
+    if (carrying.length) candidates = carrying;
   }
 
   if (!candidates.length) {
@@ -677,7 +729,7 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
     if (!matches.length && !fallback.length) {
       // Even with nothing to offer, say what the network does have.
       const base = noMatchReason || exactGapReason || EMPTY_POOL_MESSAGES[language];
-      const reason = `${base}${networkStrengths(candidates, language)}`.slice(0, 400);
+      const reason = `${base}${networkStrengths(networkCandidates, language)}`.slice(0, 400);
       const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'no_match', content: reason, search_request: requestForMatch });
       return jsonOk({ matches: [], clarification: '', no_match: true, no_match_reason: reason, resolved_request: requestForMatch, thread_id: threadId, model: result.model });
     }

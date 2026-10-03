@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { discoveryHandler, discoveryFixture, directMatch } from './fixtures/discovery-harness.mjs';
+import { discoveryHandler, discoveryFixture, directMatch, finance } from './fixtures/discovery-harness.mjs';
+
+const hr = { id: 'hr', name: 'HR Person', job_title: 'Talent Manager', department: 'Human Resources', program: 'MBA', skills: ['talent acquisition'], location: 'Paris' };
 
 // The lexical lookup and the model check each other. These pin down who has
 // the last word in each disagreement, since that is what kept regressing.
@@ -21,9 +23,9 @@ test('a request that names nothing always gets one question, even when the model
 
 test('the model cannot veto an exact match', async () => {
   const fixture = discoveryFixture({ responses: [
-    { decision: 'ready', search_request: 'finance', named_subject: 'Finance', matching_terms: [] }, directMatch,
+    { decision: 'ready', search_request: 'Financial modelling', named_subject: 'Financial modelling', matching_terms: [] }, directMatch,
   ] });
-  const result = await chat(fixture, 'someone in finance');
+  const result = await chat(fixture, 'help with Financial modelling');
   assert.equal(result.matches.length, 1);
   assert.equal(result.nearest, false);
 });
@@ -80,4 +82,30 @@ test('a refused default model falls back to the configured one instead of failin
   assert.equal(result.matches.length, 1);
   assert.ok(tried.includes('mistral-small-latest'), 'the preferred model is tried first');
   assert.ok(tried.includes('fixture-model'), 'then the configured model answers');
+});
+
+test('a vague request is asked a question even when the model invents a subject', async () => {
+  const fixture = discoveryFixture({ responses: [{ decision: 'no_match', named_subject: 'help', matching_terms: [], nearest_terms: [] }] });
+  const result = await chat(fixture, 'I need help');
+  assert.match(result.clarification, /What would you like help with/);
+});
+
+test('a department on its own is asked a question even when the model would search', async () => {
+  const fixture = discoveryFixture({ responses: [{ decision: 'ready', search_request: 'finance', named_subject: 'finance', matching_terms: ['Finance'] }] });
+  const result = await chat(fixture, 'someone in finance');
+  assert.match(result.clarification, /What in finance would help most/);
+  assert.equal(fixture.calls.length, 1);
+});
+
+test('after the answer, results must carry the subject: no HR people for finance', async () => {
+  const turns = [{ role: 'user', content: 'someone in finance' }, { role: 'assistant', kind: 'clarification', content: 'What in finance would help most?' }];
+  const hrMatch = { profile_id: hr.id, confidence: 0.9, reasons: ['Hires finance professionals.'], matched_expertise: ['talent acquisition'] };
+  const fixture = discoveryFixture({ candidates: [finance, hr], turns, responses: [
+    { decision: 'ready', search_request: 'finance', named_subject: 'finance', matching_terms: ['Finance'] },
+    { outcome: 'matches', matches: [hrMatch, directMatch.matches[0]] },
+  ] });
+  const response = await run(fixture, { action: 'chat', thread_id: 'thread', query: 'either works', lang: 'en' });
+  const result = await response.json();
+  assert.deepEqual(result.matches.map((m) => m.id), [finance.id]);
+  assert.deepEqual(payload(fixture, 1).candidates.map((c) => c.id), [finance.id], 'HR is never even offered to the matcher');
 });

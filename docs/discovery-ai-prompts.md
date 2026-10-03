@@ -168,6 +168,15 @@ Asking a question creates an obligation. Once the user has answered one, `must_a
 
 On a true `no_match` where no question was asked, `networkStrengths()` appends the three departments with the most eligible members, counted from the candidates already in hand, so "no" still carries somewhere to go.
 
+### What code decides outright
+
+Two decisions kept varying run to run when left to the model, so code makes them:
+
+- **Whether to ask.** Exactly when it can change who comes back: the conversation names nothing at all ("I need help", "someone senior" -- filler words are in `LOOKUP_STOPWORDS`), or the latest message names a whole department and nothing else ("someone in finance"). Otherwise never. The model's question is used if it wrote one; otherwise code writes it.
+- **What results must carry.** Confirmed subject terms (`anchorTerms`) filter the candidates before matching, exactly like a named place. "Someone in finance" once returned HR people whose reasons said they hire finance professionals; they are now never offered to the matcher. If nobody carries the terms, nothing is filtered.
+
+A subject the model extracts from a vague request is ignored, which is how "I need help" briefly became a search for a subject called "help".
+
 ### Lookup and model check each other
 
 Neither alone works. A lexical lookup cannot know that bookkeeping relates to financial reporting, or that carbon accounting is not accounting. A model asked an open yes/no ("is this in the network?") answered no to almost everything and suppressed every question.
