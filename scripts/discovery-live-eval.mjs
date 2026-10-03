@@ -43,6 +43,7 @@ const out = [];
 const log = (line = '') => { out.push(line); console.log(line); };
 const password = randomBytes(18).toString('base64url');
 let passed = 0; let total = 0;
+let failed = false;
 try {
   // Test the code in this commit, not whatever was deployed before it: wait
   // until the function is newer than the commit, for up to twelve minutes.
@@ -90,9 +91,17 @@ try {
     log(`- **${ok ? 'PASS' : 'FAIL'}** ${JSON.stringify(results)}\n`);
   }
   log(`**${passed}/${total} scenarios passed**`);
+  failed = passed !== total;
 } catch (error) {
   log(`\nEVAL ERROR: ${error.message}`);
+  failed = true;
 } finally {
-  await sql(`update auth.users set encrypted_password = null where id = '${TEST_USER}'`).catch((e) => log(`CLEANUP FAILED: ${e.message}`));
-  log('\n_test account password cleared_');
+  try {
+    await sql(`update auth.users set encrypted_password = null where id = '${TEST_USER}'`);
+    log('\n_test account password cleared_');
+  } catch (error) {
+    log(`CLEANUP FAILED: ${error.message}`);
+    failed = true;
+  }
+  if (failed) process.exitCode = 1;
 }

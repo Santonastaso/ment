@@ -27,7 +27,9 @@ jobs:
           COMMIT_TIME: ${{ github.event.head_commit.timestamp }}
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
-        run: node scripts/discovery-live-eval.mjs | tee /tmp/eval-results.md
+        run: |
+          set -o pipefail
+          node scripts/discovery-live-eval.mjs | tee /tmp/eval-results.md
       - name: Publish transcript
         if: always()
         run: |
