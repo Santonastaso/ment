@@ -171,3 +171,10 @@ test('the funnel stops after three questions and searches', async () => {
   const result = await say(fixture, 'anything', 'thread');
   assert.equal(result.clarification, '');
 });
+
+test('a department the model mislabels as a location still gets the department question', async () => {
+  const turns = [{ role: 'user', content: 'industry' }, { role: 'assistant', kind: 'clarification', content: 'Which field?', stage: 'field', department: '' }];
+  const fixture = discoveryFixture({ candidates: [finance, hr], turns, responses: [clarify({ named_subject: 'finance', named_location: 'finance' })] });
+  const result = await say(fixture, 'finance', 'thread');
+  assert.match(result.clarification, /What in finance would help most/);
+});

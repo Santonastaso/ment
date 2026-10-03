@@ -502,7 +502,11 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
       const userWords = new Set(wordsOf(userTurns.join(' ')));
       const grounded = (value: string) => wordsOf(value).filter((word) => word.length >= 3).some((word) => userWords.has(word));
       const extractedLocation = cleanText(result.value?.named_location, 80);
-      const namedLocation = grounded(extractedLocation) ? extractedLocation : '';
+      // A word that names a department, skill or title here is not a place: the
+      // model once returned "finance" as the location, which skipped the funnel.
+      const vocabularyWords = new Set(vocabulary.flatMap((term) => wordsOf(term)).filter((word) => word.length >= 3));
+      const isVocabulary = wordsOf(extractedLocation).filter((word) => word.length >= 3).some((word) => vocabularyWords.has(word));
+      const namedLocation = grounded(extractedLocation) && !isVocabulary ? extractedLocation : '';
       const knownLocations: string[] = Array.isArray((coverage as { locations?: string[] })?.locations)
         ? (coverage as { locations: string[] }).locations : [];
       const locationMissing = Boolean(namedLocation) && !knownLocations.some((known) => {
