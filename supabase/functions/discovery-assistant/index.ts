@@ -4,7 +4,7 @@ import { aiErrorResponse, mistralJson } from '../_shared/mistral.ts';
 import { enforceRateLimit } from '../_shared/rate-limit.ts';
 import { canHelpWithCareerGoal, hasGroundedExpertise } from '../_shared/discovery-guards.mjs';
 
-const PROMPT_VERSION = 'discovery-v14';
+const PROMPT_VERSION = 'discovery-v15';
 
 // Written here rather than by the model, so the gap names the place the user
 // actually typed instead of drifting to a vaguer sentence about seniority.
@@ -395,6 +395,7 @@ Deno.serve(async (req) => {
   let anchorTerms: string[] = [];
   let requiredDepartment = '';
   let constraintsOnly = false;
+  let departmentFilterApplied = false;
   let exactGapReason = '';
   // Set when this message is the user's answer to a question we asked. Having
   // spent their one question, returning nothing is the worst possible outcome:
@@ -560,17 +561,28 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
       const exactTerm = inVocabulary.get(namedSubject.toLowerCase());
       const confirmed = pick(result.value?.matching_terms, 8);
       const suggested = pick(result.value?.nearest_terms, 3) || [];
-      const matchingTerms = [...new Set([...(exactTerm ? [exactTerm] : []), ...(requiredDepartment ? [requiredDepartment] : []), ...(confirmed ?? hits)])];
+      // Only the user's own words, or a department or term they literally
+      // named, can make a result exact. A synonym the model proposes still
+      // finds people, but they are shown as closest: the model called due
+      // diligence a synonym of audit and the result was labelled exact.
+      const lexicalConfirmed = confirmed ? confirmed.filter((term) => hits.includes(term)) : hits;
+      const proposed = confirmed ? confirmed.filter((term) => !hits.includes(term)) : [];
+      const matchingTerms = [...new Set([...(exactTerm ? [exactTerm] : []), ...(requiredDepartment ? [requiredDepartment] : []), ...lexicalConfirmed])];
       const subjectAbsent = Boolean(namedSubject) && !matchingTerms.length;
       if (!locationMissing && subjectAbsent) {
         nearestOnly = true;
-        nearestTerms = suggested;
+        nearestTerms = [...new Set([...proposed, ...suggested])].slice(0, 4);
         exactGapReason = humanize(cleanText(result.value?.no_match_reason, 400))
           || (SUBJECT_GAP[language] || SUBJECT_GAP.English)(namedSubject);
       }
 
       const clarifiedRequest = cleanText(result.value?.search_request, 1000);
       requestForMatch = clarifiedRequest || query;
+      // Nothing to interpret: the model once read "finance in Milan" as a
+      // career-change request and rejected everyone who qualified.
+      // The user's own words ride along so "senior" survives; the model's
+      // reading of them does not.
+      if (constraintsOnly) requestForMatch = `${[requiredDepartment, namedLocation].filter(Boolean).join(' in ')} (${userTurns.join('; ')})`;
       if (requiredDepartment && !requestForMatch.toLowerCase().includes(requiredDepartment.toLowerCase())) {
         requestForMatch = `${requiredDepartment}: ${requestForMatch}`;
       }
@@ -705,7 +717,10 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
   const required = requiredDepartment ? [requiredDepartment] : anchorTerms;
   if (required.length) {
     const carrying = candidates.filter((candidate) => carries(candidate, required));
-    if (carrying.length) candidates = carrying;
+    if (carrying.length) {
+      candidates = carrying;
+      departmentFilterApplied = Boolean(requiredDepartment);
+    }
   }
 
   if (!candidates.length) {
@@ -802,8 +817,13 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
     // already ordered by relevance from discovery_candidates, so the closest
     // people are the first ones -- shown with no invented reason, under the
     // sentence that says plainly this is not what was asked for.
-    const fallback = (answeredClarification || nearestTerms.length > 0) && !matches.length
-      ? candidates.filter((candidate) => overlapsRequest(candidate, [requestForMatch, ...relatedTerms].join(' '))).slice(0, 3)
+    // Every remaining candidate already satisfies a constraint-only request, so
+    // if the matcher declines, the first of them are the answer.
+    const constraintsMet = constraintsOnly
+      && (!namedLocationFilter || locationFilterApplied)
+      && (!requiredDepartment || departmentFilterApplied);
+    const fallback = (answeredClarification || nearestTerms.length > 0 || constraintsMet) && !matches.length
+      ? candidates.filter((candidate) => constraintsMet || overlapsRequest(candidate, [requestForMatch, ...relatedTerms].join(' '))).slice(0, 3)
         .map((candidate) => publicCandidate(candidate, { reasons: [], matched_expertise: [] },
           redactInterOrg && !established.has(candidate.id)))
       : [];
@@ -817,7 +837,7 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
     // A near result is still a result: the people render as cards, under the
     // sentence that says nothing matched exactly.
     const shown = matches.length ? matches : fallback;
-    const isNear = !matches.length || (!constraintsOnly && (nearest || (nearestOnly && !locationFilterApplied)));
+    const isNear = constraintsMet ? false : (!matches.length || nearest || (nearestOnly && !locationFilterApplied));
     const gap = isNear ? (noMatchReason || exactGapReason || EMPTY_POOL_MESSAGES[language]) : '';
     const threadId = await persistTurns(ctx, body.thread_id, query, {
       kind: 'matches',

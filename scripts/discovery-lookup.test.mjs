@@ -45,14 +45,34 @@ test('an absent subject goes to its nearest terms, and invented terms are discar
   assert.doesNotMatch(retrieval, /Invented Term/);
 });
 
-test('a confirmed synonym steers retrieval without rewriting the request', async () => {
+test('a synonym only the model proposes finds people but is labelled closest', async () => {
   const fixture = discoveryFixture({ responses: [
     { decision: 'ready', search_request: 'bookkeeping', named_subject: 'bookkeeping', matching_terms: ['Financial modelling'] }, directMatch,
   ] });
   const result = await chat(fixture, 'someone who does bookkeeping');
-  assert.equal(result.nearest, false);
+  assert.equal(result.matches.length, 1);
+  assert.equal(result.nearest, true, 'only the user\'s own words can make a result exact');
   assert.equal(payload(fixture, 1).request, 'bookkeeping');
-  assert.deepEqual(payload(fixture, 1).related_terms, ['Financial modelling']);
+  assert.deepEqual(payload(fixture, 1).nearest_terms, ['Financial modelling']);
+});
+
+test('a department and a place alone are answered from the filters even if the matcher declines', async () => {
+  const milan = { ...finance, id: 'milan', location: 'Milan' };
+  const fixture = discoveryFixture({ candidates: [finance, milan, hr], responses: [
+    { decision: 'ready', search_request: 'career change help in finance', named_subject: 'finance', named_location: 'Milan' },
+    { outcome: 'no_match', matches: [], no_match_reason: 'Nobody here helps with career changes.' },
+  ] });
+  // Production coverage lists locations; the shared harness does not.
+  const rpc = fixture.sb.rpc;
+  fixture.sb.rpc = async (name, args) => {
+    const result = await rpc(name, args);
+    if (name === 'discovery_network_coverage') result.data.locations = ['Milan', 'Paris'];
+    return result;
+  };
+  const result = await chat(fixture, 'someone in finance in Milan');
+  assert.deepEqual(result.matches.map((m) => m.id), ['milan']);
+  assert.equal(result.nearest, false);
+  assert.doesNotMatch(payload(fixture, 1).request, /career change/);
 });
 
 test('a request outside the network stays a clean no-match with no question', async () => {
