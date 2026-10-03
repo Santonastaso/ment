@@ -63,3 +63,21 @@ test('a request outside the network stays a clean no-match with no question', as
   assert.equal(result.no_match, true);
   assert.equal(result.matches.length, 0);
 });
+
+test('a refused default model falls back to the configured one instead of failing', async () => {
+  const fixture = discoveryFixture({ responses: [
+    { decision: 'ready', search_request: 'Financial modelling', named_subject: 'Financial modelling' }, directMatch,
+  ] });
+  const served = fixture.fetch.bind(fixture);
+  const tried = [];
+  fixture.fetch = async (url, options) => {
+    const { model } = JSON.parse(options.body);
+    tried.push(model);
+    if (model === 'mistral-small-latest') return new Response('{"message":"quota"}', { status: 429 });
+    return served(url, options);
+  };
+  const result = await chat(fixture, 'help with Financial modelling');
+  assert.equal(result.matches.length, 1);
+  assert.ok(tried.includes('mistral-small-latest'), 'the preferred model is tried first');
+  assert.ok(tried.includes('fixture-model'), 'then the configured model answers');
+});

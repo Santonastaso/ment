@@ -30,9 +30,13 @@ function configuration(feature?: string) {
   const enabled = (Deno.env.get('AI_PROCESSING_ENABLED') || '').toLowerCase() === 'true';
   const apiKey = Deno.env.get('MISTRAL_API') || Deno.env.get('MISTRAL_API_KEY') || '';
   const featureKey = feature ? `MISTRAL_MODEL_${feature.toUpperCase().replace(/[^A-Z0-9]+/g, '_')}` : '';
-  const model = (featureKey && Deno.env.get(featureKey))
-    || (feature && FEATURE_MODEL_DEFAULTS[feature])
-    || Deno.env.get('MISTRAL_MODEL') || '';
+  const explicit = featureKey ? Deno.env.get(featureKey) || '' : '';
+  const configured = Deno.env.get('MISTRAL_MODEL') || '';
+  const model = explicit || (feature && FEATURE_MODEL_DEFAULTS[feature]) || configured;
+  // A code default is a preference, not a requirement. If the account cannot
+  // serve it -- quota, plan, outage -- fall back to the model already
+  // configured for this deployment rather than failing the user's request.
+  const fallbackModel = !explicit && configured && configured !== model ? configured : '';
   if (!enabled || !apiKey || !model) {
     console.error(JSON.stringify({
       event: 'mistral_configuration_error',
@@ -43,7 +47,7 @@ function configuration(feature?: string) {
     }));
     throw new AiNotConfiguredError();
   }
-  return { apiKey, model };
+  return { apiKey, model, fallbackModel };
 }
 
 function providerError(status: number, detail = '') {
@@ -62,9 +66,10 @@ export async function mistralJson<T>(options: {
   maxTokens?: number;
 }): Promise<{ value: T; model: string; latencyMs: number }> {
   const startedAt = performance.now();
-  const { apiKey, model } = configuration(options.feature);
-  const requestBody = JSON.stringify({
-    model,
+  const { apiKey, model: preferredModel, fallbackModel } = configuration(options.feature);
+  let model = preferredModel;
+  const bodyFor = (name: string) => JSON.stringify({
+    model: name,
     temperature: options.temperature ?? 0.1,
     max_tokens: options.maxTokens ?? 1200,
     response_format: { type: 'json_object' },
@@ -73,29 +78,39 @@ export async function mistralJson<T>(options: {
       { role: 'user', content: options.user },
     ],
   });
-  const callProvider = async () => {
+  const callProvider = async (name: string) => {
     try {
       return await fetch(MISTRAL_URL, {
         method: 'POST',
         headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: requestBody,
+        body: bodyFor(name),
       });
     } catch (error) {
       console.error(JSON.stringify({
         event: 'mistral_network_error',
-        model,
+        model: name,
         error: error instanceof Error ? error.name : 'unknown',
       }));
       throw new AiProviderError('ai_provider_unreachable', 503);
     }
   };
+  const attempt = async (name: string) => {
+    let result = await callProvider(name);
+    for (const delay of [500, 1500]) {
+      if (result.ok || (result.status !== 429 && result.status < 500)) break;
+      await result.body?.cancel();
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      result = await callProvider(name);
+    }
+    return result;
+  };
 
-  let response = await callProvider();
-  for (const delay of [500, 1500]) {
-    if (response.ok || (response.status !== 429 && response.status < 500)) break;
+  let response = await attempt(model);
+  if (!response.ok && fallbackModel) {
+    console.error(JSON.stringify({ event: 'mistral_model_fallback', from: model, to: fallbackModel, status: response.status }));
     await response.body?.cancel();
-    await new Promise((resolve) => setTimeout(resolve, delay));
-    response = await callProvider();
+    model = fallbackModel;
+    response = await attempt(model);
   }
   if (!response.ok) {
     let providerType = '';
