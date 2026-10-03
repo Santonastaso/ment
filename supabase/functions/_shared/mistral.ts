@@ -17,11 +17,22 @@ export class AiProviderError extends Error {
   }
 }
 
+// Discovery needs real semantic judgement: on ministral-3b the clarify step
+// answered "no" to almost every coverage question and missed obvious
+// neighbours. A per-feature secret (MISTRAL_MODEL_DISCOVERY_MATCH etc.) still
+// overrides this, so it can be changed without a deploy.
+const FEATURE_MODEL_DEFAULTS: Record<string, string> = {
+  discovery_clarify: 'mistral-small-latest',
+  discovery_match: 'mistral-small-latest',
+};
+
 function configuration(feature?: string) {
   const enabled = (Deno.env.get('AI_PROCESSING_ENABLED') || '').toLowerCase() === 'true';
   const apiKey = Deno.env.get('MISTRAL_API') || Deno.env.get('MISTRAL_API_KEY') || '';
   const featureKey = feature ? `MISTRAL_MODEL_${feature.toUpperCase().replace(/[^A-Z0-9]+/g, '_')}` : '';
-  const model = (featureKey && Deno.env.get(featureKey)) || Deno.env.get('MISTRAL_MODEL') || '';
+  const model = (featureKey && Deno.env.get(featureKey))
+    || (feature && FEATURE_MODEL_DEFAULTS[feature])
+    || Deno.env.get('MISTRAL_MODEL') || '';
   if (!enabled || !apiKey || !model) {
     console.error(JSON.stringify({
       event: 'mistral_configuration_error',
