@@ -82,6 +82,8 @@ type ClarificationResult = {
   // wrong often enough that London kept producing a pointless question.
   named_subject?: string;
   named_location?: string;
+  matching_terms?: string[];
+  nearest_terms?: string[];
 };
 
 const LANGUAGES: Record<string, string> = { en: 'English', it: 'Italian', fr: 'French' };
