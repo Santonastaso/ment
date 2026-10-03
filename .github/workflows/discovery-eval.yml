@@ -1,0 +1,41 @@
+name: discovery-eval
+
+# Runs real conversations against production and publishes the transcript to
+# the eval-results branch. Trigger by pushing any commit to eval/run.
+on:
+  push:
+    branches: [eval/run]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: discovery-eval
+  cancel-in-progress: false
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run live eval
+        env:
+          COMMIT_TIME: ${{ github.event.head_commit.timestamp }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: node scripts/discovery-live-eval.mjs | tee /tmp/eval-results.md
+      - name: Publish transcript
+        if: always()
+        run: |
+          git config user.name "discovery-eval"
+          git config user.email "discovery-eval@users.noreply.github.com"
+          git checkout --orphan eval-results
+          git rm -rf --cached . > /dev/null
+          cp /tmp/eval-results.md eval-results.md
+          git add -f eval-results.md
+          git commit -m "eval ${GITHUB_SHA::7} $(date -u +%FT%TZ)"
+          git push -f origin eval-results

@@ -1,0 +1,97 @@
+// Runs real conversations against the deployed discovery assistant and prints
+// a transcript with pass/fail checks. Meant for CI, where the Supabase access
+// token lives: it signs in as one dummy account with a throwaway password and
+// always clears that password afterwards.
+import { randomBytes } from 'node:crypto';
+
+const ref = process.env.SUPABASE_PROJECT_REF;
+const pat = process.env.SUPABASE_ACCESS_TOKEN;
+if (!ref || !pat) { console.log('Missing SUPABASE_PROJECT_REF or SUPABASE_ACCESS_TOKEN'); process.exit(1); }
+const TEST_USER = '40739a80-bab8-446d-a3c3-58acf6db7b4e';
+const TEST_EMAIL = 'aisha.kowalski@dummy.ment.io';
+const api = `https://api.supabase.com/v1/projects/${ref}`;
+const base = `https://${ref}.supabase.co`;
+
+const mgmt = async (path, init = {}) => {
+  const response = await fetch(api + path, { ...init, headers: { Authorization: `Bearer ${pat}`, 'Content-Type': 'application/json' } });
+  if (!response.ok) throw new Error(`${path}: ${response.status} ${(await response.text()).slice(0, 200)}`);
+  return response.json();
+};
+const sql = (query) => mgmt('/database/query', { method: 'POST', body: JSON.stringify({ query }) });
+
+const isFinance = (p) => p.department === 'Finance' || /financ/i.test(p.job_title || '');
+const SCENARIOS = [
+  { name: 'funnel: support -> industry -> finance -> career advice', turns: ['I am looking for support', 'industry', 'finance', 'career advice'],
+    check: (t) => [/What would you like help with/.test(t[0].ask), /Which field/.test(t[1].ask), /What in finance/.test(t[2].ask),
+      t[3].people.length > 0 && t[3].people.every(isFinance)] },
+  { name: 'vague: I need help', turns: ['I need help'], check: (t) => [/What would you like help with/.test(t[0].ask)] },
+  { name: 'department then either works', turns: ['someone in finance', 'either works'],
+    check: (t) => [/What in finance/.test(t[0].ask), t[1].people.length > 0 && t[1].people.every(isFinance)] },
+  { name: 'absent subject: audit', turns: ['someone in audit'], check: (t) => [!t[0].ask, t[0].people.length > 0, t[0].near] },
+  { name: 'out of scope: painter', turns: ['I want to meet a painter'], check: (t) => [!t[0].ask, t[0].people.length === 0] },
+  { name: 'specific skill: LBO modelling', turns: ['I need help with LBO modelling'], check: (t) => [!t[0].ask, t[0].people.length > 0, !t[0].near] },
+  { name: 'location: senior in London', turns: ['someone senior based in London'],
+    check: (t) => [t[0].people.length > 0 && t[0].people.every((p) => p.location === 'London')] },
+  { name: 'department + location: finance in Milan', turns: ['someone in finance in Milan'],
+    check: (t) => [!t[0].ask, t[0].people.every((p) => p.location === 'Milan' && isFinance(p)) || /Milan/.test(t[0].said)] },
+  { name: 'near subject: accounting', turns: ['somebody who works in accounting'], check: (t) => [!t[0].ask, t[0].people.length > 0] },
+  { name: 'synonym: bookkeeping', turns: ['someone who does bookkeeping'], check: (t) => [!t[0].ask, t[0].people.length > 0] },
+];
+
+const out = [];
+const log = (line = '') => { out.push(line); console.log(line); };
+const password = randomBytes(18).toString('base64url');
+let passed = 0; let total = 0;
+try {
+  // Test the code in this commit, not whatever was deployed before it: wait
+  // until the function is newer than the commit, for up to twelve minutes.
+  const committedAt = Date.parse(process.env.COMMIT_TIME || '') || 0;
+  let fn = {};
+  for (let waited = 0; waited <= 720; waited += 30) {
+    fn = await mgmt('/functions/discovery-assistant').catch(() => ({}));
+    if (!committedAt || (fn.updated_at && fn.updated_at >= committedAt)) break;
+    await new Promise((resolve) => setTimeout(resolve, 30_000));
+  }
+  if (committedAt && !(fn.updated_at >= committedAt)) log('**WARNING: function not redeployed since this commit; results reflect older code.**\n');
+  log(`# Discovery live eval\n\ncommit \`${(process.env.GITHUB_SHA || '').slice(0, 7)}\` · function v${fn.version} deployed ${fn.updated_at ? new Date(fn.updated_at).toISOString() : '?'}\n`);
+  const keys = await mgmt('/api-keys');
+  const anon = keys.find((key) => key.name === 'anon')?.api_key;
+  await sql(`update auth.users set encrypted_password = crypt('${password}', gen_salt('bf')),
+    confirmation_token = coalesce(confirmation_token, ''), recovery_token = coalesce(recovery_token, ''),
+    email_change = coalesce(email_change, ''), email_change_token_new = coalesce(email_change_token_new, '')
+    where id = '${TEST_USER}'`);
+  const session = await (await fetch(`${base}/auth/v1/token?grant_type=password`, { method: 'POST',
+    headers: { apikey: anon, 'Content-Type': 'application/json' }, body: JSON.stringify({ email: TEST_EMAIL, password }) })).json();
+  if (!session.access_token) throw new Error('sign-in failed: ' + JSON.stringify(session).slice(0, 200));
+
+  for (const scenario of SCENARIOS) {
+    log(`## ${scenario.name}`);
+    let threadId; const turns = [];
+    for (const query of scenario.turns) {
+      const response = await fetch(`${base}/functions/v1/discovery-assistant`, { method: 'POST',
+        headers: { apikey: anon, Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'chat', query, lang: 'en', ...(threadId ? { thread_id: threadId } : {}) }) });
+      const d = await response.json().catch(() => ({}));
+      threadId = d.thread_id || threadId;
+      const turn = { ask: d.clarification || '', said: d.no_match_reason || '', near: Boolean(d.nearest), people: d.matches || [] };
+      turns.push(turn);
+      log(`- **you:** ${query}`);
+      if (response.status !== 200) log(`  - HTTP ${response.status} ${JSON.stringify(d)}`);
+      else if (turn.ask) log(`  - **ment asks:** ${turn.ask}`);
+      else {
+        log(`  - **ment:** ${turn.said || '(exact matches)'}${turn.near ? ' _[closest]_' : ''}${d.model ? ` · model ${d.model}` : ''}`);
+        for (const p of turn.people) log(`    - ${p.job_title} · ${p.department} · ${p.location} — ${(p.reasons || [])[0] || ''}`);
+      }
+    }
+    const results = scenario.check(turns);
+    const ok = results.every(Boolean);
+    total += 1; if (ok) passed += 1;
+    log(`- **${ok ? 'PASS' : 'FAIL'}** ${JSON.stringify(results)}\n`);
+  }
+  log(`**${passed}/${total} scenarios passed**`);
+} catch (error) {
+  log(`\nEVAL ERROR: ${error.message}`);
+} finally {
+  await sql(`update auth.users set encrypted_password = null where id = '${TEST_USER}'`).catch((e) => log(`CLEANUP FAILED: ${e.message}`));
+  log('\n_test account password cleared_');
+}
