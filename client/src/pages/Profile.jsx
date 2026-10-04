@@ -15,7 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MapPin, Plus, X } from 'lucide-react';
+import { ArrowLeft, MapPin, Plus, X } from 'lucide-react';
 import api from '../api/index.js';
 import { useT } from '../i18n/index.jsx';
 
@@ -119,6 +119,9 @@ export default function Profile() {
     ? ['overview', 'skills', 'availability', 'experience', 'reflections']
     : ['overview', 'experience'];
   const tab = validTabs.includes(rawTab) ? rawTab : 'overview';
+  // Arrived from a chat result: offer the way back to that conversation.
+  const fromChat = !isOwnProfile && searchParams.get('from') === 'chat';
+  const chatThread = searchParams.get('thread');
   function setTab(next) {
     const params = new URLSearchParams(searchParams);
     if (next === 'overview') params.delete('tab'); else params.set('tab', next);
@@ -417,6 +420,15 @@ export default function Profile() {
 
   return (
     <PageShell className="profile-page gap-8">
+      {fromChat && (
+        <div className="-mb-4">
+          <Button type="button" variant="ghost" size="sm" className="-ml-2"
+            onClick={() => navigate(chatThread ? `/?thread=${encodeURIComponent(chatThread)}` : '/')}>
+            <ArrowLeft aria-hidden="true" />
+            {t('profile.backToChat')}
+          </Button>
+        </div>
+      )}
       {/* Toast */}
       {toast && (
         <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-lg border border-primary bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground">

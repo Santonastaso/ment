@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ArrowUp, ArrowUpRight, Check, Clock3, Pencil, RefreshCw, Search, Send, ThumbsDown, ThumbsUp, Trash2, X } from 'lucide-react';
 import api from '../../api/index.js';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -87,7 +87,7 @@ function visibleTurns(storedTurns) {
   });
 }
 
-function MatchCard({ match, index, selected, onSelect, copy, style }) {
+function MatchCard({ match, index, selected, onSelect, copy, style, profileHref, onViewProfile }) {
   const person = match.person;
   const jobTitle = person.job_title || person.current_role;
   const role = [jobTitle, person.department].filter(Boolean).join(' · ');
@@ -114,7 +114,15 @@ function MatchCard({ match, index, selected, onSelect, copy, style }) {
       </span>
 
       <span className="person-row-actions">
-        <Link className="person-row-link" to={`/profile/${person.id}`}>{copy.viewProfile}</Link>
+        <Link className="person-row-link" to={profileHref(person.id)}
+          onClick={(event) => {
+            // A plain click stays in the app and remembers the chat; a
+            // modifier click still opens the profile in a new tab.
+            if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+            event.preventDefault();
+            onViewProfile(person.id);
+          }}
+        >{copy.viewProfile}</Link>
         <Button variant={selected ? 'default' : 'ghost'} size="sm"
           type="button"
           aria-label={`${copy.choose} ${person.name}`}
@@ -167,6 +175,18 @@ export default function DiscoveryFlow() {
   const composerInputRef = useRef(null);
   const idempotencyKey = useRef(null);
   const flowVersion = useRef(0);
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const resumedFromUrl = useRef(null);
+
+  // Opening a profile from the results leaves a way back: the conversation is
+  // written into the home URL first, so both the profile's "Back to chat"
+  // button and the browser's own back button reopen it as it was.
+  const profileHref = (personId) => `/profile/${personId}?from=chat${threadId ? `&thread=${encodeURIComponent(threadId)}` : ''}`;
+  function viewProfile(personId) {
+    if (threadId) navigate(`/?thread=${encodeURIComponent(threadId)}`, { replace: true });
+    navigate(profileHref(personId));
+  }
 
   useLayoutEffect(() => {
     const input = composerInputRef.current;
@@ -192,6 +212,12 @@ export default function DiscoveryFlow() {
     }).catch(() => {});
     return () => { cancelled = true; };
   }, [user?.id]);
+  useEffect(() => {
+    const requested = searchParams.get('thread');
+    if (!user?.id || !requested || requested === threadId || resumedFromUrl.current === requested) return;
+    resumedFromUrl.current = requested;
+    resumeSearch(requested);
+  }, [user?.id, searchParams]);
   useEffect(() => { if (!user?.id || stage !== 'ask') return; api.get('/sessions').then(({ data }) => setConnections(data || [])).catch(() => {}); }, [stage, user?.id]);
 
   async function findMatches(nextQuery, activeThreadId = threadId) {
@@ -368,6 +394,7 @@ export default function DiscoveryFlow() {
   }
 
   async function reset() {
+    if (searchParams.get('thread')) { resumedFromUrl.current = null; setSearchParams({}, { replace: true }); }
     flowVersion.current += 1;
     const currentThread = threadId;
     setConnectionCategory(null);
@@ -495,7 +522,7 @@ export default function DiscoveryFlow() {
       return <div className={`discovery-chat-turn is-assistant ${turn.kind === 'error' ? 'is-error' : ''}`} key={`${turn.at || index}-${index}`}>{continues ? <span className="discovery-agent-mark-spacer" aria-hidden="true" /> : <span className="discovery-agent-mark" aria-label="Ment">M</span>}<p className="discovery-assistant-bubble">{renderInline(response)}</p></div>;
     })}</div>
     {(stage === 'matching' || stage === 'drafting') && <div className="discovery-chat-turn is-assistant is-working" role="status" aria-live="polite"><span className="discovery-agent-mark" aria-label="Ment">M</span><p className="discovery-assistant-bubble">{stage === 'matching' ? copy.finding : copy.drafting}<span className="discovery-typing" aria-hidden="true"><i /><i /><i /></span></p></div>}
-    {stage === 'choose' && <div className="discovery-reveal"><div className="discovery-match-grid" role="radiogroup" aria-label="Choose a person">{matches.map((match, index) => <MatchCard key={match.person.id} match={match} index={index} selected={selected?.person.id === match.person.id} onSelect={choose} copy={copy} style={{ animationDelay: `${Math.min(index, 6) * 65}ms` }} />)}</div><div className="discovery-result-actions" role="group" aria-label={copy.useful}>
+    {stage === 'choose' && <div className="discovery-reveal"><div className="discovery-match-grid" role="radiogroup" aria-label="Choose a person">{matches.map((match, index) => <MatchCard key={match.person.id} match={match} index={index} profileHref={profileHref} onViewProfile={viewProfile} selected={selected?.person.id === match.person.id} onSelect={choose} copy={copy} style={{ animationDelay: `${Math.min(index, 6) * 65}ms` }} />)}</div><div className="discovery-result-actions" role="group" aria-label={copy.useful}>
       <button type="button" className="discovery-result-icon" aria-label={`${copy.useful} ${copy.yes}`} title={copy.yes} aria-pressed={matchFeedback === true} onClick={() => saveMatchFeedback(true)}><ThumbsUp /></button>
       <button type="button" className="discovery-result-icon" aria-label={`${copy.useful} ${copy.no}`} title={copy.no} aria-pressed={matchFeedback === false} onClick={() => saveMatchFeedback(false)}><ThumbsDown /></button>
       <span className="discovery-result-separator" aria-hidden="true" />

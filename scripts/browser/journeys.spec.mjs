@@ -197,3 +197,27 @@ test('failed send preserves the draft and can be retried', async ({ page }) => {
   await expect(page.getByText('Keep my message', { exact: true })).toBeVisible();
   await expect(composer).toHaveValue('');
 });
+
+test('a profile opened from chat results leads back to the same results', async ({ page }) => {
+  await page.goto('/');
+  const composer = page.getByRole('textbox', { name: 'Describe who could help' });
+  await composer.fill('finance');
+  await composer.press('Enter');
+  await expect(page.getByText('Which finance skill would you like help with?')).toBeVisible();
+  await composer.fill('Financial modelling');
+  await composer.press('Enter');
+  const choose = page.getByRole('button', { name: 'Choose Peer Mentor' });
+  await expect(choose).toBeVisible();
+
+  await page.getByRole('link', { name: 'View profile' }).click();
+  await expect(page).toHaveURL(/\/profile\/peer\?from=chat&thread=thread$/);
+  await page.getByRole('button', { name: 'Back to chat' }).click();
+  await expect(page).toHaveURL(/\/\?thread=thread$/);
+  await expect(choose).toBeVisible();
+
+  // The browser's own back button returns to the same results too.
+  await page.getByRole('link', { name: 'View profile' }).click();
+  await expect(page).toHaveURL(/\/profile\/peer/);
+  await page.goBack();
+  await expect(choose).toBeVisible();
+});

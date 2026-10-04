@@ -16,6 +16,13 @@ function fixtureApi(state) {
       if (path === '/reflections') return { entries: state.reflections || [] };
       if (path === '/sessions') return state.sessions.map(payload);
       if (path === '/groups') return state.groups;
+      // A saved conversation and a peer profile, for the view-profile round trip.
+      if (path === '/discovery/threads/thread') return { id: 'thread', turns: [
+        { role: 'user', content: 'Financial modelling' },
+        { role: 'assistant', kind: 'matches', framed: true, content: 'I found someone who could be a great fit.', search_request: 'Financial modelling',
+          matches: [{ ...state.peer, expertise: ['Financial modelling'], reasons: ['Teaches financial modelling.'] }] },
+      ] };
+      if (path === `/users/${state.peer.id}`) return { ...state.peer, skills: [], career: [] };
       if (path.startsWith('/discovery/threads')) return [];
       if (path.startsWith('/skills/suggest')) return [];
       if (/^\/(sessions|groups)\/\d+\/messages/.test(path)) {
