@@ -1,5 +1,62 @@
 import { test, expect } from './fixtures.mjs';
 
+test('Home greeting uses four outlined faces and turns each 15 seconds', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('/');
+  const prism = page.locator('.discovery-greeting-prism');
+  await expect(prism.locator('.discovery-greeting-face')).toHaveCount(4);
+  await expect(prism).toHaveAttribute('style', /rotateX\(0deg\)/);
+  await page.clock.fastForward(15000);
+  await expect(prism).toHaveAttribute('style', /rotateX\(-90deg\)/);
+  await page.clock.fastForward(15000);
+  await page.clock.fastForward(15000);
+  await page.clock.fastForward(15000);
+  await expect(prism).toHaveAttribute('style', /rotateX\(-360deg\)/);
+});
+
+test('Messages rail moves smoothly and compact menus remain usable', async ({ page }) => {
+  await page.goto('/conversations?session=1');
+  const sidebar = page.locator('.app-sidebar');
+  await expect(sidebar.locator('a[href="/"] > span').filter({ hasText: /^M$/ })).toHaveCount(1);
+  await expect(sidebar.getByRole('button', { name: 'Open sidebar' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Close sidebar' }).click();
+  await page.waitForTimeout(100);
+  const sidebarWidth = await sidebar.evaluate(element => element.getBoundingClientRect().width);
+  expect(sidebarWidth).toBeGreaterThan(68);
+  expect(sidebarWidth).toBeLessThan(260);
+  await expect.poll(() => sidebar.evaluate(element => Math.round(element.getBoundingClientRect().width))).toBe(68);
+  await expect(sidebar.getByRole('link', { name: /MENT/ })).toHaveCount(0);
+  const mark = await sidebar.getByRole('button', { name: 'Open sidebar' }).locator('span').boundingBox();
+  const navIcon = await page.locator('.app-sidebar nav a svg').first().boundingBox();
+  expect(Math.abs(mark.x + mark.width / 2 - navIcon.x - navIcon.width / 2)).toBeLessThan(1);
+  await page.getByRole('button', { name: 'Open sidebar' }).click();
+  await expect.poll(() => sidebar.evaluate(element => Math.round(element.getBoundingClientRect().width))).toBe(260);
+  const rail = page.locator('.conversation-list');
+  const close = page.getByRole('button', { name: 'Hide message list' });
+  await expect(close).toBeVisible();
+  expect(await rail.evaluate(element => getComputedStyle(element.parentElement).transitionDuration)).toBe('0.48s');
+  await close.click();
+  await page.waitForTimeout(100);
+  const movingWidth = await rail.evaluate(element => element.getBoundingClientRect().width);
+  expect(movingWidth).toBeGreaterThan(64);
+  expect(movingWidth).toBeLessThan(340);
+  await expect.poll(() => rail.evaluate(element => Math.round(element.getBoundingClientRect().width))).toBe(64);
+  const compact = page.getByRole('group', { name: 'Messages' });
+  await compact.getByRole('button', { name: 'Messages' }).click();
+  await expect(page.locator('.conversation-list-content.menu-chats')).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath('messages-compact-rail.png'), animations: 'disabled' });
+  await compact.getByRole('button', { name: 'Filter conversations' }).click();
+  await expect(page.locator('.conversation-list-content.menu-filters')).toBeVisible();
+  await page.getByRole('button', { name: 'Show message list' }).click();
+  await expect.poll(() => rail.evaluate(element => Math.round(element.getBoundingClientRect().width))).toBe(340);
+  await expect(page.getByRole('heading', { name: 'Messages' })).toBeVisible();
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  expect(await rail.evaluate(element => getComputedStyle(element.parentElement).transitionDuration)).toBe('0s');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByRole('button', { name: 'Hide message list' })).toBeHidden();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+});
+
 test('Quick reflection opens a card without shifting the profile and preserves drafts', async ({ page }) => {
   await page.goto('/profile');
   const trigger = page.getByRole('button', { name: 'Start check-in', exact: true, includeHidden: true });
@@ -175,6 +232,13 @@ test('groups, unread badges and mobile back navigation', async ({ page }) => {
   await expect(group.getByLabel('2 unread messages')).toBeVisible();
   await group.click();
   await expect(page.locator('.conversation-header strong')).toHaveText('Test Group');
+  await page.getByRole('button', { name: 'Group info' }).click();
+  const groupInfo = page.getByRole('dialog', { name: 'Test Group' });
+  await expect(groupInfo.getByText('3 members')).toBeVisible();
+  await expect(groupInfo.getByText('Peer Mentor')).toBeVisible();
+  await expect(groupInfo.getByText('Another Member')).toBeVisible();
+  await groupInfo.press('Escape');
+  await expect(groupInfo).toBeHidden();
   await expect(group.getByLabel('2 unread messages')).toHaveCount(0);
   await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Mobile group message');
   await page.getByRole('button', { name: 'Send message', exact: true }).click();

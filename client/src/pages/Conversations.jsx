@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Check, ChevronLeft, Info, ListFilter, MessageCircle, MessageSquareText, PanelLeft, Send, UserRound, UsersRound } from 'lucide-react';
+import { Check, ChevronLeft, ChevronsLeft, ChevronsRight, Info, ListFilter, MessageCircle, MessageSquareText, Send, UserRound, UsersRound } from 'lucide-react';
 import api from '../api/index.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useT } from '../i18n/index.jsx';
@@ -122,6 +122,10 @@ export default function Conversations() {
   const sending = !!sendingThreads[threadKey];
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [overviewOpen, setOverviewOpen] = useState(false);
+  const [groupOverviewOpen, setGroupOverviewOpen] = useState(false);
+  const [groupMembers, setGroupMembers] = useState([]);
+  const [groupMembersLoading, setGroupMembersLoading] = useState(false);
+  const [groupMembersError, setGroupMembersError] = useState(false);
   const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [withdrawing, setWithdrawing] = useState(false);
   const [scheduledAt, setScheduledAt] = useState('');
@@ -134,6 +138,38 @@ export default function Conversations() {
   const selected = sessions.find((session) => session.id === selectedId) || null;
   const selectedGroup = groups.find((group) => group.id === selectedGroupId) || null;
   const person = selected ? otherPerson(selected, user?.id) : null;
+
+  useEffect(() => {
+    setGroupOverviewOpen(false);
+    setGroupMembers([]);
+    setGroupMembersError(false);
+  }, [selectedGroupId]);
+
+  async function openGroupOverview() {
+    if (!selectedGroup) return;
+    const groupId = selectedGroup.id;
+    setGroupOverviewOpen(true);
+    setGroupMembersLoading(true);
+    setGroupMembersError(false);
+    try {
+      const { data, error: membersError } = await supabase.from('group_members')
+        .select('user_id, role').eq('group_id', groupId);
+      if (membersError) throw membersError;
+      const members = await Promise.all((data || []).map(async (membership) => {
+        if (membership.user_id === user?.id) {
+          return { ...membership, name: user.name };
+        }
+        const { data: profile } = await supabase.rpc('peer_profile', { p_user_id: membership.user_id });
+        return { ...membership, name: profile?.name || t('groups.memberUnknown') };
+      }));
+      if (activeThreadRef.current !== `group:${groupId}`) return;
+      setGroupMembers(members.sort((a, b) => (b.role === 'owner') - (a.role === 'owner') || a.name.localeCompare(b.name)));
+    } catch {
+      if (activeThreadRef.current === `group:${groupId}`) setGroupMembersError(true);
+    } finally {
+      if (activeThreadRef.current === `group:${groupId}`) setGroupMembersLoading(false);
+    }
+  }
 
   async function loadSessions() {
     const response = await api.get('/sessions');
@@ -385,7 +421,7 @@ export default function Conversations() {
   return (
     <section className={cn('conversations-shell', (selectedId || selectedGroupId) && 'has-selection', railCollapsed && 'is-list-collapsed')}>
       <aside ref={railRef} className="conversation-list" aria-label={t('conversations.title')}>
-        <header><h1>{t('conversations.title')}</h1><span>{sessions.length + groups.length}</span><button type="button" className="conversation-list-toggle" onClick={() => { setRailCollapsed(current => !current); setRailMenu(null); }} aria-label={railCollapsed ? t('conversations.openList') : t('conversations.closeList')} title={railCollapsed ? t('conversations.openList') : t('conversations.closeList')}><PanelLeft aria-hidden="true" /></button></header>
+        <header><h1>{t('conversations.title')}</h1><span>{sessions.length + groups.length}</span><button type="button" className="conversation-list-toggle" onClick={() => { setRailCollapsed(current => !current); setRailMenu(null); }} aria-label={railCollapsed ? t('conversations.openList') : t('conversations.closeList')} title={railCollapsed ? t('conversations.openList') : t('conversations.closeList')}>{railCollapsed ? <ChevronsRight aria-hidden="true" /> : <ChevronsLeft aria-hidden="true" />}</button></header>
         {railCollapsed && <div className="conversation-rail-controls" role="group" aria-label={t('conversations.title')}>
           <button type="button" aria-label={t('conversations.filter.label')} title={t('conversations.filter.label')} aria-expanded={railMenu === 'filters'} aria-controls="conversation-list-filters" onClick={() => setRailMenu(current => current === 'filters' ? null : 'filters')}><ListFilter aria-hidden="true" /></button>
           <button type="button" aria-label={t('conversations.title')} title={t('conversations.title')} aria-expanded={railMenu === 'chats'} aria-controls="conversation-list-chats" onClick={() => setRailMenu(current => current === 'chats' ? null : 'chats')}><MessageSquareText aria-hidden="true" />{unreadCounts.sessions + unreadCounts.groups > 0 && <span className="conversation-rail-unread">{unreadCounts.sessions + unreadCounts.groups}</span>}</button>
@@ -471,7 +507,8 @@ export default function Conversations() {
             {selectedGroup ? <header className="conversation-header">
               <button className="conversation-back" type="button" onClick={() => setParams({})} aria-label={t('common.close')}><ChevronLeft /></button>
               <Avatar className="size-9"><AvatarFallback><UsersRound className="size-4" /></AvatarFallback></Avatar>
-              <div><strong>{selectedGroup.name}</strong><span>{selectedGroup.description || t('nav.groups')}</span></div>
+              <div className="conversation-header-person"><strong>{selectedGroup.name}</strong><span>{selectedGroup.description || t('nav.groups')}</span></div>
+              <div className="conversation-header-actions"><Button type="button" variant="ghost" size="icon" onClick={openGroupOverview} aria-label={t('groups.info')} title={t('groups.info')} aria-haspopup="dialog"><Info aria-hidden="true" /></Button></div>
             </header> : <header className="conversation-header">
               <button className="conversation-back" type="button" onClick={() => setParams({})} aria-label={t('common.close')}><ChevronLeft /></button>
               <Avatar className="size-9"><AvatarFallback>{initials(person?.name)}</AvatarFallback></Avatar>
@@ -541,6 +578,29 @@ export default function Conversations() {
               <Button size="sm" onClick={() => mutateSession({ status: 'scheduled' }).catch(() => setError(t('conversations.error')))}><Check aria-hidden="true" />{t('conversations.accept')}</Button>
             </>}
           </DialogFooter>
+        </DialogContent>
+      </Dialog>}
+      {selectedGroup && <Dialog open={groupOverviewOpen} onOpenChange={setGroupOverviewOpen}>
+        <DialogContent className="conversation-overview sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{selectedGroup.name}</DialogTitle>
+            <DialogDescription>{selectedGroup.description || t('groups.chatSubtitle')}</DialogDescription>
+          </DialogHeader>
+          <div className="conversation-overview-body">
+            <section aria-label={t('groups.members', { count: selectedGroup.member_count || groupMembers.length })}>
+              <p className="label-meta">{t('groups.members', { count: selectedGroup.member_count || groupMembers.length })}</p>
+              {groupMembersLoading ? <div role="status" className="space-y-2"><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /></div>
+                : groupMembersError ? <p className="text-sm text-muted-foreground">{t('groups.membersError')}</p>
+                  : <div className="grid max-h-72 gap-2 overflow-y-auto">
+                    {groupMembers.map(member => <div key={member.user_id} className="flex items-center gap-3 rounded-[var(--panel-radius)] bg-[var(--control-surface)] p-3">
+                      <Avatar className="size-9"><AvatarFallback>{initials(member.name)}</AvatarFallback></Avatar>
+                      <span className="min-w-0 flex-1 truncate font-medium">{member.name}</span>
+                      {member.role === 'owner' && <span className="text-xs text-muted-foreground">{t('groups.owner')}</span>}
+                    </div>)}
+                    {groupMembers.length === 0 && <p className="text-sm text-muted-foreground">{t('groups.noMembers')}</p>}
+                  </div>}
+            </section>
+          </div>
         </DialogContent>
       </Dialog>}
       <Dialog open={withdrawOpen} onOpenChange={value => { if (!withdrawing) setWithdrawOpen(value); }}>

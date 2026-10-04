@@ -15,10 +15,10 @@ export default function AppLayout() {
   return (
     <div className="flex h-screen min-h-screen overflow-hidden bg-[var(--background)]">
       <aside className={cn(
-        'flex h-full shrink-0 flex-col border-r border-[var(--sidebar-border)] bg-[var(--sidebar)] transition-[width] duration-300 ease-out',
+        'app-sidebar flex h-full shrink-0 flex-col border-r border-[var(--sidebar-border)] bg-[var(--sidebar)]',
         sidebarCollapsed
-          ? 'w-[68px]'
-          : 'w-[260px] max-[700px]:fixed max-[700px]:inset-y-0 max-[700px]:left-0 max-[700px]:z-50 max-[700px]:shadow-[var(--shadow-overlay)]'
+          ? 'is-collapsed'
+          : 'max-[700px]:fixed max-[700px]:inset-y-0 max-[700px]:left-0 max-[700px]:z-50 max-[700px]:shadow-[var(--shadow-overlay)]'
       )}>
         <Sidebar collapsed={sidebarCollapsed} onNavigate={closeNarrowSidebar} onToggle={() => setSidebarCollapsed(value => !value)} />
       </aside>

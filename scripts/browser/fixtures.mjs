@@ -87,7 +87,13 @@ export const test = base.extend({
       window.fixture = {
         user, peer, calls: [], pending: [], nextMessageId: 10, messages: {},
         unread: { sessions: 0, groups: 1, sessionMessages: {}, groupMessages: { 1: 2 } },
-        groups: [{ id: 1, name: 'Test Group', joined: true, member_count: 3 }],
+        groups: [{ id: 1, name: 'Test Group', description: 'A group for testing', joined: true, member_count: 3 }],
+        groupMembers: { 1: [
+          { user_id: user.id, role: 'owner' },
+          { user_id: peer.id, role: 'member' },
+          { user_id: 'another-peer', role: 'member' },
+        ] },
+        groupProfiles: { [peer.id]: peer, 'another-peer': { id: 'another-peer', name: 'Another Member' } },
         sessions: [1, 2].map(id => ({ id, status: 'scheduled', scheduled_at: '2026-01-01T12:00:00Z', title: `Meeting ${id}`, mentor_id: `peer-${id}`, mentee_id: user.id, mentor: { id: `peer-${id}`, name: `Peer ${id}` }, mentee: user })),
       };
     }, { user, peer });
@@ -122,7 +128,9 @@ export const test = base.extend({
         window.fixture.emit = (table, row) => listeners.filter(l => l.filter.table === table).forEach(l => l.callback({new:row}));
         export const supabase = {channel:()=>{
           const own=[]; return {on(event,filter,callback){const l={filter,callback};own.push(l);listeners.push(l);return this},subscribe(){return this},own};
-        }, removeChannel:channel=>channel.own.forEach(l=>listeners.splice(listeners.indexOf(l),1)), rpc:async()=>({data:{name:'Peer'}})};
+        }, removeChannel:channel=>channel.own.forEach(l=>listeners.splice(listeners.indexOf(l),1)),
+        from:table=>({select:()=>({eq:async(_column,id)=>({data:table==='group_members'?(window.fixture.groupMembers[id]||[]):[],error:null})})}),
+        rpc:async(name,args)=>({data:name==='peer_profile'?window.fixture.groupProfiles[args.p_user_id]:{name:'Peer'},error:null})};
       ` });
       if (url.pathname === '/src/api/index.js') return route.fulfill({ contentType: 'text/javascript', body: `
         export default (${fixtureApi.toString()})(window.fixture);

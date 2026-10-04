@@ -76,7 +76,7 @@ function MatchRow({ match, t }) {
 
 function ProductConversation({ t }) {
   return (
-    <div className="mx-auto mt-12 max-w-4xl overflow-hidden rounded-[18px] border border-border bg-card">
+    <div className="landing-preview overflow-hidden border border-border bg-card">
       <div className="flex items-center justify-between border-b border-border px-4 py-3 sm:px-5">
         <div className="flex items-center gap-2.5">
           <span className="grid size-7 place-items-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">M</span>
@@ -99,7 +99,7 @@ function ProductConversation({ t }) {
       <div>{MATCHES.map(match => <MatchRow key={match.name} match={match} t={t} />)}</div>
       <div className="flex items-center justify-between gap-4 border-t border-border bg-muted/55 px-4 py-3 sm:px-5">
         <p className="text-xs text-muted-foreground">{t('landing.preview.privacy')}</p>
-        <Link to="/login" className="shrink-0 text-sm font-semibold hover:underline">{t('landing.nav.signIn')}</Link>
+        <span className="landing-preview-folio">MENT / 02</span>
       </div>
     </div>
   );
@@ -107,19 +107,13 @@ function ProductConversation({ t }) {
 
 function Hero({ t }) {
   return (
-    <section className="px-5 pb-14 pt-16 sm:px-6 sm:pt-20">
-      <div className="mx-auto max-w-3xl text-center">
-        <p className="text-sm font-medium text-primary">{t('landing.hero.eyebrow')}</p>
-        <h1 className="mt-4 text-[clamp(2.25rem,6vw,3.75rem)] font-semibold leading-[1.05] tracking-[-0.045em]">
+    <section className="landing-hero">
+      <div className="landing-hero-copy">
+        <p className="landing-hero-eyebrow">{t('landing.hero.eyebrow')}</p>
+        <h1>
           {t('landing.hero.title')}
         </h1>
-        <p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-muted-foreground sm:text-[17px]">
-          {t('landing.hero.subtitle')}
-        </p>
-        <div className="landing-cta-pair mt-7 flex flex-wrap items-center justify-center gap-2.5">
-          <Link to="/login"><Button size="lg">{t('landing.hero.ctaPrimary')}</Button></Link>
-          <Link to="/request-access"><Button size="lg" variant="outline">{t('landing.hero.ctaSecondary')}</Button></Link>
-        </div>
+        <span className="landing-hero-index">MENT / 01</span>
       </div>
       <ProductConversation t={t} />
     </section>
@@ -134,34 +128,17 @@ function HowItWorks({ t }) {
   ];
 
   return (
-    <section className="border-y border-border bg-muted/55 px-5 py-14 sm:px-6">
-      <div className="mx-auto max-w-4xl">
-        <h2 className="text-xl font-semibold tracking-[-0.02em]">{t('landing.how.title')}</h2>
-        <div className="mt-5 divide-y divide-border border-y border-border">
+    <section className="landing-how">
+      <div className="landing-how-inner">
+        <h2>{t('landing.how.title')}</h2>
+        <div className="landing-how-steps">
           {steps.map(([title, description], index) => (
-            <div key={title} className="grid gap-2 py-4 sm:grid-cols-[32px_190px_1fr] sm:items-baseline">
-              <span className="text-xs tabular-nums text-muted-foreground">{index + 1}</span>
-              <h3 className="text-sm font-semibold">{title}</h3>
-              <p className="text-sm leading-6 text-muted-foreground">{description}</p>
+            <div key={title} className="landing-how-step">
+              <span>0{index + 1}</span>
+              <h3>{title}</h3>
+              <p>{description}</p>
             </div>
           ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function Closing({ t }) {
-  return (
-    <section className="px-5 py-14 sm:px-6">
-      <div className="mx-auto flex max-w-4xl flex-col justify-between gap-6 rounded-[18px] border border-border bg-card p-6 sm:flex-row sm:items-center sm:p-8">
-        <div>
-          <h2 className="max-w-xl text-2xl font-semibold tracking-[-0.03em]">{t('landing.finalCta.title')}</h2>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">{t('landing.finalCta.subtitle')}</p>
-        </div>
-        <div className="landing-cta-pair flex shrink-0 gap-2.5">
-          <Link to="/login"><Button size="lg">{t('landing.finalCta.ctaPrimary')}</Button></Link>
-          <Link to="/request-access"><Button size="lg" variant="outline">{t('landing.finalCta.ctaSecondary')}</Button></Link>
         </div>
       </div>
     </section>
@@ -190,7 +167,6 @@ export default function LandingPage() {
       <main>
         <Hero t={t} />
         <HowItWorks t={t} />
-        <Closing t={t} />
       </main>
       <Footer t={t} />
     </div>
