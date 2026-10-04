@@ -1,15 +1,32 @@
 import { test, expect } from './fixtures.mjs';
 
+test('Home greeting uses four outlined faces and turns each 15 seconds', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('/');
+  const prism = page.locator('.discovery-greeting-prism');
+  await expect(prism.locator('.discovery-greeting-face')).toHaveCount(4);
+  await expect(prism).toHaveAttribute('style', /rotateX\(0deg\)/);
+  await page.clock.fastForward(15000);
+  await expect(prism).toHaveAttribute('style', /rotateX\(-90deg\)/);
+  await page.clock.fastForward(15000);
+  await page.clock.fastForward(15000);
+  await page.clock.fastForward(15000);
+  await expect(prism).toHaveAttribute('style', /rotateX\(-360deg\)/);
+});
+
 test('Messages rail moves smoothly and compact menus remain usable', async ({ page }) => {
   await page.goto('/conversations?session=1');
   const sidebar = page.locator('.app-sidebar');
+  await expect(sidebar.locator('a[href="/"] > span').filter({ hasText: /^M$/ })).toHaveCount(1);
+  await expect(sidebar.getByRole('button', { name: 'Open sidebar' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Close sidebar' }).click();
   await page.waitForTimeout(100);
   const sidebarWidth = await sidebar.evaluate(element => element.getBoundingClientRect().width);
   expect(sidebarWidth).toBeGreaterThan(68);
   expect(sidebarWidth).toBeLessThan(260);
   await expect.poll(() => sidebar.evaluate(element => Math.round(element.getBoundingClientRect().width))).toBe(68);
-  const mark = await page.locator('.app-sidebar-toggle-mark').boundingBox();
+  await expect(sidebar.getByRole('link', { name: /MENT/ })).toHaveCount(0);
+  const mark = await sidebar.getByRole('button', { name: 'Open sidebar' }).locator('span').boundingBox();
   const navIcon = await page.locator('.app-sidebar nav a svg').first().boundingBox();
   expect(Math.abs(mark.x + mark.width / 2 - navIcon.x - navIcon.width / 2)).toBeLessThan(1);
   await page.getByRole('button', { name: 'Open sidebar' }).click();

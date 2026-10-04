@@ -148,20 +148,6 @@ button:not(:disabled):active, [data-slot="button"]:not([aria-disabled="true"]):a
 
 .app-sidebar { width: 260px; transition: width var(--motion-panel) var(--motion-round); }
 .app-sidebar.is-collapsed { width: 68px; }
-.app-sidebar-header { min-width: 0; }
-.app-sidebar.is-collapsed .app-sidebar-header { justify-content: center; }
-.app-sidebar-brand { min-width: 0; max-width: 170px; white-space: nowrap; transition: max-width var(--motion-panel) var(--motion-round), opacity 160ms var(--motion-ease), padding var(--motion-panel) var(--motion-round); }
-.app-sidebar-brand > span:first-child { flex-shrink: 0; }
-.app-sidebar.is-collapsed .app-sidebar-brand { max-width: 0; opacity: 0; padding-inline: 0; pointer-events: none; }
-.app-sidebar-toggle { position: relative; }
-.app-sidebar-toggle-mark { position: absolute; inset: 4px; opacity: 0; transition: opacity 160ms var(--motion-ease); }
-.app-sidebar.is-collapsed .app-sidebar-toggle-mark { opacity: 1; }
-.app-sidebar-toggle-icon { opacity: 1; transition: opacity 160ms var(--motion-ease); }
-.app-sidebar.is-collapsed .app-sidebar-toggle-icon { opacity: 0; }
-.app-sidebar.is-collapsed .app-sidebar-toggle:hover .app-sidebar-toggle-mark { opacity: 0; }
-.app-sidebar.is-collapsed .app-sidebar-toggle:hover .app-sidebar-toggle-icon { opacity: 1; }
-.app-sidebar-label { min-width: 0; max-width: 180px; overflow: hidden; white-space: nowrap; transition: max-width var(--motion-panel) var(--motion-round), opacity 160ms var(--motion-ease); }
-.app-sidebar.is-collapsed .app-sidebar-label { max-width: 0; opacity: 0; }
 
 .profile-tab-content, .directory-results {
   animation: contentEnter var(--motion-content) var(--motion-ease) both;
@@ -359,8 +345,13 @@ button:not(:disabled):active, [data-slot="button"]:not([aria-disabled="true"]):a
 .discovery-history-arrow svg, .discovery-history-delete svg { width: 14px; height: 14px; }
 .discovery-history-row button:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
 .discovery-ask-block h1 { margin: 0 0 1.65rem; text-align: center; font-size: clamp(25px, 2.2vw, 29px); font-weight: 500; letter-spacing: -.025em; }
-.discovery-greeting { animation: discovery-greeting-turn 720ms var(--motion-round) both; transform-origin: center; }
-@keyframes discovery-greeting-turn { 0% { opacity: .35; transform: perspective(720px) rotateX(-90deg); } 55% { opacity: 1; transform: perspective(720px) rotateX(8deg); } 100% { opacity: 1; transform: perspective(720px) rotateX(0deg); } }
+.discovery-greeting-scene { height: 88px; perspective: 900px; }
+.discovery-greeting-prism { position: relative; display: block; width: 100%; height: 100%; transform-style: preserve-3d; transition: transform 900ms var(--motion-round); }
+.discovery-greeting-face { position: absolute; inset: 0; display: grid; place-items: center; border: 1px solid var(--foreground); background: var(--background); padding: 8px 18px; backface-visibility: hidden; }
+.discovery-greeting-face:nth-child(1) { transform: rotateX(0deg) translateZ(44px); }
+.discovery-greeting-face:nth-child(2) { transform: rotateX(90deg) translateZ(44px); }
+.discovery-greeting-face:nth-child(3) { transform: rotateX(180deg) translateZ(44px); }
+.discovery-greeting-face:nth-child(4) { transform: rotateX(270deg) translateZ(44px); }
 .discovery-composer, .discovery-draft { border: 1px solid transparent; border-radius: var(--panel-radius); background: var(--control-surface); box-shadow: none; }
 .discovery-composer { display: flex; min-height: 58px; align-items: center; gap: 10px; padding: 8px 8px 8px 18px; }
 .discovery-composer textarea, .discovery-draft textarea { width: 100%; resize: none; border: 0; outline: 0; background: transparent; color: #201e1b; font: inherit; font-size: 15.5px; line-height: 1.55; }
@@ -519,7 +510,7 @@ a.person-row-name:hover { color: var(--primary); text-decoration: underline; }
 .landing-how-step p { color: var(--muted-foreground); font-size: 14px; line-height: 1.5; }
 @media (max-width: 1000px) { .landing-hero { grid-template-columns: 1fr; gap: 3rem; padding: 5rem 1.5rem; } .landing-hero h1 { max-width: 14ch; } .landing-how-inner { grid-template-columns: 1fr; gap: 2rem; } }
 @media (max-width: 620px) { .landing-hero { padding: 4rem 1rem; } .landing-hero h1 { font-size: clamp(3rem, 12vw, 4.5rem); } .landing-how { padding: 3rem 1rem; } .landing-how-step { grid-template-columns: 32px 1fr; gap: .35rem 1rem; } .landing-how-step p { grid-column: 2; } }
-@media (prefers-reduced-motion: reduce) { .discovery-greeting { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .discovery-greeting-prism { transition: none; } }
 .auth-shell { background: var(--background); }
 .directory-filter-panel, .group-create-card { background: var(--card); }
 .directory-rail { width: 100%; max-width: 100%; min-width: 0; }
@@ -650,7 +641,7 @@ a.person-row-name:hover { color: var(--primary); text-decoration: underline; }
 @media (max-width: 1000px) { .conversation-list > header { justify-content: space-between; } .conversation-list > header h1, .conversation-list > header span { position: static; } .is-list-collapsed .conversation-list > header h1, .is-list-collapsed .conversation-list > header span { opacity: 1; } .conversation-list-content { animation: none; } }
 @media (prefers-reduced-motion: reduce) {
   button:not(:disabled):active, [data-slot="button"]:not([aria-disabled="true"]):active { scale: 1; }
-  .app-sidebar-brand, .app-sidebar-toggle-mark, .app-sidebar-toggle-icon, .app-sidebar-label, .conversation-list > header h1, .conversation-list > header span { transition-duration: 0ms; }
+  .app-sidebar, .conversation-list > header h1, .conversation-list > header span { transition-duration: 0ms; }
   .conversation-list-content, .conversation-rail-controls, .is-list-collapsed .conversation-list-content.menu-filters, .is-list-collapsed .conversation-list-content.menu-chats { animation: none; }
 }
 

@@ -17,7 +17,7 @@ export default function AppLayout() {
       <aside className={cn(
         'app-sidebar flex h-full shrink-0 flex-col border-r border-[var(--sidebar-border)] bg-[var(--sidebar)]',
         sidebarCollapsed
-          ? 'is-collapsed max-[700px]:relative'
+          ? 'is-collapsed'
           : 'max-[700px]:fixed max-[700px]:inset-y-0 max-[700px]:left-0 max-[700px]:z-50 max-[700px]:shadow-[var(--shadow-overlay)]'
       )}>
         <Sidebar collapsed={sidebarCollapsed} onNavigate={closeNarrowSidebar} onToggle={() => setSidebarCollapsed(value => !value)} />
