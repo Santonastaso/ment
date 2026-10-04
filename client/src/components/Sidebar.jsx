@@ -27,16 +27,14 @@ export default function Sidebar({ collapsed = false, onNavigate, onToggle }) {
 
   return (
     <div className={cn('flex h-full flex-col py-2.5', collapsed ? 'px-2' : 'px-2.5')}>
-      <div className={cn('mb-6 flex h-11 items-center', collapsed ? 'justify-center' : 'justify-between')}>
-        {collapsed ? <button type="button" onClick={onToggle} className="group grid size-11 place-items-center rounded-full outline-none hover:bg-[var(--sidebar-accent)] focus-visible:ring-3 focus-visible:ring-[var(--sidebar-ring)]" aria-label="Open sidebar" title="Open sidebar">
-          <span className="grid size-8 place-items-center rounded-full bg-primary text-xs font-bold text-white group-hover:hidden">M</span>
-          <PanelLeft className="hidden size-[22px] text-foreground group-hover:block" strokeWidth={2.3} />
-        </button> : <Link to={user?.is_admin ? '/admin' : '/'} onClick={onNavigate} className="flex h-11 items-center gap-2.5 px-2">
+      <div className="app-sidebar-header mb-6 flex h-11 items-center justify-between">
+        <Link to={user?.is_admin ? '/admin' : '/'} onClick={onNavigate} className="app-sidebar-brand flex h-11 items-center gap-2.5 overflow-hidden px-2" tabIndex={collapsed ? -1 : undefined} aria-hidden={collapsed}>
           <span className="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">M</span>
-          <span className="text-[17px] font-semibold tracking-[-0.025em] text-foreground">MENT</span>
-        </Link>}
-        {!collapsed && onToggle && <button type="button" onClick={onToggle} className="grid size-10 place-items-center rounded-full text-muted-foreground outline-none hover:bg-[var(--sidebar-accent)] hover:text-foreground focus-visible:ring-3 focus-visible:ring-[var(--sidebar-ring)]" aria-label="Close sidebar" title="Close sidebar">
-          <PanelLeft className="size-[22px]" strokeWidth={2.3} />
+          <span className="app-sidebar-brand-name text-[17px] font-semibold tracking-[-0.025em] text-foreground">MENT</span>
+        </Link>
+        {onToggle && <button type="button" onClick={onToggle} className="app-sidebar-toggle group grid size-10 shrink-0 place-items-center rounded-full text-muted-foreground outline-none hover:bg-[var(--sidebar-accent)] hover:text-foreground focus-visible:ring-3 focus-visible:ring-[var(--sidebar-ring)]" aria-label={collapsed ? 'Open sidebar' : 'Close sidebar'} title={collapsed ? 'Open sidebar' : 'Close sidebar'}>
+          <span className="app-sidebar-toggle-mark grid size-8 place-items-center rounded-full bg-primary text-xs font-bold text-white">M</span>
+          <PanelLeft className="app-sidebar-toggle-icon size-[22px]" strokeWidth={2.3} />
         </button>}
       </div>
 
@@ -66,7 +64,7 @@ export default function Sidebar({ collapsed = false, onNavigate, onToggle }) {
               title={collapsed ? item.label : undefined}
             >
               <Icon className="size-5 shrink-0" strokeWidth={2.05} />
-              {!collapsed && <span className="flex-1">{item.label}</span>}
+              <span className="app-sidebar-label flex-1" aria-hidden={collapsed}>{item.label}</span>
               {badgeCount > 0 && (
                 <span
                   data-testid="nav-messages-unread-badge"

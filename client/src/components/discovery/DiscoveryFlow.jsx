@@ -11,7 +11,7 @@ import { CONVERSATION_FILTERS, conversationState, requestText, resumableSearch }
 const COPY = {
   en: {
     history: 'History',
-    greeting: 'Hi {name}, who would you like to connect with?', placeholder: 'Describe who could help', resume: 'Resume search', needsReply: 'Hi {name}, you have conversations waiting for you.', requestWaiting: 'Hi {name}, {person} is waiting for your reply.', completedRecently: 'Hi {name}, how did your conversation with {person} go?',
+    greetings: ['Hey {name}, would you like to meet today?', 'Hey {name}, who is on your mind?', 'Hey {name}, shall we find someone interesting?'], placeholder: 'Describe who could help', resume: 'Resume search',
     finding: 'Having a look', chooseLead: 'Here are the people who fit.', chooseBold: 'Pick one and I will write the message.',
     why: 'Why this match', choose: 'Choose', selected: 'Selected', different: 'Ask for different people', browse: 'browse the full directory', notRight: 'Not quite right?', or: 'or',
     to: 'To', intro: "Here's a suggested intro. Edit anything, then send when it feels like you.", suggested: 'Suggested draft', send: 'Send request', regenerate: 'Regenerate',
@@ -19,7 +19,7 @@ const COPY = {
   },
   it: {
     history: 'Cronologia',
-    greeting: 'Ciao {name}, con chi vorresti entrare in contatto?', placeholder: 'Descrivi chi potrebbe aiutarti', resume: 'Riprendi la ricerca', needsReply: 'Ciao {name}, alcune conversazioni aspettano una tua risposta.', requestWaiting: 'Ciao {name}, {person} aspetta una tua risposta.', completedRecently: 'Ciao {name}, com’è andata la conversazione con {person}?',
+    greetings: ['Ehi {name}, ti va di incontrare qualcuno oggi?', 'Ehi {name}, a chi stai pensando?', 'Ehi {name}, troviamo qualcuno di interessante?'], placeholder: 'Descrivi chi potrebbe aiutarti', resume: 'Riprendi la ricerca',
     finding: 'Do un’occhiata', chooseLead: 'Ecco le persone adatte.', chooseBold: 'Scegline una e scrivo io il messaggio.',
     why: 'Perché è adatto', choose: 'Scegli', selected: 'Scelto', different: 'Mostra altre persone', browse: 'sfoglia la directory', notRight: 'Non è quello che cercavi?', or: 'oppure',
     to: 'A', intro: 'Ecco un messaggio proposto. Modifica tutto quello che vuoi, poi invialo quando ti sembra giusto.', suggested: 'Messaggio proposto', send: 'Invia richiesta', regenerate: 'Rigenera',
@@ -27,7 +27,7 @@ const COPY = {
   },
   fr: {
     history: 'Historique',
-    greeting: 'Bonjour {name}, avec qui souhaitez-vous entrer en contact ?', placeholder: 'Décrivez qui pourrait vous aider', resume: 'Reprendre la recherche', needsReply: 'Bonjour {name}, des conversations attendent votre réponse.', requestWaiting: 'Bonjour {name}, {person} attend votre réponse.', completedRecently: 'Bonjour {name}, comment s’est passée votre conversation avec {person} ?',
+    greetings: ['Salut {name}, on fait une rencontre aujourd’hui ?', 'Salut {name}, quelqu’un en tête ?', 'Salut {name}, on trouve quelqu’un d’intéressant ?'], placeholder: 'Décrivez qui pourrait vous aider', resume: 'Reprendre la recherche',
     finding: 'Je regarde', chooseLead: 'Voici les personnes qui conviennent.', chooseBold: 'Choisissez-en une et j’écris le message.',
     why: 'Pourquoi ce profil', choose: 'Choisir', selected: 'Sélectionné', different: 'Voir d’autres personnes', browse: 'parcourir l’annuaire', notRight: 'Pas tout à fait ?', or: 'ou',
     to: 'À', intro: 'Voici un message proposé. Modifiez ce que vous voulez, puis envoyez-le lorsqu’il vous convient.', suggested: 'Message proposé', send: 'Envoyer la demande', regenerate: 'Régénérer',
@@ -151,6 +151,7 @@ export default function DiscoveryFlow() {
   const { lang, t } = useT();
   const copy = COPY[lang] || COPY.en;
   const [stage, setStage] = useState('ask');
+  const [greetingIndex, setGreetingIndex] = useState(0);
   const [query, setQuery] = useState('');
   const [submittedQuery, setSubmittedQuery] = useState('');
   const [turns, setTurns] = useState([]);
@@ -187,6 +188,12 @@ export default function DiscoveryFlow() {
     if (threadId) navigate(`/?thread=${encodeURIComponent(threadId)}`, { replace: true });
     navigate(profileHref(personId));
   }
+
+  useEffect(() => {
+    if (stage !== 'ask') return undefined;
+    const timer = window.setInterval(() => setGreetingIndex(index => (index + 1) % copy.greetings.length), 20000);
+    return () => window.clearInterval(timer);
+  }, [stage, copy]);
 
   useLayoutEffect(() => {
     const input = composerInputRef.current;
@@ -410,18 +417,6 @@ export default function DiscoveryFlow() {
   const connectionFilters = CONVERSATION_FILTERS.filter(option => ['needs', 'waiting', 'scheduled', 'past'].includes(option.key));
   const selectedConnectionFilter = connectionFilters.find(option => option.key === connectionCategory);
   const visibleConnections = selectedConnectionFilter ? connections.filter(session => selectedConnectionFilter.match(conversationState(session))) : [];
-  const needsReply = connections.some(session => conversationState(session) === 'needs');
-  const waitingRequest = connections.find(session => session.status === 'pending' && session.isMentor);
-  const recentCompletion = connections.find(session => {
-    const completedAt = session.isMentor ? session.mentor_completed_at : session.mentee_completed_at;
-    const age = Date.now() - new Date(completedAt || 0).getTime();
-    return !!completedAt && age >= 0 && age <= 7 * 24 * 60 * 60 * 1000;
-  });
-  const greetingSession = waitingRequest || recentCompletion;
-  const greetingPerson = greetingSession
-    ? (greetingSession.mentor_id === user?.id ? greetingSession.mentee?.name : greetingSession.mentor?.name) || ''
-    : '';
-  const greetingKey = waitingRequest ? 'requestWaiting' : recentCompletion ? 'completedRecently' : needsReply ? 'needsReply' : 'greeting';
   const isConversation = stage !== 'ask';
   // The opening question names the thread, so the header says which search you are in.
   const threadTitle = turns.find(turn => turn.role === 'user')?.content || submittedQuery || copy.placeholder;
@@ -443,7 +438,7 @@ export default function DiscoveryFlow() {
   return <section className={`discovery-flow ${isConversation ? 'is-conversation' : ''}`} aria-label="Ment discovery"><div className="discovery-thread">
     {stage === 'ask' && (
       <div className="discovery-ask-block">
-        <h1>{text(copy, greetingKey, { name: firstName, person: greetingPerson })}</h1>
+        <h1 key={`${lang}-${greetingIndex}`} className="discovery-greeting">{copy.greetings[greetingIndex]?.replace('{name}', firstName)}</h1>
         {composer()}
         {(history.length > 0 || connections.length > 0) && (
           <div className="discovery-meta-row">
