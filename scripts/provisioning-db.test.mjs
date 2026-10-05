@@ -71,6 +71,17 @@ test('admin provisioning atomically attaches Auth-only users and keeps tenant sc
     assert.equal((await one('select name from profiles where id = $1', [orphanAuthId])).name, 'Attached Member');
     assert.equal((await one("select has_function_privilege('authenticated', 'admin_auth_users_by_email(text[])', 'EXECUTE') as allowed")).allowed, false);
 
+    await db.exec(`
+      alter table public.profiles add column matches_stale boolean not null default false;
+      create function public._recompute_matches_for(uuid) returns void language sql as $$ select $$;
+      update public.profiles set matches_stale = true;
+    `);
+    await db.exec(await read('migrations/20261004103000_0069_targeted_match_refresh.sql'));
+    const refreshed = await one('select public.process_stale_matches_for($1::uuid[]) as result', [[orphanAuthId]]);
+    assert.deepEqual(refreshed.result.processed, [orphanAuthId]);
+    assert.equal((await one('select matches_stale from profiles where id = $1', [orphanAuthId])).matches_stale, false);
+    assert.equal((await one('select matches_stale from profiles where id = $1', [existingAuthId])).matches_stale, true);
+
     await db.exec(migration.slice(migration.indexOf('-- Never let onboarding')));
     await db.query("select set_config('request.jwt.claim.sub', $1, false), set_config('request.jwt.claim.role', 'authenticated', false)", [missingProfileId]);
     await assert.rejects(db.query(`select public.save_onboarding(

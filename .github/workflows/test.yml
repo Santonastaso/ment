@@ -121,6 +121,22 @@ jobs:
         run: supabase start -x studio,imgproxy,inbucket,logflare,vector,edge-runtime,supavisor
       - name: Validate database functions
         run: supabase db lint --local --fail-on error
+      - name: Verify RLS against disposable local users
+        run: |
+          set -euo pipefail
+          local_env="$(supabase status -o env)"
+          export SUPABASE_URL="$(sed -n 's/^API_URL="\([^"]*\)"$/\1/p' <<< "$local_env")"
+          export SUPABASE_ANON_KEY="$(sed -n 's/^ANON_KEY="\([^"]*\)"$/\1/p' <<< "$local_env")"
+          export SUPABASE_SERVICE_ROLE_KEY="$(sed -n 's/^SERVICE_ROLE_KEY="\([^"]*\)"$/\1/p' <<< "$local_env")"
+          test -n "$SUPABASE_URL" && test -n "$SUPABASE_ANON_KEY" && test -n "$SUPABASE_SERVICE_ROLE_KEY"
+          export MENT_EMP_EMAIL='rls-employee@ment.local'
+          export MENT_EMP_PASSWORD='local-employee-fixture-2026'
+          export MENT_ADMIN_EMAIL='rls-admin@ment.local'
+          export MENT_ADMIN_PASSWORD='local-admin-fixture-2026'
+          export MENT_PEER_EMAIL='rls-peer@ment.local'
+          export MENT_PEER_PASSWORD='local-peer-fixture-2026'
+          python3 scripts/seed_local_rls.py
+          python3 scripts/rls_smoke_test.py
       - name: Stop local services
         if: always()
         run: supabase stop --no-backup

@@ -117,6 +117,7 @@ test('pilot feedback migrations: group lifecycle, tenant boundaries, capacity an
     await db.exec(conversations.slice(conversations.indexOf('create or replace function public.pm_set_outbound_message'), conversations.indexOf('create or replace function public.accept_session')));
     await db.exec(await migration('20261001103000_0059_atomic_conversation_request.sql'));
     await db.exec(await migration('20261001104000_0060_request_expiry_guard.sql'));
+    await db.exec(await migration('20261004100000_0066_request_retry_integrity.sql'));
     await db.exec('create trigger pm_session_guard before insert or update on sessions for each row execute function pm_session_guard()');
     await as(applicant);
     const key = '40000000-0000-0000-0000-000000000001';
@@ -126,6 +127,10 @@ test('pilot feedback migrations: group lifecycle, tenant boundaries, capacity an
     assert.equal((await one('select pre_session_question from sessions where id = $1', [sent.id])).pre_session_question.length, 1000);
     assert.equal((await request()).rows[0].value.id, sent.id);
     assert.equal((await one('select count(*)::int value from session_messages where session_id = $1', [sent.id])).value, 1);
+    await assert.rejects(db.query(`select request_conversation($1, 'Finance help', 'Changed text',
+      p_pre_session_question => $2, p_idempotency_key => $3)`, [owner, 'A'.repeat(1000), key]), /idempotency_conflict/);
+    assert.equal((await one('select outbound_message from sessions where id = $1', [sent.id])).outbound_message, 'Please help');
+    assert.equal((await one('select body from session_messages where session_id = $1', [sent.id])).body, 'Please help');
     await assert.rejects(db.query(`select request_conversation($1, 'Again', 'Please help',
       p_pre_session_question => 'Finance help', p_idempotency_key => gen_random_uuid())`, [owner]), /active_session_exists/);
     await db.query("update sessions set created_at = now() - interval '8 days', request_expires_at = now() - interval '1 second' where id = $1", [sent.id]);

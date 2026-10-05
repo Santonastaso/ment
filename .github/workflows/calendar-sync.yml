@@ -1,0 +1,35 @@
+name: calendar-sync
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: calendar-sync-production
+      cancel-in-progress: false
+    timeout-minutes: 5
+    steps:
+      - name: Reconcile queued calendar events
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo '::error::Configure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.'
+            exit 1
+          fi
+          curl --silent --show-error --fail-with-body --max-time 120 \
+            --retry 2 --retry-delay 5 --retry-all-errors \
+            --request POST \
+            --header "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            --header 'Content-Type: application/json' \
+            --data '{"action":"drain_sync_queue"}' \
+            "$SUPABASE_URL/functions/v1/calendar-provider"

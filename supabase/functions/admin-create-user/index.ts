@@ -142,6 +142,7 @@ Deno.serve(async (req) => {
     .from('imports')
     .download(storagePath);
   if (dlErr || !file) return jsonError(`download_failed: ${dlErr?.message ?? 'unknown'}`, 400);
+  if (file.size > 2 * 1024 * 1024) return jsonError('import_file_too_large', 413);
 
   let rows: Record<string, unknown>[];
   try {
@@ -152,6 +153,7 @@ Deno.serve(async (req) => {
     return jsonError(`parse_failed: ${(e as Error).message}`, 400);
   }
   if (!rows.length) return jsonError('empty_file', 400);
+  if (rows.length > 250) return jsonError('import_batch_too_large', 413);
 
   const tempPasswords: { email: string; password: string }[] = [];
   const adminOrgId = ctx.profile.organization_id;
@@ -335,8 +337,9 @@ Deno.serve(async (req) => {
     const { error: staleError } = await ctx.sb.from('profiles').update({ matches_stale: true }).in('id', touchedIds);
     if (staleError) warnings.push('match_queue_failed');
     else {
-      const { error: matchError } = await ctx.sb.rpc('process_stale_matches', { p_batch: touchedIds.length });
+      const { data: matchResult, error: matchError } = await ctx.sb.rpc('process_stale_matches_for', { p_ids: touchedIds });
       if (matchError) warnings.push('match_recompute_failed');
+      else if (matchResult?.failed?.length) warnings.push(`match_recompute_failed_for_${matchResult.failed.length}_members`);
     }
   }
   const { count: matchCount, error: countError } = await ctx.sb.from('match_scores').select('*', { count: 'exact', head: true });

@@ -18,6 +18,7 @@ async function handler() {
         contents: `export const corsHeaders = {};
           export const jsonOk = (value, status = 200) => Response.json(value, { status });
           export const jsonError = (error, status = 400) => Response.json({ error }, { status });
+          export const adminClient = () => globalThis.__calendarFixture.ctx.sb;
           export const requireUser = async () => globalThis.__calendarFixture.ctx;`, loader: 'js',
       }));
     } }],
