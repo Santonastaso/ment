@@ -37,4 +37,23 @@ for email_key, password_key, name, scope in users:
         user = json.load(response)
     if not user.get("id"):
         raise SystemExit(f"Failed to create local fixture {name}")
+    profile = json.dumps({
+        "id": user["id"],
+        "name": name,
+        "organization_id": organization_id,
+        "admin_scope": scope,
+        "is_admin": scope != "none",
+        "onboarding_complete": True,
+    }).encode()
+    profile_request = urllib.request.Request(
+        f"{url}/rest/v1/profiles?on_conflict=id", data=profile, method="POST",
+        headers={
+            "apikey": key,
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+            "Prefer": "resolution=merge-duplicates",
+        },
+    )
+    with urllib.request.urlopen(profile_request, timeout=20):
+        pass
     print(f"Seeded {name}")
