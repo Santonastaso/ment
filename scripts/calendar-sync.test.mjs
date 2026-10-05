@@ -10,7 +10,7 @@ async function handler() {
   const bundled = await build({
     entryPoints: [fileURLToPath(new URL('../supabase/functions/calendar-provider/index.ts', import.meta.url))],
     bundle: true, write: false, format: 'esm', platform: 'node',
-    banner: { js: `const Deno = { serve: fn => { globalThis.__calendarHandler = fn; }, env: { get: key => key === 'CALENDAR_TOKEN_ENCRYPTION_KEY' ? '${secret}' : '' } };
+    banner: { js: `const Deno = { serve: fn => { globalThis.__calendarHandler = fn; }, env: { get: key => ({ CALENDAR_TOKEN_ENCRYPTION_KEY: '${secret}', GOOGLE_CLIENT_ID: 'fixture-client', GOOGLE_CLIENT_SECRET: 'fixture-secret' })[key] || '' } };
       const fetch = (...args) => globalThis.__calendarFixture.fetch(...args);` },
     plugins: [{ name: 'calendar-auth-fixture', setup(builder) {
       builder.onResolve({ filter: /_shared\/index\.ts$/ }, () => ({ path: 'auth', namespace: 'calendar-fixture' }));
@@ -23,7 +23,7 @@ async function handler() {
       }));
     } }],
   });
-  await import(`data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString('base64')}`);
+  await import(`data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString('base64')}#${Math.random()}`);
   return globalThis.__calendarHandler;
 }
 
@@ -70,6 +70,52 @@ test('cancelling a meeting deletes its external event even without a scheduled d
   assert.equal(response.status, 200);
   assert.ok(mutations.some(row => row.table === 'calendar_events' && row.action === 'delete'));
   assert.ok(mutations.some(row => row.table === 'sessions' && row.action === 'update' && row.value.meeting_url === null));
+  delete globalThis.__calendarFixture;
+  delete globalThis.__calendarHandler;
+});
+
+test('event creation stops if a refreshed OAuth token cannot be saved', async () => {
+  const run = await handler();
+  const session = { id: 2, mentor_id: 'mentor', mentee_id: 'mentee', status: 'scheduled', scheduled_at: '2026-10-10T10:00:00Z', duration_minutes: 60, title: 'Session', pre_session_question: '' };
+  const connection = { refresh_ciphertext: await encryptedToken('refresh-token'), token_expires_at: '2000-01-01T00:00:00Z' };
+  const mutations = [];
+  const calls = [];
+  globalThis.__calendarFixture = {
+    ctx: { user: { id: 'mentor' }, sb: {
+      auth: { admin: { getUserById: async () => ({ data: { user: { email: 'member@example.test' } } }) } },
+      rpc: async () => ({ data: 'lease', error: null }),
+      from(table) {
+        let action = 'select';
+        const query = {
+          select() { return this; },
+          eq() { return this; },
+          update() { action = 'update'; return this; },
+          delete() { action = 'delete'; return this; },
+          upsert() { action = 'upsert'; return this; },
+          async maybeSingle() {
+            return { data: table === 'sessions' ? session : table === 'calendar_connections' ? connection : null, error: null };
+          },
+          then(resolve) {
+            mutations.push({ table, action });
+            return Promise.resolve(resolve({ error: table === 'calendar_connections' && action === 'update' ? new Error('write failed') : null }));
+          },
+        };
+        return query;
+      },
+    } },
+    fetch: async (url) => {
+      calls.push(url);
+      assert.match(url, /oauth2\.googleapis\.com\/token/);
+      return Response.json({ access_token: 'new-access-token', refresh_token: 'rotated-refresh-token', expires_in: 3600 });
+    },
+  };
+  const response = await run(new Request('https://fixture.invalid/calendar', {
+    method: 'POST', body: JSON.stringify({ action: 'create_event', session_id: 2, provider: 'google' }),
+  }));
+  assert.equal(response.status, 500);
+  assert.equal((await response.json()).error, 'calendar_connection_save_failed');
+  assert.equal(calls.length, 1, 'must not create an external event with an unsaved rotated token');
+  assert.ok(mutations.some(row => row.table === 'calendar_event_claims' && row.action === 'delete'));
   delete globalThis.__calendarFixture;
   delete globalThis.__calendarHandler;
 });

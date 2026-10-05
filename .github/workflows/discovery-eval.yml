@@ -1,14 +1,10 @@
 name: discovery-eval
 
-# Runs real conversations against production and publishes the transcript to
-# the eval-results branch. Trigger by pushing any commit to eval/run.
 on:
-  push:
-    branches: [eval/run]
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: discovery-eval
@@ -16,28 +12,34 @@ concurrency:
 
 jobs:
   eval:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    environment: staging-eval
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
-      - name: Run live eval
+          node-version: '24'
+      - name: Run staging eval
         env:
-          COMMIT_TIME: ${{ github.event.head_commit.timestamp }}
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_EVAL_ACCESS_TOKEN: ${{ secrets.SUPABASE_EVAL_ACCESS_TOKEN }}
+          SUPABASE_EVAL_PROJECT_REF: ${{ vars.SUPABASE_EVAL_PROJECT_REF }}
+          SUPABASE_PRODUCTION_PROJECT_REF: ${{ vars.SUPABASE_PRODUCTION_PROJECT_REF }}
+          SUPABASE_EVAL_TEST_USER: ${{ vars.SUPABASE_EVAL_TEST_USER }}
+          SUPABASE_EVAL_TEST_EMAIL: ${{ vars.SUPABASE_EVAL_TEST_EMAIL }}
         run: |
-          set -o pipefail
+          set -euo pipefail
+          export COMMIT_TIME="$(git show -s --format=%cI "$GITHUB_SHA")"
           node scripts/discovery-live-eval.mjs | tee /tmp/eval-results.md
-      - name: Publish transcript
+      - name: Retain sanitized results
         if: always()
-        run: |
-          git config user.name "discovery-eval"
-          git config user.email "discovery-eval@users.noreply.github.com"
-          git checkout --orphan eval-results
-          git rm -rf --cached . > /dev/null
-          cp /tmp/eval-results.md eval-results.md
-          git add -f eval-results.md
-          git commit -m "eval ${GITHUB_SHA::7} $(date -u +%FT%TZ)"
-          git push -f origin eval-results
+        uses: actions/upload-artifact@v4
+        with:
+          name: discovery-eval-${{ github.sha }}
+          path: /tmp/eval-results.md
+          if-no-files-found: ignore
+          retention-days: 7

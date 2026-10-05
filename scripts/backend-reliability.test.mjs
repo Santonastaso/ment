@@ -47,11 +47,16 @@ test('calendar work is queued at commit and claimed once', async () => {
   }
 });
 
-test('new profile source text expires while historical drafts remain untouched', async () => {
+test('profile source text expires after 30 days, including historical drafts', async () => {
   const db = new PGlite();
   try {
     await db.exec(`
       create role anon; create role authenticated; create role service_role;
+      create schema cron;
+      create table cron.job(jobid bigint generated always as identity, jobname text);
+      create function cron.unschedule(bigint) returns boolean language sql as $$ select true $$;
+      create function cron.schedule(text, text, text) returns bigint language plpgsql as $$
+      begin insert into cron.job(jobname) values ($1); return 1; end $$;
       create table public.profile_drafts(
         id bigint primary key, raw_text text, proposed_json jsonb,
         created_at timestamptz not null default now()
@@ -60,15 +65,20 @@ test('new profile source text expires while historical drafts remain untouched',
         (1, 'old source', '{}'::jsonb, now() - interval '60 days');
     `);
     await db.exec(await migration('20261004104000_0070_profile_source_retention.sql'));
+    await db.exec(await migration('20261005101000_0072_profile_source_retention_backfill.sql'));
+    assert.equal((await db.query("select count(*)::int as count from cron.job where jobname = 'mt-profile-source-retention'")).rows[0].count, 1);
     await db.exec("insert into public.profile_drafts(id, raw_text, proposed_json) values (2, 'new source', '{}'::jsonb)");
-    assert.equal((await db.query('select raw_text_expires_at from profile_drafts where id = 1')).rows[0].raw_text_expires_at, null);
+    await db.exec("insert into public.profile_drafts(id, raw_text, proposed_json) values (3, null, '{}'::jsonb)");
+    await db.exec("update public.profile_drafts set raw_text = 'newly added source' where id = 3");
+    assert.ok((await db.query('select raw_text_expires_at from profile_drafts where id = 1')).rows[0].raw_text_expires_at < new Date());
     await db.exec("update public.profile_drafts set raw_text_expires_at = now() - interval '1 day' where id = 2");
     assert.ok((await db.query('select raw_text_expires_at from profile_drafts where id = 2')).rows[0].raw_text_expires_at > new Date());
+    assert.ok((await db.query('select raw_text_expires_at from profile_drafts where id = 3')).rows[0].raw_text_expires_at > new Date());
     await db.exec('drop trigger profile_source_expiry on public.profile_drafts');
     await db.exec("update public.profile_drafts set raw_text_expires_at = now() - interval '1 day' where id = 2");
-    assert.equal((await db.query('select public.purge_expired_profile_source_text() as purged')).rows[0].purged, 1);
+    assert.equal((await db.query('select public.purge_expired_profile_source_text() as purged')).rows[0].purged, 2);
     const rows = (await db.query('select id, raw_text, proposed_json from public.profile_drafts order by id')).rows;
-    assert.equal(rows[0].raw_text, 'old source');
+    assert.equal(rows[0].raw_text, null);
     assert.equal(rows[1].raw_text, null);
     assert.deepEqual(rows[1].proposed_json, {});
   } finally {

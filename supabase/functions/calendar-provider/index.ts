@@ -234,7 +234,10 @@ Deno.serve(async (req) => {
       if (!leaseToken) return jsonError('calendar_creation_in_progress', 409);
       try {
       const resolved = await accessToken(connection, provider);
-      if (resolved.update) await ctx.sb.from('calendar_connections').update(resolved.update).eq('user_id', connectionOwnerId).eq('provider', provider);
+      if (resolved.update) {
+        const { error: connectionError } = await ctx.sb.from('calendar_connections').update(resolved.update).eq('user_id', connectionOwnerId).eq('provider', provider);
+        if (connectionError) return jsonError('calendar_connection_save_failed', 500);
+      }
       const participantIds = [session.mentor_id, session.mentee_id];
       const participants = await Promise.all(participantIds.map(async (id) => (await ctx.sb.auth.admin.getUserById(id)).data.user?.email || ''));
       const start = new Date(session.scheduled_at);
