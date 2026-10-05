@@ -353,3 +353,26 @@ export function frameNudge(language: string, random: () => number = Math.random)
   const options = NUDGE[language] || NUDGE.English;
   return options[Math.floor(random() * options.length) % options.length];
 }
+
+const SAME_PEOPLE: Record<string, (one: boolean) => string> = {
+  English: (one) => one
+    ? "That's the same person I showed you before — they're still the best fit for that. Want me to try a different angle?"
+    : "These are the same people I showed you before — they're still the best fit for that. Want me to try a different angle?",
+  Italian: (one) => one
+    ? 'È la stessa persona che ti ho mostrato prima: resta la più adatta. Vuoi che provi da un’altra angolazione?'
+    : 'Sono le stesse persone che ti ho mostrato prima: restano le più adatte. Vuoi che provi da un’altra angolazione?',
+  French: (one) => one
+    ? 'C’est la même personne que je vous ai montrée — elle reste la plus pertinente. Voulez-vous que j’essaie sous un autre angle ?'
+    : 'Ce sont les mêmes personnes que je vous ai montrées — elles restent les plus pertinentes. Voulez-vous que j’essaie sous un autre angle ?',
+};
+const SOME_REPEATED: Record<string, (fresh: number) => string> = {
+  English: (fresh) => fresh === 1 ? 'One of these is new; the others you have already seen.' : `${fresh} of these are new; the others you have already seen.`,
+  Italian: (fresh) => fresh === 1 ? 'Una di queste è nuova; le altre le hai già viste.' : `${fresh} di queste sono nuove; le altre le hai già viste.`,
+  French: (fresh) => fresh === 1 ? 'Une de ces personnes est nouvelle ; vous avez déjà vu les autres.' : `${fresh} de ces personnes sont nouvelles ; vous avez déjà vu les autres.`,
+};
+export function frameSamePeople(language: string, count: number) {
+  return (SAME_PEOPLE[language] || SAME_PEOPLE.English)(count === 1);
+}
+export function frameSomeRepeated(language: string, fresh: number) {
+  return (SOME_REPEATED[language] || SOME_REPEATED.English)(fresh);
+}

@@ -3,7 +3,7 @@ import { recordAiRun } from '../_shared/ai-telemetry.ts';
 import { aiErrorResponse, mistralJson } from '../_shared/mistral.ts';
 import { enforceRateLimit } from '../_shared/rate-limit.ts';
 import { canHelpWithCareerGoal, hasGroundedExpertise } from '../_shared/discovery-guards.mjs';
-import { departmentChoices, frameChat, frameExhausted, frameNarrow, frameNoMatch, frameOpenAgain, frameRefineNone, frameSmallTalk, frameNudge, narrowChoices, ownWordsInvite, scopeChoices, type Choice, frameResults, namesARole, NO_GAP, type Gap } from './framing.ts';
+import { departmentChoices, frameChat, frameExhausted, frameNarrow, frameNoMatch, frameOpenAgain, frameRefineNone, frameSmallTalk, frameNudge, frameSamePeople, frameSomeRepeated, narrowChoices, ownWordsInvite, scopeChoices, type Choice, frameResults, namesARole, NO_GAP, type Gap } from './framing.ts';
 
 const PROMPT_VERSION = 'discovery-v20';
 
@@ -562,6 +562,7 @@ Deno.serve(async (req) => {
   // A named place the network does not cover: the request's constraints are
   // then not met, whatever the department filter found.
   let placeMissing = false;
+  let seenBefore = new Set<string>();
   // Set when this message is the user's answer to a question we asked. Having
   // spent their one question, returning nothing is the worst possible outcome:
   // we made them work and gave back less than if we had never asked.
@@ -588,6 +589,11 @@ Deno.serve(async (req) => {
       const { data } = await ctx.sb.from('discovery_threads').select('turns')
         .eq('id', body.thread_id).eq('user_id', ctx.user.id).maybeSingle();
       if (Array.isArray(data?.turns)) priorTurns = data.turns as Array<Record<string, unknown>>;
+    }
+    // Everyone already shown in this conversation, so a repeat is said aloud.
+    for (const turn of priorTurns) {
+      if (turn.role !== 'assistant' || turn.kind !== 'matches' || !Array.isArray(turn.matches)) continue;
+      for (const match of turn.matches as Array<{ id?: string }>) if (match?.id) seenBefore.add(String(match.id));
     }
     const conversation = conversationFromTurns(priorTurns, query)
       .map((turn) => (turn.role === 'user' ? { ...turn, content: expandAbbreviations(turn.content) } : turn));
@@ -1127,7 +1133,12 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
     // Inside a chosen department the user's follow-up words ("career advice")
     // are not a field of their own, so they are never named as missing.
     const resultGap = isNear && !requiredDepartment ? gapInOwnWords(gapState, query, language) : gapState;
-    const message = frameResults(language, { near: isNear, count: shown.length, gap: resultGap, closeTerms, more: followUp === 'more' });
+    // Being transparent about repeats: the same people coming back after a
+    // follow-up otherwise reads as if the follow-up found them afresh.
+    const repeated = shown.filter((person) => seenBefore.has(person.id)).length;
+    const framed = frameResults(language, { near: isNear, count: shown.length, gap: resultGap, closeTerms, more: followUp === 'more' });
+    const message = repeated && repeated === shown.length ? frameSamePeople(language, shown.length)
+      : repeated ? `${framed} ${frameSomeRepeated(language, shown.length - repeated)}` : framed;
     const threadId = await persistTurns(ctx, body.thread_id, query, {
       kind: 'matches',
       content: message,

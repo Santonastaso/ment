@@ -405,3 +405,27 @@ test('a place the network does not cover is answered about the place', async () 
   const result = await chat(fixture, 'someone in finance in Tokyo');
   assert.match(result.no_match_reason, /^I couldn't find anyone based in Tokyo\. Want me to look in another city/);
 });
+
+test('people already shown are called out as the same people', async () => {
+  const turns = [
+    { role: 'user', content: 'investment banking' },
+    { role: 'assistant', kind: 'matches', framed: true, content: 'Good news.', search_request: 'investment banking', department: '', location: '',
+      matches: [{ id: finance.id, name: finance.name }] },
+  ];
+  const fixture = discoveryFixture({ turns, responses: [clarify({ named_subject: 'Financial modelling' }), directMatch] });
+  const result = await say(fixture, 'I would like someone with 3+ years of experience', 'thread');
+  assert.match(result.message, /^That's the same person I showed you before/);
+});
+
+test('a mix of new and repeated people says how many are new', async () => {
+  const second = { ...finance, id: 'finance2', name: 'Second Finance' };
+  const turns = [
+    { role: 'user', content: 'investment banking' },
+    { role: 'assistant', kind: 'matches', framed: true, content: 'Good news.', search_request: 'investment banking', department: '', location: '',
+      matches: [{ id: finance.id, name: finance.name }] },
+  ];
+  const fixture = discoveryFixture({ candidates: [finance, second], turns, responses: [clarify({ named_subject: 'Financial modelling' }),
+    { outcome: 'matches', matches: [directMatch.matches[0], { ...directMatch.matches[0], profile_id: second.id }] }] });
+  const result = await say(fixture, 'someone with more experience', 'thread');
+  assert.match(result.message, /One of these is new; the others you have already seen\.$/);
+});

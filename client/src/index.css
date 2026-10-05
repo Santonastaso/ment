@@ -376,6 +376,8 @@ button:not(:disabled):active, [data-slot="button"]:not([aria-disabled="true"]):a
 .discovery-chat-turn.is-assistant + .discovery-chat-turn.is-assistant { margin-top: -.55rem; }
 .discovery-assistant-bubble strong { font-weight: 600; color: var(--foreground); }
 .discovery-assistant-bubble em { font-style: italic; }
+/* Marks a person who already appeared earlier in this conversation. */
+.discovery-seen-badge { display: inline-block; margin-left: .5rem; border-radius: 999px; background: var(--control-surface); padding: .05rem .5rem; font-size: 12px; font-weight: 500; color: var(--muted-foreground); vertical-align: middle; }
 /* Earlier result sets in the conversation, reopened in place. */
 .discovery-earlier { display: flex; min-width: 0; flex-direction: column; gap: .6rem; }
 .discovery-earlier-toggle { align-self: flex-start; border: 0; background: transparent; padding: .1rem 0; font-size: 14px; font-weight: 500; color: var(--primary); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
