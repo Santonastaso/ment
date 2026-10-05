@@ -8,6 +8,7 @@ export default function AppLayout() {
   const location = useLocation();
   const isDiscovery = location.pathname === '/';
   const isConversation = location.pathname === '/conversations';
+  const isGroups = location.pathname === '/groups';
   const closeNarrowSidebar = () => {
     if (window.matchMedia('(max-width: 700px)').matches) setSidebarCollapsed(true);
   };
@@ -23,8 +24,9 @@ export default function AppLayout() {
         <Sidebar collapsed={sidebarCollapsed} onNavigate={closeNarrowSidebar} onToggle={() => setSidebarCollapsed(value => !value)} />
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col max-[700px]:ml-[68px]">
-        <main className={cn('flex-1 overflow-auto bg-[var(--background)] px-5 py-6 sm:px-8', (isDiscovery || isConversation) && 'px-0 py-0 sm:px-0')}>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col max-[700px]:ml-[68px]">
+        <main className={cn('min-h-0 flex-1 bg-[var(--background)] px-5 sm:px-8',
+          isConversation ? 'overflow-hidden px-0 py-0 sm:px-0' : isDiscovery ? 'overflow-auto px-0 py-0 sm:px-0' : isGroups ? 'overflow-auto pb-6 pt-2' : 'overflow-auto py-6')}>
           <div className={cn('mx-auto w-full max-w-[900px]', (isDiscovery || isConversation) && 'max-w-none')}>
             <Outlet />
           </div>

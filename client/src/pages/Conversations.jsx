@@ -141,7 +141,6 @@ export default function Conversations() {
   const [withdrawing, setWithdrawing] = useState(false);
   const [scheduledAt, setScheduledAt] = useState('');
   const [savingSchedule, setSavingSchedule] = useState(false);
-  const endRef = useRef(null);
   const messagesRef = useRef(null);
   const preserveScrollRef = useRef(null);
   const senderNamesRef = useRef(new Map());
@@ -359,7 +358,7 @@ export default function Conversations() {
       const { mode, height, top } = preserveScrollRef.current;
       box.scrollTop = mode === 'prepend' ? top + box.scrollHeight - height : top;
       preserveScrollRef.current = null;
-    } else endRef.current?.scrollIntoView({ block: 'end' });
+    } else if (box) box.scrollTop = box.scrollHeight;
   }, [messages, selectedId, selectedGroupId]);
   useEffect(() => {
     setOverviewOpen(false);
@@ -595,7 +594,6 @@ export default function Conversations() {
                   {selectedGroup && message.sender_id !== user?.id && <strong>{message.sender_name}</strong>}<p>{message.body}</p><time>{formatMessageTime(message.created_at)}</time>
                 </div>;
               })}
-              <div ref={endRef} />
             </div>
 
             <form className="conversation-composer" onSubmit={sendMessage}>

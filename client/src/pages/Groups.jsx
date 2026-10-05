@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import api from '../api/index.js';
 import { useT } from '../i18n/index.jsx';
 import { PageShell } from '../components/PageShell.jsx';
-import { Surface, SurfaceBody, SurfaceHeader } from '../components/Surface.jsx';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Plus, Users } from 'lucide-react';
@@ -127,13 +126,11 @@ export default function Groups() {
   return (
     <PageShell>
       <h1 className="sr-only">{t('groups.pageTitle')}</h1>
-      <Surface className="group-list-card overflow-visible rounded-none border-x-0 border-b-0 bg-transparent">
-        <SurfaceHeader
-          className="items-center px-0 pb-2 pt-0 sm:px-0"
-          title={t('groups.list.title')}
-          action={<Button type="button" size="icon-lg" aria-label={t('groups.create.title')} title={t('groups.create.title')} onClick={() => { setError(''); setCreateOpen(true); }}><Plus aria-hidden="true" /></Button>}
-        />
-        <SurfaceBody className="px-0 pt-2 sm:px-0">
+      <header className="flex min-h-11 items-center justify-between">
+        <h2 className="text-[19px] font-semibold tracking-[-0.02em]">{t('groups.list.title')}</h2>
+        <Button type="button" size="icon-lg" aria-label={t('groups.create.title')} title={t('groups.create.title')} onClick={() => { setError(''); setCreateOpen(true); }}><Plus aria-hidden="true" /></Button>
+      </header>
+      <div>
           {error && !createOpen && !joinTarget && !reviewTarget && <p className="text-sm text-destructive" role="alert">{error}</p>}
           {loading && groups.length === 0 ? (
             <div role="status" aria-label={t('common.loading')} className="space-y-2">
@@ -186,8 +183,7 @@ export default function Groups() {
               ))}
             </div>
           )}
-        </SurfaceBody>
-      </Surface>
+      </div>
 
       <Dialog open={createOpen} onOpenChange={open => { if (!saving) setCreateOpen(open); }}>
         <DialogContent>
