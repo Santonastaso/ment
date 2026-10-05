@@ -113,6 +113,12 @@ try {
       sent.push(Date.now());
       let response = await call();
       if (response.status === 503) { await new Promise((resolve) => setTimeout(resolve, 3000)); response = await call(); }
+      // Back-to-back runs share the per-user rate-limit window; wait it out
+      // rather than recording the limiter as a product failure.
+      for (let attempt = 0; response.status === 429 && attempt < 6; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 60_000));
+        response = await call();
+      }
       const d = await response.json().catch(() => ({}));
       threadId = d.thread_id || threadId;
       const turn = { ask: d.clarification || '', said: d.no_match_reason || '', near: Boolean(d.nearest), people: d.matches || [], choices: (d.suggestions || []).map((c) => c.label) };
