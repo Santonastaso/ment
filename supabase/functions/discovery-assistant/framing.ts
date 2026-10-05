@@ -32,6 +32,7 @@ type Copy = {
   moreOne: string[];
   exhausted: string[];
   followUp: string[];
+  narrow: string;
 };
 
 const COPY: Record<string, Copy> = {
@@ -79,6 +80,7 @@ const COPY: Record<string, Copy> = {
     moreOne: ["Here's one more person who could help. If they look useful, I'll draft a message."],
     exhausted: ["That's everyone who fits this search for now. Want me to widen it — a nearby field, another city, or a different skill?"],
     followUp: ['Want more options, or should I narrow it down?', 'Happy to show more people or narrow it down — just say.'],
+    narrow: 'Happy to narrow it down — what matters most to you: a particular city, how senior they are, or a specific skill?',
   },
   Italian: {
     exactMany: [
@@ -124,6 +126,7 @@ const COPY: Record<string, Copy> = {
     moreOne: ['Ecco un’altra persona che potrebbe aiutarti. Se ti sembra utile, preparo io il messaggio.'],
     exhausted: ['Per questa ricerca non ci sono altre persone adatte al momento. Vuoi che allarghi la ricerca, a un settore vicino, un’altra città o una competenza diversa?'],
     followUp: ['Vuoi vedere altre persone o restringere la ricerca?', 'Posso mostrarti altre persone o restringere la ricerca: dimmi tu.'],
+    narrow: 'Volentieri, restringiamo la ricerca: cosa conta di più per te, una città in particolare, il livello di seniority o una competenza precisa?',
   },
   French: {
     exactMany: [
@@ -169,6 +172,7 @@ const COPY: Record<string, Copy> = {
     moreOne: ['Voici une autre personne qui pourrait vous aider. Si le profil vous semble utile, je rédige le message.'],
     exhausted: ['C’est tout le monde pour cette recherche pour le moment. Voulez-vous que j’élargisse — un domaine voisin, une autre ville ou une autre compétence ?'],
     followUp: ['Voulez-vous plus de profils, ou que j’affine la recherche ?', 'Je peux vous montrer d’autres personnes ou affiner la recherche — dites-moi.'],
+    narrow: 'Avec plaisir, affinons : qu’est-ce qui compte le plus pour vous — une ville en particulier, le niveau d’expérience ou une compétence précise ?',
   },
 };
 
@@ -208,6 +212,10 @@ export function frameResults(language: string, options: {
 export function frameChat(language: string, intent: string, examples: string, random: () => number = Math.random) {
   const copy = copyFor(language);
   return intent === 'thanks' ? pick(copy.thanks, random) : copy.greeting(examples);
+}
+
+export function frameNarrow(language: string) {
+  return copyFor(language).narrow;
 }
 
 export function frameExhausted(language: string, random: () => number = Math.random) {

@@ -3,9 +3,9 @@ import { recordAiRun } from '../_shared/ai-telemetry.ts';
 import { aiErrorResponse, mistralJson } from '../_shared/mistral.ts';
 import { enforceRateLimit } from '../_shared/rate-limit.ts';
 import { canHelpWithCareerGoal, hasGroundedExpertise } from '../_shared/discovery-guards.mjs';
-import { frameChat, frameExhausted, frameNoMatch, frameResults, namesARole, NO_GAP, type Gap } from './framing.ts';
+import { frameChat, frameExhausted, frameNarrow, frameNoMatch, frameResults, namesARole, NO_GAP, type Gap } from './framing.ts';
 
-const PROMPT_VERSION = 'discovery-v17';
+const PROMPT_VERSION = 'discovery-v18';
 
 // Written here rather than by the model, so the gap names the place the user
 // actually typed instead of drifting to a vaguer sentence about seniority.
@@ -351,7 +351,7 @@ function publicCandidate(candidate: Candidate, ranked?: RankedMatch, redactIdent
     background: [candidate.program, candidate.department].filter(Boolean).join(' · ')
       || (redactIdentity ? 'Professional experience' : candidate.job_title || 'Professional experience'),
     reasons: Array.isArray(ranked?.reasons)
-      ? ranked.reasons.map((reason) => cleanText(reason, 180)).filter(Boolean).slice(0, 2)
+      ? ranked.reasons.map((reason) => humanize(cleanText(reason, 180))).filter(Boolean).slice(0, 2)
       : [],
   };
 }
@@ -664,7 +664,8 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
         const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'chat', content: reply });
         return jsonOk({ matches: [], clarification: reply, thread_id: threadId });
       }
-      const following = (intent === 'more' || intent === 'refine') && lastShown && !latestDepartment;
+      const answeringNarrow = answering && previous?.stage === 'narrow';
+      const following = (intent === 'more' || intent === 'refine' || answeringNarrow) && lastShown && !latestDepartment;
       if (following) {
         // Build on the results already shown instead of searching the words
         // "more options" as if they were a request.
@@ -696,9 +697,13 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
       let step: { stage: string; question: string; department?: string } | null = null;
       if (intent === 'ask_me' && questionsAsked < MAX_QUESTIONS) {
         const known = cleanText(lastShown?.department, 80) || earlierDepartment || requiredDepartment;
-        step = known
-          ? { stage: 'department', department: known, question: broadQuestion(language, known) }
-          : { stage: 'open', question: askTemplate(language, coverage) };
+        // After results, questions narrow what is already on screen rather
+        // than starting over.
+        step = lastShown && !known
+          ? { stage: 'narrow', question: frameNarrow(language) }
+          : known
+            ? { stage: 'department', department: known, question: broadQuestion(language, known) }
+            : { stage: 'open', question: askTemplate(language, coverage) };
       } else if (!following && questionsAsked < MAX_QUESTIONS && !locationMissing) {
         const meta = metaKind(latestRaw);
         if (latestDepartment && latestDepartment !== earlierDepartment) {
@@ -941,7 +946,12 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
       : [];
     if (!matches.length && !fallback.length) {
       // Even with nothing to offer, say what the network does have.
-      const reason = followUp === 'more' ? frameExhausted(language) : frameNoMatch(language, gapState, topDepartments(networkCandidates));
+      // Wording only: when the model extracted no subject, name the user's own
+      // unfamiliar words rather than a generic "no exact match".
+      const ownWords = contentWords(query).filter((word) => !LOOKUP_STOPWORDS.has(word)).slice(0, 2).join(' ');
+      const shownGap: Gap = gapState.kind === 'none' && ownWords
+        ? { kind: 'subject', value: ownWords, role: namesARole(language, query, ownWords) } : gapState;
+      const reason = followUp === 'more' ? frameExhausted(language) : frameNoMatch(language, shownGap, topDepartments(networkCandidates));
       const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'no_match', content: reason, search_request: requestForMatch });
       return jsonOk({ matches: [], clarification: '', no_match: true, no_match_reason: reason, resolved_request: requestForMatch, thread_id: threadId, model: result.model });
     }
@@ -949,7 +959,10 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
     // sentence that says nothing matched exactly.
     const shown = matches.length ? matches : fallback;
     const isNear = constraintsMet ? false : (!matches.length || nearest || (nearestOnly && !locationFilterApplied));
-    const message = frameResults(language, { near: isNear, count: shown.length, gap: gapState, closeTerms: nearestTerms, more: followUp === 'more' });
+    const shownIds = new Set(shown.map((person) => person.id));
+    const shownPeople = candidates.filter((candidate) => shownIds.has(candidate.id));
+    const closeTerms = nearestTerms.filter((term) => shownPeople.some((person) => carries(person, [term])));
+    const message = frameResults(language, { near: isNear, count: shown.length, gap: gapState, closeTerms, more: followUp === 'more' });
     const threadId = await persistTurns(ctx, body.thread_id, query, {
       kind: 'matches',
       content: message,

@@ -28,7 +28,7 @@ const SCENARIOS = [
   { name: 'CTO 1: who are you', turns: ['Hi who are you?'], check: (t) => [/Ment/.test(t[0].ask), t[0].people.length === 0] },
   { name: 'CTO 2: slang around a department', turns: ['nevermind, im looking for someone in finance bro'], check: (t) => [/What in finance/.test(t[0].ask)] },
   { name: 'CTO 3: react to results', turns: ['I need help with LBO modelling', 'no but i want more options not just 1 shot recommendation ask me clarifying questions come on'],
-    check: (t) => [t[0].people.length > 0, Boolean(t[1].ask) && !/couldn't find/i.test(t[1].ask)] },
+    check: (t) => [t[0].people.length > 0, /narrow it down/i.test(t[1].ask)] },
   { name: 'more options after results', turns: ['someone in finance', 'either works', 'show me more options'],
     check: (t) => [t[1].people.length > 0, t[2].people.length > 0 || /everyone who fits/.test(t[2].said),
       t[2].people.every((p) => !t[1].people.some((q) => q.id === p.id)), t[2].people.every(isFinance)] },
