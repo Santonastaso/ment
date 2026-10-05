@@ -121,13 +121,13 @@ try {
       }
       const d = await response.json().catch(() => ({}));
       threadId = d.thread_id || threadId;
-      const turn = { ask: d.clarification || '', said: d.no_match_reason || '', near: Boolean(d.nearest), people: d.matches || [], choices: (d.suggestions || []).map((c) => c.label) };
+      const turn = { ask: d.clarification || '', said: d.no_match_reason || d.message || '', near: Boolean(d.nearest), people: d.matches || [], choices: (d.suggestions || []).map((c) => c.label) };
       turns.push(turn);
       log(`- **you:** ${query}`);
       if (response.status !== 200) log(`  - HTTP ${response.status} ${JSON.stringify(d)}`);
       else if (turn.ask) log(`  - **ment asks:** ${turn.ask}${turn.choices.length ? `\n    - choices: ${turn.choices.join(' · ')}` : ''}`);
       else {
-        log(`  - **ment:** ${turn.said || '(exact matches)'}${turn.near ? ' _[closest]_' : ''}${d.model ? ` · model ${d.model}` : ''}`);
+        log(`  - **ment:** ${turn.said || '(no message)'}${turn.near ? ' _[closest]_' : ''}${d.model ? ` · model ${d.model}` : ''}`);
         for (const p of turn.people) log(`    - ${p.job_title} · ${p.department} · ${p.location} — ${(p.reasons || [])[0] || ''}`);
       }
     }
