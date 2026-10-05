@@ -1,4 +1,4 @@
-import { corsHeaders, jsonError, jsonOk, requireUser } from '../_shared/index.ts';
+import { adminClient, corsHeaders, jsonError, jsonOk, requireUser } from '../_shared/index.ts';
 
 type Provider = 'google' | 'microsoft';
 const validProvider = (value: unknown): value is Provider => value === 'google' || value === 'microsoft';
@@ -79,15 +79,103 @@ async function accessToken(connection: Record<string, unknown>, provider: Provid
   return { token: refreshed.access_token, update: { token_ciphertext: await encrypt(refreshed.access_token), refresh_ciphertext: refreshed.refresh_token ? await encrypt(refreshed.refresh_token) : connection.refresh_ciphertext, token_expires_at: new Date(Date.now() + Number(refreshed.expires_in || 3600) * 1000).toISOString(), updated_at: new Date().toISOString() } };
 }
 
+async function syncSessionEvents(sb: ReturnType<typeof adminClient>, sessionId: number, userId?: string) {
+  if (!Number.isSafeInteger(sessionId) || sessionId < 1) return jsonError('invalid_session', 400);
+  const { data: session, error: sessionError } = await sb.from('sessions').select('id,mentor_id,mentee_id,status,scheduled_at,duration_minutes,meeting_url').eq('id', sessionId).maybeSingle();
+  if (sessionError || !session || (userId && ![session.mentor_id, session.mentee_id].includes(userId))) return jsonError('not_found', 404);
+  const { data: events, error: eventsError } = await sb.from('calendar_events').select('*').eq('session_id', sessionId);
+  if (eventsError) return jsonError('calendar_event_lookup_failed', 500);
+  for (const event of events || []) {
+    const eventProvider = event.provider as Provider;
+    if (!validProvider(eventProvider)) return jsonError('calendar_provider_required');
+    if (session.status === 'scheduled' && session.scheduled_at && new Date(event.scheduled_for).getTime() === new Date(session.scheduled_at).getTime()) continue;
+    if (!['scheduled', 'cancelled', 'declined', 'expired'].includes(session.status)) continue;
+    const { data: connection, error: connectionError } = await sb.from('calendar_connections').select('*').eq('user_id', event.owner_id).eq('provider', eventProvider).maybeSingle();
+    if (connectionError || !connection) return jsonError('calendar_reconnect_required', 409);
+    const resolved = await accessToken(connection, eventProvider);
+    if (resolved.update) {
+      const { error: updateError } = await sb.from('calendar_connections').update(resolved.update).eq('user_id', event.owner_id).eq('provider', eventProvider);
+      if (updateError) return jsonError('calendar_connection_save_failed', 500);
+    }
+    const cancelled = session.status !== 'scheduled';
+    const start = cancelled ? null : new Date(session.scheduled_at);
+    const end = start ? new Date(start.getTime() + Number(session.duration_minutes || 60) * 60_000) : null;
+    const endpoint = eventProvider === 'google'
+      ? `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(event.external_event_id)}?sendUpdates=all`
+      : `https://graph.microsoft.com/v1.0/me/events/${encodeURIComponent(event.external_event_id)}`;
+    const payload = cancelled ? null : eventProvider === 'google'
+      ? { start: { dateTime: start!.toISOString() }, end: { dateTime: end!.toISOString() } }
+      : { start: { dateTime: start!.toISOString().replace('Z', ''), timeZone: 'UTC' }, end: { dateTime: end!.toISOString().replace('Z', ''), timeZone: 'UTC' } };
+    const response = await fetch(endpoint, {
+      method: cancelled ? 'DELETE' : 'PATCH',
+      headers: { Authorization: `Bearer ${resolved.token}`, 'Content-Type': 'application/json' },
+      ...(!cancelled && { body: JSON.stringify(payload) }),
+    });
+    if (!response.ok && !(cancelled && [404, 410].includes(response.status))) return jsonError('calendar_event_sync_failed', 502);
+    if (cancelled) {
+      const { error: deleteError } = await sb.from('calendar_events').delete().eq('id', event.id);
+      if (deleteError) return jsonError('calendar_event_sync_failed', 500);
+      if (session.meeting_url && session.meeting_url === event.join_url) {
+        const { error: linkError } = await sb.from('sessions').update({ meeting_url: null }).eq('id', sessionId);
+        if (linkError) return jsonError('calendar_event_sync_failed', 500);
+      }
+    } else {
+      const { error: updateError } = await sb.from('calendar_events').update({ scheduled_for: session.scheduled_at, updated_at: new Date().toISOString() }).eq('id', event.id);
+      if (updateError) return jsonError('calendar_event_sync_failed', 500);
+    }
+  }
+  return jsonOk({ synced: (events || []).length });
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return jsonError('method_not_allowed', 405);
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const serviceRequest = Boolean(serviceKey && req.headers.get('Authorization') === `Bearer ${serviceKey}`);
   let ctx;
-  try { ctx = await requireUser(req); } catch (response) { return response as Response; }
+  if (!serviceRequest) {
+    try { ctx = await requireUser(req); } catch (response) { return response as Response; }
+  }
   try {
     const body = await req.json().catch(() => ({}));
     const action = String(body.action || 'status');
     const provider = body.provider;
+
+    if (serviceRequest && action === 'drain_sync_queue') {
+      const sb = adminClient();
+      const { data: jobs, error } = await sb.rpc('claim_calendar_sync_jobs', { p_limit: 20 });
+      if (error) return jsonError('calendar_job_claim_failed', 500);
+      let synced = 0;
+      let failed = 0;
+      for (const job of jobs || []) {
+        let failure = '';
+        try {
+          const response = await syncSessionEvents(sb, job.session_id);
+          if (!response.ok) failure = (await response.json()).error || 'calendar_event_sync_failed';
+        } catch (error) {
+          failure = error instanceof Error ? error.message : 'calendar_event_sync_failed';
+        }
+        const current = sb.from('calendar_sync_jobs').delete()
+          .eq('session_id', job.session_id).eq('generation', job.generation).eq('status', 'sending');
+        if (!failure) {
+          const { error: doneError } = await current;
+          if (doneError) failed++;
+          else synced++;
+        } else {
+          failed++;
+          const delayMinutes = Math.min(60, 2 ** Math.min(job.attempts, 6));
+          await sb.from('calendar_sync_jobs').update({
+            status: job.attempts >= 8 ? 'failed' : 'queued', claimed_at: null,
+            next_attempt_at: new Date(Date.now() + delayMinutes * 60_000).toISOString(),
+            last_error: failure.slice(0, 200), updated_at: new Date().toISOString(),
+          }).eq('session_id', job.session_id).eq('generation', job.generation).eq('status', 'sending');
+        }
+      }
+      return failed ? new Response(JSON.stringify({ synced, failed }), {
+        status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }) : jsonOk({ synced, failed });
+    }
+    if (serviceRequest) return jsonError('unsupported_action', 400);
 
     if (action === 'status') {
       const { data, error } = await ctx.sb.from('calendar_connections').select('provider,provider_email,token_expires_at').eq('user_id', ctx.user.id);
@@ -99,52 +187,7 @@ Deno.serve(async (req) => {
       return jsonOk({ connections: data || [], providers });
     }
     if (action === 'sync_session_events') {
-      const sessionId = Number(body.session_id);
-      if (!Number.isSafeInteger(sessionId) || sessionId < 1) return jsonError('invalid_session', 400);
-      const { data: session, error: sessionError } = await ctx.sb.from('sessions').select('id,mentor_id,mentee_id,status,scheduled_at,duration_minutes,meeting_url').eq('id', sessionId).maybeSingle();
-      if (sessionError || !session || ![session.mentor_id, session.mentee_id].includes(ctx.user.id)) return jsonError('not_found', 404);
-      const { data: events, error: eventsError } = await ctx.sb.from('calendar_events').select('*').eq('session_id', sessionId);
-      if (eventsError) return jsonError('calendar_event_lookup_failed', 500);
-      for (const event of events || []) {
-        const eventProvider = event.provider as Provider;
-        if (!validProvider(eventProvider)) return jsonError('calendar_provider_required');
-        if (session.status === 'scheduled' && session.scheduled_at && event.scheduled_for === session.scheduled_at) continue;
-        if (!['scheduled', 'cancelled', 'declined', 'expired'].includes(session.status)) continue;
-        const { data: connection, error: connectionError } = await ctx.sb.from('calendar_connections').select('*').eq('user_id', event.owner_id).eq('provider', eventProvider).maybeSingle();
-        if (connectionError || !connection) return jsonError('calendar_reconnect_required', 409);
-        const resolved = await accessToken(connection, eventProvider);
-        if (resolved.update) {
-          const { error: updateError } = await ctx.sb.from('calendar_connections').update(resolved.update).eq('user_id', event.owner_id).eq('provider', eventProvider);
-          if (updateError) return jsonError('calendar_connection_save_failed', 500);
-        }
-        const cancelled = session.status !== 'scheduled';
-        const start = cancelled ? null : new Date(session.scheduled_at);
-        const end = start ? new Date(start.getTime() + Number(session.duration_minutes || 60) * 60_000) : null;
-        const endpoint = eventProvider === 'google'
-          ? `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(event.external_event_id)}?sendUpdates=all`
-          : `https://graph.microsoft.com/v1.0/me/events/${encodeURIComponent(event.external_event_id)}`;
-        const payload = cancelled ? null : eventProvider === 'google'
-          ? { start: { dateTime: start!.toISOString() }, end: { dateTime: end!.toISOString() } }
-          : { start: { dateTime: start!.toISOString().replace('Z', ''), timeZone: 'UTC' }, end: { dateTime: end!.toISOString().replace('Z', ''), timeZone: 'UTC' } };
-        const response = await fetch(endpoint, {
-          method: cancelled ? 'DELETE' : 'PATCH',
-          headers: { Authorization: `Bearer ${resolved.token}`, 'Content-Type': 'application/json' },
-          ...(!cancelled && { body: JSON.stringify(payload) }),
-        });
-        if (!response.ok && !(cancelled && [404, 410].includes(response.status))) return jsonError('calendar_event_sync_failed', 502);
-        if (cancelled) {
-          const { error: deleteError } = await ctx.sb.from('calendar_events').delete().eq('id', event.id);
-          if (deleteError) return jsonError('calendar_event_sync_failed', 500);
-          if (session.meeting_url && session.meeting_url === event.join_url) {
-            const { error: linkError } = await ctx.sb.from('sessions').update({ meeting_url: null }).eq('id', sessionId);
-            if (linkError) return jsonError('calendar_event_sync_failed', 500);
-          }
-        } else {
-          const { error: updateError } = await ctx.sb.from('calendar_events').update({ scheduled_for: session.scheduled_at, updated_at: new Date().toISOString() }).eq('id', event.id);
-          if (updateError) return jsonError('calendar_event_sync_failed', 500);
-        }
-      }
-      return jsonOk({ synced: (events || []).length });
+      return syncSessionEvents(ctx.sb, Number(body.session_id), ctx.user.id);
     }
     if (!validProvider(provider)) return jsonError('calendar_provider_required');
 
@@ -184,6 +227,12 @@ Deno.serve(async (req) => {
       const connectionOwnerId = ctx.user.id;
       const { data: connection } = await ctx.sb.from('calendar_connections').select('*').eq('user_id', connectionOwnerId).eq('provider', provider).maybeSingle();
       if (!connection) return jsonError('calendar_not_connected', 409);
+      const { data: leaseToken, error: leaseError } = await ctx.sb.rpc('claim_calendar_event', {
+        p_session_id: session.id, p_provider: provider, p_owner_id: connectionOwnerId,
+      });
+      if (leaseError) return jsonError('calendar_event_claim_failed', 500);
+      if (!leaseToken) return jsonError('calendar_creation_in_progress', 409);
+      try {
       const resolved = await accessToken(connection, provider);
       if (resolved.update) await ctx.sb.from('calendar_connections').update(resolved.update).eq('user_id', connectionOwnerId).eq('provider', provider);
       const participantIds = [session.mentor_id, session.mentee_id];
@@ -193,14 +242,21 @@ Deno.serve(async (req) => {
       let externalEventId = ''; let joinUrl = ''; let htmlUrl = '';
       if (provider === 'google') {
         const googlePayload: Record<string, unknown> = { summary: session.title, description: session.pre_session_question || '', start: { dateTime: start.toISOString() }, end: { dateTime: end.toISOString() }, attendees: participants.filter(Boolean).map((email) => ({ email })) };
-        if (!existingEvent) googlePayload.conferenceData = { createRequest: { requestId: `ment-${session.id}-${crypto.randomUUID()}`, conferenceSolutionKey: { type: 'hangoutsMeet' } } };
+        const stableEventId = `ment${session.id.toString(32)}`;
+        if (!existingEvent) {
+          googlePayload.id = stableEventId;
+          googlePayload.conferenceData = { createRequest: { requestId: `ment-${session.id}`, conferenceSolutionKey: { type: 'hangoutsMeet' } } };
+        }
         const eventPath = existingEvent ? `/events/${encodeURIComponent(existingEvent.external_event_id)}` : '/events';
         const response = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary${eventPath}?conferenceDataVersion=1&sendUpdates=all`, { method: existingEvent ? 'PATCH' : 'POST', headers: { Authorization: `Bearer ${resolved.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(googlePayload) });
-        if (!response.ok) throw new Error('calendar_event_create_failed');
-        const event = await response.json(); externalEventId = event.id; joinUrl = event.hangoutLink || event.conferenceData?.entryPoints?.find((item: { entryPointType: string }) => item.entryPointType === 'video')?.uri || ''; htmlUrl = event.htmlLink || '';
+        const eventResponse = response.status === 409 && !existingEvent
+          ? await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${stableEventId}`, { headers: { Authorization: `Bearer ${resolved.token}` } })
+          : response;
+        if (!eventResponse.ok) throw new Error('calendar_event_create_failed');
+        const event = await eventResponse.json(); externalEventId = event.id; joinUrl = event.hangoutLink || event.conferenceData?.entryPoints?.find((item: { entryPointType: string }) => item.entryPointType === 'video')?.uri || ''; htmlUrl = event.htmlLink || '';
       } else {
         const eventPath = existingEvent ? `/events/${encodeURIComponent(existingEvent.external_event_id)}` : '/events';
-        const response = await fetch(`https://graph.microsoft.com/v1.0/me${eventPath}`, { method: existingEvent ? 'PATCH' : 'POST', headers: { Authorization: `Bearer ${resolved.token}`, 'Content-Type': 'application/json', Prefer: 'outlook.timezone="UTC"' }, body: JSON.stringify({ subject: session.title, body: { contentType: 'text', content: session.pre_session_question || '' }, start: { dateTime: start.toISOString().replace('Z', ''), timeZone: 'UTC' }, end: { dateTime: end.toISOString().replace('Z', ''), timeZone: 'UTC' }, attendees: participants.filter(Boolean).map((email) => ({ emailAddress: { address: email }, type: 'required' })), isOnlineMeeting: true, onlineMeetingProvider: 'teamsForBusiness' }) });
+        const response = await fetch(`https://graph.microsoft.com/v1.0/me${eventPath}`, { method: existingEvent ? 'PATCH' : 'POST', headers: { Authorization: `Bearer ${resolved.token}`, 'Content-Type': 'application/json', Prefer: 'outlook.timezone="UTC"' }, body: JSON.stringify({ subject: session.title, body: { contentType: 'text', content: session.pre_session_question || '' }, start: { dateTime: start.toISOString().replace('Z', ''), timeZone: 'UTC' }, end: { dateTime: end.toISOString().replace('Z', ''), timeZone: 'UTC' }, attendees: participants.filter(Boolean).map((email) => ({ emailAddress: { address: email }, type: 'required' })), isOnlineMeeting: true, onlineMeetingProvider: 'teamsForBusiness', ...(!existingEvent && { transactionId: `ment-session-${session.id}` }) }) });
         if (!response.ok) throw new Error('calendar_event_create_failed');
         const event = response.status === 204 ? null : await response.json();
         externalEventId = event?.id || existingEvent?.external_event_id || '';
@@ -214,6 +270,10 @@ Deno.serve(async (req) => {
         if (linkError) return jsonError('calendar_event_save_failed', 500);
       }
       return jsonOk({ provider, join_url: joinUrl, html_url: htmlUrl, event_id: externalEventId }, 201);
+      } finally {
+        await ctx.sb.from('calendar_event_claims').delete()
+          .eq('session_id', session.id).eq('provider', provider).eq('lease_token', leaseToken);
+      }
     }
     return jsonError('unsupported_action', 400);
   } catch (error) {

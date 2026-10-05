@@ -40,7 +40,7 @@ Deno.serve(async (req) => {
   // Recover jobs left mid-send if the worker was interrupted.
   await sb
     .from('notification_outbox')
-    .update({ status: 'queued', claimed_at: null })
+    .update({ status: 'queued', claimed_at: null, next_attempt_at: new Date().toISOString() })
     .eq('status', 'sending')
     .lt('claimed_at', new Date(Date.now() - 15 * 60 * 1000).toISOString());
 
@@ -48,6 +48,7 @@ Deno.serve(async (req) => {
     .from('notification_outbox')
     .select('id, user_id, topic, payload, created_at, idempotency_key, attempts')
     .eq('status', 'queued')
+    .lte('next_attempt_at', new Date().toISOString())
     .order('created_at')
     .limit(50);
   if (error) return json({ error: error.message }, 500);
@@ -64,6 +65,17 @@ Deno.serve(async (req) => {
       .maybeSingle();
     if (!claim) continue;
 
+    async function fail(reason: string, retryable = false) {
+      failed++;
+      const retry = retryable && row.attempts < 2;
+      const delayMinutes = Math.min(60, 2 ** (row.attempts + 1));
+      await sb.from('notification_outbox').update({
+        status: retry ? 'queued' : 'failed', claimed_at: null,
+        next_attempt_at: new Date(Date.now() + delayMinutes * 60_000).toISOString(),
+        last_error: reason.slice(0, 200),
+      }).eq('id', row.id).eq('status', 'sending');
+    }
+
     const payload = row.payload && typeof row.payload === 'object' && !Array.isArray(row.payload)
       ? row.payload as Record<string, unknown> : {};
     const content = messageFor(row.topic, payload, appOrigin);
@@ -75,8 +87,7 @@ Deno.serve(async (req) => {
       session = data;
     }
     if (!content || !isDeliverable({ ...row, payload }, session)) {
-      failed++;
-      await sb.from('notification_outbox').update({ status: 'failed', claimed_at: null }).eq('id', row.id).eq('status', 'sending');
+      await fail('not_deliverable');
       continue;
     }
 
@@ -89,34 +100,33 @@ Deno.serve(async (req) => {
     ]);
     const email = profile?.notification_email || authUser?.user?.email;
     if (!email) {
-      failed++;
-      await sb.from('notification_outbox').update({ status: 'failed', claimed_at: null }).eq('id', row.id).eq('status', 'sending');
+      await fail('recipient_email_missing');
       continue;
     }
 
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        authorization: `Bearer ${resendKey}`,
-        'content-type': 'application/json',
-        'Idempotency-Key': row.idempotency_key,
-      },
-      body: JSON.stringify({
-        from,
-        to: [email],
-        subject: content!.subject,
-        text: content!.text,
-      }),
-    });
-    if (response.ok) {
+    try {
+      const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${resendKey}`,
+          'content-type': 'application/json',
+          'Idempotency-Key': row.idempotency_key,
+        },
+        body: JSON.stringify({
+          from,
+          to: [email],
+          subject: content!.subject,
+          text: content!.text,
+        }),
+      });
+      if (!response.ok) {
+        await fail(`resend_${response.status}`, [409, 429].includes(response.status) || response.status >= 500);
+        continue;
+      }
       sent++;
-      await sb.from('notification_outbox').update({ status: 'sent', claimed_at: null, sent_at: new Date().toISOString() }).eq('id', row.id).eq('status', 'sending');
-    } else {
-      failed++;
-      const retry = ([409, 429].includes(response.status) || response.status >= 500) && row.attempts < 2;
-      await sb.from('notification_outbox')
-        .update({ status: retry ? 'queued' : 'failed', claimed_at: null })
-        .eq('id', row.id).eq('status', 'sending');
+      await sb.from('notification_outbox').update({ status: 'sent', claimed_at: null, sent_at: new Date().toISOString(), last_error: null }).eq('id', row.id).eq('status', 'sending');
+    } catch {
+      await fail('resend_network_error', true);
     }
   }
   return json({ sent, failed }, failed ? 502 : 200);
