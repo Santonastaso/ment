@@ -191,7 +191,13 @@ const LOOKUP_STOPWORDS = new Set(['someone', 'somebody', 'person', 'people', 'lo
   'does', 'did', 'has', 'had', 'here', 'these', 'those', 'very', 'too', 'much', 'many', 'such', 'only', 'than',
   'then', 'now', 'hey', 'hello', 'doing', 'maybe', 'hmm', 'umm', 'uhm', 'idk', 'nothing', 'whatever', 'idea', 'ideas', 'start', 'begin', 'know', 'dont', 'sure',
   'proponi', 'proporre', 'suggerisci', 'consigli', 'consiglia', 'interessa', 'interessano', 'propose', 'proposer',
-  'suggère', 'suggerer', 'intéresse', 'interesse']);
+  'suggère', 'suggerer', 'intéresse', 'interesse',
+  // Italian and French filler, so "una competenza precisa" reads as a category.
+  'una', 'uno', 'dei', 'delle', 'degli', 'della', 'del', 'per', 'con', 'che', 'non', 'sono', 'vorrei', 'voglio',
+  'cerco', 'cercando', 'qualcuno', 'persona', 'persone', 'posso', 'puoi', 'proposta', 'proposte', 'precisa',
+  'preciso', 'specifica', 'specifico', 'qualche', 'altro', 'altra', 'une', 'des', 'pour', 'avec', 'que', 'pas',
+  'suis', 'voudrais', 'veux', 'cherche', 'quelqu', 'personne', 'personnes', 'précise', 'précis', 'spécifique',
+  'peux', 'pouvez', 'aimerais', 'besoin', 'specific', 'compétence', 'compétences', 'métier', 'métiers', 'rôle', 'rôles']);
 const wordsOf = (value: string) => value.toLowerCase().split(/[^\p{L}\p{N}&]+/u).filter(Boolean);
 const contentWords = (value: string) => wordsOf(value).filter((word) => word.length >= 3 && !LOOKUP_STOPWORDS.has(word));
 
@@ -235,8 +241,8 @@ const BROAD_SENTENCE: Record<string, (field: string) => string> = {
 // ("industry", "a skill"), then a whole department, then specifics.
 const MAX_QUESTIONS = 3;
 const META_WORDS: Record<string, string[]> = {
-  skill: ['skill', 'skills', 'competenza', 'competenze', 'competence', 'competences'],
-  role: ['role', 'roles', 'job', 'jobs', 'position', 'positions', 'ruolo', 'ruoli', 'poste', 'postes'],
+  skill: ['skill', 'skills', 'competenza', 'competenze', 'competence', 'competences', 'compétence', 'compétences'],
+  role: ['role', 'roles', 'job', 'jobs', 'position', 'positions', 'ruolo', 'ruoli', 'poste', 'postes', 'rôle', 'rôles', 'métier', 'métiers'],
   field: ['industry', 'industries', 'field', 'fields', 'sector', 'sectors', 'area', 'areas', 'domain', 'domains',
     'function', 'functions', 'settore', 'settori', 'ambito', 'secteur', 'domaine'],
 };
@@ -738,9 +744,9 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
         const meta = metaKind(latestRaw);
         if (latestDepartment && latestDepartment !== earlierDepartment) {
           step = { stage: 'department', department: latestDepartment, question: broadQuestion(language, latestDepartment) };
-        } else if (!latestContent.length && meta === 'skill') {
+        } else if (!meaningfulLatest.length && !namesPlace && meta === 'skill') {
           step = { stage: 'skill', department: earlierDepartment, question: (SKILL_SENTENCE[language] || SKILL_SENTENCE.English)(earlierDepartment.toLowerCase()) };
-        } else if (!latestContent.length && meta === 'role') {
+        } else if (!meaningfulLatest.length && !namesPlace && meta === 'role') {
           step = { stage: 'role', department: earlierDepartment, question: (ROLE_SENTENCE[language] || ROLE_SENTENCE.English)(earlierDepartment.toLowerCase()) };
         } else if (!latestContent.length && !earlierDepartment) {
           step = meta === 'field'

@@ -37,6 +37,10 @@ const SCENARIOS = [
       t.every((x) => x.people.length === 0)] },
   { name: 'choice path: interested in finance -> a specific skill', turns: ["I'm interested in finance", 'a specific skill'],
     check: (t) => [/What in finance/.test(t[0].ask) && t[0].choices.includes('Career advice'), /Which finance skill/.test(t[1].ask)] },
+  { name: 'Italian: marketing -> una competenza precisa', lang: 'it', turns: ['Mi interessa marketing', 'una competenza precisa'],
+    check: (t) => [/marketing/.test(t[0].ask) && t[0].choices.length > 0, /Con quale competenza in marketing/.test(t[1].ask), t[1].people.length === 0] },
+  { name: 'French: finance -> une compétence précise', lang: 'fr', turns: ["Je m'intéresse à finance", 'une compétence précise'],
+    check: (t) => [/finance/.test(t[0].ask), /Sur quelle competence en finance/.test(t[1].ask), t[1].people.length === 0] },
   { name: 'thanks', turns: ['thanks!'], check: (t) => [/welcome|happy to help/i.test(t[0].ask), t[0].people.length === 0] },
   { name: 'department alone: marketing', turns: ['someone in marketing'], check: (t) => [/What in marketing/.test(t[0].ask)] },
   { name: 'vague: I need help', turns: ['I need help'], check: (t) => [/What would you like help with/.test(t[0].ask)] },
@@ -86,7 +90,7 @@ try {
     for (const query of scenario.turns) {
       const call = () => fetch(`${base}/functions/v1/${fnName}`, { method: 'POST',
         headers: { apikey: anon, Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'chat', query, lang: 'en', ...(threadId ? { thread_id: threadId } : {}) }) });
+        body: JSON.stringify({ action: 'chat', query, lang: scenario.lang || 'en', ...(threadId ? { thread_id: threadId } : {}) }) });
       // Supabase's edge runtime occasionally answers 503 "service degraded";
       // that is the platform, not this code, so try once more before judging.
       let response = await call();

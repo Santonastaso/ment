@@ -298,3 +298,22 @@ test('the greeting offers the same starting choices', async () => {
   assert.match(result.clarification, /I'm Ment/);
   assert.ok(result.suggestions.some((c) => c.label === 'Finance'));
 });
+
+test('a category answer in Italian or French asks "which one" instead of searching', async () => {
+  const turns = [{ role: 'user', content: 'Mi interessa marketing' }, { role: 'assistant', kind: 'clarification', content: 'Cosa ti servirebbe di piu in marketing?', stage: 'department', department: 'Marketing' }];
+  const marketing = { ...finance, id: 'mkt', department: 'Marketing', job_title: 'SEO & Content Lead', skills: ['content strategy'] };
+  for (const [lang, reply, expected] of [['it', 'una competenza precisa', /Con quale competenza in marketing/], ['fr', 'une compétence précise', /Sur quelle competence en marketing/]]) {
+    const fixture = discoveryFixture({ candidates: [marketing], turns, responses: [clarify()] });
+    const result = await (await run(fixture, { action: 'chat', thread_id: 'thread', query: reply, lang })).json();
+    assert.match(result.clarification, expected);
+    assert.equal(fixture.calls.length, 1, 'no search was run');
+  }
+});
+
+test('a skill named alongside the category is searched, not asked again', async () => {
+  const turns = [{ role: 'user', content: 'finance' }, { role: 'assistant', kind: 'clarification', content: 'What in finance?', stage: 'department', department: 'Finance' }];
+  const fixture = discoveryFixture({ turns, responses: [clarify({ named_subject: 'Financial modelling' }), directMatch] });
+  const result = await say(fixture, 'a specific skill: financial modelling', 'thread');
+  assert.equal(result.clarification, '');
+  assert.equal(result.matches.length, 1);
+});
