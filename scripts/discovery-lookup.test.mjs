@@ -317,3 +317,19 @@ test('a skill named alongside the category is searched, not asked again', async 
   assert.equal(result.clarification, '');
   assert.equal(result.matches.length, 1);
 });
+
+test('a follow-up nobody meets keeps the earlier people as the closest answer', async () => {
+  const turns = [
+    { role: 'user', content: 'I am looking for someone working as consultant' },
+    { role: 'assistant', kind: 'matches', framed: true, content: 'These people look like a great fit.', search_request: 'consultant', department: '', location: '',
+      matches: [{ id: finance.id, name: finance.name, job_title: finance.job_title }] },
+  ];
+  const fixture = discoveryFixture({ turns, responses: [
+    clarify({ named_subject: '5 years of experience' }),
+    { outcome: 'no_match', matches: [], no_match_reason: 'Nobody has that.' },
+  ] });
+  const result = await say(fixture, 'is there someone with more than 5 years of experience?', 'thread');
+  assert.match(result.message, /^Nobody here matches that extra requirement/);
+  assert.deepEqual(result.matches.map((m) => m.id), [finance.id]);
+  assert.match(payload(fixture, 1).request, /^consultant; /, 'the follow-up refines the earlier search');
+});

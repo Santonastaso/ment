@@ -306,3 +306,12 @@ export function ownWordsInvite(language: string) {
 export function frameOpenAgain(language: string) {
   return choiceCopy(language).openAgain;
 }
+
+const REFINE_NONE: Record<string, string> = {
+  English: "Nobody here matches that extra requirement — the people I showed you before are still the closest fit in the network. Want me to try a different angle?",
+  Italian: 'Nessuno qui soddisfa anche questo requisito: le persone che ti ho mostrato prima restano le più vicine nella rete. Vuoi che provi da un’altra angolazione?',
+  French: 'Personne ici ne correspond à ce critère supplémentaire — les personnes que je vous ai montrées restent les plus proches dans le réseau. Voulez-vous que j’essaie sous un autre angle ?',
+};
+export function frameRefineNone(language: string) {
+  return REFINE_NONE[language] || REFINE_NONE.English;
+}

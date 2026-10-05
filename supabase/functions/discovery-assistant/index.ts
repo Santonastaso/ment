@@ -3,7 +3,7 @@ import { recordAiRun } from '../_shared/ai-telemetry.ts';
 import { aiErrorResponse, mistralJson } from '../_shared/mistral.ts';
 import { enforceRateLimit } from '../_shared/rate-limit.ts';
 import { canHelpWithCareerGoal, hasGroundedExpertise } from '../_shared/discovery-guards.mjs';
-import { departmentChoices, frameChat, frameExhausted, frameNarrow, frameNoMatch, frameOpenAgain, narrowChoices, ownWordsInvite, scopeChoices, type Choice, frameResults, namesARole, NO_GAP, type Gap } from './framing.ts';
+import { departmentChoices, frameChat, frameExhausted, frameNarrow, frameNoMatch, frameOpenAgain, frameRefineNone, narrowChoices, ownWordsInvite, scopeChoices, type Choice, frameResults, namesARole, NO_GAP, type Gap } from './framing.ts';
 
 const PROMPT_VERSION = 'discovery-v19';
 
@@ -302,7 +302,12 @@ const INTENT_PATTERNS: Array<[string, RegExp[]]> = [
   ['thanks', [/^\s*(thanks|thank you|thx|cheers|grazie|merci)\b/]],
   ['greeting', [/^\s*(hi|hello|hey|hiya|ciao|salve|buongiorno|bonjour|salut)\b/, /\bwho are you\b/, /\bwhat (are|can) you\b/,
     /\bhow does (this|it) work\b/, /\bwhat is this\b/, /\bchi sei\b/, /\bcosa (sei|fai)\b/, /\bqui (es[- ]tu|[eê]tes[- ]vous)\b/]],
-  ['refine', [/\binstead\b/, /\brather\b/, /\binvece\b/, /\bplut[oô]t\b/, /\bmore (senior|junior|experienced)\b/, /\bpi[uù] senior\b/, /\bplus seniors?\b/, /\bonly in\b/, /\bsolo a\b/, /\buniquement [aà]\b/]],
+  ['refine', [/\binstead\b/, /\brather\b/, /\binvece\b/, /\bplut[oô]t\b/, /\bmore (senior|junior|experienced)\b/, /\bpi[uù] senior\b/, /\bplus seniors?\b/, /\bonly in\b/, /\bsolo a\b/, /\buniquement [aà]\b/,
+    // Questions about the people already on screen ("is there someone with
+    // more than 5 years of experience?") narrow them; they are not new topics.
+    /\b(is|are) there (any|anyone|someone|somebody|people)\b/, /\b(anyone|someone|somebody|people) (with|who|that)\b/,
+    /\byears? of experience\b/, /\b(more|less|fewer) than \d+/, /\bat least \d+/, /\bany of (them|these)\b/,
+    /\bc'[eè] qualcuno\b/, /\bqualcuno (con|che)\b/, /\banni di esperienza\b/, /\by a-t-il\b/, /\bquelqu'un (avec|qui)\b/, /\bans d'exp[eé]rience\b/]],
 ];
 
 const ASK_ORDER = ['Finance', 'Consulting', 'Marketing', 'Strategy', 'Data & Analytics', 'Operations'];
@@ -476,6 +481,7 @@ Deno.serve(async (req) => {
   // People already shown, for "more options", and how to word what follows.
   let excludeIds = new Set<string>();
   let followUp: '' | 'more' = '';
+  let refineFallback: Array<Record<string, unknown>> = [];
   // Set when this message is the user's answer to a question we asked. Having
   // spent their one question, returning nothing is the worst possible outcome:
   // we made them work and gave back less than if we had never asked.
@@ -719,6 +725,9 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
           if (!namedLocationFilter) namedLocationFilter = cleanText(lastShown.location, 80);
           requestForMatch = previousRequest;
         } else {
+          // If the refinement fits nobody, the people already shown stay the
+          // closest answer, and the reply says so instead of dropping them.
+          refineFallback = Array.isArray(lastShown.matches) ? lastShown.matches as Array<Record<string, unknown>> : [];
           requiredDepartment = mentionedDepartment(meaningfulLatest) || previousDepartment;
           const textPlace = knownLocations.find((place) => wordsOf(place).every((word) => latestContent.includes(word)));
           if (!namedLocationFilter && textPlace) namedLocationFilter = textPlace;
@@ -888,6 +897,11 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
 
   if (!candidates.length) {
     // Nobody is available at all, so asking for more detail would not help.
+    if (refineFallback.length) {
+      const message = frameRefineNone(language);
+      const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'matches', content: message, framed: true, search_request: requestForMatch, matches: refineFallback, nearest: true });
+      return jsonOk({ matches: refineFallback, clarification: '', nearest: true, message, no_match_reason: message, resolved_request: requestForMatch, thread_id: threadId });
+    }
     const reason = followUp === 'more' ? frameExhausted(language) : EMPTY_POOL_MESSAGES[language];
     const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'no_match', content: reason, search_request: requestForMatch });
     return jsonOk({ matches: [], clarification: '', no_match: true, no_match_reason: reason, resolved_request: requestForMatch, thread_id: threadId });
@@ -991,6 +1005,15 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
         .map((candidate) => publicCandidate(candidate, { reasons: [], matched_expertise: [] },
           redactInterOrg && !established.has(candidate.id)))
       : [];
+    if (!matches.length && !fallback.length && refineFallback.length) {
+      const message = frameRefineNone(language);
+      const threadId = await persistTurns(ctx, body.thread_id, query, {
+        kind: 'matches', content: message, framed: true, search_request: requestForMatch,
+        matches: refineFallback, nearest: true, department: requiredDepartment,
+        location: locationFilterApplied ? namedLocationFilter : '',
+      });
+      return jsonOk({ matches: refineFallback, clarification: '', nearest: true, message, no_match_reason: message, resolved_request: requestForMatch, thread_id: threadId, model: result.model });
+    }
     if (!matches.length && !fallback.length) {
       // Even with nothing to offer, say what the network does have.
       // Wording only: when the model extracted no subject, name the user's own

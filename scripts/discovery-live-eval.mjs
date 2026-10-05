@@ -41,6 +41,8 @@ const SCENARIOS = [
     check: (t) => [/marketing/.test(t[0].ask) && t[0].choices.length > 0, /Con quale competenza in marketing/.test(t[1].ask), t[1].people.length === 0] },
   { name: 'French: finance -> une compétence précise', lang: 'fr', turns: ["Je m'intéresse à finance", 'une compétence précise'],
     check: (t) => [/finance/.test(t[0].ask), /Sur quelle competence en finance/.test(t[1].ask), t[1].people.length === 0] },
+  { name: 'follow-up about the people shown', turns: ['I am looking for someone working as consultant', 'is there someone with more than 5 years of experience?'],
+    check: (t) => [t[0].people.length > 0, t[1].people.length > 0, !/working in years/i.test(t[1].said)] },
   { name: 'thanks', turns: ['thanks!'], check: (t) => [/welcome|happy to help/i.test(t[0].ask), t[0].people.length === 0] },
   { name: 'department alone: marketing', turns: ['someone in marketing'], check: (t) => [/What in marketing/.test(t[0].ask)] },
   { name: 'vague: I need help', turns: ['I need help'], check: (t) => [/What would you like help with/.test(t[0].ask)] },
