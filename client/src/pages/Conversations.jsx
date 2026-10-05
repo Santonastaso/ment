@@ -556,7 +556,6 @@ export default function Conversations() {
               <Avatar className="size-9"><AvatarFallback>{initials(person?.name)}</AvatarFallback></Avatar>
               <div className="conversation-header-person"><strong>{person?.name}</strong><span>{selected.status === 'pending' && !isExpired(selected) && selected.isMentee ? t('conversations.requestSent') : stateLabel(selected, rowState(selected), t)}</span></div>
               <div className="conversation-header-actions">
-                {selected.status === 'scheduled' && selected.scheduled_at && <IcsDownloadButton sessionId={selected.id} session={selected} meetingUrl={selected.meeting_url} onReschedule={() => { setOverviewOpen(true); setScheduleOpen(true); }} compact />}
                 {(selected.status === 'scheduled' || selected.status === 'completed') && <MeetingFeedback key={selected.id} session={selected} onSaved={loadSessions} compact />}
                 <Button type="button" variant="ghost" size="icon" onClick={() => setOverviewOpen(true)} aria-label={t('conversations.requestDetails')} title={t('conversations.requestDetails')} aria-haspopup="dialog"><Info aria-hidden="true" /></Button>
               </div>
@@ -573,6 +572,17 @@ export default function Conversations() {
                   {selected.follow_up_intent && <span>{selected.follow_up_intent === 'ongoing' ? copy.ongoing : copy.oneOff}</span>}
                   {(selected.topics || []).map(topic => <span key={topic}>{topic}</span>)}
                 </div>
+                {(selected.status === 'pending' && !isExpired(selected) || selected.status === 'scheduled') && <div className="conversation-request-actions">
+                  {selected.status === 'pending' && selected.isMentee && <Button type="button" variant="danger" size="sm" onClick={() => setWithdrawOpen(true)}>{t('conversations.withdraw')}</Button>}
+                  {selected.status === 'pending' && selected.isMentor && <>
+                    <Button type="button" variant="danger" size="sm" onClick={() => mutateSession({ status: 'declined' }).catch(() => setError(t('conversations.error')))}>{t('conversations.decline')}</Button>
+                    <Button type="button" size="sm" onClick={() => mutateSession({ status: 'scheduled' }).catch(() => setError(t('conversations.error')))}><Check aria-hidden="true" />{t('conversations.accept')}</Button>
+                  </>}
+                  {selected.status === 'scheduled' && <>
+                    {selected.scheduled_at && <IcsDownloadButton sessionId={selected.id} session={selected} meetingUrl={selected.meeting_url} label={t('conversations.sendInvite')} />}
+                    <Button type="button" variant="ghost" size="sm" onClick={() => { setOverviewOpen(true); setScheduleOpen(true); }}>{t(selected.scheduled_at ? 'conversations.reschedule' : 'conversations.schedule')}</Button>
+                  </>}
+                </div>}
               </article>}
               {messages.map((message) => {
                 if (message.kind === 'request') return null;
@@ -628,11 +638,6 @@ export default function Conversations() {
           </div>
           <DialogFooter className="conversation-overview-footer">
             <Button variant="ghost" size="sm" render={<Link to={`/profile/${person?.id}`} />}><UserRound aria-hidden="true" />{t('conversations.profile')}</Button>
-            {selected.status === 'pending' && !isExpired(selected) && selected.isMentee && <Button type="button" variant="danger" size="sm"  onClick={() => { setOverviewOpen(false); setWithdrawOpen(true); }}>{t('conversations.withdraw')}</Button>}
-            {selected.status === 'pending' && !isExpired(selected) && selected.isMentor && <>
-              <Button size="sm" variant="danger"  onClick={() => mutateSession({ status: 'declined' }).catch(() => setError(t('conversations.error')))}>{t('conversations.decline')}</Button>
-              <Button size="sm" onClick={() => mutateSession({ status: 'scheduled' }).catch(() => setError(t('conversations.error')))}><Check aria-hidden="true" />{t('conversations.accept')}</Button>
-            </>}
           </DialogFooter>
         </DialogContent>
       </Dialog>}

@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { CalendarDays } from 'lucide-react';
+import { CalendarDays, Download, ExternalLink } from 'lucide-react';
 import api, { invokeUserFunction } from '../api/index.js';
 import { buildSessionIcs, downloadIcs } from '../lib/ics.js';
 import { useT } from '../i18n/index.jsx';
+import { Button } from './ui/button.jsx';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog.jsx';
 
 
 // supabase-js surfaces a non-2xx edge response as a FunctionsHttpError whose
@@ -22,8 +24,9 @@ async function providerErrorMessage(error, t) {
   return t('components.ics.connectFailed');
 }
 
-export default function IcsDownloadButton({ sessionId, session, className = '', label, meetingUrl, onReschedule, compact = false }) {
+export default function IcsDownloadButton({ sessionId, session, className = '', label, meetingUrl }) {
   const { t } = useT();
+  const [open, setOpen] = useState(false);
   const [connections, setConnections] = useState([]);
   const [providers, setProviders] = useState([]);
   const [loading, setLoading] = useState('');
@@ -78,27 +81,31 @@ export default function IcsDownloadButton({ sessionId, session, className = '', 
       const summary = t('components.ics.summary', { name: peer?.name || t('components.match.unknown') });
       const slug = (peer?.name || 'ment').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
       downloadIcs(`chat-with-${slug}.ics`, buildSessionIcs(current, current.mentor, current.mentee, { summary }));
+      setOpen(false);
     } catch {
       setError(t('components.ics.downloadFailed'));
     } finally { setLoading(''); }
   }
 
   const connected = new Set(connections.map((item) => item.provider));
-  const actionLabel = created ? t('components.ics.ready') : (label || t('components.ics.addToCalendar'));
+  const actionLabel = label || t('components.ics.addToCalendar');
 
-  return <div className="calendar-action">
-    <details className="calendar-more">
-      <summary className={`${className}${compact ? ' calendar-more-compact' : ''}`} aria-label={compact ? actionLabel : undefined} title={compact ? actionLabel : undefined}>
-        {compact ? <CalendarDays aria-hidden="true" /> : actionLabel}
-      </summary>
-      <div className="calendar-more-menu">
-        {(created?.join_url || meetingUrl) && <a href={created?.join_url || meetingUrl} target="_blank" rel="noreferrer">{t('components.ics.join')}</a>}
-        {onReschedule && <button type="button" onClick={onReschedule}>{t('components.ics.changeTime')}</button>}
-        {providers.map(provider => <button key={provider} type="button" disabled={!!loading} onClick={() => connected.has(provider) ? createEvent(provider) : connect(provider)}>{loading === provider ? t('common.loading') : t(`components.ics.${connected.has(provider) ? 'add' : 'connect'}.${provider}`)}</button>)}
-        <button type="button" disabled={!!loading} onClick={download}>{loading === 'ics' ? t('components.ics.downloading') : t('components.ics.download')}</button>
-        {created?.html_url && <a href={created.html_url} target="_blank" rel="noreferrer">{t('components.ics.openEvent')}</a>}
-      </div>
-    </details>
-    {error && <p className="w-full text-xs text-destructive" role="status" aria-live="polite">{error}</p>}
-  </div>;
+  return <>
+    <Button type="button" size="sm" className={className} onClick={() => setOpen(true)}><CalendarDays aria-hidden="true" />{actionLabel}</Button>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{t('components.ics.addToCalendar')}</DialogTitle>
+          <DialogDescription>{t('components.ics.chooseMethod')}</DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-2">
+          {providers.map(provider => <Button key={provider} type="button" variant="outline" className="w-full justify-start" disabled={!!loading} onClick={() => connected.has(provider) ? createEvent(provider) : connect(provider)}><CalendarDays aria-hidden="true" />{loading === provider ? t('common.loading') : t(`components.ics.${connected.has(provider) ? 'add' : 'connect'}.${provider}`)}</Button>)}
+          <Button type="button" variant="outline" className="w-full justify-start" disabled={!!loading} onClick={download}><Download aria-hidden="true" />{loading === 'ics' ? t('components.ics.downloading') : t('components.ics.download')}</Button>
+          {(created?.html_url || created?.join_url || meetingUrl) && <a className="inline-flex items-center gap-2 rounded-[var(--control-radius)] px-4 py-2 text-sm font-medium hover:bg-[var(--control-surface)]" href={created?.html_url || created?.join_url || meetingUrl} target="_blank" rel="noreferrer"><ExternalLink className="size-4" aria-hidden="true" />{created?.html_url ? t('components.ics.openEvent') : t('components.ics.join')}</a>}
+        </div>
+        {created && <p role="status" className="text-sm text-muted-foreground">{t('components.ics.ready')}</p>}
+        {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
+      </DialogContent>
+    </Dialog>
+  </>;
 }

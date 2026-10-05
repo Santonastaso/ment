@@ -209,7 +209,8 @@ test('onboarding to discovery, request, acceptance, chat and meeting', async ({ 
   await page.getByRole('button', { name: 'Request overview' }).click();
   await expect(page.getByRole('dialog')).toContainText('Financial modelling');
   await page.screenshot({ path: test.info().outputPath('request-overview.png'), animations: 'disabled' });
-  await page.getByRole('button', { name: 'Withdraw request' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
+  await page.locator('.conversation-request-card').getByRole('button', { name: 'Withdraw request' }).click();
   const withdrawDialog = page.getByRole('dialog');
   await expect(withdrawDialog.getByText('This will cancel the pending session request. You can start a new request later.')).toBeVisible();
   await expect.poll(() => page.evaluate(() => window.fixture.calls.some(call => call.method === 'put' && call.path === '/sessions/3' && call.body.status === 'cancelled'))).toBe(false);
@@ -221,10 +222,10 @@ test('onboarding to discovery, request, acceptance, chat and meeting', async ({ 
   await expect(page.getByRole('heading', { name: 'Groups', exact: true })).toBeVisible();
   await page.locator('nav').getByRole('link', { name: /^Messages/ }).click();
   await page.getByRole('button', { name: /Viewer Student/ }).click();
-  await page.getByRole('button', { name: 'Request overview' }).click();
-  await page.getByRole('button', { name: 'Accept', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Schedule', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Schedule', exact: true }).click();
+  const requestCard = page.locator('.conversation-request-card');
+  await requestCard.getByRole('button', { name: 'Accept', exact: true }).click();
+  await expect(requestCard.getByRole('button', { name: 'Schedule', exact: true })).toBeVisible();
+  await requestCard.getByRole('button', { name: 'Schedule', exact: true }).click();
   const future = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 16);
   const scheduledAt = await page.evaluate(value => new Date(value).toISOString(), future);
   await page.getByLabel('New time', { exact: true }).fill(future);
@@ -359,8 +360,7 @@ test('request history survives a missed reply and cancellation without reloading
   });
   await expect(timeline.getByText('I have a few ideas.')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Request overview' }).click();
-  await page.getByRole('dialog').getByRole('button', { name: 'Withdraw request' }).click();
+  await timeline.locator('.conversation-request-card').getByRole('button', { name: 'Withdraw request' }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Withdraw request' }).click();
   await expect(timeline.locator('.conversation-event')).toContainText('Cancelled');
   await expect(timeline.locator('.conversation-request-card')).toContainText('Supplier sourcing');

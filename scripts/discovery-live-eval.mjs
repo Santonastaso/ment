@@ -1,21 +1,27 @@
-// Runs real conversations against the deployed discovery assistant and prints
-// a transcript with pass/fail checks. Meant for CI, where the Supabase access
-// token lives: it signs in as one dummy account with a throwaway password and
-// always clears that password afterwards.
+// Runs synthetic scenarios against staging and reports aggregate pass/fail only.
 import { randomBytes } from 'node:crypto';
 
-const ref = process.env.SUPABASE_PROJECT_REF;
-const pat = process.env.SUPABASE_ACCESS_TOKEN;
-if (!ref || !pat) { console.log('Missing SUPABASE_PROJECT_REF or SUPABASE_ACCESS_TOKEN'); process.exit(1); }
-const TEST_USER = '40739a80-bab8-446d-a3c3-58acf6db7b4e';
-const TEST_EMAIL = 'aisha.kowalski@dummy.ment.io';
+const ref = process.env.SUPABASE_EVAL_PROJECT_REF;
+const pat = process.env.SUPABASE_EVAL_ACCESS_TOKEN;
+const productionRef = process.env.SUPABASE_PRODUCTION_PROJECT_REF;
+const TEST_USER = process.env.SUPABASE_EVAL_TEST_USER;
+const TEST_EMAIL = process.env.SUPABASE_EVAL_TEST_EMAIL;
+if (!ref || !pat || !productionRef || !TEST_USER || !TEST_EMAIL) throw new Error('Missing staging eval configuration');
+if (ref.toLowerCase() === productionRef.toLowerCase()) throw new Error('Live eval must not target production');
+if (!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(TEST_USER)
+  || !/^[a-z0-9._%+-]+@dummy\.ment\.io$/i.test(TEST_EMAIL)) {
+  throw new Error('Live eval requires its dedicated dummy test account');
+}
+if (!/^[a-z0-9]{20}$/i.test(ref) || !/^[a-z0-9]{20}$/i.test(productionRef)) {
+  throw new Error('Invalid Supabase project reference');
+}
 const api = `https://api.supabase.com/v1/projects/${ref}`;
 const base = `https://${ref}.supabase.co`;
 const fnName = process.env.DISCOVERY_FUNCTION || 'discovery-assistant';
 
 const mgmt = async (path, init = {}) => {
   const response = await fetch(api + path, { ...init, headers: { Authorization: `Bearer ${pat}`, 'Content-Type': 'application/json' } });
-  if (!response.ok) throw new Error(`${path}: ${response.status} ${(await response.text()).slice(0, 200)}`);
+  if (!response.ok) throw new Error(`${path}: ${response.status}`);
   return response.json();
 };
 const sql = (query) => mgmt('/database/query', { method: 'POST', body: JSON.stringify({ query }) });
@@ -75,6 +81,7 @@ const password = randomBytes(18).toString('base64url');
 let passed = 0; let total = 0;
 let sent = [];
 let failed = false;
+let passwordWasSet = false;
 try {
   // Test the code in this commit, not whatever was deployed before it: wait
   // until the function is newer than the commit, for up to twelve minutes.
@@ -89,13 +96,21 @@ try {
   log(`# Discovery live eval (${fnName})\n\ncommit \`${(process.env.GITHUB_SHA || '').slice(0, 7)}\` · function v${fn.version} deployed ${fn.updated_at ? new Date(fn.updated_at).toISOString() : '?'}\n`);
   const keys = await mgmt('/api-keys');
   const anon = keys.find((key) => key.name === 'anon')?.api_key;
-  await sql(`update auth.users set encrypted_password = crypt('${password}', gen_salt('bf')),
-    confirmation_token = coalesce(confirmation_token, ''), recovery_token = coalesce(recovery_token, ''),
-    email_change = coalesce(email_change, ''), email_change_token_new = coalesce(email_change_token_new, '')
-    where id = '${TEST_USER}'`);
+  await sql(`do $eval$
+    declare updated integer;
+    begin
+      update auth.users set encrypted_password = crypt('${password}', gen_salt('bf')),
+        confirmation_token = coalesce(confirmation_token, ''), recovery_token = coalesce(recovery_token, ''),
+        email_change = coalesce(email_change, ''), email_change_token_new = coalesce(email_change_token_new, '')
+        where id = '${TEST_USER}' and lower(email) = lower('${TEST_EMAIL}');
+      get diagnostics updated = row_count;
+      if updated <> 1 then raise exception 'evaluation_fixture_mismatch'; end if;
+    end;
+  $eval$`);
+  passwordWasSet = true;
   const session = await (await fetch(`${base}/auth/v1/token?grant_type=password`, { method: 'POST',
     headers: { apikey: anon, 'Content-Type': 'application/json' }, body: JSON.stringify({ email: TEST_EMAIL, password }) })).json();
-  if (!session.access_token) throw new Error('sign-in failed: ' + JSON.stringify(session).slice(0, 200));
+  if (!session.access_token) throw new Error('staging test account sign-in failed');
 
   for (const scenario of SCENARIOS) {
     log(`## ${scenario.name}`);
@@ -124,12 +139,9 @@ try {
       const turn = { ask: d.clarification || '', said: d.no_match_reason || d.message || '', near: Boolean(d.nearest), people: d.matches || [], choices: (d.suggestions || []).map((c) => c.label) };
       turns.push(turn);
       log(`- **you:** ${query}`);
-      if (response.status !== 200) log(`  - HTTP ${response.status} ${JSON.stringify(d)}`);
-      else if (turn.ask) log(`  - **ment asks:** ${turn.ask}${turn.choices.length ? `\n    - choices: ${turn.choices.join(' · ')}` : ''}`);
-      else {
-        log(`  - **ment:** ${turn.said || '(no message)'}${turn.near ? ' _[closest]_' : ''}${d.model ? ` · model ${d.model}` : ''}`);
-        for (const p of turn.people) log(`    - ${p.job_title} · ${p.department} · ${p.location} — ${(p.reasons || [])[0] || ''}`);
-      }
+      if (response.status !== 200) log(`  - HTTP ${response.status}`);
+      else if (turn.ask) log('  - clarification returned');
+      else log(`  - ${turn.people.length} matches returned`);
     }
     const results = scenario.check(turns);
     const ok = results.every(Boolean);
@@ -139,15 +151,17 @@ try {
   log(`**${passed}/${total} scenarios passed**`);
   failed = passed !== total;
 } catch (error) {
-  log(`\nEVAL ERROR: ${error.message}`);
+  log(`\nEVAL ERROR: ${error instanceof Error ? error.message : 'unknown error'}`);
   failed = true;
 } finally {
-  try {
-    await sql(`update auth.users set encrypted_password = null where id = '${TEST_USER}'`);
-    log('\n_test account password cleared_');
-  } catch (error) {
-    log(`CLEANUP FAILED: ${error.message}`);
-    failed = true;
+  if (passwordWasSet) {
+    try {
+      await sql(`update auth.users set encrypted_password = null where id = '${TEST_USER}'`);
+      log('\n_test account password cleared_');
+    } catch {
+      log('CLEANUP FAILED: test account password could not be cleared');
+      failed = true;
+    }
   }
   if (failed) process.exitCode = 1;
 }

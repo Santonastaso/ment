@@ -76,6 +76,7 @@ export default function Groups() {
 
   async function toggleMembership(group) {
     if (saving) return;
+    if (group.is_owner) return;
     if (!group.joined && group.join_status !== 'pending') {
       setError(''); setReason(''); setJoinTarget(group);
       return;
@@ -130,7 +131,7 @@ export default function Groups() {
         <SurfaceHeader
           className="items-center px-0 pb-2 pt-0 sm:px-0"
           title={t('groups.list.title')}
-          action={<Button type="button" size="icon" className="size-12 rounded-xl" aria-label={t('groups.create.title')} title={t('groups.create.title')} onClick={() => { setError(''); setCreateOpen(true); }}><Plus className="size-6" /></Button>}
+          action={<Button type="button" size="icon-lg" aria-label={t('groups.create.title')} title={t('groups.create.title')} onClick={() => { setError(''); setCreateOpen(true); }}><Plus aria-hidden="true" /></Button>}
         />
         <SurfaceBody className="px-0 pt-2 sm:px-0">
           {error && !createOpen && !joinTarget && !reviewTarget && <p className="text-sm text-destructive" role="alert">{error}</p>}
@@ -172,13 +173,13 @@ export default function Groups() {
                         {t('groups.chat')}
                       </Button>
                     )}
-                    <Button variant={group.joined ? 'link' : 'ghost'} size="sm"
+                    {!group.is_owner && <Button variant={group.joined ? 'link' : 'ghost'} size="sm"
                       type="button"
                       disabled={saving}
                       onClick={() => toggleMembership(group)}
                     >
                       {group.joined ? t('groups.leave') : group.join_status === 'pending' ? t('groups.withdraw') : t('groups.requestJoin')}
-                    </Button>
+                    </Button>}
                   </span>
                   {!group.joined && group.join_status && <span className="person-row-detail text-sm text-muted-foreground">{t(`groups.joinStatus.${group.join_status}`)}</span>}
                 </article>
