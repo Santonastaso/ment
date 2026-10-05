@@ -130,7 +130,7 @@ export default function Groups() {
         <SurfaceHeader
           className="items-center px-0 pb-2 pt-0 sm:px-0"
           title={t('groups.list.title')}
-          action={<Button type="button" size="icon" className="size-12 rounded-xl" aria-label={t('groups.create.title')} title={t('groups.create.title')} onClick={() => { setError(''); setCreateOpen(true); }}><Plus className="size-6" /></Button>}
+          action={<Button type="button" size="icon-lg" aria-label={t('groups.create.title')} title={t('groups.create.title')} onClick={() => { setError(''); setCreateOpen(true); }}><Plus aria-hidden="true" /></Button>}
         />
         <SurfaceBody className="px-0 pt-2 sm:px-0">
           {error && !createOpen && !joinTarget && !reviewTarget && <p className="text-sm text-destructive" role="alert">{error}</p>}

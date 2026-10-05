@@ -6,7 +6,7 @@ import { useT } from '../i18n/index.jsx';
 import { Button } from './ui/button.jsx';
 import Portal from './ui/portal.jsx';
 import { useModalA11y } from '../lib/useModalA11y.js';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, X } from 'lucide-react';
 
 const TOTAL_STEPS = 4;
 
@@ -130,7 +130,7 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
         <div className="flex-shrink-0 border-b border-[var(--border-subtle)] px-6 py-5">
           <div className="flex items-center justify-between">
             <h2 id="session-request-title" className="text-xl font-semibold tracking-[-0.02em] text-foreground">{t('components.sessionRequest.title')}</h2>
-            <button disabled={submitting} aria-label={copy.close} onClick={onClose} className="grid size-9 place-items-center rounded-lg text-2xl leading-none text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">&times;</button>
+            <Button type="button" variant="ghost" size="icon-sm" disabled={submitting} aria-label={copy.close} title={copy.close} onClick={onClose}><X aria-hidden="true" /></Button>
           </div>
           <p className="text-sm text-muted-foreground mt-1">{t('components.sessionRequest.subtitle', { name: mentor.name, department: mentor.department })}</p>
         </div>
