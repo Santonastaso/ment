@@ -49,16 +49,17 @@ export default function UserMenu({ compact = false, placement = 'topbar' }) {
   }
 
   return (
-    <div className={cn('relative', !compact && 'w-full')} ref={rootRef}>
+    <div className="relative w-full" ref={rootRef}>
       <button
         type="button"
         onClick={() => setOpen(v => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
+        aria-label={compact ? user?.name || t('nav.myProfile') : undefined}
         className={cn(
           'inline-flex h-12 items-center gap-2.5 rounded-full px-2 text-sm font-medium text-foreground',
-          compact && 'size-9 justify-center rounded-full p-0',
-          !compact && 'w-full justify-start',
+          compact ? 'w-11' : 'w-full',
+          'justify-start',
           'outline-none hover:bg-[var(--sidebar-accent)] focus-visible:ring-2 focus-visible:ring-ring/50',
           open && 'bg-[var(--sidebar-accent)]'
         )}
@@ -68,7 +69,7 @@ export default function UserMenu({ compact = false, placement = 'topbar' }) {
             {initials}
           </AvatarFallback>
         </Avatar>
-        {!compact && <span className="min-w-0 flex-1 truncate text-left">{user?.name}</span>}
+        <span className={cn('sidebar-user-label min-w-0 flex-1 truncate text-left', compact && 'is-hidden')}>{user?.name}</span>
       </button>
 
       {open && (

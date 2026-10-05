@@ -16,6 +16,7 @@ function fixtureApi(state) {
       if (path === '/reflections') return { entries: state.reflections || [] };
       if (path === '/sessions') return state.sessions.map(payload);
       if (path === '/groups') return state.groups;
+      if (path.startsWith('/directory?')) return { people: [state.peer], total: 1, facets: {} };
       // A saved conversation and a peer profile, for the view-profile round trip.
       if (path === '/discovery/threads/thread') return { id: 'thread', turns: [
         { role: 'user', content: 'Financial modelling' },
@@ -26,7 +27,8 @@ function fixtureApi(state) {
       if (path.startsWith('/discovery/threads')) return [];
       if (path.startsWith('/skills/suggest')) return [];
       if (/^\/(sessions|groups)\/\d+\/messages/.test(path)) {
-        const rows = state.messages[path] || [];
+        const [messagePath] = path.split('?');
+        const rows = state.messages[messagePath] || [];
         return path.startsWith('/groups') ? rows : { messages: rows, hasMore: false };
       }
     }
@@ -51,7 +53,7 @@ function fixtureApi(state) {
       if (path === '/sessions') {
         const row = { ...body, id: 3, status: 'pending', mentor: state.peer, mentee: state.user, mentee_id: state.user.id, request_expires_at: new Date(Date.now() + 7 * 86400000).toISOString() };
         state.sessions.push(row);
-        state.messages['/sessions/3/messages'] = [{ id: 1, sender_id: state.user.id, body: body.message, created_at: new Date().toISOString() }];
+        state.messages['/sessions/3/messages'] = [{ id: 1, sender_id: state.user.id, kind: 'request', body: body.message, created_at: new Date().toISOString() }];
         return payload(row);
       }
       if (path === '/groups') { const row = { ...body, id: 2, joined: true, is_owner: true, member_count: 1 }; state.groups.push(row); return row; }
@@ -59,6 +61,7 @@ function fixtureApi(state) {
         const send = () => {
           const row = { id: ++state.nextMessageId, sender_id: state.user.id, body: body.body, created_at: new Date().toISOString() };
           state.messages[path] = [...(state.messages[path] || []), row];
+          sessionStorage.setItem('ment.fixture.messages', JSON.stringify(state.messages));
           return row;
         };
         return state.delaySends ? new Promise(resolve => state.pending.push(() => resolve(send()))) : send();
@@ -69,6 +72,13 @@ function fixtureApi(state) {
       if (/^\/sessions\/\d+$/.test(path)) {
         const session = state.sessions.find(s => s.id === Number(path.split('/')[2]));
         Object.assign(session, body, body.status === 'completed' ? { status: 'scheduled', viewer_completed: true } : {});
+        if (body.status === 'cancelled' || body.status === 'declined') {
+          const messagePath = `${path}/messages`;
+          state.messages[messagePath] = [...(state.messages[messagePath] || []), {
+            id: ++state.nextMessageId, sender_id: state.user.id, kind: 'system',
+            body: body.status === 'cancelled' ? 'Request withdrawn.' : 'Request declined.', created_at: new Date().toISOString(),
+          }];
+        }
         return payload(session);
       }
     }
@@ -85,7 +95,7 @@ export const test = base.extend({
     await page.addInitScript(({ user, peer }) => {
       localStorage.setItem('ment.lang', 'en');
       window.fixture = {
-        user, peer, calls: [], pending: [], nextMessageId: 10, messages: {},
+        user, peer, calls: [], pending: [], nextMessageId: 10, messages: JSON.parse(sessionStorage.getItem('ment.fixture.messages') || '{}'),
         unread: { sessions: 0, groups: 1, sessionMessages: {}, groupMessages: { 1: 2 } },
         groups: [{ id: 1, name: 'Test Group', description: 'A group for testing', joined: true, member_count: 3 }],
         groupMembers: { 1: [

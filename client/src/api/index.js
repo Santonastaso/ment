@@ -480,15 +480,11 @@ async function get(url) {
     const [path, query] = url.split('?');
     const id = Number(path.split('/')[2]);
     const before = new URLSearchParams(query || '').get('before');
-    let request = supabase.from('session_messages')
-      .select('id,session_id,sender_id,kind,body,created_at')
-      .eq('session_id', id)
-      .order('id', { ascending: false })
-      .limit(51);
-    if (before) request = request.lt('id', Number(before));
-    const { data, error } = await request;
+    const { data, error } = await supabase.rpc('my_session_messages', { p_session_id: id });
     if (error) throw new ApiError(error.message, 404);
-    return ok({ messages: (data || []).slice(0, 50).reverse(), hasMore: (data || []).length > 50 });
+    const history = (data || []).sort((a, b) => a.id - b.id);
+    const eligible = before ? history.filter((message) => message.id < Number(before)) : history;
+    return ok({ messages: eligible.slice(-50), hasMore: eligible.length > 50 });
   }
 
   if (url === '/sessions/pending-acceptances') {

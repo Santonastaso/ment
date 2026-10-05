@@ -1,10 +1,11 @@
 import { test, expect } from './fixtures.mjs';
 
-test('Home greeting uses four outlined faces and turns each 15 seconds', async ({ page }) => {
+test('Home greeting uses four borderless faces and turns each 15 seconds', async ({ page }) => {
   await page.clock.install();
   await page.goto('/');
   const prism = page.locator('.discovery-greeting-prism');
   await expect(prism.locator('.discovery-greeting-face')).toHaveCount(4);
+  expect(await prism.locator('.discovery-greeting-face').first().evaluate(element => getComputedStyle(element).borderTopWidth)).toBe('0px');
   await expect(prism).toHaveAttribute('style', /rotateX\(0deg\)/);
   await page.clock.fastForward(15000);
   await expect(prism).toHaveAttribute('style', /rotateX\(-90deg\)/);
@@ -17,18 +18,31 @@ test('Home greeting uses four outlined faces and turns each 15 seconds', async (
 test('Messages rail moves smoothly and compact menus remain usable', async ({ page }) => {
   await page.goto('/conversations?session=1');
   const sidebar = page.locator('.app-sidebar');
-  await expect(sidebar.locator('a[href="/"] > span').filter({ hasText: /^M$/ })).toHaveCount(1);
+  await expect(sidebar.getByRole('button', { name: 'Close sidebar' })).toHaveCount(2);
   await expect(sidebar.getByRole('button', { name: 'Open sidebar' })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Close sidebar' }).click();
+  const anchorCenters = async () => {
+    const boxes = await Promise.all([
+      sidebar.locator('button:has-text("M") span').first().boundingBox(),
+      sidebar.locator('nav a svg').first().boundingBox(),
+      sidebar.locator('button[aria-haspopup="menu"] [data-slot="avatar"]').boundingBox(),
+    ]);
+    return boxes.map(box => box.x + box.width / 2);
+  };
+  const before = await anchorCenters();
+  await page.getByRole('button', { name: 'Close sidebar' }).last().click();
   await page.waitForTimeout(100);
   const sidebarWidth = await sidebar.evaluate(element => element.getBoundingClientRect().width);
   expect(sidebarWidth).toBeGreaterThan(68);
   expect(sidebarWidth).toBeLessThan(260);
   await expect.poll(() => sidebar.evaluate(element => Math.round(element.getBoundingClientRect().width))).toBe(68);
   await expect(sidebar.getByRole('link', { name: /MENT/ })).toHaveCount(0);
-  const mark = await sidebar.getByRole('button', { name: 'Open sidebar' }).locator('span').boundingBox();
-  const navIcon = await page.locator('.app-sidebar nav a svg').first().boundingBox();
-  expect(Math.abs(mark.x + mark.width / 2 - navIcon.x - navIcon.width / 2)).toBeLessThan(1);
+  const after = await anchorCenters();
+  before.forEach((center, index) => expect(after[index]).toBeCloseTo(center, 0));
+  expect(Math.abs(after[0] - after[1])).toBeLessThan(3);
+  expect(Math.abs(after[0] - after[2])).toBeLessThan(3);
+  await sidebar.getByRole('button', { name: 'Viewer Student' }).click();
+  await expect(sidebar.getByRole('menu')).toBeVisible();
+  await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Open sidebar' }).click();
   await expect.poll(() => sidebar.evaluate(element => Math.round(element.getBoundingClientRect().width))).toBe(260);
   const rail = page.locator('.conversation-list');
@@ -55,6 +69,19 @@ test('Messages rail moves smoothly and compact menus remain usable', async ({ pa
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByRole('button', { name: 'Hide message list' })).toBeHidden();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+});
+
+test('Explorer sticky panel rules share the same width', async ({ page }) => {
+  await page.goto('/explorer');
+  await expect(page.locator('.directory-pagination')).toBeVisible();
+  const edges = await page.locator('.directory-search-panel').evaluate(panel => {
+    const pagination = panel.querySelector('.directory-pagination');
+    const panelRect = panel.getBoundingClientRect();
+    const paginationRect = pagination.getBoundingClientRect();
+    return [panelRect.left, panelRect.right, paginationRect.left, paginationRect.right];
+  });
+  expect(edges[0]).toBeCloseTo(edges[2], 0);
+  expect(edges[1]).toBeCloseTo(edges[3], 0);
 });
 
 test('Quick reflection opens a card without shifting the profile and preserves drafts', async ({ page }) => {
@@ -92,6 +119,33 @@ test('Quick reflection opens a card without shifting the profile and preserves d
   await expect(dialog).toBeHidden();
 });
 
+test('Reflection log can add a check-in from its header', async ({ page }) => {
+  await page.goto('/profile');
+  await page.getByTestId('profile-tab-reflections').click();
+  const add = page.getByRole('button', { name: 'Start check-in' });
+  await expect(add).toBeVisible();
+  await add.click();
+  const dialog = page.getByRole('dialog', { name: 'Weekly check-in' });
+  await dialog.getByRole('textbox', { name: 'What did you feel you needed support on this week?' }).fill('Practice presenting clearly.');
+  await dialog.getByRole('button', { name: 'Save reflection' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole('button', { name: /Practice presenting clearly/ })).toBeVisible();
+});
+
+test('Messages count sits beside its heading', async ({ page }) => {
+  await page.goto('/conversations?session=1');
+  const heading = page.locator('.conversation-list-heading');
+  await expect(heading.locator('h1')).toHaveText('Messages');
+  await expect(heading.locator('.conversation-list-count')).toHaveText('3');
+  const gap = await heading.evaluate(element => {
+    const title = element.querySelector('h1').getBoundingClientRect();
+    const count = element.querySelector('.conversation-list-count').getBoundingClientRect();
+    return count.left - title.right;
+  });
+  expect(gap).toBeGreaterThanOrEqual(0);
+  expect(gap).toBeLessThanOrEqual(12);
+});
+
 test('Home categories expand into chat cards before opening a conversation', async ({ page }) => {
   await page.goto('/conversations?session=1');
   await page.evaluate(() => {
@@ -116,7 +170,9 @@ test('Home categories expand into chat cards before opening a conversation', asy
     await expect(page).toHaveURL('http://127.0.0.1:3010/');
   }
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole('button', { name: 'Close sidebar', exact: true }).click();
+  const mainLeft = await page.locator('main').evaluate(element => element.getBoundingClientRect().left);
+  await page.getByRole('button', { name: 'Close sidebar', exact: true }).last().click();
+  expect(await page.locator('main').evaluate(element => element.getBoundingClientRect().left)).toBeCloseTo(mainLeft, 0);
   await expect(page.getByRole('region', { name: /^Past/ })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
   await categories.getByRole('button', { name: /^Past/ }).click();
@@ -260,6 +316,57 @@ test('failed send preserves the draft and can be retried', async ({ page }) => {
   await page.getByRole('button', { name: 'Send message', exact: true }).click();
   await expect(page.getByText('Keep my message', { exact: true })).toBeVisible();
   await expect(composer).toHaveValue('');
+});
+
+test('sent message is still visible after a full reload', async ({ page }) => {
+  await page.goto('/conversations?session=1');
+  await page.getByRole('textbox', { name: 'Message', exact: true }).fill('This must survive reload');
+  await page.getByRole('button', { name: 'Send message', exact: true }).click();
+  await expect(page.locator('.conversation-messages').getByText('This must survive reload')).toBeVisible();
+  await page.reload();
+  await expect(page.locator('.conversation-messages').getByText('This must survive reload')).toBeVisible();
+});
+
+test('request history survives a missed reply and cancellation without reloading', async ({ page }) => {
+  await page.addInitScript(() => {
+    const { user, peer } = window.fixture;
+    window.fixture.sessions.push({
+      id: 3, status: 'pending', title: 'Supplier sourcing', pre_session_question: 'How do we find better suppliers?',
+      outbound_message: 'Could we talk about suppliers?', created_at: new Date().toISOString(),
+      topics: ['procurement', 'supplier research'], follow_up_intent: 'ongoing',
+      mentor_id: peer.id, mentee_id: user.id, mentor: peer, mentee: user,
+    });
+    window.fixture.messages['/sessions/3/messages'] = [
+      { id: 1, sender_id: user.id, kind: 'request', body: 'Could we talk about suppliers?', created_at: new Date().toISOString() },
+      { id: 2, sender_id: peer.id, kind: 'message', body: 'Yes, happy to help.', created_at: new Date().toISOString() },
+    ];
+  });
+  await page.goto('/conversations?session=3');
+  const timeline = page.locator('.conversation-messages');
+  await expect(timeline.locator('.conversation-request-card')).toContainText('Supplier sourcing');
+  await expect(timeline.locator('.conversation-request-card')).toContainText('Could we talk about suppliers?');
+  await expect(timeline.getByText('Yes, happy to help.')).toBeVisible();
+
+  await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Thanks, let us plan it.');
+  await page.getByRole('button', { name: 'Send message', exact: true }).click();
+  await expect(timeline.getByText('Thanks, let us plan it.')).toBeVisible();
+
+  await page.evaluate(() => {
+    window.fixture.messages['/sessions/3/messages'].push({
+      id: ++window.fixture.nextMessageId, sender_id: window.fixture.peer.id, kind: 'message', body: 'I have a few ideas.', created_at: new Date().toISOString(),
+    });
+    window.dispatchEvent(new Event('focus'));
+  });
+  await expect(timeline.getByText('I have a few ideas.')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Request overview' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Withdraw request' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Withdraw request' }).click();
+  await expect(timeline.locator('.conversation-event')).toContainText('Cancelled');
+  await expect(timeline.locator('.conversation-request-card')).toContainText('Supplier sourcing');
+  await expect(timeline.getByText('Yes, happy to help.')).toBeVisible();
+  await expect(timeline.getByText('Thanks, let us plan it.')).toBeVisible();
+  await expect(timeline.getByText('I have a few ideas.')).toBeVisible();
 });
 
 test('a profile opened from chat results leads back to the same results', async ({ page }) => {

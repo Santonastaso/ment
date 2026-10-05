@@ -834,9 +834,10 @@ export default function Profile() {
                 {t('profile.reflection.descSuffix')}
               </>
             }
+            action={<Button ref={reflectionTriggerRef} type="button" variant="outline" size="icon-sm" aria-label={t('components.reflection.startCheckIn')} aria-haspopup="dialog" onClick={() => setReflectionOpen(true)}><Plus className="size-4" aria-hidden="true" /></Button>}
           />
           <SurfaceBody className="pt-5">
-            <ProfileReflection history draft={reflectionDraft} onDraftChange={setReflectionDraft} onSkillsApplied={refreshProfile} />
+            <ProfileReflection history draft={reflectionDraft} onDraftChange={setReflectionDraft} onSkillsApplied={refreshProfile} open={reflectionOpen} onOpenChange={setReflectionOpen} returnFocus={reflectionTriggerRef} />
           </SurfaceBody>
         </Surface>
       )}
