@@ -221,10 +221,10 @@ test('onboarding to discovery, request, acceptance, chat and meeting', async ({ 
   await expect(page.getByRole('heading', { name: 'Groups', exact: true })).toBeVisible();
   await page.locator('nav').getByRole('link', { name: /^Messages/ }).click();
   await page.getByRole('button', { name: /Viewer Student/ }).click();
-  await page.getByRole('button', { name: 'Request overview' }).click();
-  await page.getByRole('button', { name: 'Accept', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Schedule', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Schedule', exact: true }).click();
+  const requestCard = page.locator('.conversation-request-card');
+  await requestCard.getByRole('button', { name: 'Accept', exact: true }).click();
+  await expect(requestCard.getByRole('button', { name: 'Schedule', exact: true })).toBeVisible();
+  await requestCard.getByRole('button', { name: 'Schedule', exact: true }).click();
   const future = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 16);
   const scheduledAt = await page.evaluate(value => new Date(value).toISOString(), future);
   await page.getByLabel('New time', { exact: true }).fill(future);

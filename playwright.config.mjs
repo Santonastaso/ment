@@ -19,7 +19,7 @@ export default defineConfig({
     command: 'node node_modules/vite/bin/vite.js --host 127.0.0.1 --port 3010 --strictPort --configLoader runner',
     cwd: './client',
     url: 'http://127.0.0.1:3010',
-    reuseExistingServer: false,
+    reuseExistingServer: !process.env.CI,
     timeout: 30_000,
     env: { VITE_SUPABASE_URL: 'https://example.supabase.co', VITE_SUPABASE_ANON_KEY: 'build_only_placeholder' },
   },

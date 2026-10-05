@@ -631,6 +631,10 @@ a.person-row-name:hover { color: var(--primary); text-decoration: underline; }
 .conversation-request-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
 .conversation-request-meta:empty { display: none; }
 .conversation-request-meta span { border-radius: var(--control-radius); background: var(--control-surface); padding: 5px 10px; color: var(--muted-foreground); font-size: 11px; }
+.conversation-request-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 16px; border-top: 1px solid var(--border-subtle); padding-top: 14px; }
+.conversation-request-actions .calendar-action { width: auto; }
+.conversation-request-actions .calendar-more summary.conversation-request-calendar { display: inline-flex; height: 36px; align-items: center; border-radius: var(--control-radius); background: var(--control-surface); padding: 0 16px; color: var(--foreground); font-size: 14px; font-weight: 600; }
+.conversation-request-actions .calendar-more summary.conversation-request-calendar:hover { background: var(--control-surface-hover); }
 .conversation-event { display: flex; width: fit-content; max-width: 100%; align-items: center; gap: 7px; margin: 22px auto; border: 1px solid var(--border-subtle); border-radius: var(--control-radius); background: var(--card); padding: 7px 12px; color: var(--muted-foreground); font-size: 11px; text-align: center; }
 .conversation-event svg { width: 15px; height: 15px; color: var(--primary); }
 .conversation-event strong { color: var(--foreground); font-size: 12px; font-weight: 650; }
