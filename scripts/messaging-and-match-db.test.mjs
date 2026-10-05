@@ -7,6 +7,37 @@ const migration = name => readFile(new URL(`../supabase/migrations/${name}`, imp
 const owner = '10000000-0000-0000-0000-000000000001';
 const outsider = '10000000-0000-0000-0000-000000000002';
 
+test('session history RPC reads messages hidden by direct table RLS', async () => {
+  const db = new PGlite();
+  try {
+    await db.exec(`
+      create role anon; create role authenticated; create role service_role;
+      create schema auth; grant usage on schema auth to authenticated;
+      create function auth.uid() returns uuid language sql stable as
+        $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
+      create table sessions(id bigint primary key, mentor_id uuid, mentee_id uuid);
+      create table session_messages(id bigint primary key, session_id bigint, sender_id uuid,
+        kind text, body text, created_at timestamptz);
+      insert into sessions values (1, '${owner}', '${outsider}');
+      insert into session_messages values (1, 1, '${owner}', 'message', 'Stored reply', now());
+      alter table sessions enable row level security;
+      grant select on sessions to authenticated;
+    `);
+    const sql = await migration('20260909110000_0037_conversations_and_capacity.sql');
+    await db.exec(sql.slice(sql.indexOf('alter table public.session_messages enable row level security'),
+      sql.indexOf('insert into public.session_messages(session_id, sender_id, kind, body, created_at)')));
+    await db.exec(sql.slice(sql.indexOf('create or replace function public.my_session_messages'),
+      sql.indexOf('create or replace function public.send_session_message')));
+    await db.query("select set_config('request.jwt.claim.sub', $1, false)", [owner]);
+    await db.exec('set role authenticated');
+    assert.equal((await db.query('select count(*)::int value from session_messages')).rows[0].value, 0);
+    const history = (await db.query('select my_session_messages(1) value')).rows[0].value;
+    assert.equal(history[0].body, 'Stored reply');
+  } finally {
+    await db.close();
+  }
+});
+
 test('group history pages backwards and rejects non-members', async () => {
   const db = new PGlite();
   try {

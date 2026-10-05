@@ -86,7 +86,7 @@ export default function ProfileReflection({ history = false, draft, onDraftChang
   return (
     <div className="space-y-3">
       {!history && !controlled && <Button ref={triggerRef} type="button" aria-haspopup="dialog" onClick={() => setOpen(true)}>{t('components.reflection.startCheckIn')}</Button>}
-      {!history && (
+      {(!history || controlled) && (
         <Dialog open={open} onOpenChange={next => { if (!busy) { setOpen(next); setError(''); } }}>
           <DialogContent className="sm:max-w-lg" showCloseButton={!busy} finalFocus={returnFocus || triggerRef}>
             <DialogHeader>
