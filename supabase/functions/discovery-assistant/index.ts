@@ -5,7 +5,7 @@ import { enforceRateLimit } from '../_shared/rate-limit.ts';
 import { canHelpWithCareerGoal, hasGroundedExpertise } from '../_shared/discovery-guards.mjs';
 import { departmentChoices, frameChat, frameExhausted, frameNarrow, frameNoMatch, frameOpenAgain, frameRefineNone, frameSmallTalk, frameNudge, narrowChoices, ownWordsInvite, scopeChoices, type Choice, frameResults, namesARole, NO_GAP, type Gap } from './framing.ts';
 
-const PROMPT_VERSION = 'discovery-v19';
+const PROMPT_VERSION = 'discovery-v20';
 
 // Written here rather than by the model, so the gap names the place the user
 // actually typed instead of drifting to a vaguer sentence about seniority.
@@ -309,6 +309,7 @@ const INTENT_PATTERNS: Array<[string, RegExp[]]> = [
     // Questions about the people already on screen ("is there someone with
     // more than 5 years of experience?") narrow them; they are not new topics.
     /\b(is|are) there (any|anyone|someone|somebody|people)\b/, /\b(anyone|someone|somebody|people) (with|who|that)\b/,
+    /\bwhat about\b/, /\bhow about\b/, /\bche ne dici\b/, /\bet (si|pour)\b/,
     /\byears? of experience\b/, /\b(more|less|fewer) than \d+/, /\bat least \d+/, /\bany of (them|these)\b/,
     /\bc'[eè] qualcuno\b/, /\bqualcuno (con|che)\b/, /\banni di esperienza\b/, /\by a-t-il\b/, /\bquelqu'un (avec|qui)\b/, /\bans d'exp[eé]rience\b/]],
 ];
@@ -353,6 +354,53 @@ async function smallTalkReply(language: string, message: string) {
     // Fall through to the template: small talk must never fail the chat.
   }
   return frameSmallTalk(language);
+}
+
+// The network stores cities, so a region or country is translated into the
+// cities it covers. "IB in Europe" otherwise read Europe as a missing city
+// and threw away a search that had answers in London, Paris and Milan.
+const EUROPE = ['Amsterdam', 'Berlin', 'Brussels', 'Cergy', 'Dublin', 'Frankfurt', 'Geneva', 'Lisbon', 'London', 'Madrid', 'Milan', 'Munich', 'Paris', 'Zurich'];
+const REGION_CITIES: Record<string, string[]> = {
+  europe: EUROPE, europa: EUROPE, european: EUROPE, europeo: EUROPE, européen: EUROPE, 'eu': EUROPE,
+  uk: ['London'], 'united kingdom': ['London'], england: ['London'], britain: ['London'], 'regno unito': ['London'], 'royaume-uni': ['London'], 'royaume uni': ['London'],
+  france: ['Paris', 'Cergy'], francia: ['Paris', 'Cergy'],
+  italy: ['Milan'], italia: ['Milan'], italie: ['Milan'],
+  germany: ['Berlin', 'Frankfurt', 'Munich'], germania: ['Berlin', 'Frankfurt', 'Munich'], allemagne: ['Berlin', 'Frankfurt', 'Munich'],
+  switzerland: ['Geneva', 'Zurich'], svizzera: ['Geneva', 'Zurich'], suisse: ['Geneva', 'Zurich'],
+  spain: ['Madrid'], spagna: ['Madrid'], espagne: ['Madrid'],
+  netherlands: ['Amsterdam'], holland: ['Amsterdam'], 'paesi bassi': ['Amsterdam'], 'pays-bas': ['Amsterdam'],
+  belgium: ['Brussels'], belgio: ['Brussels'], belgique: ['Brussels'],
+  portugal: ['Lisbon'], portogallo: ['Lisbon'],
+  ireland: ['Dublin'], irlanda: ['Dublin'], irlande: ['Dublin'],
+  asia: ['Hong Kong', 'Seoul', 'Singapore'], asie: ['Hong Kong', 'Seoul', 'Singapore'],
+  korea: ['Seoul'], 'south korea': ['Seoul'], corea: ['Seoul'], corée: ['Seoul'],
+  'united states': ['New York', 'San Francisco'], usa: ['New York', 'San Francisco'], 'stati uniti': ['New York', 'San Francisco'], 'états-unis': ['New York', 'San Francisco'], 'etats-unis': ['New York', 'San Francisco'],
+  america: ['New York', 'San Francisco', 'Toronto', 'Mexico City', 'São Paulo'], americas: ['New York', 'San Francisco', 'Toronto', 'Mexico City', 'São Paulo'],
+  'north america': ['New York', 'San Francisco', 'Toronto', 'Mexico City'], canada: ['Toronto'],
+  'south america': ['São Paulo'], 'latin america': ['São Paulo', 'Mexico City'], 'america latina': ['São Paulo', 'Mexico City'], 'amérique latine': ['São Paulo', 'Mexico City'],
+  brazil: ['São Paulo'], brasile: ['São Paulo'], brésil: ['São Paulo'],
+  'middle east': ['Dubai'], 'medio oriente': ['Dubai'], 'moyen-orient': ['Dubai'], uae: ['Dubai'],
+  africa: ['Rabat'], afrique: ['Rabat'], morocco: ['Rabat'], marocco: ['Rabat'], maroc: ['Rabat'],
+  australia: ['Sydney'], australie: ['Sydney'], oceania: ['Sydney'],
+};
+const REGION_KEYS = Object.keys(REGION_CITIES).sort((a, b) => b.length - a.length);
+const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+function placeCities(name: string, known: string[]) {
+  return (REGION_CITIES[name.toLowerCase().trim()] || []).filter((city) => known.includes(city));
+}
+function regionIn(text: string) {
+  const lower = text.toLowerCase();
+  return REGION_KEYS.find((key) => key.length > 2 && new RegExp(`(^|[^\\p{L}])${escapeRegex(key)}([^\\p{L}]|$)`, 'u').test(lower)) || '';
+}
+
+// Common abbreviations, expanded for analysis only: the user's bubble still
+// shows what they typed. "IB" is not a word the network uses.
+const ABBREVIATIONS: Array<[RegExp, string]> = [
+  [/\bIB\b/gi, 'IB (investment banking)'], [/\bPE\b/g, 'PE (private equity)'], [/\bVC\b/g, 'VC (venture capital)'],
+  [/\bHR\b/g, 'HR (human resources)'], [/\bPM\b/g, 'PM (product management)'], [/\bM&A\b/g, 'M&A (mergers and acquisitions)'],
+];
+function expandAbbreviations(text: string) {
+  return ABBREVIATIONS.reduce((current, [pattern, expansion]) => current.replace(pattern, expansion), text);
 }
 
 function messageIntent(text: string, hasResults: boolean, namesSomething: boolean) {
@@ -509,6 +557,11 @@ Deno.serve(async (req) => {
   let excludeIds = new Set<string>();
   let followUp: '' | 'more' = '';
   let refineFallback: Array<Record<string, unknown>> = [];
+  // Cities a named region or country stands for; empty for a single city.
+  let locationCities: string[] = [];
+  // A named place the network does not cover: the request's constraints are
+  // then not met, whatever the department filter found.
+  let placeMissing = false;
   // Set when this message is the user's answer to a question we asked. Having
   // spent their one question, returning nothing is the worst possible outcome:
   // we made them work and gave back less than if we had never asked.
@@ -536,7 +589,8 @@ Deno.serve(async (req) => {
         .eq('id', body.thread_id).eq('user_id', ctx.user.id).maybeSingle();
       if (Array.isArray(data?.turns)) priorTurns = data.turns as Array<Record<string, unknown>>;
     }
-    const conversation = conversationFromTurns(priorTurns, query);
+    const conversation = conversationFromTurns(priorTurns, query)
+      .map((turn) => (turn.role === 'user' ? { ...turn, content: expandAbbreviations(turn.content) } : turn));
     const hasClarified = priorTurns.some((turn) => turn.role === 'assistant' && turn.kind === 'clarification');
     answeredClarification = hasClarified;
     const startedAt = Date.now();
@@ -618,20 +672,23 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
       // model once returned "finance" as the location, which skipped the funnel.
       const vocabularyWords = new Set(vocabulary.flatMap((term) => wordsOf(term)).filter((word) => word.length >= 3));
       const isVocabulary = wordsOf(extractedLocation).filter((word) => word.length >= 3).some((word) => vocabularyWords.has(word));
-      const namedLocation = grounded(extractedLocation) && !isVocabulary ? extractedLocation : '';
       const knownLocations: string[] = Array.isArray((coverage as { locations?: string[] })?.locations)
         ? (coverage as { locations: string[] }).locations : [];
-      const locationMissing = Boolean(namedLocation) && !knownLocations.some((known) => {
+      const namedLocation = (grounded(extractedLocation) && !isVocabulary ? extractedLocation : '') || regionIn(userTurns.at(-1) || '');
+      const regionCities = placeCities(namedLocation, knownLocations);
+      const locationMissing = Boolean(namedLocation) && !regionCities.length && !knownLocations.some((known) => {
         const a = known.toLowerCase();
         const b = namedLocation.toLowerCase();
         return a.includes(b) || b.includes(a);
       });
       if (locationMissing) {
+        placeMissing = true;
         nearestOnly = true;
         exactGapReason = (LOCATION_GAP[language] || LOCATION_GAP.English)(namedLocation);
         gapState = { kind: 'place', value: namedLocation, role: false };
       } else if (namedLocation) {
         namedLocationFilter = namedLocation;
+        locationCities = regionCities;
       }
       // Lookup and model check each other. Code finds the coverage terms that
       // share a word with the request; the model confirms or drops those, adds
@@ -751,7 +808,10 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
           excludeIds = new Set(shownBefore.filter(Boolean));
           followUp = 'more';
           requiredDepartment = previousDepartment;
-          if (!namedLocationFilter) namedLocationFilter = cleanText(lastShown.location, 80);
+          if (!namedLocationFilter) {
+            namedLocationFilter = cleanText(lastShown.location, 80);
+            locationCities = placeCities(namedLocationFilter, knownLocations);
+          }
           requestForMatch = previousRequest;
         } else {
           // If the refinement fits nobody, the people already shown stay the
@@ -760,7 +820,10 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
           requiredDepartment = mentionedDepartment(meaningfulLatest) || previousDepartment;
           const textPlace = knownLocations.find((place) => wordsOf(place).every((word) => latestContent.includes(word)));
           if (!namedLocationFilter && textPlace) namedLocationFilter = textPlace;
-          if (!namedLocationFilter && !locationMissing) namedLocationFilter = cleanText(lastShown.location, 80);
+          if (!namedLocationFilter && !locationMissing) {
+            namedLocationFilter = cleanText(lastShown.location, 80);
+            locationCities = placeCities(namedLocationFilter, knownLocations);
+          }
           requestForMatch = `${previousRequest}; ${latestRaw}`;
         }
         anchorTerms = requiredDepartment ? [requiredDepartment] : [];
@@ -888,9 +951,11 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
   const networkCandidates = candidates;
   if (namedLocationFilter) {
     const wanted = namedLocationFilter.toLowerCase();
+    const cities = new Set(locationCities.map((city) => city.toLowerCase()));
     const inPlace = candidates.filter((candidate) => {
       const where = cleanText(candidate.location, 80).toLowerCase();
-      return Boolean(where) && (where.includes(wanted) || wanted.includes(where));
+      if (!where) return false;
+      return cities.size ? cities.has(where) : (where.includes(wanted) || wanted.includes(where));
     });
     if (inPlace.length) {
       candidates = inPlace;
@@ -1026,7 +1091,7 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
     // sentence that says plainly this is not what was asked for.
     // Every remaining candidate already satisfies a constraint-only request, so
     // if the matcher declines, the first of them are the answer.
-    const constraintsMet = constraintsOnly
+    const constraintsMet = constraintsOnly && !placeMissing
       && (!namedLocationFilter || locationFilterApplied)
       && (!requiredDepartment || departmentFilterApplied);
     const fallback = (answeredClarification || nearestTerms.length > 0 || constraintsMet) && !matches.length

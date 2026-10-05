@@ -222,9 +222,18 @@ export function frameExhausted(language: string, random: () => number = Math.ran
   return pick(copyFor(language).exhausted, random);
 }
 
+const PLACE_RETRY: Record<string, string> = {
+  English: '. Want me to look in another city, or anywhere in the network?',
+  Italian: '. Vuoi che cerchi in un’altra città, o ovunque nella rete?',
+  French: '. Voulez-vous que je cherche dans une autre ville, ou n’importe où dans le réseau ?',
+};
+
 export function frameNoMatch(language: string, gap: Gap, strengths: string[], random: () => number = Math.random) {
   const copy = copyFor(language);
   const shown = asWritten(gap);
+  // A missing place is about the place: asking for an industry the user has
+  // already given made the reply read like it had not been listening.
+  if (gap.kind === 'place' || gap.kind === 'busy') return `${copy.missing(shown)}${PLACE_RETRY[language] || PLACE_RETRY.English}`;
   return `${copy.missing(shown)}${pick(copy.retry(listOf(strengths, copy.join)), random)}`;
 }
 

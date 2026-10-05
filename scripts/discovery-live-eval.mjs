@@ -46,6 +46,13 @@ const SCENARIOS = [
   { name: 'small talk', turns: ['how are you doing?'],
     check: (t) => [Boolean(t[0].ask) && !/What would you like help with/.test(t[0].ask), t[0].choices.length > 0, t[0].people.length === 0,
       /someone new|new skill/.test(t[0].ask), !/coffee|weather|sunny/i.test(t[0].ask)] },
+  { name: 'IB, then experience, then Europe', turns: ['looking for something in investment banking', 'I would like someone with 3+ years of experience', 'what about someone working in IB in Europe?'],
+    check: (t) => {
+      const europe = ['Amsterdam', 'Berlin', 'Brussels', 'Cergy', 'Dublin', 'Frankfurt', 'Geneva', 'Lisbon', 'London', 'Madrid', 'Milan', 'Munich', 'Paris', 'Zurich'];
+      return [t[0].people.length > 0, t[2].people.length > 0,
+        t[2].people.every((p) => europe.includes(p.location)) || /^Nobody here matches that extra requirement/.test(t[2].said),
+        !/industry, a job title/.test(t[2].said)];
+    } },
   { name: 'thanks', turns: ['thanks!'], check: (t) => [/welcome|happy to help/i.test(t[0].ask), t[0].people.length === 0] },
   { name: 'department alone: marketing', turns: ['someone in marketing'], check: (t) => [/What in marketing/.test(t[0].ask)] },
   { name: 'vague: I need help', turns: ['I need help'], check: (t) => [/What would you like help with/.test(t[0].ask)] },

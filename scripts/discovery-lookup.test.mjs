@@ -357,3 +357,51 @@ test('a small-talk reply that invents a life is replaced by the template', async
   assert.doesNotMatch(result.clarification, /coffee|sunny/);
   assert.match(result.clarification, /new skill/);
 });
+
+// Regions: the network stores cities, so "Europe" means the European ones.
+const withLocations = (fixture, locations) => {
+  const rpc = fixture.sb.rpc;
+  fixture.sb.rpc = async (name, args) => {
+    const result = await rpc(name, args);
+    if (name === 'discovery_network_coverage') result.data.locations = locations;
+    return result;
+  };
+  return fixture;
+};
+const banker = (id, location) => ({ ...finance, id, name: `Banker ${id}`, job_title: 'Investment Banking Associate', skills: ['investment banking'], location });
+
+test('"what about IB in Europe" after results narrows them to European cities', async () => {
+  const london = banker('london', 'London'); const rabat = banker('rabat', 'Rabat');
+  const turns = [
+    { role: 'user', content: 'looking for something in investment banking' },
+    { role: 'assistant', kind: 'matches', framed: true, content: 'Good news.', search_request: 'investment banking', department: '', location: '',
+      matches: [{ id: rabat.id, name: rabat.name }] },
+  ];
+  const fixture = withLocations(discoveryFixture({ candidates: [london, rabat], turns, responses: [
+    clarify({ named_subject: 'investment banking', named_location: 'Europe' }),
+    { outcome: 'matches', matches: [{ profile_id: london.id, confidence: 0.9, reasons: ['IB in London.'], matched_expertise: ['investment banking'] }] },
+  ] }), ['London', 'Rabat']);
+  const result = await say(fixture, 'what about someone working in IB in Europe?', 'thread');
+  assert.deepEqual(payload(fixture, 1).candidates.map((c) => c.id), [london.id], 'only European cities reach the matcher');
+  assert.match(payload(fixture, 1).request, /^investment banking; /, 'it builds on the earlier search');
+  assert.deepEqual(result.matches.map((m) => m.id), [london.id]);
+});
+
+test('a region named without the model extracting it still filters', async () => {
+  const london = banker('london', 'London'); const dubai = banker('dubai', 'Dubai');
+  const fixture = withLocations(discoveryFixture({ candidates: [london, dubai], responses: [
+    clarify({ named_subject: 'investment banking' }),
+    { outcome: 'matches', matches: [{ profile_id: london.id, confidence: 0.9, reasons: ['IB.'], matched_expertise: ['investment banking'] }] },
+  ] }), ['London', 'Dubai']);
+  await chat(fixture, 'investment banking in Europe');
+  assert.deepEqual(payload(fixture, 1).candidates.map((c) => c.id), [london.id]);
+});
+
+test('a place the network does not cover is answered about the place', async () => {
+  const fixture = withLocations(discoveryFixture({ candidates: [finance], responses: [
+    clarify({ named_subject: 'finance', named_location: 'Tokyo' }),
+    { outcome: 'no_match', matches: [] },
+  ] }), ['Paris']);
+  const result = await chat(fixture, 'someone in finance in Tokyo');
+  assert.match(result.no_match_reason, /^I couldn't find anyone based in Tokyo\. Want me to look in another city/);
+});
