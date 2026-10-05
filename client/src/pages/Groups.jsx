@@ -76,6 +76,7 @@ export default function Groups() {
 
   async function toggleMembership(group) {
     if (saving) return;
+    if (group.is_owner) return;
     if (!group.joined && group.join_status !== 'pending') {
       setError(''); setReason(''); setJoinTarget(group);
       return;
@@ -172,13 +173,13 @@ export default function Groups() {
                         {t('groups.chat')}
                       </Button>
                     )}
-                    <Button variant={group.joined ? 'link' : 'ghost'} size="sm"
+                    {!group.is_owner && <Button variant={group.joined ? 'link' : 'ghost'} size="sm"
                       type="button"
                       disabled={saving}
                       onClick={() => toggleMembership(group)}
                     >
                       {group.joined ? t('groups.leave') : group.join_status === 'pending' ? t('groups.withdraw') : t('groups.requestJoin')}
-                    </Button>
+                    </Button>}
                   </span>
                   {!group.joined && group.join_status && <span className="person-row-detail text-sm text-muted-foreground">{t(`groups.joinStatus.${group.join_status}`)}</span>}
                 </article>

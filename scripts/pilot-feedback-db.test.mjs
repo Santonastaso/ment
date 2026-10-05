@@ -114,11 +114,22 @@ test('pilot feedback migrations: group lifecycle, tenant boundaries, capacity an
     await db.exec(hardened.slice(hardened.indexOf('create function public.request_session('), hardened.indexOf('drop function if exists public.accept_session')));
     const conversations = await migration('20260909110000_0037_conversations_and_capacity.sql');
     await db.exec(conversations.slice(conversations.indexOf('create table if not exists public.session_messages'), conversations.indexOf('alter table public.session_messages enable row level security')));
+    await db.exec(conversations.slice(conversations.indexOf('create or replace function public.my_session_relationships'), conversations.indexOf('create or replace function public.my_session_messages')));
     await db.exec(conversations.slice(conversations.indexOf('create or replace function public.pm_set_outbound_message'), conversations.indexOf('create or replace function public.accept_session')));
     await db.exec(await migration('20261001103000_0059_atomic_conversation_request.sql'));
     await db.exec(await migration('20261001104000_0060_request_expiry_guard.sql'));
     await db.exec(await migration('20261004100000_0066_request_retry_integrity.sql'));
     await db.exec('create trigger pm_session_guard before insert or update on sessions for each row execute function pm_session_guard()');
+    await db.exec(`delete from group_members where group_id = ${created.id} and user_id = '${owner}';
+      insert into group_join_requests(group_id, user_id, reason) values (${created.id}, '${owner}', 'Self request');`);
+    await db.exec(await migration('20261005102000_0073_group_owner_and_request_restart.sql'));
+    await as(owner);
+    assert.equal((await one('select count(*)::int value from group_members where group_id = $1 and user_id = $2', [created.id, owner])).value, 1);
+    assert.equal((await one('select status from group_join_requests where group_id = $1 and user_id = $2', [created.id, owner])).status, 'withdrawn');
+    await assert.rejects(db.query('select leave_group($1)', [created.id]), /group_owner_cannot_leave/);
+    await assert.rejects(db.query('select request_group_join($1, $2)', [created.id, 'Again']), /group_owner_cannot_join/);
+    await assert.rejects(db.query('select review_group_join($1, $2, true)', [created.id, owner]), /cannot_review_self/);
+    await db.query("update profiles set role = 'alumnus' where id = $1", [owner]);
     await as(applicant);
     const key = '40000000-0000-0000-0000-000000000001';
     const request = () => db.query(`select request_conversation($1, 'Finance help', 'Please help',
@@ -133,7 +144,14 @@ test('pilot feedback migrations: group lifecycle, tenant boundaries, capacity an
     assert.equal((await one('select body from session_messages where session_id = $1', [sent.id])).body, 'Please help');
     await assert.rejects(db.query(`select request_conversation($1, 'Again', 'Please help',
       p_pre_session_question => 'Finance help', p_idempotency_key => gen_random_uuid())`, [owner]), /active_session_exists/);
-    await db.query("update sessions set created_at = now() - interval '8 days', request_expires_at = now() - interval '1 second' where id = $1", [sent.id]);
+    await db.query("update sessions set status = 'cancelled' where id = $1", [sent.id]);
+    assert.deepEqual((await one('select my_session_relationships() value')).value, []);
+    const restarted = (await db.query(`select request_conversation($1, 'Fresh request', 'New message',
+      p_pre_session_question => 'Finance help', p_idempotency_key => gen_random_uuid()) value`, [owner])).rows[0].value;
+    assert.notEqual(restarted.id, sent.id);
+    assert.equal((await one('select my_session_relationships() value')).value[0].session_id, restarted.id);
+    assert.equal((await one('select count(*)::int value from session_messages where session_id = $1', [sent.id])).value, 1);
+    await db.query("update sessions set created_at = now() - interval '8 days', request_expires_at = now() - interval '1 second' where id = $1", [restarted.id]);
     // Deliberately fail message storage to verify the real request RPC rolls back too.
     await db.exec("alter table session_messages add constraint simulated_failure check (body <> 'Simulate failure')");
     const before = (await one('select count(*)::int value from sessions')).value;

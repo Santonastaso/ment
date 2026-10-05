@@ -68,6 +68,13 @@
   "components.sessionRequest.step2TopicsPicked": "Topics you picked",
   "components.sessionRequest.step3Label": "Proposed date and time",
   "components.sessionRequest.step3Optional": "(optional — you can set this later)",
+  "components.sessionRequest.pickTime": "Suggest a time",
+  "components.sessionRequest.date": "Date",
+  "components.sessionRequest.time": "Time",
+  "components.sessionRequest.day1": "Tomorrow",
+  "components.sessionRequest.day3": "In 3 days",
+  "components.sessionRequest.day7": "Next week",
+  "components.sessionRequest.step3Invalid": "Choose a date and time at least one hour from now.",
   "components.sessionRequest.step3YourQuestion": "Your focus question:",
   "components.sessionRequest.step3Topics": "Topics:",
   "components.sessionRequest.cancel": "Cancel",
@@ -313,6 +320,7 @@
 
   "components.ics.downloading": "Downloading…",
   "components.ics.addToCalendar": "Add to calendar",
+  "components.ics.chooseMethod": "Choose a calendar to send the invite, or download a calendar file.",
 
   "components.suggested.heuristic": "Heuristic",
 

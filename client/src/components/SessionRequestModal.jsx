@@ -21,7 +21,7 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
   const [draft, setDraft] = useState('');
   const [draftEdited, setDraftEdited] = useState(false);
   const [requestTitle, setRequestTitle] = useState(initialQuestion.slice(0, 80));
-  const [reviewDetailsOpen, setReviewDetailsOpen] = useState(false);
+  const [topicsOpen, setTopicsOpen] = useState(false);
   const idempotencyKey = useRef(crypto.randomUUID());
   const submitLock = useRef(false);
   const submittedPayload = useRef(null);
@@ -43,12 +43,20 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
     bodyRef.current?.scrollTo({ top: 0 });
   }, [step]);
 
-  // Min datetime: 1 hour from now
+  // Keep the default comfortably beyond the one-hour minimum.
   const minDate = new Date(Date.now() + 60 * 60 * 1000);
   const minDateTime = new Date(minDate.getTime() - minDate.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  const suggestedDate = new Date(Date.now() + 90 * 60 * 1000);
+  const suggestedDateTime = new Date(suggestedDate.getTime() - suggestedDate.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  function pickDay(days) {
+    const date = new Date();
+    date.setDate(date.getDate() + days);
+    date.setHours(14, 0, 0, 0);
+    setScheduledAt(new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16));
+  }
 
   async function reviewDraft() {
-    if (scheduledAt && new Date(scheduledAt).getTime() < Date.now() + 60 * 60 * 1000) { setError(t('components.sessionRequest.step3Label')); return; }
+    if (scheduledAt && (!Number.isFinite(new Date(scheduledAt).getTime()) || new Date(scheduledAt).getTime() < Date.now() + 60 * 60 * 1000)) { setError(t('components.sessionRequest.step3Invalid')); return; }
     setError('');
     if (!draftEdited) {
       setGeneratingDraft(true);
@@ -225,33 +233,29 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
                   })}
                 </div>
               </div>
-              {selectedTopics.length > 0 && (
-                <div className="mt-3 rounded-lg border border-[var(--border)] bg-muted/40 p-3">
-                  <p className="text-[11px] uppercase tracking-wide text-foreground font-medium mb-1">{t('components.sessionRequest.step2TopicsPicked')}</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {selectedTopics.map(t => (
-                      <span key={t} className="rounded-md border border-[var(--border)] bg-card px-2.5 py-0.5 text-xs text-foreground">
-                        {t}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
           {/* STEP 3 — Date/time */}
           {step === 3 && (
-            <div>
-              <label className="label">{t('components.sessionRequest.step3Label')} <span className="text-muted-foreground font-normal">{t('components.sessionRequest.step3Optional')}</span></label>
-              <input
-                type="datetime-local"
-                aria-label={t('components.sessionRequest.step3Label')}
-                className="input"
-                value={scheduledAt}
-                min={minDateTime}
-                onChange={e => setScheduledAt(e.target.value)}
-              />
+            <div className="space-y-4">
+              <p className="label">{t('components.sessionRequest.step3Label')}</p>
+              <div className="grid grid-cols-2 gap-2" role="group" aria-label={t('components.sessionRequest.step3Label')}>
+                <Button type="button" variant={!scheduledAt ? 'default' : 'outline'} className="h-auto min-h-11 whitespace-normal px-3" aria-pressed={!scheduledAt} onClick={() => setScheduledAt('')}>{t('components.sessionRequest.reviewNoTime')}</Button>
+                <Button type="button" variant={scheduledAt ? 'default' : 'outline'} className="h-auto min-h-11 whitespace-normal px-3" aria-pressed={!!scheduledAt} onClick={() => setScheduledAt(suggestedDateTime)}>{t('components.sessionRequest.pickTime')}</Button>
+              </div>
+              {scheduledAt && <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2 flex flex-wrap gap-2">
+                  {[1, 3, 7].map(days => <Button key={days} type="button" size="sm" variant="outline" onClick={() => pickDay(days)}>{t(`components.sessionRequest.day${days}`)}</Button>)}
+                </div>
+                <label className="label">{t('components.sessionRequest.date')}
+                  <input type="date" className="input mt-1" min={minDateTime.slice(0, 10)} value={scheduledAt.slice(0, 10)} onChange={e => setScheduledAt(`${e.target.value}T${scheduledAt.slice(11, 16)}`)} />
+                </label>
+                <label className="label">{t('components.sessionRequest.time')}
+                  <input type="time" className="input mt-1" value={scheduledAt.slice(11, 16)} onChange={e => setScheduledAt(`${scheduledAt.slice(0, 10)}T${e.target.value}`)} />
+                </label>
+              </div>}
+              <p className="text-xs text-muted-foreground">{t('components.sessionRequest.step3Optional')}</p>
             </div>
           )}
 
@@ -260,24 +264,28 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
               <p className="font-semibold text-foreground">{t('components.sessionRequest.reviewTitle')}</p>
               <label className="block">{t('components.sessionRequest.requestTitle')}<input className="input mt-1" value={requestTitle} maxLength={120} disabled={submitting || !!submittedPayload.current} onChange={e => setRequestTitle(e.target.value)} /></label>
               <label className="block">{copy.message}<textarea className="input mt-1 min-h-40 resize-none" value={draft} maxLength={6000} disabled={submitting || !!submittedPayload.current} onChange={e => { setDraft(e.target.value); setDraftEdited(true); }} /></label>
-              <div className="rounded-2xl border border-border p-3">
+              <section className="space-y-2" aria-label={t('components.sessionRequest.reviewTopics')}>
                 <Button
                   type="button"
                   variant="outline"
-                  aria-expanded={reviewDetailsOpen}
-                  aria-controls="session-request-review-details"
+                  aria-expanded={topicsOpen}
+                  aria-controls="session-request-review-topics"
                   className="w-full justify-between whitespace-normal text-left"
-                  onClick={() => setReviewDetailsOpen(open => !open)}
+                  onClick={() => setTopicsOpen(open => !open)}
                 >
-                  <span>{t('components.sessionRequest.reviewDetails')}</span>
-                  <ChevronDown aria-hidden="true" className={`transition-transform duration-200 ${reviewDetailsOpen ? 'rotate-180' : ''}`} />
+                  <span>{t('components.sessionRequest.reviewTopics')} · {selectedTopics.length}</span>
+                  <ChevronDown aria-hidden="true" className={`transition-transform duration-200 ${topicsOpen ? 'rotate-180' : ''}`} />
                 </Button>
-                {reviewDetailsOpen && <div id="session-request-review-details" className="mt-3 space-y-3 border-t border-border pt-3">
-                  {selectedTopics.length > 0 && <div><span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('components.sessionRequest.reviewTopics')}</span><p className="mt-1 text-foreground">{selectedTopics.join(', ')}</p></div>}
-                  <div><span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('components.sessionRequest.reviewWhen')}</span><p className="mt-1 text-foreground">{scheduledAt ? new Date(scheduledAt).toLocaleString(lang) : t('components.sessionRequest.reviewNoTime')}</p></div>
-                  <p className="text-foreground">{intent === 'ongoing' ? copy.ongoing : copy.oneOff}</p>
+                {topicsOpen && <div id="session-request-review-topics" className="flex flex-wrap gap-2 pt-1">
+                  {teachSkills.map(skill => <Button key={skill} type="button" size="sm" variant={selectedTopics.includes(skill) ? 'default' : 'outline'} aria-pressed={selectedTopics.includes(skill)} onClick={() => toggleTopic(skill)}>{skill}</Button>)}
+                  {teachSkills.length === 0 && <p className="text-muted-foreground">{t('components.sessionRequest.step1NoSkills', { name: mentor.name.split(' ')[0] })}</p>}
                 </div>}
-              </div>
+              </section>
+              <section className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3" aria-label={t('components.sessionRequest.reviewWhen')}>
+                <div><p className="text-xs font-medium text-muted-foreground">{t('components.sessionRequest.reviewWhen')}</p><p>{scheduledAt ? new Date(scheduledAt).toLocaleString(lang) : t('components.sessionRequest.reviewNoTime')}</p></div>
+                <Button type="button" variant="outline" size="sm" onClick={() => setStep(3)}>{t(scheduledAt ? 'conversations.reschedule' : 'components.sessionRequest.pickTime')}</Button>
+              </section>
+              <p className="text-muted-foreground">{intent === 'ongoing' ? copy.ongoing : copy.oneOff}</p>
               <p className="text-xs text-muted-foreground">{t('components.sessionRequest.reviewNotice')}</p>
             </div>
           )}

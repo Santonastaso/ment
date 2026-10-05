@@ -579,7 +579,7 @@ export default function Conversations() {
                     <Button type="button" size="sm" onClick={() => mutateSession({ status: 'scheduled' }).catch(() => setError(t('conversations.error')))}><Check aria-hidden="true" />{t('conversations.accept')}</Button>
                   </>}
                   {selected.status === 'scheduled' && <>
-                    {selected.scheduled_at && <IcsDownloadButton className="conversation-request-calendar" sessionId={selected.id} session={selected} meetingUrl={selected.meeting_url} onReschedule={() => { setOverviewOpen(true); setScheduleOpen(true); }} label={t('conversations.sendInvite')} />}
+                    {selected.scheduled_at && <IcsDownloadButton sessionId={selected.id} session={selected} meetingUrl={selected.meeting_url} label={t('conversations.sendInvite')} />}
                     <Button type="button" variant="ghost" size="sm" onClick={() => { setOverviewOpen(true); setScheduleOpen(true); }}>{t(selected.scheduled_at ? 'conversations.reschedule' : 'conversations.schedule')}</Button>
                   </>}
                 </div>}

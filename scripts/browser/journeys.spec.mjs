@@ -209,7 +209,8 @@ test('onboarding to discovery, request, acceptance, chat and meeting', async ({ 
   await page.getByRole('button', { name: 'Request overview' }).click();
   await expect(page.getByRole('dialog')).toContainText('Financial modelling');
   await page.screenshot({ path: test.info().outputPath('request-overview.png'), animations: 'disabled' });
-  await page.getByRole('button', { name: 'Withdraw request' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
+  await page.locator('.conversation-request-card').getByRole('button', { name: 'Withdraw request' }).click();
   const withdrawDialog = page.getByRole('dialog');
   await expect(withdrawDialog.getByText('This will cancel the pending session request. You can start a new request later.')).toBeVisible();
   await expect.poll(() => page.evaluate(() => window.fixture.calls.some(call => call.method === 'put' && call.path === '/sessions/3' && call.body.status === 'cancelled'))).toBe(false);
