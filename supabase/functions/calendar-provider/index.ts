@@ -132,7 +132,7 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return jsonError('method_not_allowed', 405);
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   const serviceRequest = Boolean(serviceKey && req.headers.get('Authorization') === `Bearer ${serviceKey}`);
-  let ctx;
+  let ctx!: Awaited<ReturnType<typeof requireUser>>;
   if (!serviceRequest) {
     try { ctx = await requireUser(req); } catch (response) { return response as Response; }
   }
