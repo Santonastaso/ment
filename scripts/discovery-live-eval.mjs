@@ -61,6 +61,7 @@ const out = [];
 const log = (line = '') => { out.push(line); console.log(line); };
 const password = randomBytes(18).toString('base64url');
 let passed = 0; let total = 0;
+let sent = [];
 let failed = false;
 try {
   // Test the code in this commit, not whatever was deployed before it: wait
@@ -93,6 +94,11 @@ try {
         body: JSON.stringify({ action: 'chat', query, lang: scenario.lang || 'en', ...(threadId ? { thread_id: threadId } : {}) }) });
       // Supabase's edge runtime occasionally answers 503 "service degraded";
       // that is the platform, not this code, so try once more before judging.
+      // The function allows 30 chat messages per user per five minutes; the
+      // suite is longer than that, so pace it to stay inside the limit.
+      sent = sent.filter((at) => Date.now() - at < 300_000);
+      if (sent.length >= 26) await new Promise((resolve) => setTimeout(resolve, 300_000 - (Date.now() - sent[0]) + 1000));
+      sent.push(Date.now());
       let response = await call();
       if (response.status === 503) { await new Promise((resolve) => setTimeout(resolve, 3000)); response = await call(); }
       const d = await response.json().catch(() => ({}));
