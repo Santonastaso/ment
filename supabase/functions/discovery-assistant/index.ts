@@ -1001,7 +1001,10 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
     const shownIds = new Set(shown.map((person) => person.id));
     const shownPeople = candidates.filter((candidate) => shownIds.has(candidate.id));
     const closeTerms = nearestTerms.filter((term) => shownPeople.some((person) => carries(person, [term])));
-    const message = frameResults(language, { near: isNear, count: shown.length, gap: isNear ? gapInOwnWords(gapState, query, language) : gapState, closeTerms, more: followUp === 'more' });
+    // Inside a chosen department the user's follow-up words ("career advice")
+    // are not a field of their own, so they are never named as missing.
+    const resultGap = isNear && !requiredDepartment ? gapInOwnWords(gapState, query, language) : gapState;
+    const message = frameResults(language, { near: isNear, count: shown.length, gap: resultGap, closeTerms, more: followUp === 'more' });
     const threadId = await persistTurns(ctx, body.thread_id, query, {
       kind: 'matches',
       content: message,

@@ -24,7 +24,7 @@ const isFinance = (p) => p.department === 'Finance' || /financ/i.test(p.job_titl
 const SCENARIOS = [
   { name: 'funnel: support -> industry -> finance -> career advice', turns: ['I am looking for support', 'industry', 'finance', 'career advice'],
     check: (t) => [/What would you like help with/.test(t[0].ask), /Which field/.test(t[1].ask), /What in finance/.test(t[2].ask),
-      t[3].people.length > 0 && t[3].people.every(isFinance)] },
+      t[3].people.length > 0 && t[3].people.every(isFinance), !/working in career/i.test(t[3].said)] },
   { name: 'CTO 1: who are you', turns: ['Hi who are you?'], check: (t) => [/Ment/.test(t[0].ask), t[0].people.length === 0] },
   { name: 'CTO 2: slang around a department', turns: ['nevermind, im looking for someone in finance bro'], check: (t) => [/What in finance/.test(t[0].ask)] },
   { name: 'CTO 3: react to results', turns: ['I need help with LBO modelling', 'no but i want more options not just 1 shot recommendation ask me clarifying questions come on'],
