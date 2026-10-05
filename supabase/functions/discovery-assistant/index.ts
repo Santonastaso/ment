@@ -309,6 +309,14 @@ function shownLocations(turn: Record<string, unknown> | undefined) {
   return [...new Set(matches.map((match) => cleanText(match?.location, 80)).filter(Boolean))].slice(0, 2);
 }
 
+// Wording only: when nothing was extracted, name the user's own unfamiliar
+// words rather than a generic "no exact match".
+function gapInOwnWords(gap: Gap, text: string, language: string): Gap {
+  if (gap.kind !== 'none') return gap;
+  const own = contentWords(text).slice(0, 2).join(' ');
+  return own ? { kind: 'subject', value: own, role: namesARole(language, text, own) } : gap;
+}
+
 function messageIntent(text: string, hasResults: boolean, namesSomething: boolean) {
   const lower = text.toLowerCase();
   for (const [intent, patterns] of INTENT_PATTERNS) {
@@ -737,7 +745,7 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
         } else if (!latestContent.length && !earlierDepartment) {
           step = meta === 'field'
             ? { stage: 'field', question: (FIELD_SENTENCE[language] || FIELD_SENTENCE.English)(departmentExamples(language, coverage)) }
-            : { stage: 'open', question: askTemplate(language, coverage) };
+            : { stage: 'open', question: questionsAsked > 0 ? frameOpenAgain(language) : askTemplate(language, coverage) };
         }
       }
       // Nothing to search yet: keep guiding instead of running an empty search.
@@ -981,9 +989,7 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
       // Even with nothing to offer, say what the network does have.
       // Wording only: when the model extracted no subject, name the user's own
       // unfamiliar words rather than a generic "no exact match".
-      const ownWords = contentWords(query).slice(0, 2).join(' ');
-      const shownGap: Gap = gapState.kind === 'none' && ownWords
-        ? { kind: 'subject', value: ownWords, role: namesARole(language, query, ownWords) } : gapState;
+      const shownGap = gapInOwnWords(gapState, query, language);
       const reason = followUp === 'more' ? frameExhausted(language) : frameNoMatch(language, shownGap, topDepartments(networkCandidates));
       const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'no_match', content: reason, search_request: requestForMatch });
       return jsonOk({ matches: [], clarification: '', no_match: true, no_match_reason: reason, resolved_request: requestForMatch, thread_id: threadId, model: result.model });
@@ -995,7 +1001,7 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
     const shownIds = new Set(shown.map((person) => person.id));
     const shownPeople = candidates.filter((candidate) => shownIds.has(candidate.id));
     const closeTerms = nearestTerms.filter((term) => shownPeople.some((person) => carries(person, [term])));
-    const message = frameResults(language, { near: isNear, count: shown.length, gap: gapState, closeTerms, more: followUp === 'more' });
+    const message = frameResults(language, { near: isNear, count: shown.length, gap: isNear ? gapInOwnWords(gapState, query, language) : gapState, closeTerms, more: followUp === 'more' });
     const threadId = await persistTurns(ctx, body.thread_id, query, {
       kind: 'matches',
       content: message,

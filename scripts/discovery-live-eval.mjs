@@ -33,7 +33,7 @@ const SCENARIOS = [
     check: (t) => [t[1].people.length > 0, t[2].people.length > 0 || /everyone who fits/.test(t[2].said),
       t[2].people.every((p) => !t[1].people.some((q) => q.id === p.id)), t[2].people.every(isFinance)] },
   { name: 'proposals, asked twice', turns: ['hi how are you?', 'can you propose some people to me?', 'I would like you to propose some people to me'],
-    check: (t) => [/Ment/.test(t[0].ask), /in your own words/.test(t[1].ask) && t[1].choices.length > 0, Boolean(t[2].ask) && t[2].choices.length > 0,
+    check: (t) => [/Ment/.test(t[0].ask), /in your own words/.test(t[1].ask) && t[1].choices.length > 0, /places people often start/.test(t[2].ask) && t[2].choices.length > 0,
       t.every((x) => x.people.length === 0)] },
   { name: 'choice path: interested in finance -> a specific skill', turns: ["I'm interested in finance", 'a specific skill'],
     check: (t) => [/What in finance/.test(t[0].ask) && t[0].choices.includes('Career advice'), /Which finance skill/.test(t[1].ask)] },
@@ -84,9 +84,13 @@ try {
     log(`## ${scenario.name}`);
     let threadId; const turns = [];
     for (const query of scenario.turns) {
-      const response = await fetch(`${base}/functions/v1/${fnName}`, { method: 'POST',
+      const call = () => fetch(`${base}/functions/v1/${fnName}`, { method: 'POST',
         headers: { apikey: anon, Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'chat', query, lang: 'en', ...(threadId ? { thread_id: threadId } : {}) }) });
+      // Supabase's edge runtime occasionally answers 503 "service degraded";
+      // that is the platform, not this code, so try once more before judging.
+      let response = await call();
+      if (response.status === 503) { await new Promise((resolve) => setTimeout(resolve, 3000)); response = await call(); }
       const d = await response.json().catch(() => ({}));
       threadId = d.thread_id || threadId;
       const turn = { ask: d.clarification || '', said: d.no_match_reason || '', near: Boolean(d.nearest), people: d.matches || [], choices: (d.suggestions || []).map((c) => c.label) };
