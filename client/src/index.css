@@ -376,6 +376,10 @@ button:not(:disabled):active, [data-slot="button"]:not([aria-disabled="true"]):a
 .discovery-chat-turn.is-assistant + .discovery-chat-turn.is-assistant { margin-top: -.55rem; }
 .discovery-assistant-bubble strong { font-weight: 600; color: var(--foreground); }
 .discovery-assistant-bubble em { font-style: italic; }
+/* Earlier result sets in the conversation, reopened in place. */
+.discovery-earlier { display: flex; min-width: 0; flex-direction: column; gap: .6rem; }
+.discovery-earlier-toggle { align-self: flex-start; border: 0; background: transparent; padding: .1rem 0; font-size: 14px; font-weight: 500; color: var(--primary); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.discovery-earlier-toggle:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 /* Tappable choices under a question, with the composer still open for free text. */
 .discovery-assistant-stack { display: flex; min-width: 0; flex-direction: column; gap: .6rem; }
 .discovery-suggestions { display: flex; flex-wrap: wrap; gap: .45rem; }

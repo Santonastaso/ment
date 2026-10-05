@@ -405,3 +405,22 @@ test('a suggested choice under a question sends it as the reply', async ({ page 
   await expect(page.getByRole('button', { name: 'Choose Peer Mentor' })).toBeVisible();
   await expect(choice).toHaveCount(0);
 });
+
+test('earlier results in the conversation can be reopened', async ({ page }) => {
+  await page.goto('/');
+  const composer = page.getByRole('textbox', { name: 'Describe who could help' });
+  await composer.fill('finance');
+  await composer.press('Enter');
+  await expect(page.getByText('Which finance skill would you like help with?')).toBeVisible();
+  await composer.fill('Financial modelling');
+  await composer.press('Enter');
+  await expect(page.getByRole('button', { name: 'Choose Peer Mentor' })).toHaveCount(1);
+  await composer.fill('someone with more experience');
+  await composer.press('Enter');
+  const reopen = page.getByRole('button', { name: 'Show this person again' });
+  await expect(reopen).toBeVisible();
+  await reopen.click();
+  await expect(page.getByRole('button', { name: 'Choose Peer Mentor' })).toHaveCount(2);
+  await page.getByRole('button', { name: 'Hide these people' }).click();
+  await expect(page.getByRole('button', { name: 'Choose Peer Mentor' })).toHaveCount(1);
+});
