@@ -32,7 +32,7 @@ const SCENARIOS = [
   { name: 'more options after results', turns: ['someone in finance', 'either works', 'show me more options'],
     check: (t) => [t[1].people.length > 0, t[2].people.length > 0 || /everyone who fits/.test(t[2].said),
       t[2].people.every((p) => !t[1].people.some((q) => q.id === p.id)), t[2].people.every(isFinance)] },
-  { name: 'thanks', turns: ['thanks!'], check: (t) => [Boolean(t[0].ask), t[0].people.length === 0] },
+  { name: 'thanks', turns: ['thanks!'], check: (t) => [/welcome|happy to help/i.test(t[0].ask), t[0].people.length === 0] },
   { name: 'department alone: marketing', turns: ['someone in marketing'], check: (t) => [/What in marketing/.test(t[0].ask)] },
   { name: 'vague: I need help', turns: ['I need help'], check: (t) => [/What would you like help with/.test(t[0].ask)] },
   { name: 'department then either works', turns: ['someone in finance', 'either works'],
