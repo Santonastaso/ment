@@ -544,7 +544,7 @@ a.person-row-name:hover { color: var(--primary); text-decoration: underline; }
 .conversation-rail-controls button[aria-expanded="true"] { background: var(--control-surface); color: var(--foreground); }
 .conversation-rail-unread { position: absolute; right: 0; top: 0; display: grid; min-width: 17px; height: 17px; place-items: center; border-radius: 50%; background: var(--primary); color: var(--primary-foreground); padding: 0 3px; font-size: 10px; }
 .is-list-collapsed .conversation-list-content { display: none; position: absolute; left: calc(100% + 8px); top: 12px; width: min(340px, calc(100vw - 110px)); max-height: calc(100vh - 24px); overflow: hidden; border: 1px solid var(--border-subtle); border-radius: var(--dialog-radius); background: var(--card); box-shadow: var(--shadow-overlay); padding: 12px 8px; }
-.is-list-collapsed .conversation-list-content.menu-filters, .is-list-collapsed .conversation-list-content.menu-chats { transform-origin: top left; animation: railPopoverIn var(--motion-panel) var(--motion-round) both; }
+.is-list-collapsed .conversation-list-content.menu-filters, .is-list-collapsed .conversation-list-content.menu-chats { display: flex; transform-origin: top left; animation: railPopoverIn var(--motion-panel) var(--motion-round) both; }
 @keyframes railPopoverIn { from { opacity: 0; transform: translateX(-6px) scale(.97); } to { opacity: 1; transform: none; } }
 .is-list-collapsed .menu-filters .conversation-list-scroll, .is-list-collapsed .menu-chats .conversation-filters { display: none; }
 .is-list-collapsed .menu-filters .conversation-filters { margin-bottom: 8px; }
