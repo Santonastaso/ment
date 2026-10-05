@@ -360,8 +360,7 @@ test('request history survives a missed reply and cancellation without reloading
   });
   await expect(timeline.getByText('I have a few ideas.')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Request overview' }).click();
-  await page.getByRole('dialog').getByRole('button', { name: 'Withdraw request' }).click();
+  await timeline.locator('.conversation-request-card').getByRole('button', { name: 'Withdraw request' }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Withdraw request' }).click();
   await expect(timeline.locator('.conversation-event')).toContainText('Cancelled');
   await expect(timeline.locator('.conversation-request-card')).toContainText('Supplier sourcing');
