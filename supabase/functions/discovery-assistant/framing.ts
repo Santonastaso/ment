@@ -238,3 +238,71 @@ export function namesARole(language: string, userText: string, subject: string) 
   const articles = ARTICLES[language] || ARTICLES.English;
   return Boolean(first) && words.some((word, index) => word === first && articles.includes(words[index - 1]));
 }
+
+// Tappable choices shown under a question. The label is what the button says;
+// the message is what gets sent, phrased so the funnel reads it like typed text.
+export type Choice = { label: string; message: string };
+
+const CHOICE_COPY: Record<string, {
+  invite: string;
+  openAgain: string;
+  interestedIn: (field: string) => string;
+  scope: Choice[];
+  senior: Choice;
+  onlyIn: (place: string) => Choice;
+}> = {
+  English: {
+    invite: 'Pick one below, or tell me in your own words.',
+    openAgain: "No problem — here are a few places people often start. What would you like help with?",
+    interestedIn: (field) => `I'm interested in ${field}`,
+    scope: [
+      { label: 'A specific skill', message: 'a specific skill' },
+      { label: 'A type of role', message: 'a type of role' },
+      { label: 'Career advice', message: 'career advice' },
+    ],
+    senior: { label: 'More senior people', message: 'more senior people' },
+    onlyIn: (place) => ({ label: `Only in ${place}`, message: `only in ${place}` }),
+  },
+  Italian: {
+    invite: 'Scegli qui sotto, oppure scrivimelo con parole tue.',
+    openAgain: 'Nessun problema: ecco alcuni punti da cui si parte spesso. Con cosa ti serve aiuto?',
+    interestedIn: (field) => `Mi interessa ${field}`,
+    scope: [
+      { label: 'Una competenza precisa', message: 'una competenza precisa' },
+      { label: 'Un tipo di ruolo', message: 'un tipo di ruolo' },
+      { label: 'Consigli di carriera', message: 'consigli di carriera' },
+    ],
+    senior: { label: 'Persone più senior', message: 'persone più senior' },
+    onlyIn: (place) => ({ label: `Solo a ${place}`, message: `solo a ${place}` }),
+  },
+  French: {
+    invite: 'Choisissez ci-dessous, ou dites-le-moi avec vos mots.',
+    openAgain: 'Pas de souci — voici quelques points de départ fréquents. Sur quoi aimeriez-vous de l’aide ?',
+    interestedIn: (field) => `Je m'intéresse à ${field}`,
+    scope: [
+      { label: 'Une compétence précise', message: 'une compétence précise' },
+      { label: 'Un type de poste', message: 'un type de poste' },
+      { label: 'Des conseils de carrière', message: 'des conseils de carrière' },
+    ],
+    senior: { label: 'Profils plus seniors', message: 'profils plus seniors' },
+    onlyIn: (place) => ({ label: `Uniquement à ${place}`, message: `uniquement à ${place}` }),
+  },
+};
+const choiceCopy = (language: string) => CHOICE_COPY[language] || CHOICE_COPY.English;
+
+export function departmentChoices(language: string, departments: string[]): Choice[] {
+  return departments.map((name) => ({ label: name, message: choiceCopy(language).interestedIn(inSentence(name)) }));
+}
+export function scopeChoices(language: string): Choice[] {
+  return choiceCopy(language).scope;
+}
+export function narrowChoices(language: string, places: string[]): Choice[] {
+  const copy = choiceCopy(language);
+  return [copy.senior, ...places.map((place) => copy.onlyIn(place))];
+}
+export function ownWordsInvite(language: string) {
+  return choiceCopy(language).invite;
+}
+export function frameOpenAgain(language: string) {
+  return choiceCopy(language).openAgain;
+}

@@ -32,6 +32,11 @@ const SCENARIOS = [
   { name: 'more options after results', turns: ['someone in finance', 'either works', 'show me more options'],
     check: (t) => [t[1].people.length > 0, t[2].people.length > 0 || /everyone who fits/.test(t[2].said),
       t[2].people.every((p) => !t[1].people.some((q) => q.id === p.id)), t[2].people.every(isFinance)] },
+  { name: 'proposals, asked twice', turns: ['hi how are you?', 'can you propose some people to me?', 'I would like you to propose some people to me'],
+    check: (t) => [/Ment/.test(t[0].ask), /in your own words/.test(t[1].ask) && t[1].choices.length > 0, Boolean(t[2].ask) && t[2].choices.length > 0,
+      t.every((x) => x.people.length === 0)] },
+  { name: 'choice path: interested in finance -> a specific skill', turns: ["I'm interested in finance", 'a specific skill'],
+    check: (t) => [/What in finance/.test(t[0].ask) && t[0].choices.includes('Career advice'), /Which finance skill/.test(t[1].ask)] },
   { name: 'thanks', turns: ['thanks!'], check: (t) => [/welcome|happy to help/i.test(t[0].ask), t[0].people.length === 0] },
   { name: 'department alone: marketing', turns: ['someone in marketing'], check: (t) => [/What in marketing/.test(t[0].ask)] },
   { name: 'vague: I need help', turns: ['I need help'], check: (t) => [/What would you like help with/.test(t[0].ask)] },
@@ -84,11 +89,11 @@ try {
         body: JSON.stringify({ action: 'chat', query, lang: 'en', ...(threadId ? { thread_id: threadId } : {}) }) });
       const d = await response.json().catch(() => ({}));
       threadId = d.thread_id || threadId;
-      const turn = { ask: d.clarification || '', said: d.no_match_reason || '', near: Boolean(d.nearest), people: d.matches || [] };
+      const turn = { ask: d.clarification || '', said: d.no_match_reason || '', near: Boolean(d.nearest), people: d.matches || [], choices: (d.suggestions || []).map((c) => c.label) };
       turns.push(turn);
       log(`- **you:** ${query}`);
       if (response.status !== 200) log(`  - HTTP ${response.status} ${JSON.stringify(d)}`);
-      else if (turn.ask) log(`  - **ment asks:** ${turn.ask}`);
+      else if (turn.ask) log(`  - **ment asks:** ${turn.ask}${turn.choices.length ? `\n    - choices: ${turn.choices.join(' · ')}` : ''}`);
       else {
         log(`  - **ment:** ${turn.said || '(exact matches)'}${turn.near ? ' _[closest]_' : ''}${d.model ? ` · model ${d.model}` : ''}`);
         for (const p of turn.people) log(`    - ${p.job_title} · ${p.department} · ${p.location} — ${(p.reasons || [])[0] || ''}`);

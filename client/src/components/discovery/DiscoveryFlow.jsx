@@ -243,7 +243,7 @@ export default function DiscoveryFlow() {
       setMatches(nextMatches);
       if (data.clarification) {
         setClarification(data.clarification);
-        setTurns(current => [...current, { role: 'assistant', kind: 'clarification', content: data.clarification, at: new Date().toISOString() }]);
+        setTurns(current => [...current, { role: 'assistant', kind: 'clarification', content: data.clarification, suggestions: Array.isArray(data.suggestions) ? data.suggestions : [], at: new Date().toISOString() }]);
         setStage('clarify');
       } else {
         setSubmittedQuery(requestText(data.resolved_request, message));
@@ -518,7 +518,7 @@ export default function DiscoveryFlow() {
         : turn.content;
       // One agent mark per run of assistant turns.
       const continues = renderedTurns[index - 1]?.role === 'assistant';
-      return <div className={`discovery-chat-turn is-assistant ${turn.kind === 'error' ? 'is-error' : ''}`} key={`${turn.at || index}-${index}`}>{continues ? <span className="discovery-agent-mark-spacer" aria-hidden="true" /> : <span className="discovery-agent-mark" aria-label="Ment">M</span>}<p className="discovery-assistant-bubble">{renderInline(response)}</p></div>;
+      return <div className={`discovery-chat-turn is-assistant ${turn.kind === 'error' ? 'is-error' : ''}`} key={`${turn.at || index}-${index}`}>{continues ? <span className="discovery-agent-mark-spacer" aria-hidden="true" /> : <span className="discovery-agent-mark" aria-label="Ment">M</span>}<div className="discovery-assistant-stack"><p className="discovery-assistant-bubble">{renderInline(response)}</p>{index === renderedTurns.length - 1 && stage === 'clarify' && Array.isArray(turn.suggestions) && turn.suggestions.length > 0 && <div className="discovery-suggestions" role="group">{turn.suggestions.map(choice => <button type="button" key={choice.label} className="discovery-suggestion" disabled={sending} onClick={() => findMatches(choice.message)}>{choice.label}</button>)}</div>}</div></div>;
     })}</div>
     {(stage === 'matching' || stage === 'drafting') && <div className="discovery-chat-turn is-assistant is-working" role="status" aria-live="polite"><span className="discovery-agent-mark" aria-label="Ment">M</span><p className="discovery-assistant-bubble">{stage === 'matching' ? copy.finding : copy.drafting}<span className="discovery-typing" aria-hidden="true"><i /><i /><i /></span></p></div>}
     {stage === 'choose' && <div className="discovery-reveal"><div className="discovery-match-grid" role="radiogroup" aria-label="Choose a person">{matches.map((match, index) => <MatchCard key={match.person.id} match={match} index={index} profileHref={profileHref} onViewProfile={viewProfile} selected={selected?.person.id === match.person.id} onSelect={choose} copy={copy} style={{ animationDelay: `${Math.min(index, 6) * 65}ms` }} />)}</div><div className="discovery-result-actions" role="group" aria-label={copy.useful}>

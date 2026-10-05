@@ -3,9 +3,9 @@ import { recordAiRun } from '../_shared/ai-telemetry.ts';
 import { aiErrorResponse, mistralJson } from '../_shared/mistral.ts';
 import { enforceRateLimit } from '../_shared/rate-limit.ts';
 import { canHelpWithCareerGoal, hasGroundedExpertise } from '../_shared/discovery-guards.mjs';
-import { frameChat, frameExhausted, frameNarrow, frameNoMatch, frameResults, namesARole, NO_GAP, type Gap } from './framing.ts';
+import { departmentChoices, frameChat, frameExhausted, frameNarrow, frameNoMatch, frameOpenAgain, narrowChoices, ownWordsInvite, scopeChoices, type Choice, frameResults, namesARole, NO_GAP, type Gap } from './framing.ts';
 
-const PROMPT_VERSION = 'discovery-v18';
+const PROMPT_VERSION = 'discovery-v19';
 
 // Written here rather than by the model, so the gap names the place the user
 // actually typed instead of drifting to a vaguer sentence about seniority.
@@ -182,7 +182,16 @@ const LOOKUP_STOPWORDS = new Set(['someone', 'somebody', 'person', 'people', 'lo
   'industries', 'fields', 'sectors', 'areas', 'domain', 'domains', 'functions', 'skill', 'skills', 'specific',
   'particular', 'job', 'jobs', 'position', 'positions', 'general', 'generally', 'yes', 'sure', 'okay',
   'settore', 'settori', 'ambito', 'competenza', 'competenze', 'ruolo', 'ruoli', 'secteur', 'domaine',
-  'competence', 'competences', 'poste', 'postes', 'aiuto', 'aide']);
+  'competence', 'competences', 'poste', 'postes', 'aiuto', 'aide',
+  // Asking for proposals is not a subject: "can you propose some people to me?"
+  // was searched as a field called "propose some people".
+  'propose', 'proposal', 'proposals', 'suggest', 'suggestion', 'suggestions', 'recommend', 'recommendation',
+  'recommendations', 'options', 'option', 'show', 'give', 'list', 'names', 'interested', 'interest', 'interests',
+  'you', 'your', 'are', 'was', 'were', 'not', 'but', 'all', 'what', 'how', 'why', 'when', 'where', 'which', 'will',
+  'does', 'did', 'has', 'had', 'here', 'these', 'those', 'very', 'too', 'much', 'many', 'such', 'only', 'than',
+  'then', 'now', 'hey', 'hello', 'doing', 'maybe', 'hmm', 'umm', 'uhm', 'idk', 'nothing', 'whatever', 'idea', 'ideas', 'start', 'begin', 'know', 'dont', 'sure',
+  'proponi', 'proporre', 'suggerisci', 'consigli', 'consiglia', 'interessa', 'interessano', 'propose', 'proposer',
+  'suggère', 'suggerer', 'intéresse', 'interesse']);
 const wordsOf = (value: string) => value.toLowerCase().split(/[^\p{L}\p{N}&]+/u).filter(Boolean);
 const contentWords = (value: string) => wordsOf(value).filter((word) => word.length >= 3 && !LOOKUP_STOPWORDS.has(word));
 
@@ -287,8 +296,18 @@ const INTENT_PATTERNS: Array<[string, RegExp[]]> = [
   ['thanks', [/^\s*(thanks|thank you|thx|cheers|grazie|merci)\b/]],
   ['greeting', [/^\s*(hi|hello|hey|hiya|ciao|salve|buongiorno|bonjour|salut)\b/, /\bwho are you\b/, /\bwhat (are|can) you\b/,
     /\bhow does (this|it) work\b/, /\bwhat is this\b/, /\bchi sei\b/, /\bcosa (sei|fai)\b/, /\bqui (es[- ]tu|[eê]tes[- ]vous)\b/]],
-  ['refine', [/\binstead\b/, /\brather\b/, /\binvece\b/, /\bplut[oô]t\b/, /\bmore (senior|junior|experienced)\b/]],
+  ['refine', [/\binstead\b/, /\brather\b/, /\binvece\b/, /\bplut[oô]t\b/, /\bmore (senior|junior|experienced)\b/, /\bpi[uù] senior\b/, /\bplus seniors?\b/, /\bonly in\b/, /\bsolo a\b/, /\buniquement [aà]\b/]],
 ];
+
+const ASK_ORDER = ['Finance', 'Consulting', 'Marketing', 'Strategy', 'Data & Analytics', 'Operations'];
+function preferredDepartments(departments: string[]) {
+  return [...ASK_ORDER.filter((name) => departments.includes(name)), ...departments]
+    .filter((name, index, all) => all.indexOf(name) === index).slice(0, 6);
+}
+function shownLocations(turn: Record<string, unknown> | undefined) {
+  const matches = Array.isArray(turn?.matches) ? turn?.matches as Array<{ location?: string }> : [];
+  return [...new Set(matches.map((match) => cleanText(match?.location, 80)).filter(Boolean))].slice(0, 2);
+}
 
 function messageIntent(text: string, hasResults: boolean, namesSomething: boolean) {
   const lower = text.toLowerCase();
@@ -661,8 +680,9 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
       const intent = messageIntent(latestRaw, Boolean(lastShown), namesSomething);
       if (intent === 'greeting' || intent === 'thanks') {
         const reply = frameChat(language, intent, departmentExamples(language, coverage));
-        const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'chat', content: reply });
-        return jsonOk({ matches: [], clarification: reply, thread_id: threadId });
+        const choices = intent === 'greeting' ? departmentChoices(language, preferredDepartments(departments)) : [];
+        const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'chat', content: reply, suggestions: choices });
+        return jsonOk({ matches: [], clarification: reply, suggestions: choices, thread_id: threadId });
       }
       const answeringNarrow = answering && previous?.stage === 'narrow';
       const following = (intent === 'more' || intent === 'refine' || answeringNarrow) && lastShown && !latestDepartment;
@@ -686,6 +706,8 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
           requestForMatch = previousRequest;
         } else {
           requiredDepartment = mentionedDepartment(meaningfulLatest) || previousDepartment;
+          const textPlace = knownLocations.find((place) => wordsOf(place).every((word) => latestContent.includes(word)));
+          if (!namedLocationFilter && textPlace) namedLocationFilter = textPlace;
           if (!namedLocationFilter && !locationMissing) namedLocationFilter = cleanText(lastShown.location, 80);
           requestForMatch = `${previousRequest}; ${latestRaw}`;
         }
@@ -694,7 +716,7 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
       }
 
       // One level down the funnel per answer, while the answer narrows nothing.
-      let step: { stage: string; question: string; department?: string } | null = null;
+      let step: { stage: string; question: string; department?: string; suggestions?: Choice[] } | null = null;
       if (intent === 'ask_me' && questionsAsked < MAX_QUESTIONS) {
         const known = cleanText(lastShown?.department, 80) || earlierDepartment || requiredDepartment;
         // After results, questions narrow what is already on screen rather
@@ -718,9 +740,20 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
             : { stage: 'open', question: askTemplate(language, coverage) };
         }
       }
+      // Nothing to search yet: keep guiding instead of running an empty search.
+      if (!step && !latestContent.length && !earlierDepartment && !following && !lastShown && !locationMissing) {
+        step = { stage: 'open', question: questionsAsked > 0 ? frameOpenAgain(language) : askTemplate(language, coverage) };
+      }
       if (step) {
-        const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'clarification', content: step.question, stage: step.stage, department: step.department || '' });
-        return jsonOk({ matches: [], clarification: step.question, thread_id: threadId });
+        // Tappable choices under the question, with room for the user's own words.
+        const choices = step.stage === 'open' || step.stage === 'field'
+          ? departmentChoices(language, preferredDepartments(departments))
+          : step.stage === 'department' ? scopeChoices(language)
+            : step.stage === 'narrow' ? narrowChoices(language, shownLocations(lastShown)) : [];
+        step.suggestions = choices;
+        const question = choices.length ? `${step.question} ${ownWordsInvite(language)}` : step.question;
+        const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'clarification', content: question, stage: step.stage, department: step.department || '', suggestions: choices });
+        return jsonOk({ matches: [], clarification: question, suggestions: choices, thread_id: threadId });
       }
     } catch (error) {
       const mapped = aiErrorResponse(error);
@@ -948,7 +981,7 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
       // Even with nothing to offer, say what the network does have.
       // Wording only: when the model extracted no subject, name the user's own
       // unfamiliar words rather than a generic "no exact match".
-      const ownWords = contentWords(query).filter((word) => !LOOKUP_STOPWORDS.has(word)).slice(0, 2).join(' ');
+      const ownWords = contentWords(query).slice(0, 2).join(' ');
       const shownGap: Gap = gapState.kind === 'none' && ownWords
         ? { kind: 'subject', value: ownWords, role: namesARole(language, query, ownWords) } : gapState;
       const reason = followUp === 'more' ? frameExhausted(language) : frameNoMatch(language, shownGap, topDepartments(networkCandidates));

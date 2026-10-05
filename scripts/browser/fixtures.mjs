@@ -46,7 +46,8 @@ function fixtureApi(state) {
       if (path.endsWith('/acknowledge')) { state.sessions.find(s => s.id === Number(path.split('/')[2])).mentee_acknowledged_at = new Date().toISOString(); return {}; }
       if (path === '/users/me/onboarding') return { ...state.user, ...body, onboarding_complete: true };
       if (path === '/discovery/matches') {
-        if (state.calls.filter(c => c.path === path).length === 1) return { thread_id: 'thread', matches: [], clarification: 'Which finance skill would you like help with?' };
+        if (state.calls.filter(c => c.path === path).length === 1) return { thread_id: 'thread', matches: [], clarification: 'Which finance skill would you like help with?',
+          suggestions: [{ label: 'Financial modelling', message: 'Financial modelling' }] };
         return { thread_id: 'thread', resolved_request: 'Financial modelling', matches: [{ ...state.peer, expertise: ['Financial modelling'], reasons: ['Teaches financial modelling.'] }] };
       }
       if (path === '/discovery/draft') return { thread_id: 'thread', draft: 'Hi Peer, I would appreciate your advice on financial modelling.' };

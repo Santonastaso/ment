@@ -392,3 +392,16 @@ test('a profile opened from chat results leads back to the same results', async 
   await page.goBack();
   await expect(choose).toBeVisible();
 });
+
+test('a suggested choice under a question sends it as the reply', async ({ page }) => {
+  await page.goto('/');
+  const composer = page.getByRole('textbox', { name: 'Describe who could help' });
+  await composer.fill('finance');
+  await composer.press('Enter');
+  const choice = page.getByRole('button', { name: 'Financial modelling', exact: true });
+  await expect(choice).toBeVisible();
+  await choice.click();
+  await expect(page.locator('.discovery-user-bubble', { hasText: 'Financial modelling' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Choose Peer Mentor' })).toBeVisible();
+  await expect(choice).toHaveCount(0);
+});

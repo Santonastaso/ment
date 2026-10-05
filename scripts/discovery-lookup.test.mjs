@@ -164,12 +164,16 @@ test('a category answer inside a department asks for the specific thing', async 
   assert.equal(result.clarification, 'Which finance skill would you like help with?');
 });
 
-test('the funnel stops after three questions and searches', async () => {
+test('after three questions a reply naming nothing is still guided, and a named field searches', async () => {
   const q = (content) => ({ role: 'assistant', kind: 'clarification', content, stage: 'open' });
   const turns = [{ role: 'user', content: 'help' }, q('1?'), { role: 'user', content: 'hmm' }, q('2?'), { role: 'user', content: 'not sure' }, q('3?')];
-  const fixture = discoveryFixture({ turns, responses: [clarify(), { outcome: 'no_match', matches: [], no_match_reason: 'Nothing yet.' }] });
-  const result = await say(fixture, 'anything', 'thread');
-  assert.equal(result.clarification, '');
+  const vague = discoveryFixture({ turns, responses: [clarify()] });
+  const guided = await say(vague, 'anything', 'thread');
+  assert.ok(guided.clarification && guided.suggestions.length > 0, 'searching on nothing would return noise');
+  const named = discoveryFixture({ turns, responses: [clarify({ named_subject: 'Financial modelling' }), directMatch] });
+  const searched = await say(named, 'Financial modelling', 'thread');
+  assert.equal(searched.clarification, '');
+  assert.equal(searched.matches.length, 1);
 });
 
 test('a department the model mislabels as a location still gets the department question', async () => {
@@ -259,4 +263,38 @@ test('when nobody else fits, "more" says so and offers to widen', async () => {
   const fixture = discoveryFixture({ candidates: [finance, hr], turns: shownTurns(), responses: [clarify({ intent: 'more' })] });
   const result = await say(fixture, 'more please', 'thread');
   assert.match(result.no_match_reason, /everyone who fits/);
+});
+
+// Guided choices: asking for proposals is vague, and vague keeps being guided.
+test('asking for proposals is guided with choices, not searched', async () => {
+  const fixture = discoveryFixture({ candidates: [finance, hr], responses: [clarify({ named_subject: 'propose some people' })] });
+  const result = await chat(fixture, 'can you propose some people to me?');
+  assert.match(result.clarification, /What would you like help with/);
+  assert.match(result.clarification, /in your own words/);
+  assert.deepEqual(result.suggestions.map((c) => c.label), ['Finance', 'Human Resources']);
+  assert.equal(result.suggestions[0].message, "I'm interested in finance");
+  assert.equal(fixture.calls.length, 1, 'no search was run');
+});
+
+test('a second vague request keeps guiding, past the question cap', async () => {
+  const q = (content) => ({ role: 'assistant', kind: 'clarification', content, stage: 'open' });
+  const turns = [{ role: 'user', content: 'help' }, q('1?'), { role: 'user', content: 'hmm' }, q('2?'), { role: 'user', content: 'not sure' }, q('3?')];
+  const fixture = discoveryFixture({ candidates: [finance, hr], turns, responses: [clarify()] });
+  const result = await say(fixture, 'I would like you to propose some people to me', 'thread');
+  assert.match(result.clarification, /here are a few places people often start/);
+  assert.ok(result.suggestions.length > 0);
+});
+
+test('a chosen department offers how to narrow it', async () => {
+  const fixture = discoveryFixture({ candidates: [finance, hr], responses: [clarify({ named_subject: 'finance' })] });
+  const result = await chat(fixture, "I'm interested in finance");
+  assert.match(result.clarification, /What in finance would help most/);
+  assert.deepEqual(result.suggestions.map((c) => c.label), ['A specific skill', 'A type of role', 'Career advice']);
+});
+
+test('the greeting offers the same starting choices', async () => {
+  const fixture = discoveryFixture({ candidates: [finance, hr], responses: [clarify()] });
+  const result = await chat(fixture, 'hi how are you?');
+  assert.match(result.clarification, /I'm Ment/);
+  assert.ok(result.suggestions.some((c) => c.label === 'Finance'));
 });
