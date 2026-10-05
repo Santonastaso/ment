@@ -369,7 +369,7 @@ export default function DiscoveryFlow() {
       if (lastAssistant.kind === 'matches' && Array.isArray(lastAssistant.matches)) {
         setMatches(lastAssistant.matches.map(person => ({ person, expertise: person.expertise || [], background: person.background || '', reasons: person.reasons || [] })));
         setStage('choose');
-      } else if (lastAssistant.kind === 'clarification') {
+      } else if ((lastAssistant.kind === 'clarification' || lastAssistant.kind === 'chat')) {
         setClarification(lastAssistant.content || '');
         setStage('clarify');
       } else if (lastAssistant.kind === 'no_match') {

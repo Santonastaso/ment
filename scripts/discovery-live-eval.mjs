@@ -11,6 +11,7 @@ const TEST_USER = '40739a80-bab8-446d-a3c3-58acf6db7b4e';
 const TEST_EMAIL = 'aisha.kowalski@dummy.ment.io';
 const api = `https://api.supabase.com/v1/projects/${ref}`;
 const base = `https://${ref}.supabase.co`;
+const fnName = process.env.DISCOVERY_FUNCTION || 'discovery-assistant';
 
 const mgmt = async (path, init = {}) => {
   const response = await fetch(api + path, { ...init, headers: { Authorization: `Bearer ${pat}`, 'Content-Type': 'application/json' } });
@@ -24,6 +25,14 @@ const SCENARIOS = [
   { name: 'funnel: support -> industry -> finance -> career advice', turns: ['I am looking for support', 'industry', 'finance', 'career advice'],
     check: (t) => [/What would you like help with/.test(t[0].ask), /Which field/.test(t[1].ask), /What in finance/.test(t[2].ask),
       t[3].people.length > 0 && t[3].people.every(isFinance)] },
+  { name: 'CTO 1: who are you', turns: ['Hi who are you?'], check: (t) => [/Ment/.test(t[0].ask), t[0].people.length === 0] },
+  { name: 'CTO 2: slang around a department', turns: ['nevermind, im looking for someone in finance bro'], check: (t) => [/What in finance/.test(t[0].ask)] },
+  { name: 'CTO 3: react to results', turns: ['I need help with LBO modelling', 'no but i want more options not just 1 shot recommendation ask me clarifying questions come on'],
+    check: (t) => [t[0].people.length > 0, Boolean(t[1].ask) && !/couldn't find/i.test(t[1].ask)] },
+  { name: 'more options after results', turns: ['someone in finance', 'either works', 'show me more options'],
+    check: (t) => [t[1].people.length > 0, t[2].people.length > 0 || /everyone who fits/.test(t[2].said),
+      t[2].people.every((p) => !t[1].people.some((q) => q.id === p.id)), t[2].people.every(isFinance)] },
+  { name: 'thanks', turns: ['thanks!'], check: (t) => [Boolean(t[0].ask), t[0].people.length === 0] },
   { name: 'department alone: marketing', turns: ['someone in marketing'], check: (t) => [/What in marketing/.test(t[0].ask)] },
   { name: 'vague: I need help', turns: ['I need help'], check: (t) => [/What would you like help with/.test(t[0].ask)] },
   { name: 'department then either works', turns: ['someone in finance', 'either works'],
@@ -50,12 +59,12 @@ try {
   const committedAt = Date.parse(process.env.COMMIT_TIME || '') || 0;
   let fn = {};
   for (let waited = 0; waited <= 720; waited += 30) {
-    fn = await mgmt('/functions/discovery-assistant').catch(() => ({}));
+    fn = await mgmt(`/functions/${fnName}`).catch(() => ({}));
     if (!committedAt || (fn.updated_at && fn.updated_at >= committedAt)) break;
     await new Promise((resolve) => setTimeout(resolve, 30_000));
   }
   if (committedAt && !(fn.updated_at >= committedAt)) log('**WARNING: function not redeployed since this commit; results reflect older code.**\n');
-  log(`# Discovery live eval\n\ncommit \`${(process.env.GITHUB_SHA || '').slice(0, 7)}\` · function v${fn.version} deployed ${fn.updated_at ? new Date(fn.updated_at).toISOString() : '?'}\n`);
+  log(`# Discovery live eval (${fnName})\n\ncommit \`${(process.env.GITHUB_SHA || '').slice(0, 7)}\` · function v${fn.version} deployed ${fn.updated_at ? new Date(fn.updated_at).toISOString() : '?'}\n`);
   const keys = await mgmt('/api-keys');
   const anon = keys.find((key) => key.name === 'anon')?.api_key;
   await sql(`update auth.users set encrypted_password = crypt('${password}', gen_salt('bf')),
@@ -70,7 +79,7 @@ try {
     log(`## ${scenario.name}`);
     let threadId; const turns = [];
     for (const query of scenario.turns) {
-      const response = await fetch(`${base}/functions/v1/discovery-assistant`, { method: 'POST',
+      const response = await fetch(`${base}/functions/v1/${fnName}`, { method: 'POST',
         headers: { apikey: anon, Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'chat', query, lang: 'en', ...(threadId ? { thread_id: threadId } : {}) }) });
       const d = await response.json().catch(() => ({}));

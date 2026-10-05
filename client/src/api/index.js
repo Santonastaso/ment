@@ -698,7 +698,9 @@ async function post(url, body = {}, opts = {}) {
   }
 
   if (url === '/discovery/matches' || url === '/discovery/draft') {
-    const { data, error } = await invokeUserFunction('discovery-assistant', {
+    // A local build can point at a test copy of the function; production
+    // leaves this unset and calls the real one.
+    const { data, error } = await invokeUserFunction(import.meta.env.VITE_DISCOVERY_FUNCTION || 'discovery-assistant', {
       ...body,
       lang: body.lang || getLang(),
       action: url.endsWith('/draft') ? 'draft' : 'chat',

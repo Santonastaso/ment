@@ -26,6 +26,12 @@ type Copy = {
   actOne: string[];
   retry: (strengths: string) => string[];
   join: string;
+  greeting: (examples: string) => string;
+  thanks: string[];
+  moreMany: string[];
+  moreOne: string[];
+  exhausted: string[];
+  followUp: string[];
 };
 
 const COPY: Record<string, Copy> = {
@@ -67,6 +73,12 @@ const COPY: Record<string, Copy> = {
       `${strengths ? ` — most people here are in ${strengths}` : ''}. Tell me a bit more, like an industry, a role or a skill, and I'll have another look.`,
     ],
     join: 'and',
+    greeting: (examples) => `Hi! I'm Ment — I help you find people in the ESSEC network who can help with your studies or career, and I'll draft the intro message for you. What are you looking for?${examples ? ` For example a field like ${examples}, a skill, or a type of role.` : ''}`,
+    thanks: ["You're welcome! Anything else I can help you find?", 'Happy to help — just say if you want to look for someone else.'],
+    moreMany: ["Here are a few more people who could help. Pick whoever looks most useful and I'll draft a message."],
+    moreOne: ["Here's one more person who could help. If they look useful, I'll draft a message."],
+    exhausted: ["That's everyone who fits this search for now. Want me to widen it — a nearby field, another city, or a different skill?"],
+    followUp: ['Want more options, or should I narrow it down?', 'Happy to show more people or narrow it down — just say.'],
   },
   Italian: {
     exactMany: [
@@ -106,6 +118,12 @@ const COPY: Record<string, Copy> = {
       `${strengths ? `: qui la maggior parte delle persone è in ${strengths}` : ''}. Dimmi qualcosa in più, come un settore, un ruolo o una competenza, e ci riprovo.`,
     ],
     join: 'e',
+    greeting: (examples) => `Ciao! Sono Ment: ti aiuto a trovare persone nella rete ESSEC che possono aiutarti negli studi o nella carriera, e preparo io il messaggio di presentazione. Cosa stai cercando?${examples ? ` Per esempio un settore come ${examples}, una competenza o un tipo di ruolo.` : ''}`,
+    thanks: ['Figurati! Posso aiutarti a trovare qualcun altro?', 'Con piacere: dimmi pure se vuoi cercare qualcun altro.'],
+    moreMany: ['Ecco altre persone che potrebbero aiutarti. Scegli chi ti sembra più utile e preparo io il messaggio.'],
+    moreOne: ['Ecco un’altra persona che potrebbe aiutarti. Se ti sembra utile, preparo io il messaggio.'],
+    exhausted: ['Per questa ricerca non ci sono altre persone adatte al momento. Vuoi che allarghi la ricerca, a un settore vicino, un’altra città o una competenza diversa?'],
+    followUp: ['Vuoi vedere altre persone o restringere la ricerca?', 'Posso mostrarti altre persone o restringere la ricerca: dimmi tu.'],
   },
   French: {
     exactMany: [
@@ -145,6 +163,12 @@ const COPY: Record<string, Copy> = {
       `${strengths ? ` — ici, la plupart des gens sont en ${strengths}` : ''}. Dites-m'en un peu plus, comme un secteur, un poste ou une compétence, et je relance la recherche.`,
     ],
     join: 'et',
+    greeting: (examples) => `Bonjour ! Je suis Ment : je vous aide à trouver des personnes du réseau ESSEC qui peuvent vous aider dans vos études ou votre carrière, et je rédige le message de présentation. Que cherchez-vous ?${examples ? ` Par exemple un domaine comme ${examples}, une compétence ou un type de poste.` : ''}`,
+    thanks: ['Avec plaisir ! Puis-je vous aider à trouver quelqu’un d’autre ?', 'Ravi d’aider — dites-moi si vous voulez chercher quelqu’un d’autre.'],
+    moreMany: ['Voici quelques autres personnes qui pourraient vous aider. Choisissez celle qui vous semble la plus utile et je rédige le message.'],
+    moreOne: ['Voici une autre personne qui pourrait vous aider. Si le profil vous semble utile, je rédige le message.'],
+    exhausted: ['C’est tout le monde pour cette recherche pour le moment. Voulez-vous que j’élargisse — un domaine voisin, une autre ville ou une autre compétence ?'],
+    followUp: ['Voulez-vous plus de profils, ou que j’affine la recherche ?', 'Je peux vous montrer d’autres personnes ou affiner la recherche — dites-moi.'],
   },
 };
 
@@ -167,15 +191,27 @@ function copyFor(language: string) {
 }
 
 export function frameResults(language: string, options: {
-  near: boolean; count: number; gap: Gap; closeTerms: string[]; random?: () => number;
+  near: boolean; count: number; gap: Gap; closeTerms: string[]; more?: boolean; random?: () => number;
 }) {
   const copy = copyFor(language);
   const random = options.random || Math.random;
   const one = options.count === 1;
-  if (!options.near) return pick(one ? copy.exactOne : copy.exactMany, random);
+  // Every set of results ends on an open door, never a one-shot answer.
+  const followUp = pick(copy.followUp, random);
+  if (options.more) return `${pick(one ? copy.moreOne : copy.moreMany, random)} ${followUp}`;
+  if (!options.near) return `${pick(one ? copy.exactOne : copy.exactMany, random)} ${followUp}`;
   const gap = asWritten(options.gap);
   const terms = listOf(options.closeTerms.slice(0, 2), copy.join);
-  return `${copy.missing(gap)}${(one ? copy.closeOne : copy.closeMany)(terms)} ${pick(one ? copy.actOne : copy.actMany, random)}`;
+  return `${copy.missing(gap)}${(one ? copy.closeOne : copy.closeMany)(terms)} ${pick(one ? copy.actOne : copy.actMany, random)} ${followUp}`;
+}
+
+export function frameChat(language: string, intent: string, examples: string, random: () => number = Math.random) {
+  const copy = copyFor(language);
+  return intent === 'thanks' ? pick(copy.thanks, random) : copy.greeting(examples);
+}
+
+export function frameExhausted(language: string, random: () => number = Math.random) {
+  return pick(copyFor(language).exhausted, random);
 }
 
 export function frameNoMatch(language: string, gap: Gap, strengths: string[], random: () => number = Math.random) {

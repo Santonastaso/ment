@@ -209,3 +209,54 @@ test('a no-match invites a more specific request instead of stopping', async () 
   assert.match(result.no_match_reason, /^I couldn't find anyone working as a painter here/);
   assert.match(result.no_match_reason, /industry|role|job title|skill/);
 });
+
+// The CTO's three cases: small talk, slang around a department, and reacting
+// to the results instead of searching the words of the reaction.
+test('"who are you" gets an introduction, not a search', async () => {
+  const fixture = discoveryFixture({ responses: [clarify({ intent: 'greeting' })] });
+  const result = await chat(fixture, 'Hi who are you?');
+  assert.match(result.clarification, /I'm Ment/);
+  assert.equal(fixture.calls.length, 1);
+  assert.equal(fixture.thread.turns.at(-1).kind, 'chat');
+});
+
+test('a greeting that names a field is still a search', async () => {
+  const fixture = discoveryFixture({ responses: [clarify({ intent: 'greeting', named_subject: 'finance' })] });
+  const result = await chat(fixture, 'hi, someone in finance');
+  assert.match(result.clarification, /What in finance would help most/);
+});
+
+test('slang around a department still gets the scoping question', async () => {
+  const fixture = discoveryFixture({ responses: [clarify({ named_subject: 'finance' })] });
+  const result = await chat(fixture, 'nevermind, im looking for someone in finance bro');
+  assert.match(result.clarification, /What in finance would help most/);
+});
+
+const shownTurns = (department = 'Finance') => [
+  { role: 'user', content: 'someone in finance' },
+  { role: 'assistant', kind: 'matches', framed: true, content: 'I found someone.', search_request: 'Finance', department, location: '',
+    matches: [{ id: finance.id, name: finance.name }] },
+];
+
+test('"ask me questions" after results starts scoping instead of searching', async () => {
+  const fixture = discoveryFixture({ candidates: [finance, hr], turns: shownTurns(), responses: [clarify({ intent: 'ask_me' })] });
+  const result = await say(fixture, 'no but i want more options, ask me clarifying questions', 'thread');
+  assert.match(result.clarification, /What in finance would help most/);
+});
+
+test('"more options" excludes people already shown and keeps the scope', async () => {
+  const second = { ...finance, id: 'finance2', name: 'Second Finance' };
+  const fixture = discoveryFixture({ candidates: [finance, second, hr], turns: shownTurns(), responses: [
+    clarify({ intent: 'more' }),
+    { outcome: 'matches', matches: [{ profile_id: second.id, confidence: 0.9, reasons: ['Also in finance.'], matched_expertise: ['Financial modelling'] }] },
+  ] });
+  const result = await say(fixture, 'show me more options', 'thread');
+  assert.deepEqual(payload(fixture, 1).candidates.map((c) => c.id), [second.id], 'shown people and HR are excluded');
+  assert.match(result.message, /one more person/);
+});
+
+test('when nobody else fits, "more" says so and offers to widen', async () => {
+  const fixture = discoveryFixture({ candidates: [finance, hr], turns: shownTurns(), responses: [clarify({ intent: 'more' })] });
+  const result = await say(fixture, 'more please', 'thread');
+  assert.match(result.no_match_reason, /everyone who fits/);
+});

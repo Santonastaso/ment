@@ -1,0 +1,50 @@
+name: discovery-dev
+
+# Deploys a test copy of the discovery function as discovery-assistant-dev,
+# then runs the live eval against it. Production users never call this copy;
+# only a local build with VITE_DISCOVERY_FUNCTION set does. Trigger by pushing
+# to dev/discovery.
+on:
+  push:
+    branches: [dev/discovery]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: discovery-dev
+  cancel-in-progress: false
+
+jobs:
+  deploy-and-eval:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.119.0
+      - name: Deploy test copy
+        run: |
+          cp -r supabase/functions/discovery-assistant supabase/functions/discovery-assistant-dev
+          supabase functions deploy discovery-assistant-dev --project-ref "$SUPABASE_PROJECT_REF" --use-api
+      - name: Live eval against the test copy
+        env:
+          DISCOVERY_FUNCTION: discovery-assistant-dev
+        run: node scripts/discovery-live-eval.mjs | tee /tmp/eval-results.md
+      - name: Publish transcript
+        if: always()
+        run: |
+          git config user.name "discovery-eval"
+          git config user.email "discovery-eval@users.noreply.github.com"
+          git checkout --orphan eval-results-dev
+          git rm -rf --cached . > /dev/null
+          cp /tmp/eval-results.md eval-results.md 2>/dev/null || echo "DEPLOY OR EVAL FAILED before a transcript was produced (run ${GITHUB_RUN_ID})" > eval-results.md
+          git add -f eval-results.md
+          git commit -m "dev eval ${GITHUB_SHA::7} $(date -u +%FT%TZ)"
+          git push -f origin eval-results-dev
