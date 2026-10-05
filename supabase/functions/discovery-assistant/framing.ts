@@ -334,3 +334,13 @@ export function frameSmallTalk(language: string, random: () => number = Math.ran
   const options = SMALL_TALK[language] || SMALL_TALK.English;
   return options[Math.floor(random() * options.length) % options.length];
 }
+
+const NUDGE: Record<string, string[]> = {
+  English: ['Shall we get cracking — meeting someone new or learning a new skill?', 'Ready to meet someone new or pick up a new skill?'],
+  Italian: ['Ci mettiamo all’opera: vuoi conoscere qualcuno di nuovo o imparare una nuova competenza?', 'Pronto a conoscere qualcuno di nuovo o imparare una nuova competenza?'],
+  French: ['On s’y met : rencontrer quelqu’un de nouveau ou apprendre une nouvelle compétence ?', 'Prêt à rencontrer quelqu’un de nouveau ou à apprendre une nouvelle compétence ?'],
+};
+export function frameNudge(language: string, random: () => number = Math.random) {
+  const options = NUDGE[language] || NUDGE.English;
+  return options[Math.floor(random() * options.length) % options.length];
+}

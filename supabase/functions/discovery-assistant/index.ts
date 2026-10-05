@@ -3,7 +3,7 @@ import { recordAiRun } from '../_shared/ai-telemetry.ts';
 import { aiErrorResponse, mistralJson } from '../_shared/mistral.ts';
 import { enforceRateLimit } from '../_shared/rate-limit.ts';
 import { canHelpWithCareerGoal, hasGroundedExpertise } from '../_shared/discovery-guards.mjs';
-import { departmentChoices, frameChat, frameExhausted, frameNarrow, frameNoMatch, frameOpenAgain, frameRefineNone, frameSmallTalk, narrowChoices, ownWordsInvite, scopeChoices, type Choice, frameResults, namesARole, NO_GAP, type Gap } from './framing.ts';
+import { departmentChoices, frameChat, frameExhausted, frameNarrow, frameNoMatch, frameOpenAgain, frameRefineNone, frameSmallTalk, frameNudge, narrowChoices, ownWordsInvite, scopeChoices, type Choice, frameResults, namesARole, NO_GAP, type Gap } from './framing.ts';
 
 const PROMPT_VERSION = 'discovery-v19';
 
@@ -338,15 +338,17 @@ async function smallTalkReply(language: string, message: string) {
   try {
     const result = await mistralJson<{ reply?: string }>({
       feature: 'discovery_clarify',
-      system: `You are Ment, the friendly assistant of ESSEC's mentoring network, which helps students and alumni meet people who can help with their studies or career. Respond in ${language}. The user is making small talk. Reply like a warm, upbeat friend in one or two short sentences: answer them naturally (for example say you are doing well and ask how they are), then invite them to get going -- meeting someone new or learning a new skill. Sound casual and human. No emojis, no lists, no quotation marks. Never mention databases, profiles, candidates, algorithms or AI. Return JSON only: {"reply":"..."}.`,
+      system: `You are Ment, the friendly assistant of ESSEC's mentoring network. Respond in ${language}. The user is making small talk. Write ONE short, warm, casual sentence that answers them and asks how they are -- for example that you are doing well and want to know how they are. You are an assistant: never invent a life, plans, weather, food, drinks, places or meetings, and never suggest meeting you. Do not suggest anything else; the application adds the next step itself. No emojis, no quotation marks. Return JSON only: {"reply":"..."}.`,
       user: JSON.stringify({ message: message.slice(0, 300) }),
-      temperature: 0.7,
-      maxTokens: 120,
+      temperature: 0.6,
+      maxTokens: 80,
     });
-    const reply = humanize(cleanText(result.value?.reply, 320)).replace(/^["'“]+|["'”]+$/g, '');
-    const usable = reply.length >= 15 && reply.length <= 300
-      && !/\b(database|profile|candidate|algorithm|artificial intelligence|language model|json)\b/i.test(reply);
-    if (usable) return reply;
+    const reply = humanize(cleanText(result.value?.reply, 200)).replace(/^["'“]+|["'”]+$/g, '');
+    // One short sentence, nothing invented, then the nudge from code: the
+    // model left the nudge out, and once offered to grab a coffee.
+    const usable = reply.length >= 10 && reply.length <= 140
+      && !/\b(database|profile|candidate|algorithm|artificial intelligence|language model|json|coffee|caf[eé]|weather|sunny|lunch|dinner|drink|weekend|vacation|holiday)\b/i.test(reply);
+    if (usable) return `${reply} ${frameNudge(language)}`;
   } catch {
     // Fall through to the template: small talk must never fail the chat.
   }
