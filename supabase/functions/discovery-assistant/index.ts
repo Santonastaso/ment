@@ -3,7 +3,7 @@ import { recordAiRun } from '../_shared/ai-telemetry.ts';
 import { aiErrorResponse, mistralJson } from '../_shared/mistral.ts';
 import { enforceRateLimit } from '../_shared/rate-limit.ts';
 import { canHelpWithCareerGoal, hasGroundedExpertise } from '../_shared/discovery-guards.mjs';
-import { departmentChoices, frameChat, frameExhausted, frameNarrow, frameNoMatch, frameOpenAgain, frameRefineNone, narrowChoices, ownWordsInvite, scopeChoices, type Choice, frameResults, namesARole, NO_GAP, type Gap } from './framing.ts';
+import { departmentChoices, frameChat, frameExhausted, frameNarrow, frameNoMatch, frameOpenAgain, frameRefineNone, frameSmallTalk, narrowChoices, ownWordsInvite, scopeChoices, type Choice, frameResults, namesARole, NO_GAP, type Gap } from './framing.ts';
 
 const PROMPT_VERSION = 'discovery-v19';
 
@@ -300,6 +300,9 @@ const INTENT_PATTERNS: Array<[string, RegExp[]]> = [
     /\b(anyone|someone|somebody) else\b/, /\bshow (me )?more\b/, /^\s*more\s*(please|pls)?\s*[.!?]*\s*$/,
     /\baltr[ie] (persone|profili|opzioni|nomi)\b/, /\bd'autres\b/, /\bautres (profils|personnes|options)\b/]],
   ['thanks', [/^\s*(thanks|thank you|thx|cheers|grazie|merci)\b/]],
+  ['smalltalk', [/\bhow (are|r) (you|u)\b/, /\bhow('s| is) (it going|everything|your day)\b/, /\bhow are things\b/, /\bwhat'?s up\b/,
+    /\bhow have you been\b/, /\bnice to meet you\b/, /\bgood (morning|afternoon|evening)\b/, /\bcome (stai|va)\b/, /\btutto bene\b/,
+    /\bbuon(giorno|asera|pomeriggio)\b/, /\b[cç]a va\b/, /\bcomment (allez|vas)[- ](vous|tu)\b/]],
   ['greeting', [/^\s*(hi|hello|hey|hiya|ciao|salve|buongiorno|bonjour|salut)\b/, /\bwho are you\b/, /\bwhat (are|can) you\b/,
     /\bhow does (this|it) work\b/, /\bwhat is this\b/, /\bchi sei\b/, /\bcosa (sei|fai)\b/, /\bqui (es[- ]tu|[eê]tes[- ]vous)\b/]],
   ['refine', [/\binstead\b/, /\brather\b/, /\binvece\b/, /\bplut[oô]t\b/, /\bmore (senior|junior|experienced)\b/, /\bpi[uù] senior\b/, /\bplus seniors?\b/, /\bonly in\b/, /\bsolo a\b/, /\buniquement [aà]\b/,
@@ -326,6 +329,28 @@ function gapInOwnWords(gap: Gap, text: string, language: string): Gap {
   if (gap.kind !== 'none') return gap;
   const own = contentWords(text).slice(0, 2).join(' ');
   return own ? { kind: 'subject', value: own, role: namesARole(language, text, own) } : gap;
+}
+
+// Small talk is the one place Mistral writes freely: a short social reply
+// where variety helps and nothing about matching depends on it. Code checks
+// the result and falls back to a warm template if it is unusable.
+async function smallTalkReply(language: string, message: string) {
+  try {
+    const result = await mistralJson<{ reply?: string }>({
+      feature: 'discovery_clarify',
+      system: `You are Ment, the friendly assistant of ESSEC's mentoring network, which helps students and alumni meet people who can help with their studies or career. Respond in ${language}. The user is making small talk. Reply like a warm, upbeat friend in one or two short sentences: answer them naturally (for example say you are doing well and ask how they are), then invite them to get going -- meeting someone new or learning a new skill. Sound casual and human. No emojis, no lists, no quotation marks. Never mention databases, profiles, candidates, algorithms or AI. Return JSON only: {"reply":"..."}.`,
+      user: JSON.stringify({ message: message.slice(0, 300) }),
+      temperature: 0.7,
+      maxTokens: 120,
+    });
+    const reply = humanize(cleanText(result.value?.reply, 320)).replace(/^["'“]+|["'”]+$/g, '');
+    const usable = reply.length >= 15 && reply.length <= 300
+      && !/\b(database|profile|candidate|algorithm|artificial intelligence|language model|json)\b/i.test(reply);
+    if (usable) return reply;
+  } catch {
+    // Fall through to the template: small talk must never fail the chat.
+  }
+  return frameSmallTalk(language);
 }
 
 function messageIntent(text: string, hasResults: boolean, namesSomething: boolean) {
@@ -698,9 +723,11 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
       const lastShown = [...priorTurns].reverse().find((turn) => turn.role === 'assistant' && turn.kind === 'matches');
       const namesSomething = meaningfulLatest.length > 0 || namesPlace;
       const intent = messageIntent(latestRaw, Boolean(lastShown), namesSomething);
-      if (intent === 'greeting' || intent === 'thanks') {
-        const reply = frameChat(language, intent, departmentExamples(language, coverage));
-        const choices = intent === 'greeting' ? departmentChoices(language, preferredDepartments(departments)) : [];
+      if (intent === 'greeting' || intent === 'thanks' || intent === 'smalltalk') {
+        const reply = intent === 'smalltalk'
+          ? await smallTalkReply(language, latestRaw)
+          : frameChat(language, intent, departmentExamples(language, coverage));
+        const choices = intent === 'greeting' || intent === 'smalltalk' ? departmentChoices(language, preferredDepartments(departments)) : [];
         const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'chat', content: reply, suggestions: choices });
         return jsonOk({ matches: [], clarification: reply, suggestions: choices, thread_id: threadId });
       }

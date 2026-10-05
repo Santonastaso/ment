@@ -315,3 +315,22 @@ const REFINE_NONE: Record<string, string> = {
 export function frameRefineNone(language: string) {
   return REFINE_NONE[language] || REFINE_NONE.English;
 }
+
+const SMALL_TALK: Record<string, string[]> = {
+  English: [
+    "All good here, thanks for asking! How about you? Shall we get cracking — meeting someone new or learning a new skill?",
+    "Doing great, thanks! How are things on your side? Want to find someone interesting to talk to, or pick up a new skill?",
+  ],
+  Italian: [
+    'Tutto bene, grazie! E tu come stai? Ci mettiamo all’opera: vuoi conoscere qualcuno di nuovo o imparare una nuova competenza?',
+    'Alla grande, grazie! Tu come va? Che ne dici di trovare qualcuno con cui parlare o una nuova competenza da imparare?',
+  ],
+  French: [
+    'Tout va bien, merci ! Et vous ? On s’y met : rencontrer quelqu’un de nouveau ou apprendre une nouvelle compétence ?',
+    'Très bien, merci ! Et de votre côté ? Envie de rencontrer quelqu’un d’intéressant ou d’apprendre une nouvelle compétence ?',
+  ],
+};
+export function frameSmallTalk(language: string, random: () => number = Math.random) {
+  const options = SMALL_TALK[language] || SMALL_TALK.English;
+  return options[Math.floor(random() * options.length) % options.length];
+}

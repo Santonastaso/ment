@@ -294,7 +294,7 @@ test('a chosen department offers how to narrow it', async () => {
 
 test('the greeting offers the same starting choices', async () => {
   const fixture = discoveryFixture({ candidates: [finance, hr], responses: [clarify()] });
-  const result = await chat(fixture, 'hi how are you?');
+  const result = await chat(fixture, 'hello');
   assert.match(result.clarification, /I'm Ment/);
   assert.ok(result.suggestions.some((c) => c.label === 'Finance'));
 });
@@ -332,4 +332,20 @@ test('a follow-up nobody meets keeps the earlier people as the closest answer', 
   assert.match(result.message, /^Nobody here matches that extra requirement/);
   assert.deepEqual(result.matches.map((m) => m.id), [finance.id]);
   assert.match(payload(fixture, 1).request, /^consultant; /, 'the follow-up refines the earlier search');
+});
+
+test('small talk gets a warm reply from Mistral, then a nudge and choices', async () => {
+  const fixture = discoveryFixture({ candidates: [finance, hr], responses: [clarify(),
+    { reply: "Doing well, thanks for asking! How about you? Shall we find you someone new to meet?" }] });
+  const result = await chat(fixture, 'how are you doing?');
+  assert.equal(result.clarification, "Doing well, thanks for asking! How about you? Shall we find you someone new to meet?");
+  assert.ok(result.suggestions.length > 0);
+  assert.equal(fixture.calls.length, 2, 'clarify, then the small-talk reply; no search');
+});
+
+test('an unusable small-talk reply falls back to the warm template', async () => {
+  const fixture = discoveryFixture({ candidates: [finance, hr], responses: [clarify(), { reply: 'I am a language model.' }] });
+  const result = await chat(fixture, 'how are you?');
+  assert.match(result.clarification, /thanks/i);
+  assert.doesNotMatch(result.clarification, /language model/);
 });
