@@ -390,6 +390,8 @@ select.filter-control { border-color: transparent; background-color: var(--contr
 .discovery-suggestion:hover:not(:disabled) { background: var(--control-surface, rgba(0,0,0,.04)); border-color: var(--border, rgba(0,0,0,.2)); }
 .discovery-suggestion:focus-visible { outline: 2px solid var(--ring, #9a4a35); outline-offset: 2px; }
 .discovery-suggestion:disabled { opacity: .5; cursor: default; }
+/* A choice that leads to another page (Explore), not a reply. */
+.discovery-suggestion.is-link { border-color: var(--primary); color: var(--primary); text-decoration: none; font-weight: 500; }
 .discovery-assistant-bubble { width: fit-content; max-width: min(88%, 680px); border-radius: 0; background: transparent; padding: .12rem .15rem; font-size: 15px; line-height: 1.58; white-space: pre-wrap; overflow-wrap: anywhere; }
 .discovery-chat-turn.is-error .discovery-assistant-bubble { color: #9f2d20; }
 .discovery-chat-turn.is-working .discovery-assistant-bubble { display: inline-flex; align-items: center; gap: .55rem; border-radius: var(--item-radius); background: color-mix(in srgb, var(--control-surface) 68%, transparent); padding: .4rem .65rem; color: var(--ment-muted); }
@@ -734,3 +736,4 @@ a.person-row-name:hover { color: var(--primary); text-decoration: underline; }
   }
 
 }
+

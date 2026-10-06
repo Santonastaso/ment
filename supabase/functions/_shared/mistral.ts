@@ -24,6 +24,7 @@ export class AiProviderError extends Error {
 const FEATURE_MODEL_DEFAULTS: Record<string, string> = {
   discovery_clarify: 'mistral-small-latest',
   discovery_match: 'mistral-small-latest',
+  discovery_voice: 'mistral-small-latest',
 };
 
 function configuration(feature?: string) {
