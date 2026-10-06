@@ -45,13 +45,23 @@ Return JSON only: {"text":"..."}`;
 // Sentences said in the last replies are not said again, verbatim or nearly:
 // two sentences repeat when most of their meaningful words are shared.
 const sentences = (text: string) => text.split(/(?<=[.!?])\s+/).map((part) => part.trim()).filter(Boolean);
-const meaningful = (text: string) => new Set(wordList(text).map(({ word }) => word.toLowerCase()).filter((word) => word.length >= 4));
+const FILLER = new Set(['the', 'and', 'for', 'you', 'are', 'was', 'but', 'that', 'this', 'with', 'have', 'they', 'them', 'your', 'who', 'one']);
+// Stems, so "someone different" and "some different people" share words.
+const meaningful = (text: string) => new Set(wordList(text).map(({ word }) => word.toLowerCase().replace(/['’].*$/, ''))
+  .filter((word) => word.length >= 3 && !FILLER.has(word)).map((word) => word.slice(0, 5)));
 function sameSentence(a: string, b: string) {
   const x = meaningful(a);
   const y = meaningful(b);
-  if (x.size < 3 || y.size < 3) return a.trim().toLowerCase() === b.trim().toLowerCase();
+  if (x.size < 2 || y.size < 2) return a.trim().toLowerCase() === b.trim().toLowerCase();
   const shared = [...x].filter((word) => y.has(word)).length;
   return shared / Math.min(x.size, y.size) >= 0.6;
+}
+const opener = (text: string) => wordList(text).slice(0, 2).map(({ word }) => word.toLowerCase()).join(' ');
+// Starting two replies in a row the same way ("Got it — ...", "Got it — ...")
+// reads as canned even when the rest differs.
+export function sameOpening(text: string, recent: string[]) {
+  const start = opener(text);
+  return Boolean(start) && recent.some((reply) => sentences(reply).some((sentence) => opener(sentence) === start));
 }
 export function repeats(text: string, recent: string[]) {
   const before = recent.flatMap(sentences);

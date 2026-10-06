@@ -4,7 +4,7 @@ import { aiErrorResponse, mistralJson } from '../_shared/mistral.ts';
 import { enforceRateLimit } from '../_shared/rate-limit.ts';
 import { canHelpWithCareerGoal, hasGroundedExpertise } from '../_shared/discovery-guards.mjs';
 import { departmentChoices, frameChat, frameExhausted, frameNarrow, frameNoMatch, frameOpenAgain, frameRefineNone, frameSmallTalk, frameNudge, frameSamePeople, frameSomeRepeated, frameRejectedNone, framePrivacy, frameDirectory, framePerson, exploreChoice, frameWhichFirst, narrowChoices, ownWordsInvite, scopeChoices, type Choice, frameResults, namesARole, NO_GAP, type Gap, frameConflict, conflictChoices, frameScope, frameBroad } from './framing.ts';
-import { keepsFacts, repeats, VOICE_PROMPT, withoutRepeats } from './voice.ts';
+import { keepsFacts, repeats, sameOpening, VOICE_PROMPT, withoutRepeats } from './voice.ts';
 import { NO_PARTS, narrowStepwise, negatedWords, readParts, withoutExcluded, type Filter, type Parts } from './request.ts';
 
 const PROMPT_VERSION = 'discovery-v25';
@@ -389,7 +389,7 @@ async function voiced(language: string, original: string, userMessage: string, r
       maxTokens: 260,
     });
     const rewritten = humanize(cleanText(result.value?.text, 600)).replace(/^["'“]+|["'”]+$/g, '');
-    return keepsFacts(text, rewritten, userMessage) && !repeats(rewritten, recent) ? rewritten : text;
+    return keepsFacts(text, rewritten, userMessage) && !repeats(rewritten, recent) && !sameOpening(rewritten, recent) ? rewritten : text;
   } catch {
     return text;
   }
@@ -1493,7 +1493,10 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
     // Being transparent about repeats: the same people coming back after a
     // follow-up otherwise reads as if the follow-up found them afresh.
     const repeated = shown.filter((person) => seenBefore.has(person.id)).length;
-    const framed = frameResults(language, { near: isNear, count: shown.length, gap: resultGap, closeTerms, more: followUp === 'more', different: followUp === 'reject', clarified: answeredScope, first: seenBefore.size === 0 });
+    const framed = frameResults(language, { near: isNear, count: shown.length, gap: resultGap, closeTerms, more: followUp === 'more', different: followUp === 'reject', clarified: answeredScope, first: seenBefore.size === 0, recent: recentReplies,
+      // The first person shown, by first name and title, when not redacted.
+      person: shown[0]?.name && shown[0].name !== 'Network member' && shown[0].job_title
+        ? { first: String(shown[0].name).split(/\s+/)[0], title: String(shown[0].job_title) } : undefined });
     const message = await voiced(language, repeated && repeated === shown.length ? frameSamePeople(language, shown.length)
       : repeated ? `${framed} ${frameSomeRepeated(language, shown.length - repeated)}` : framed, query, recentReplies);
     const threadId = await persistTurns(ctx, body.thread_id, query, {

@@ -212,7 +212,7 @@ test('a single exact match is never asked to "pick one"', async () => {
   const result = await chat(fixture, 'help with Financial modelling');
   assert.equal(result.matches.length, 1);
   assert.doesNotMatch(result.message, /pick/i);
-  assert.match(result.message, /someone/i);
+  assert.match(result.message, /someone|Finance/i);
   assert.equal(fixture.thread.turns.at(-1).framed, true);
 });
 
@@ -277,7 +277,7 @@ test('"more options" excludes people already shown and keeps the scope', async (
   ] });
   const result = await say(fixture, 'show me more options', 'thread');
   assert.deepEqual(payload(fixture, 1).candidates.map((c) => c.id), [second.id], 'shown people and HR are excluded');
-  assert.match(result.message, /one more person/);
+  assert.match(result.message, /more|another/i);
 });
 
 test('when nobody else fits, "more" says so and offers to widen', async () => {
@@ -580,7 +580,7 @@ test('pushback that finds new people says they are different, with no invented p
     { outcome: 'matches', matches: [{ ...directMatch.matches[0], profile_id: second.id }] },
   ] });
   const result = await say(fixture, 'this is not what I want', 'thread');
-  assert.match(result.message, /^Got it — here's someone different\./);
+  assert.match(result.message, /different|another angle|fresh face|scratch that/i);
   assert.doesNotMatch(result.message, /based in/);
 });
 
@@ -730,7 +730,7 @@ test('"give me more options" keeps the scope even when the model repeats the ear
   const result = await say(fixture, 'give me more options', 'thread');
   assert.equal(result.clarification, '', 'no question about what they want');
   assert.deepEqual(result.matches.map((m) => m.id), ['hr-london-2']);
-  assert.match(result.message, /a few more people|one more person/);
+  assert.match(result.message, /more|another/i);
 });
 
 test('answering a scoping question keeps the field: other companies still means HR', async () => {
@@ -746,7 +746,7 @@ test('answering a scoping question keeps the field: other companies still means 
   const result = await say(fixture, choice.message, first.thread_id);
   assert.deepEqual(lastPayload(fixture).candidates.map((c) => c.id), ['hr'], 'only HR people are considered');
   assert.deepEqual(result.matches.map((m) => m.id), ['hr']);
-  assert.match(result.message, /^Your first request had no exact match — but with your clarification, I think this person is a really good fit!/);
+  assert.match(result.message, /first request had no exact match|what you first asked/);
 });
 
 test('many people for a one-part request are scoped first, with choices from the people here', async () => {
@@ -860,4 +860,19 @@ test('a second question does not repeat the invitation under the first', async (
   const result = await say(fixture, 'hmm', 'thread');
   assert.ok(result.clarification);
   assert.doesNotMatch(result.clarification, /Pick one below, or tell me in your own words/);
+});
+
+test('back-to-back pushback never opens or reads the same way twice', async () => {
+  const people = Array.from({ length: 4 }, (_, i) => ({ ...finance, id: `p${i}`, name: `Person${i} Surname`, job_title: 'CFO' }));
+  const previous = 'Got it — here\'s someone different.';
+  for (let run = 0; run < 12; run += 1) {
+    const turns = [...shownFinance, { role: 'user', content: 'none of these are relevant' },
+      { role: 'assistant', kind: 'matches', framed: true, content: previous, search_request: 'Financial modelling', matches: [{ id: 'p0', name: 'Person0 Surname' }] }];
+    const fixture = discoveryFixture({ candidates: people, turns, responses: [
+      clarify(), { outcome: 'matches', matches: [{ ...directMatch.matches[0], profile_id: 'p1' }] },
+    ] });
+    const result = await say(fixture, 'still not what I want', 'thread');
+    assert.doesNotMatch(result.message, /^Got it/, 'not the same opening as the last reply');
+    assert.doesNotMatch(result.message, /someone different|some different people/);
+  }
 });

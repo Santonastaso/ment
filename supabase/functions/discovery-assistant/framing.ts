@@ -1,3 +1,4 @@
+import { repeats, sameOpening } from './voice.ts';
 // Everything Ment says around the results. These are templates rather than
 // model prose: the sentences set the tone and say what happens next, and the
 // small model wrote them like compliance notices. Specifics come from real
@@ -215,29 +216,172 @@ function copyFor(language: string) {
 // The lead sentence of a two-sentence template.
 const lead = (text: string) => text.split(/(?<=[.!])\s+/)[0];
 
+// The people being shown, by first name and title, so the reply can talk
+// about them the way a person would ("How about Theo, a CFO?") instead of
+// "here are some people". Empty for redacted members.
+export type Shown = { first: string; title: string };
+
+// "a CFO", "an HR Director", "an Investment Associate".
+const withArticle = (title: string) => {
+  const acronym = /^[A-Z]{2,}/.test(title);
+  const vowel = acronym ? /^[AEFHILMNORSX]/.test(title) : /^[aeiou]/i.test(title);
+  return `${vowel ? 'an' : 'a'} ${title}`;
+};
+
+type Line = (person: Shown, count: number) => string;
+type Lines = {
+  exactOne: Line[]; exactMany: Line[]; differentOne: Line[]; differentMany: Line[];
+  moreOne: Line[]; moreMany: Line[]; clarifiedOne: Line[]; clarifiedMany: Line[];
+  closeOne: Line[]; closeMany: Line[];
+};
+const others = (count: number, one: string, many: string) => (count - 1 === 1 ? one : many.replace('{n}', String(count - 1)));
+
+// Several ways to say each thing. Variants that name a person are used only
+// when a name and title are known; the reply avoids anything said in the
+// last two replies, so back-to-back messages never repeat themselves.
+const LINES: Record<string, Lines> = {
+  English: {
+    exactOne: [
+      (p) => `${p.first} looks like a strong fit — ${withArticle(p.title)}.`,
+      (p) => `Meet ${p.first}, ${withArticle(p.title)}. I think they could really help.`,
+      (p) => `I've got just the person: ${p.first}, ${withArticle(p.title)}.`,
+    ],
+    exactMany: [
+      (p, n) => `I've found ${n} people who could really help — ${p.first}, ${withArticle(p.title)}, is a great place to start.`,
+      (p, n) => `Good news: ${n} strong options here. Have a look at ${p.first} first — ${withArticle(p.title)}.`,
+      (p, n) => `${n} people stand out for this, starting with ${p.first}, ${withArticle(p.title)}.`,
+    ],
+    differentOne: [
+      (p) => `Fair enough — let's try another angle. How about ${p.first}, ${withArticle(p.title)}?`,
+      (p) => `No problem, here's a fresh face: ${p.first}, ${withArticle(p.title)}.`,
+      (p) => `Okay, scratch that! ${p.first} might be closer to what you have in mind — ${withArticle(p.title)}.`,
+    ],
+    differentMany: [
+      (p, n) => `Fair enough — here are ${n} fresh faces, starting with ${p.first}, ${withArticle(p.title)}.`,
+      (p, n) => `No problem, let's switch it up. ${p.first} (${p.title}) and ${others(n, 'one other', '{n} others')} might be closer.`,
+      (p) => `Okay, new batch! Have a look at ${p.first}, ${withArticle(p.title)}, and the others below.`,
+    ],
+    moreOne: [
+      (p) => `One more for you: ${p.first}, ${withArticle(p.title)}.`,
+      (p) => `Here's another option — ${p.first}, ${withArticle(p.title)}.`,
+    ],
+    moreMany: [
+      (p) => `A few more to consider, starting with ${p.first}, ${withArticle(p.title)}.`,
+      (p, n) => `Here are ${n} more people — ${p.first} (${p.title}) is one to look at.`,
+    ],
+    clarifiedOne: [
+      (p) => `No exact match for what you first asked — but with your clarification, ${p.first}, ${withArticle(p.title)}, looks like a really good fit!`,
+      (p) => `That helps a lot! Your first request had no exact match, but ${p.first} (${p.title}) fits what you've described now.`,
+    ],
+    clarifiedMany: [
+      (p, n) => `No exact match for what you first asked — but with your clarification I've found ${n} people who fit well, starting with ${p.first}, ${withArticle(p.title)}.`,
+      (p) => `That helps a lot! Your first request had no exact match, but these people fit what you've described now — ${p.first} (${p.title}) especially.`,
+    ],
+    closeOne: [
+      (p) => `, but ${p.first}, ${withArticle(p.title)}, comes pretty close and could still help.`,
+      (p) => `, though ${p.first} (${p.title}) is close and could still be a great help.`,
+    ],
+    closeMany: [
+      (p) => `, but ${p.first} (${p.title}) and the others below come pretty close.`,
+      (p) => `, though these people are close — ${p.first}, ${withArticle(p.title)}, especially.`,
+    ],
+  },
+  Italian: {
+    exactOne: [
+      (p) => `${p.first} (${p.title}) sembra proprio la persona giusta.`,
+      (p) => `Ti presento ${p.first}, ${p.title}: credo possa davvero aiutarti.`,
+      (p) => `Ho la persona che fa per te: ${p.first} (${p.title}).`,
+    ],
+    exactMany: [
+      (p, n) => `Ho trovato ${n} persone che possono davvero aiutarti: ${p.first} (${p.title}) è un ottimo punto di partenza.`,
+      (p, n) => `Buone notizie: ${n} ottime opzioni. Inizia da ${p.first}, ${p.title}.`,
+    ],
+    differentOne: [
+      (p) => `Giusto, proviamo un'altra strada. Che ne dici di ${p.first} (${p.title})?`,
+      (p) => `Nessun problema, ecco una persona nuova: ${p.first}, ${p.title}.`,
+    ],
+    differentMany: [
+      (p, n) => `D'accordo, ecco ${n} persone nuove, a partire da ${p.first} (${p.title}).`,
+      (p) => `Cambiamo un po': dai un'occhiata a ${p.first} (${p.title}) e agli altri qui sotto.`,
+    ],
+    moreOne: [(p) => `Eccone un'altra: ${p.first}, ${p.title}.`, (p) => `Un'altra opzione: ${p.first} (${p.title}).`],
+    moreMany: [(p) => `Altre persone da considerare, a partire da ${p.first} (${p.title}).`],
+    clarifiedOne: [(p) => `Per la tua prima richiesta non c'era una corrispondenza esatta, ma con il tuo chiarimento ${p.first} (${p.title}) sembra davvero adatto.`],
+    clarifiedMany: [(p, n) => `Per la tua prima richiesta non c'era una corrispondenza esatta, ma con il tuo chiarimento ho trovato ${n} persone adatte, a partire da ${p.first} (${p.title}).`],
+    closeOne: [(p) => `, ma ${p.first} (${p.title}) ci va molto vicino e potrebbe comunque aiutarti.`],
+    closeMany: [(p) => `, ma ${p.first} (${p.title}) e gli altri qui sotto ci vanno vicino.`],
+  },
+  French: {
+    exactOne: [
+      (p) => `${p.first} (${p.title}) semble vraiment correspondre.`,
+      (p) => `Je vous présente ${p.first}, ${p.title} : je pense qu'il ou elle peut vraiment vous aider.`,
+      (p) => `J'ai la personne qu'il vous faut : ${p.first} (${p.title}).`,
+    ],
+    exactMany: [
+      (p, n) => `J'ai trouvé ${n} personnes qui peuvent vraiment vous aider — ${p.first} (${p.title}) est un excellent point de départ.`,
+      (p, n) => `Bonne nouvelle : ${n} belles options. Commencez par ${p.first}, ${p.title}.`,
+    ],
+    differentOne: [
+      (p) => `D'accord, essayons autre chose. Que diriez-vous de ${p.first} (${p.title}) ?`,
+      (p) => `Pas de souci, voici quelqu'un de nouveau : ${p.first}, ${p.title}.`,
+    ],
+    differentMany: [
+      (p, n) => `D'accord, voici ${n} nouvelles personnes, à commencer par ${p.first} (${p.title}).`,
+      (p) => `Changeons un peu : regardez ${p.first} (${p.title}) et les autres ci-dessous.`,
+    ],
+    moreOne: [(p) => `En voici une autre : ${p.first}, ${p.title}.`, (p) => `Autre option : ${p.first} (${p.title}).`],
+    moreMany: [(p) => `D'autres personnes à considérer, à commencer par ${p.first} (${p.title}).`],
+    clarifiedOne: [(p) => `Pas de correspondance exacte pour votre première demande, mais avec votre précision, ${p.first} (${p.title}) semble vraiment convenir.`],
+    clarifiedMany: [(p, n) => `Pas de correspondance exacte pour votre première demande, mais avec votre précision j'ai trouvé ${n} personnes qui conviennent, à commencer par ${p.first} (${p.title}).`],
+    closeOne: [(p) => `, mais ${p.first} (${p.title}) s'en approche beaucoup et pourrait quand même vous aider.`],
+    closeMany: [(p) => `, mais ${p.first} (${p.title}) et les autres ci-dessous s'en approchent.`],
+  },
+};
+
+// Picks a phrasing that repeats nothing from the last replies, when one does.
+function fresh(options: string[], recent: string[], random: () => number) {
+  const unused = options.filter((text) => !repeats(text, recent) && !sameOpening(text, recent));
+  return pick(unused.length ? unused : options, random);
+}
+
 export function frameResults(language: string, options: {
   near: boolean; count: number; gap: Gap; closeTerms: string[]; more?: boolean; different?: boolean; clarified?: boolean;
   // The first results of the conversation say what to do next; later ones
   // do not repeat it -- "happy to show more, just say" every time is how a
   // chatbot talks.
-  first?: boolean; random?: () => number;
+  first?: boolean; person?: Shown; recent?: string[]; random?: () => number;
 }) {
   const copy = copyFor(language);
+  const lines = LINES[language] || LINES.English;
   const random = options.random || Math.random;
+  const recent = options.recent || [];
   const one = options.count === 1;
   const first = options.first !== false;
+  const person = options.person?.first && options.person?.title ? options.person : null;
+  const named = (list: Line[]) => (person ? list.map((line) => line(person, options.count)) : []);
   const act = first ? ` ${pick(one ? copy.actOne : copy.actMany, random)}` : '';
   const offer = first ? ` ${pick(copy.followUp, random)}` : '';
   const full = (text: string) => (first ? text : lead(text));
-  if (options.more) return `${full(pick(one ? copy.moreOne : copy.moreMany, random))}${offer}`;
+  if (options.more) {
+    return `${fresh([...(one ? copy.moreOne : copy.moreMany).map(full), ...named(one ? lines.moreOne : lines.moreMany)], recent, random)}${offer}`;
+  }
   // After the user answered a question asked because nothing matched
   // exactly: say the first request had no exact match, and credit the answer.
-  if (options.clarified) return `${(CLARIFIED[language] || CLARIFIED.English)(one)}${act}${offer}`;
-  if (options.different) return `${(DIFFERENT[language] || DIFFERENT.English)(one)}${act}${offer}`;
-  if (!options.near) return `${full(pick(one ? copy.exactOne : copy.exactMany, random))}${offer}`;
+  if (options.clarified) {
+    return `${fresh([(CLARIFIED[language] || CLARIFIED.English)(one), ...named(one ? lines.clarifiedOne : lines.clarifiedMany)], recent, random)}${act}${offer}`;
+  }
+  if (options.different) {
+    return `${fresh([(DIFFERENT[language] || DIFFERENT.English)(one), ...named(one ? lines.differentOne : lines.differentMany)], recent, random)}${act}${offer}`;
+  }
+  if (!options.near) {
+    return `${fresh([...(one ? copy.exactOne : copy.exactMany).map(full), ...named(one ? lines.exactOne : lines.exactMany)], recent, random)}${offer}`;
+  }
   const gap = asWritten(options.gap);
   const terms = listOf(options.closeTerms.slice(0, 2), copy.join);
-  return `${copy.missing(gap)}${(one ? copy.closeOne : copy.closeMany)(terms)}${act}${offer}`;
+  // With close terms the generic tail names them, which is the more useful
+  // sentence; the named tails are for when there are none to name.
+  const tails = terms ? [(one ? copy.closeOne : copy.closeMany)(terms)] : [(one ? copy.closeOne : copy.closeMany)(''), ...named(one ? lines.closeOne : lines.closeMany)];
+  return `${copy.missing(gap)}${fresh(tails, recent, random)}${act}${offer}`;
 }
 
 export function frameChat(language: string, intent: string, examples: string, random: () => number = Math.random) {
