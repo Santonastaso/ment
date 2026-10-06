@@ -19,7 +19,7 @@
   "onboarding.import.desc": "Carica una valutazione delle performance o un CV (.docx o .pdf). Precompiliamo il tuo profilo — puoi modificare tutto prima di salvare.",
   "onboarding.import.reading": "Lettura del documento…",
   "onboarding.import.drop": "Trascina un file o clicca per sfogliare",
-  "onboarding.import.hint": ".docx, .pdf, .txt — max 10MB",
+  "onboarding.import.hint": ".docx, .pdf, .txt — massimo 10 MB",
   "onboarding.import.consent": "Accetto che questo file venga elaborato per creare una bozza del mio profilo. L'elaborazione AI è facoltativa.",
   "onboarding.import.consentRequired": "Conferma prima l'elaborazione del file.",
   "onboarding.import.error": "Impossibile leggere il file. Prova un altro formato o salta per inserire i dati manualmente.",

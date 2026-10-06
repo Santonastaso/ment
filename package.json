@@ -16,7 +16,7 @@
     "eval:ai": "node scripts/discovery-eval.mjs",
     "lint": "supabase db lint --linked",
     "deploy:functions": "supabase functions deploy",
-    "check:i18n": "node scripts/check-i18n-coverage.mjs",
+    "check:i18n": "node scripts/check-i18n-coverage.mjs --strict-translations",
     "check:migrations": "node scripts/check-migrations.mjs"
   },
   "devDependencies": {
