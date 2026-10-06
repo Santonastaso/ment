@@ -927,7 +927,7 @@ export default function AdminDashboard() {
             action={
               <div className="flex flex-wrap items-center gap-2">
                 <select
-                  className="input h-8 min-w-32 text-sm"
+                  className="input filter-control min-w-32 text-sm"
                   value={feedbackFilter}
                   onChange={e => { setFeedbackFilter(e.target.value); loadFeedback(e.target.value); }}
                 >
@@ -936,7 +936,7 @@ export default function AdminDashboard() {
                   <option value="reviewing">{t('admin.feedback.statusReviewing')}</option>
                   <option value="resolved">{t('admin.feedback.statusResolved')}</option>
                 </select>
-                <Button type="button" variant="outline" size="sm" onClick={() => loadFeedback(feedbackFilter)} disabled={feedbackLoading}>
+                <Button type="button" variant="outline" size="sm" className="filter-control" onClick={() => loadFeedback(feedbackFilter)} disabled={feedbackLoading}>
                   {feedbackLoading ? t('admin.common.refreshing') : t('admin.common.refresh')}
                 </Button>
               </div>

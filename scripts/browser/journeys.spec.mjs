@@ -20,6 +20,12 @@ test('Messages rail moves smoothly and compact menus remain usable', async ({ pa
   await expect(page.locator('.conversation-messages')).toBeVisible();
   expect(await page.locator('main').evaluate(element => element.scrollHeight <= element.clientHeight + 1)).toBe(true);
   const sidebar = page.locator('.app-sidebar');
+  const home = sidebar.getByRole('link', { name: 'Home' });
+  const all = page.locator('.conversation-filters button[aria-pressed="true"]');
+  const [homeBox, allBox] = await Promise.all([home.boundingBox(), all.boundingBox()]);
+  expect(allBox.y).toBeCloseTo(homeBox.y, 0);
+  expect(allBox.height).toBe(homeBox.height);
+  expect(await all.evaluate(element => getComputedStyle(element).borderRadius)).toBe(await home.evaluate(element => getComputedStyle(element).borderRadius));
   const centerY = async locator => {
     const box = await locator.boundingBox();
     return box.y + box.height / 2;
@@ -55,6 +61,8 @@ test('Messages rail moves smoothly and compact menus remain usable', async ({ pa
   const close = page.getByRole('button', { name: 'Hide message list' });
   await expect(close).toBeVisible();
   expect(Math.abs(await centerY(close) - await centerY(sidebar.getByRole('button', { name: 'Close sidebar' }).last()))).toBeLessThan(3);
+  expect(Math.abs(await centerY(close) - await centerY(page.locator('.conversation-header')))).toBeLessThan(3);
+  expect(Math.abs(await centerY(page.getByRole('heading', { name: 'Messages' })) - await centerY(page.locator('.conversation-header')))).toBeLessThan(3);
   expect(await rail.evaluate(element => getComputedStyle(element.parentElement).transitionDuration)).toBe('0.48s');
   await close.click();
   await page.waitForTimeout(100);
@@ -67,6 +75,11 @@ test('Messages rail moves smoothly and compact menus remain usable', async ({ pa
   expect(Math.abs(await centerY(compact.getByRole('button', { name: 'Messages' })) - await centerY(sidebar.getByRole('link', { name: 'Explorer' })))).toBeLessThan(3);
   await compact.getByRole('button', { name: 'Messages' }).click();
   await expect(page.locator('.conversation-list-content.menu-chats')).toBeVisible();
+  const [menuBox, headerBox] = await Promise.all([
+    page.locator('.conversation-list-content.menu-chats').boundingBox(),
+    page.locator('.conversation-header').boundingBox(),
+  ]);
+  expect(menuBox.y).toBeGreaterThan(headerBox.y + headerBox.height);
   await page.screenshot({ path: test.info().outputPath('messages-compact-rail.png'), animations: 'disabled' });
   await compact.getByRole('button', { name: 'Filter conversations' }).click();
   await expect(page.locator('.conversation-list-content.menu-filters')).toBeVisible();
@@ -92,6 +105,30 @@ test('Groups heading aligns with the sidebar toggle without an empty card', asyn
 test('Explorer sticky panel rules share the same width', async ({ page }) => {
   await page.goto('/explorer');
   await expect(page.locator('.directory-pagination')).toBeVisible();
+  const home = page.locator('.app-sidebar').getByRole('link', { name: 'Home' });
+  const [homeHeight, homeRadius] = await home.evaluate(element => {
+    const style = getComputedStyle(element);
+    return [element.getBoundingClientRect().height, style.borderRadius];
+  });
+  for (const control of await page.locator('.directory-filter, .directory-search-panel .filter-control').all()) {
+    const [height, radius] = await control.evaluate(element => {
+      const style = getComputedStyle(element);
+      return [element.getBoundingClientRect().height, style.borderRadius];
+    });
+    expect(height).toBe(homeHeight);
+    expect(radius).toBe(homeRadius);
+  }
+  await page.locator('.directory-filter').first().click();
+  const option = page.locator('.directory-filter-option').first();
+  await expect(option).toBeVisible();
+  expect(await option.evaluate(element => element.getBoundingClientRect().height)).toBe(homeHeight);
+  expect(await option.evaluate(element => getComputedStyle(element).borderRadius)).toBe(homeRadius);
+  await page.keyboard.press('Escape');
+  const [searchBox, brandBox] = await Promise.all([
+    page.locator('.directory-search-panel form').boundingBox(),
+    page.locator('.app-sidebar button[title="Close sidebar"]').first().boundingBox(),
+  ]);
+  expect(Math.abs(searchBox.y + searchBox.height / 2 - brandBox.y - brandBox.height / 2)).toBeLessThan(3);
   const edges = await page.locator('.directory-search-panel').evaluate(panel => {
     const pagination = panel.querySelector('.directory-pagination');
     const panelRect = panel.getBoundingClientRect();
@@ -104,6 +141,11 @@ test('Explorer sticky panel rules share the same width', async ({ page }) => {
 
 test('Quick reflection opens a card without shifting the profile and preserves drafts', async ({ page }) => {
   await page.goto('/profile');
+  const [tabsBox, brandBox] = await Promise.all([
+    page.locator('.profile-tabs').boundingBox(),
+    page.locator('.app-sidebar button[title="Close sidebar"]').first().boundingBox(),
+  ]);
+  expect(Math.abs(tabsBox.y + tabsBox.height / 2 - brandBox.y - brandBox.height / 2)).toBeLessThan(3);
   const trigger = page.getByRole('button', { name: 'Start check-in', exact: true, includeHidden: true });
   await expect(trigger).toBeVisible();
   await trigger.scrollIntoViewIfNeeded();
@@ -135,6 +177,20 @@ test('Quick reflection opens a card without shifting the profile and preserves d
   await page.screenshot({ path: test.info().outputPath('quick-reflection-card.png'), animations: 'disabled' });
   await dialog.press('Escape');
   await expect(dialog).toBeHidden();
+});
+
+test('Profile skill filters share the navigation pill geometry', async ({ page }) => {
+  await page.goto('/profile');
+  await page.getByTestId('profile-tab-skills').click();
+  const home = page.locator('.app-sidebar').getByRole('link', { name: 'Home' });
+  const geometry = locator => locator.evaluate(element => {
+    const style = getComputedStyle(element);
+    return [element.getBoundingClientRect().height, style.borderRadius];
+  });
+  const expected = await geometry(home);
+  for (const filter of await page.locator('.skill-cloud-filters button').all()) {
+    expect(await geometry(filter)).toEqual(expected);
+  }
 });
 
 test('Reflection log can add a check-in from its header', async ({ page }) => {
@@ -318,7 +374,7 @@ test('groups, unread badges and mobile back navigation', async ({ page }) => {
   await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Mobile group message');
   await page.getByRole('button', { name: 'Send message', exact: true }).click();
   await expect(page.getByText('Mobile group message', { exact: true })).toBeVisible();
-  await expect(page.locator('.conversation-messages time')).toHaveText(/^\d{2}\/\d{2}\/\d{2} \d{2}:\d{2}$/);
+  await expect(page.locator('.conversation-message time')).toHaveText(/^\d{2}:\d{2}$/);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
   await page.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(page.getByRole('button', { name: /New Group/ })).toBeVisible();
@@ -344,6 +400,31 @@ test('sent message is still visible after a full reload', async ({ page }) => {
   await expect(page.locator('.conversation-messages').getByText('This must survive reload')).toBeVisible();
   await page.reload();
   await expect(page.locator('.conversation-messages').getByText('This must survive reload')).toBeVisible();
+});
+
+test('chat groups messages by local day and shows only clock times', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.fixture.sessions[0].created_at = '2026-01-01T09:00:00Z';
+    window.fixture.messages['/sessions/1/messages'] = [
+      { id: 1, sender_id: 'viewer', kind: 'message', body: 'First day', created_at: '2026-01-01T10:00:00Z' },
+      { id: 2, sender_id: 'peer-1', kind: 'message', body: 'Second day', created_at: '2026-01-02T10:00:00Z' },
+      { id: 3, sender_id: 'viewer', kind: 'system', body: 'Request accepted.', created_at: '2026-01-02T11:00:00Z' },
+    ];
+    window.fixture.messages['/groups/1/messages'] = [
+      { id: 4, sender_id: 'viewer', sender_name: 'Viewer Student', body: 'Group day one', created_at: '2026-01-01T10:00:00Z' },
+      { id: 5, sender_id: 'peer', sender_name: 'Peer Mentor', body: 'Group day two', created_at: '2026-01-02T10:00:00Z' },
+    ];
+  });
+  await page.goto('/conversations?session=1');
+  const timeline = page.locator('.conversation-messages');
+  await expect(timeline.locator('.conversation-day')).toHaveCount(2);
+  expect(await timeline.locator('.conversation-day time').evaluateAll(items => items.map(item => item.dateTime))).toEqual(['2026-01-01', '2026-01-02']);
+  await expect(timeline.locator('.conversation-request-card time')).toHaveText(/^\d{2}:\d{2}$/);
+  await expect(timeline.locator('.conversation-message time')).toHaveText([/^\d{2}:\d{2}$/, /^\d{2}:\d{2}$/]);
+  await expect(timeline.locator('.conversation-event time')).toHaveText(/^\d{2}:\d{2}$/);
+  await page.getByRole('button', { name: /Test Group/ }).click();
+  await expect(timeline.locator('.conversation-day')).toHaveCount(2);
+  await expect(timeline.locator('.conversation-message time')).toHaveText([/^\d{2}:\d{2}$/, /^\d{2}:\d{2}$/]);
 });
 
 test('request history survives a missed reply and cancellation without reloading', async ({ page }) => {

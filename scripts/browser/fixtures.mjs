@@ -29,7 +29,7 @@ function fixtureApi(state) {
       if (/^\/(sessions|groups)\/\d+\/messages/.test(path)) {
         const [messagePath] = path.split('?');
         const rows = state.messages[messagePath] || [];
-        return path.startsWith('/groups') ? rows : { messages: rows, hasMore: false };
+        return { messages: rows, hasMore: false };
       }
     }
     if (method === 'post') {

@@ -101,10 +101,11 @@ export default function Explorer() {
   const updatingResults = dirLoading || Boolean(dirData && dirData.requestKey !== requestKey);
 
   return (
-    <PageShell title={t('explorer.title')} hideTitle className="gap-6">
+    <PageShell className="gap-6">
 
               <div className="directory-rail directory-search-panel grid min-w-0 gap-3">
-                  <form onSubmit={submitSearch} className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-2">
+                  <h1 className="sr-only">{t('explorer.title')}</h1>
+                  <form onSubmit={submitSearch} className="grid min-h-[var(--workspace-top-row)] w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
                     <Input aria-label={t('explorer.searchLabel')} placeholder={t('explorer.searchLabel')} value={inputValue} onChange={e => setInputValue(e.target.value)} />
                     <Button type="submit">{t('explorer.searchButton')}</Button>
                   </form>
@@ -117,7 +118,7 @@ export default function Explorer() {
                   <DirectoryFilter label={t('explorer.sortLabel')} value={sort} onChange={value => setParam('sort', value)} options={[{ value: 'relevance', label: t('explorer.sortRelevance') }, { value: 'name', label: t('explorer.sortName') }]} />
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <Button type="button" size="sm" variant="ghost" onClick={() => { setInputValue(''); setSearchParams({}); }}>{t('explorer.clearFilters')}</Button>
+                  <Button type="button" size="sm" variant="ghost" className="filter-control" onClick={() => { setInputValue(''); setSearchParams({}); }}>{t('explorer.clearFilters')}</Button>
                 </div>
                 {!dirError && total > 0 && (
                   <div className="directory-pagination flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4 text-sm text-muted-foreground">
