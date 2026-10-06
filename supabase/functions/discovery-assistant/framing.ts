@@ -212,23 +212,32 @@ function copyFor(language: string) {
   return COPY[language] || COPY.English;
 }
 
+// The lead sentence of a two-sentence template.
+const lead = (text: string) => text.split(/(?<=[.!])\s+/)[0];
+
 export function frameResults(language: string, options: {
-  near: boolean; count: number; gap: Gap; closeTerms: string[]; more?: boolean; different?: boolean; clarified?: boolean; random?: () => number;
+  near: boolean; count: number; gap: Gap; closeTerms: string[]; more?: boolean; different?: boolean; clarified?: boolean;
+  // The first results of the conversation say what to do next; later ones
+  // do not repeat it -- "happy to show more, just say" every time is how a
+  // chatbot talks.
+  first?: boolean; random?: () => number;
 }) {
   const copy = copyFor(language);
   const random = options.random || Math.random;
   const one = options.count === 1;
-  // Every set of results ends on an open door, never a one-shot answer.
-  const followUp = pick(copy.followUp, random);
-  if (options.more) return `${pick(one ? copy.moreOne : copy.moreMany, random)} ${followUp}`;
+  const first = options.first !== false;
+  const act = first ? ` ${pick(one ? copy.actOne : copy.actMany, random)}` : '';
+  const offer = first ? ` ${pick(copy.followUp, random)}` : '';
+  const full = (text: string) => (first ? text : lead(text));
+  if (options.more) return `${full(pick(one ? copy.moreOne : copy.moreMany, random))}${offer}`;
   // After the user answered a question asked because nothing matched
   // exactly: say the first request had no exact match, and credit the answer.
-  if (options.clarified) return `${(CLARIFIED[language] || CLARIFIED.English)(one)} ${pick(one ? copy.actOne : copy.actMany, random)} ${followUp}`;
-  if (options.different) return `${(DIFFERENT[language] || DIFFERENT.English)(one)} ${pick(one ? copy.actOne : copy.actMany, random)} ${followUp}`;
-  if (!options.near) return `${pick(one ? copy.exactOne : copy.exactMany, random)} ${followUp}`;
+  if (options.clarified) return `${(CLARIFIED[language] || CLARIFIED.English)(one)}${act}${offer}`;
+  if (options.different) return `${(DIFFERENT[language] || DIFFERENT.English)(one)}${act}${offer}`;
+  if (!options.near) return `${full(pick(one ? copy.exactOne : copy.exactMany, random))}${offer}`;
   const gap = asWritten(options.gap);
   const terms = listOf(options.closeTerms.slice(0, 2), copy.join);
-  return `${copy.missing(gap)}${(one ? copy.closeOne : copy.closeMany)(terms)} ${pick(one ? copy.actOne : copy.actMany, random)} ${followUp}`;
+  return `${copy.missing(gap)}${(one ? copy.closeOne : copy.closeMany)(terms)}${act}${offer}`;
 }
 
 export function frameChat(language: string, intent: string, examples: string, random: () => number = Math.random) {

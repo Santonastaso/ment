@@ -4,7 +4,7 @@ import { aiErrorResponse, mistralJson } from '../_shared/mistral.ts';
 import { enforceRateLimit } from '../_shared/rate-limit.ts';
 import { canHelpWithCareerGoal, hasGroundedExpertise } from '../_shared/discovery-guards.mjs';
 import { departmentChoices, frameChat, frameExhausted, frameNarrow, frameNoMatch, frameOpenAgain, frameRefineNone, frameSmallTalk, frameNudge, frameSamePeople, frameSomeRepeated, frameRejectedNone, framePrivacy, frameDirectory, framePerson, exploreChoice, frameWhichFirst, narrowChoices, ownWordsInvite, scopeChoices, type Choice, frameResults, namesARole, NO_GAP, type Gap, frameConflict, conflictChoices, frameScope, frameBroad } from './framing.ts';
-import { keepsFacts, VOICE_PROMPT } from './voice.ts';
+import { keepsFacts, repeats, VOICE_PROMPT, withoutRepeats } from './voice.ts';
 import { NO_PARTS, narrowStepwise, negatedWords, readParts, withoutExcluded, type Filter, type Parts } from './request.ts';
 
 const PROMPT_VERSION = 'discovery-v25';
@@ -376,18 +376,20 @@ async function smallTalkReply(language: string, message: string) {
 
 // Says a templated reply again in a warmer, less canned voice. The template
 // is returned whenever the rewrite fails or drops or invents anything.
-async function voiced(language: string, text: string, userMessage: string) {
+async function voiced(language: string, original: string, userMessage: string, recent: string[] = []) {
+  // Whatever happens below, nothing said in the last replies is said again.
+  const text = withoutRepeats(original, recent);
   if (!text || Deno.env.get('DISCOVERY_VOICE') === 'off') return text;
   try {
     const result = await mistralJson<{ text?: string }>({
       feature: 'discovery_voice',
       system: VOICE_PROMPT(language),
-      user: JSON.stringify({ message: text, user_said: userMessage.slice(0, 300) }),
+      user: JSON.stringify({ message: text, user_said: userMessage.slice(0, 300), previous_replies: recent }),
       temperature: 0.8,
       maxTokens: 260,
     });
     const rewritten = humanize(cleanText(result.value?.text, 600)).replace(/^["'“]+|["'”]+$/g, '');
-    return keepsFacts(text, rewritten, userMessage) ? rewritten : text;
+    return keepsFacts(text, rewritten, userMessage) && !repeats(rewritten, recent) ? rewritten : text;
   } catch {
     return text;
   }
@@ -667,6 +669,8 @@ Deno.serve(async (req) => {
   let typedTerms: string[] = [];
   // Answering a scoping question asked because nothing matched exactly.
   let answeredScope = false;
+  // The last replies, so the next one never repeats their sentences.
+  let recentReplies: string[] = [];
   const answer = (data: Record<string, unknown>) => jsonOk(understood ? { ...data, understood } : data);
   // Set when this message is the user's answer to a question we asked. Having
   // spent their one question, returning nothing is the worst possible outcome:
@@ -700,6 +704,8 @@ Deno.serve(async (req) => {
       if (turn.role !== 'assistant' || turn.kind !== 'matches' || !Array.isArray(turn.matches)) continue;
       for (const match of turn.matches as Array<{ id?: string }>) if (match?.id) seenBefore.add(String(match.id));
     }
+    recentReplies = priorTurns.filter((turn) => turn.role === 'assistant' && typeof turn.content === 'string' && turn.kind !== 'draft')
+      .slice(-2).map((turn) => cleanText(turn.content, 600));
     const conversation = conversationFromTurns(priorTurns, query)
       .map((turn) => (turn.role === 'user' ? { ...turn, content: expandAbbreviations(turn.content) } : turn));
     const hasClarified = priorTurns.some((turn) => turn.role === 'assistant' && turn.kind === 'clarification');
@@ -1026,7 +1032,7 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
       if (intent === 'greeting' || intent === 'thanks' || intent === 'smalltalk') {
         const reply = intent === 'smalltalk'
           ? await smallTalkReply(language, latestRaw)
-          : await voiced(language, frameChat(language, intent, departmentExamples(language, coverage)), latestOriginal);
+          : await voiced(language, frameChat(language, intent, departmentExamples(language, coverage)), latestOriginal, recentReplies);
         const choices = intent === 'greeting' || intent === 'smalltalk' ? departmentChoices(language, preferredDepartments(departments)) : [];
         const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'chat', content: reply, suggestions: choices });
         return answer({ matches: [], clarification: reply, suggestions: choices, thread_id: threadId });
@@ -1149,7 +1155,7 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
           : step.stage === 'department' ? scopeChoices(language)
             : step.stage === 'narrow' ? narrowChoices(language, shownLocations(lastShown)) : [];
         step.suggestions = choices;
-        const question = await voiced(language, choices.length ? `${step.question} ${ownWordsInvite(language)}` : step.question, latestOriginal);
+        const question = await voiced(language, choices.length ? `${step.question} ${ownWordsInvite(language)}` : step.question, latestOriginal, recentReplies);
         const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'clarification', content: question, stage: step.stage, department: step.department || '', suggestions: choices });
         return answer({ matches: [], clarification: question, suggestions: choices, thread_id: threadId });
       }
@@ -1289,12 +1295,12 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
   if (!candidates.length) {
     // Nobody is available at all, so asking for more detail would not help.
     if (refineFallback.length) {
-      const message = await voiced(language, frameRefineNone(language), query);
+      const message = await voiced(language, frameRefineNone(language), query, recentReplies);
       const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'matches', content: message, framed: true, search_request: requestForMatch, matches: refineFallback, nearest: true });
       return answer({ matches: refineFallback, clarification: '', nearest: true, message, no_match_reason: message, resolved_request: requestForMatch, thread_id: threadId });
     }
     const reason = await voiced(language, followUp === 'reject' ? frameRejectedNone(language, rejectedSubject)
-      : followUp === 'more' ? frameExhausted(language) : EMPTY_POOL_MESSAGES[language], query);
+      : followUp === 'more' ? frameExhausted(language) : EMPTY_POOL_MESSAGES[language], query, recentReplies);
     const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'no_match', content: reason, search_request: requestForMatch });
     return answer({ matches: [], clarification: '', no_match: true, no_match_reason: reason, resolved_request: requestForMatch, thread_id: threadId });
   }
@@ -1327,7 +1333,7 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
         })
         : null;
     if (scope) {
-      const question = await voiced(language, `${scope.question} ${ownWordsInvite(language)}`, query);
+      const question = await voiced(language, `${scope.question} ${ownWordsInvite(language)}`, query, recentReplies);
       const threadId = await persistTurns(ctx, body.thread_id, query, {
         kind: 'clarification', content: question, stage: 'scope', suggestions: scope.choices,
         // What "show me the closest" will run, and the scope an answer keeps.
@@ -1456,7 +1462,7 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
           redactInterOrg && !established.has(candidate.id)))
       : [];
     if (!matches.length && !fallback.length && !typedCarriers.length && refineFallback.length) {
-      const message = await voiced(language, frameRefineNone(language), query);
+      const message = await voiced(language, frameRefineNone(language), query, recentReplies);
       const threadId = await persistTurns(ctx, body.thread_id, query, {
         kind: 'matches', content: message, framed: true, search_request: requestForMatch,
         matches: refineFallback, nearest: true, department: requiredDepartment,
@@ -1470,7 +1476,7 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
       // unfamiliar words rather than a generic "no exact match".
       const shownGap = describedGap(gapState, subjectLabel);
       const reason = await voiced(language, followUp === 'reject' ? frameRejectedNone(language, rejectedSubject)
-        : followUp === 'more' ? frameExhausted(language) : frameNoMatch(language, shownGap, topDepartments(networkCandidates.filter((candidate) => candidate.department !== requiredDepartment))), query);
+        : followUp === 'more' ? frameExhausted(language) : frameNoMatch(language, shownGap, topDepartments(networkCandidates.filter((candidate) => candidate.department !== requiredDepartment))), query, recentReplies);
       const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'no_match', content: reason, search_request: requestForMatch });
       return answer({ matches: [], clarification: '', no_match: true, no_match_reason: reason, resolved_request: requestForMatch, thread_id: threadId, model: result.model });
     }
@@ -1487,9 +1493,9 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
     // Being transparent about repeats: the same people coming back after a
     // follow-up otherwise reads as if the follow-up found them afresh.
     const repeated = shown.filter((person) => seenBefore.has(person.id)).length;
-    const framed = frameResults(language, { near: isNear, count: shown.length, gap: resultGap, closeTerms, more: followUp === 'more', different: followUp === 'reject', clarified: answeredScope });
+    const framed = frameResults(language, { near: isNear, count: shown.length, gap: resultGap, closeTerms, more: followUp === 'more', different: followUp === 'reject', clarified: answeredScope, first: seenBefore.size === 0 });
     const message = await voiced(language, repeated && repeated === shown.length ? frameSamePeople(language, shown.length)
-      : repeated ? `${framed} ${frameSomeRepeated(language, shown.length - repeated)}` : framed, query);
+      : repeated ? `${framed} ${frameSomeRepeated(language, shown.length - repeated)}` : framed, query, recentReplies);
     const threadId = await persistTurns(ctx, body.thread_id, query, {
       kind: 'matches',
       content: message,

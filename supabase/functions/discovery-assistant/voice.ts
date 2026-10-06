@@ -20,8 +20,10 @@ export function keepsFacts(original: string, rewritten: string, userMessage: str
   if (!rewritten || rewritten.length > 480 || FORBIDDEN.test(rewritten)) return false;
   const before = wordList(original).length;
   const after = wordList(rewritten).length;
-  if (after < before * 0.5 || after > before * 1.5 + 8) return false;
-  if (original.includes('?') !== rewritten.includes('?')) return false;
+  if (after < before * 0.5 || after > before * 1.6 + 10) return false;
+  // A question may be added -- that is often what makes it engaging -- but
+  // one that was asked must still be asked.
+  if (original.includes('?') && !rewritten.includes('?')) return false;
   // Nothing dropped.
   if (properNouns(original).some((noun) => !rewritten.includes(noun))) return false;
   if (quoted(original).some((phrase) => !rewritten.includes(phrase))) return false;
@@ -37,4 +39,28 @@ export function keepsFacts(original: string, rewritten: string, userMessage: str
 export const VOICE_PROMPT = (language: string) => `You are Ment, the assistant of ESSEC's mentoring network, chatting with a student or alumnus. Rewrite "message" in ${language} so it sounds like a warm, upbeat person talking -- engaging, natural and lightly playful where it fits, always respectful, never sarcastic or over the top. Vary your wording; do not open with "Great" or "Sure" every time.
 Keep exactly the same meaning: every name, place, company, number, quoted phrase and option it mentions, and end with the same question if it asks one. Do not add facts, people, places, promises or details, and do not drop any. Never mention profiles, databases, candidates, searches, algorithms, AI or yourself as a bot. No emojis, no markdown. Keep it about the same length.
 "user_said" is the user's last message, for tone only: if it was playful or impossible, a gentle joke is welcome.
+"previous_replies" are your last messages in this conversation. Never reuse their sentences, openings or closing lines -- a person does not repeat themselves word for word. Do not end with a stock offer like "just say" or "happy to help".
 Return JSON only: {"text":"..."}`;
+
+// Sentences said in the last replies are not said again, verbatim or nearly:
+// two sentences repeat when most of their meaningful words are shared.
+const sentences = (text: string) => text.split(/(?<=[.!?])\s+/).map((part) => part.trim()).filter(Boolean);
+const meaningful = (text: string) => new Set(wordList(text).map(({ word }) => word.toLowerCase()).filter((word) => word.length >= 4));
+function sameSentence(a: string, b: string) {
+  const x = meaningful(a);
+  const y = meaningful(b);
+  if (x.size < 3 || y.size < 3) return a.trim().toLowerCase() === b.trim().toLowerCase();
+  const shared = [...x].filter((word) => y.has(word)).length;
+  return shared / Math.min(x.size, y.size) >= 0.6;
+}
+export function repeats(text: string, recent: string[]) {
+  const before = recent.flatMap(sentences);
+  return sentences(text).some((sentence) => before.some((other) => sameSentence(sentence, other)));
+}
+// Drops sentences already said recently, keeping at least the first one.
+export function withoutRepeats(text: string, recent: string[]) {
+  const before = recent.flatMap(sentences);
+  const parts = sentences(text);
+  const kept = parts.filter((sentence, index) => index === 0 || !before.some((other) => sameSentence(sentence, other)));
+  return kept.join(' ');
+}

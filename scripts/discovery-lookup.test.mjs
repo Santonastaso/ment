@@ -822,3 +822,42 @@ for (const [label, reply] of [
     assert.match(result.clarification, /^Good one! I'm fairly sure Gotham isn't a real place/);
   });
 }
+
+// No sentence is said twice in back-to-back replies.
+const shownFinance = [
+  { role: 'user', content: 'someone who knows Financial modelling' },
+  { role: 'assistant', kind: 'matches', framed: true, search_request: 'Financial modelling', department: '', location: '',
+    content: "I found someone who could be a great fit. Take a look — if they feel right, I'll draft the message for you. Happy to show more people or narrow it down — just say.",
+    matches: [{ id: finance.id, name: finance.name }] },
+];
+
+test('pushback after results does not repeat the closing offer', async () => {
+  const second = { ...finance, id: 'finance2', name: 'Second Finance' };
+  const fixture = discoveryFixture({ candidates: [finance, second], turns: shownFinance, responses: [
+    clarify(), { outcome: 'matches', matches: [{ ...directMatch.matches[0], profile_id: second.id }] },
+  ] });
+  const result = await say(fixture, 'none of these are relevant', 'thread');
+  assert.deepEqual(result.matches.map((m) => m.id), ['finance2']);
+  assert.doesNotMatch(result.message, /just say|narrow it down|draft/);
+});
+
+test('a rewrite that repeats the previous reply falls back to the template', async () => {
+  const second = { ...finance, id: 'finance2', name: 'Second Finance' };
+  const fixture = discoveryFixture({ voice: true, candidates: [finance, second], turns: shownFinance, responses: [
+    clarify(), { outcome: 'matches', matches: [{ ...directMatch.matches[0], profile_id: second.id }] },
+    { text: "Here's someone new! Happy to show more people or narrow it down — just say." },
+  ] });
+  const result = await say(fixture, 'none of these are relevant', 'thread');
+  assert.doesNotMatch(result.message, /just say/);
+});
+
+test('a second question does not repeat the invitation under the first', async () => {
+  const turns = [
+    { role: 'user', content: 'I need help' },
+    { role: 'assistant', kind: 'clarification', stage: 'open', content: 'What would you like help with — for example finance? Pick one below, or tell me in your own words.' },
+  ];
+  const fixture = discoveryFixture({ turns, responses: [clarify()] });
+  const result = await say(fixture, 'hmm', 'thread');
+  assert.ok(result.clarification);
+  assert.doesNotMatch(result.clarification, /Pick one below, or tell me in your own words/);
+});
