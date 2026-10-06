@@ -329,7 +329,9 @@ test('onboarding to discovery, request, acceptance, chat and meeting', async ({ 
   await composer.press('Enter');
   await page.getByRole('button', { name: 'Choose Peer Mentor' }).click();
   await page.getByRole('textbox', { name: 'Suggested draft' }).fill('Please help me with financial modelling.');
+  await page.getByRole('group', { name: 'What kind of support?' }).getByRole('button', { name: 'Ongoing support' }).click();
   await page.getByRole('button', { name: 'Send request', exact: true }).click();
+  expect(await page.evaluate(() => window.fixture.calls.find(call => call.method === 'post' && call.path === '/sessions')?.body.follow_up_intent)).toBe('ongoing');
   await page.getByRole('link', { name: 'Open chat', exact: true }).click();
   await expect(page.getByText('Please help me with financial modelling.', { exact: true })).toBeVisible();
   await expect(page.locator('.conversation-header')).not.toContainText('Financial modelling');
@@ -353,15 +355,16 @@ test('onboarding to discovery, request, acceptance, chat and meeting', async ({ 
   await requestCard.getByRole('button', { name: 'Accept', exact: true }).click();
   await expect(requestCard.getByRole('button', { name: 'Schedule', exact: true })).toBeVisible();
   await requestCard.getByRole('button', { name: 'Schedule', exact: true }).click();
-  const future = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 16);
-  const scheduledAt = await page.evaluate(value => new Date(value).toISOString(), future);
+  const future = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10);
+  const scheduledAt = await page.evaluate(value => new Date(`${value}T14:00`).toISOString(), future);
   await page.getByLabel('New time', { exact: true }).fill(future);
+  await page.getByLabel('Time', { exact: true }).selectOption('14:00');
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
   const message = page.getByRole('textbox', { name: 'Message', exact: true });
   await message.fill('Happy to help.');
   await page.getByRole('button', { name: 'Send message', exact: true }).click();
-  await expect(page.getByText('Happy to help.', { exact: true })).toBeVisible();
+  await expect(page.locator('.conversation-message').getByText('Happy to help.', { exact: true })).toBeVisible();
   await page.clock.setFixedTime(new Date(Date.now() + 3 * 86400000));
   await page.evaluate(student => window.fixture.setUser(student), student);
   await page.getByRole('link', { name: 'Groups', exact: true }).click();
@@ -426,7 +429,7 @@ test('groups, unread badges and mobile back navigation', async ({ page }) => {
   await expect(group.getByLabel('2 unread messages')).toHaveCount(0);
   await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Mobile group message');
   await page.getByRole('button', { name: 'Send message', exact: true }).click();
-  await expect(page.getByText('Mobile group message', { exact: true })).toBeVisible();
+  await expect(page.locator('.conversation-message').getByText('Mobile group message', { exact: true })).toBeVisible();
   await expect(page.locator('.conversation-message time')).toHaveText(/^\d{2}:\d{2}$/);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
   await page.getByRole('button', { name: 'Close', exact: true }).click();
@@ -442,8 +445,34 @@ test('failed send preserves the draft and can be retried', async ({ page }) => {
   await expect(page.getByRole('alert')).toBeVisible();
   await expect(composer).toHaveValue('Keep my message');
   await page.getByRole('button', { name: 'Send message', exact: true }).click();
-  await expect(page.getByText('Keep my message', { exact: true })).toBeVisible();
+  await expect(page.locator('.conversation-message').getByText('Keep my message', { exact: true })).toBeVisible();
   await expect(composer).toHaveValue('');
+});
+
+test('chat rail previews the latest message after send and reload', async ({ page }) => {
+  await page.goto('/conversations?session=1');
+  const direct = page.locator('.conversation-list-item').filter({ hasText: 'Peer 1' });
+  await expect(direct.locator('small')).toHaveText('Meeting 1');
+  await page.getByRole('textbox', { name: 'Message', exact: true }).fill('The newest direct reply');
+  await page.getByRole('button', { name: 'Send message', exact: true }).click();
+  await expect(direct.locator('small')).toHaveText('The newest direct reply');
+  await page.reload();
+  await expect(direct.locator('small')).toHaveText('The newest direct reply');
+  const group = page.locator('.conversation-list-item').filter({ hasText: 'Test Group' });
+  await group.click();
+  await page.getByRole('textbox', { name: 'Message', exact: true }).fill('The newest group reply');
+  await page.getByRole('button', { name: 'Send message', exact: true }).click();
+  await expect(group.locator('small')).toHaveText('The newest group reply');
+  await page.reload();
+  await expect(group.locator('small')).toHaveText('The newest group reply');
+});
+
+test('a closed request offers a fresh request from the chat', async ({ page }) => {
+  await page.goto('/conversations?session=1');
+  await page.evaluate(() => { window.fixture.sessions[0].status = 'cancelled'; window.dispatchEvent(new Event('focus')); });
+  await page.getByRole('button', { name: 'Request another session' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Request a session' });
+  await expect(dialog).toBeVisible();
 });
 
 test('chat composer grows for multiline drafts and Enter sends', async ({ page }) => {

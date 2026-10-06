@@ -7,6 +7,7 @@ import { Button } from './ui/button.jsx';
 import Portal from './ui/portal.jsx';
 import { useModalA11y } from '../lib/useModalA11y.js';
 import { ChevronDown, X } from 'lucide-react';
+import TimeSlotSelect from './TimeSlotSelect.jsx';
 
 const TOTAL_STEPS = 4;
 
@@ -256,9 +257,7 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
                 <label className="label">{t('components.sessionRequest.date')}
                   <input type="date" className="input mt-1" min={minDateTime.slice(0, 10)} value={scheduledAt.slice(0, 10)} onChange={e => setScheduledAt(`${e.target.value}T${scheduledAt.slice(11, 16)}`)} />
                 </label>
-                <label className="label">{t('components.sessionRequest.time')}
-                  <input type="time" className="input mt-1" value={scheduledAt.slice(11, 16)} onChange={e => setScheduledAt(`${scheduledAt.slice(0, 10)}T${e.target.value}`)} />
-                </label>
+                <TimeSlotSelect label={t('components.sessionRequest.time')} value={scheduledAt} min={minDateTime} onChange={setScheduledAt} />
               </div>}
               <p className="text-xs text-muted-foreground">{t('components.sessionRequest.step3Optional')}</p>
             </div>
@@ -290,7 +289,12 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
                 <div><p className="text-xs font-medium text-muted-foreground">{t('components.sessionRequest.reviewWhen')}</p><p>{scheduledAt ? new Date(scheduledAt).toLocaleString(lang) : t('components.sessionRequest.reviewNoTime')}</p></div>
                 <Button type="button" variant="outline" size="sm" onClick={() => setStep(3)}>{t(scheduledAt ? 'conversations.reschedule' : 'components.sessionRequest.pickTime')}</Button>
               </section>
-              <p className="text-muted-foreground">{intent === 'ongoing' ? copy.ongoing : copy.oneOff}</p>
+              <section className="space-y-2" aria-label={copy.intent}>
+                <p className="font-medium">{copy.intent}</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {[{ value: 'one_off', label: copy.oneOff }, { value: 'ongoing', label: copy.ongoing }].map(option => <Button key={option.value} type="button" variant={intent === option.value ? 'default' : 'outline'} aria-pressed={intent === option.value} disabled={submitting || !!submittedPayload.current} className="h-auto min-h-11 whitespace-normal" onClick={() => setIntent(option.value)}>{option.label}</Button>)}
+                </div>
+              </section>
               <p className="text-xs text-muted-foreground">{t('components.sessionRequest.reviewNotice')}</p>
             </div>
           )}
