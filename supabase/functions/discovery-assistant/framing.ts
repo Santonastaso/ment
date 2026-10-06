@@ -376,3 +376,18 @@ export function frameSamePeople(language: string, count: number) {
 export function frameSomeRepeated(language: string, fresh: number) {
   return (SOME_REPEATED[language] || SOME_REPEATED.English)(fresh);
 }
+
+const REJECTED_NONE: Record<string, (subject: string) => string> = {
+  English: (subject) => subject
+    ? `Sorry about that — nobody here works in ${subject} directly, so those were only the closest I could find. Want me to try a different angle?`
+    : 'Sorry about that — those were the closest I could find. Want me to try a different angle?',
+  Italian: (subject) => subject
+    ? `Scusa, hai ragione: qui nessuno lavora direttamente in ambito ${subject}, quelle erano solo le persone più vicine. Vuoi che provi da un’altra angolazione?`
+    : 'Scusa: quelle erano le persone più vicine che ho trovato. Vuoi che provi da un’altra angolazione?',
+  French: (subject) => subject
+    ? `Désolé — personne ici ne travaille directement en ${subject}, c’étaient seulement les profils les plus proches. Voulez-vous que j’essaie sous un autre angle ?`
+    : 'Désolé — c’étaient les profils les plus proches que j’ai trouvés. Voulez-vous que j’essaie sous un autre angle ?',
+};
+export function frameRejectedNone(language: string, subject: string) {
+  return (REJECTED_NONE[language] || REJECTED_NONE.English)(inSentence(subject));
+}

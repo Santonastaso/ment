@@ -3,9 +3,9 @@ import { recordAiRun } from '../_shared/ai-telemetry.ts';
 import { aiErrorResponse, mistralJson } from '../_shared/mistral.ts';
 import { enforceRateLimit } from '../_shared/rate-limit.ts';
 import { canHelpWithCareerGoal, hasGroundedExpertise } from '../_shared/discovery-guards.mjs';
-import { departmentChoices, frameChat, frameExhausted, frameNarrow, frameNoMatch, frameOpenAgain, frameRefineNone, frameSmallTalk, frameNudge, frameSamePeople, frameSomeRepeated, narrowChoices, ownWordsInvite, scopeChoices, type Choice, frameResults, namesARole, NO_GAP, type Gap } from './framing.ts';
+import { departmentChoices, frameChat, frameExhausted, frameNarrow, frameNoMatch, frameOpenAgain, frameRefineNone, frameSmallTalk, frameNudge, frameSamePeople, frameSomeRepeated, frameRejectedNone, narrowChoices, ownWordsInvite, scopeChoices, type Choice, frameResults, namesARole, NO_GAP, type Gap } from './framing.ts';
 
-const PROMPT_VERSION = 'discovery-v20';
+const PROMPT_VERSION = 'discovery-v21';
 
 // Written here rather than by the model, so the gap names the place the user
 // actually typed instead of drifting to a vaguer sentence about seniority.
@@ -192,6 +192,10 @@ const LOOKUP_STOPWORDS = new Set(['someone', 'somebody', 'person', 'people', 'lo
   'then', 'now', 'hey', 'hello', 'doing', 'maybe', 'hmm', 'umm', 'uhm', 'idk', 'nothing', 'whatever', 'idea', 'ideas', 'start', 'begin', 'know', 'dont', 'sure',
   'proponi', 'proporre', 'suggerisci', 'consigli', 'consiglia', 'interessa', 'interessano', 'propose', 'proposer',
   'suggère', 'suggerer', 'intéresse', 'interesse',
+  // Words around a change of subject, not subjects themselves.
+  'instead', 'rather', 'about', 'related', 'relating', 'regarding', 'try', 'trying', 'angle', 'asked', 'ask', 'mean',
+  'meant', 'none', 'matters', 'matter', 'actually', 'think', 'thinking', 'stuff', 'things', 'thing', 'else',
+  'different', 'another', 'totally', 'completely', 'forget', 'invece', 'piuttosto', 'plutôt', 'plutot',
   // Italian and French filler, so "una competenza precisa" reads as a category.
   'una', 'uno', 'dei', 'delle', 'degli', 'della', 'del', 'per', 'con', 'che', 'non', 'sono', 'vorrei', 'voglio',
   'cerco', 'cercando', 'qualcuno', 'persona', 'persone', 'posso', 'puoi', 'proposta', 'proposte', 'precisa',
@@ -305,6 +309,9 @@ const INTENT_PATTERNS: Array<[string, RegExp[]]> = [
     /\bbuon(giorno|asera|pomeriggio)\b/, /\b[cç]a va\b/, /\bcomment (allez|vas)[- ](vous|tu)\b/]],
   ['greeting', [/^\s*(hi|hello|hey|hiya|ciao|salve|buongiorno|bonjour|salut)\b/, /\bwho are you\b/, /\bwhat (are|can) you\b/,
     /\bhow does (this|it) work\b/, /\bwhat is this\b/, /\bchi sei\b/, /\bcosa (sei|fai)\b/, /\bqui (es[- ]tu|[eê]tes[- ]vous)\b/]],
+  ['reject', [/\bnone of (these|them|those)\b/, /\bnothing to do with\b/, /\bnot what i\b/, /\bnot relevant\b/,
+    /\bwrong (people|person|profiles?|matches)\b/, /\bthat'?s not (it|right|what)\b/, /\bthese (are not|aren'?t) (right|relevant|what)\b/,
+    /\bnon c'entra(no)?\b/, /\bnessuno di questi\b/, /\baucun rapport\b/, /\bpas ce que\b/, /\baucun de ces\b/]],
   ['refine', [/\binstead\b/, /\brather\b/, /\binvece\b/, /\bplut[oô]t\b/, /\bmore (senior|junior|experienced)\b/, /\bpi[uù] senior\b/, /\bplus seniors?\b/, /\bonly in\b/, /\bsolo a\b/, /\buniquement [aà]\b/,
     // Questions about the people already on screen ("is there someone with
     // more than 5 years of experience?") narrow them; they are not new topics.
@@ -402,6 +409,14 @@ const ABBREVIATIONS: Array<[RegExp, string]> = [
 function expandAbbreviations(text: string) {
   return ABBREVIATIONS.reduce((current, [pattern, expansion]) => current.replace(pattern, expansion), text);
 }
+
+// Words that qualify the search on screen rather than naming a new subject:
+// "more than 5 years of experience" narrows, it does not change topic.
+const QUALIFIER_WORDS = new Set(['experience', 'experienced', 'years', 'year', 'senior', 'juniors', 'junior', 'seniority',
+  'level', 'levels', 'based', 'located', 'location', 'city', 'cities', 'country', 'countries', 'esperienza', 'anni',
+  'anno', 'ans', 'expérience', 'ville', 'città', 'paese', 'pays', 'older', 'younger']);
+// Phrases that announce a change of subject even while answering a question.
+const SWITCH_PATTERN = /\b(instead|rather|actually|forget (it|that|this)|different angle|another angle|something else|invece|piuttosto|plut[oô]t|autre chose)\b/;
 
 function messageIntent(text: string, hasResults: boolean, namesSomething: boolean) {
   const lower = text.toLowerCase();
@@ -555,7 +570,8 @@ Deno.serve(async (req) => {
   let gapState: Gap = NO_GAP;
   // People already shown, for "more options", and how to word what follows.
   let excludeIds = new Set<string>();
-  let followUp: '' | 'more' = '';
+  let followUp: '' | 'more' | 'reject' = '';
+  let rejectedSubject = '';
   let refineFallback: Array<Record<string, unknown>> = [];
   // Cities a named region or country stands for; empty for a single city.
   let locationCities: string[] = [];
@@ -607,7 +623,11 @@ Deno.serve(async (req) => {
       // history only when the latest carries no subject ("either works").
       const userTurns = conversation.filter((turn) => turn.role === 'user').map((turn) => turn.content);
       const latestHits = lexicalHits(userTurns.at(-1) || '', vocabulary);
-      const hits = latestHits.length ? latestHits : lexicalHits(userTurns.join(' '), vocabulary);
+      // The whole history is consulted only when answering one of our own
+      // questions ("either works"). Anywhere else it dragged old topics back:
+      // "construction", unknown to the network, fell back to "Strategy".
+      const answeringOurQuestion = priorTurns.at(-1)?.role === 'assistant' && priorTurns.at(-1)?.kind === 'clarification';
+      const hits = latestHits.length || !answeringOurQuestion ? latestHits : lexicalHits(userTurns.join(' '), vocabulary);
       const result = await mistralJson<ClarificationResult>({
         feature: 'discovery_clarify',
         system: `You are Ment, a university-network matching assistant. Respond in ${language}. Read all turns as separate messages. A later user turn can refine OR replace the earlier goal. If it changes topic, discard the old search criteria unless the user explicitly keeps them. Never combine abandoned goals. Never claim you searched or found people.
@@ -725,22 +745,44 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
       // extracted subject names something beyond it ("finance audit").
       const meaningfulLatest = latestContent.filter((word) => vocabularyWords.has(word));
       const vague = !contentWords(userTurns.join(' ')).length;
+      // A new subject starts a new search. The subject of the latest message is
+      // what it names beyond qualifiers and places; if any of it is not part of
+      // the search on screen, the topic has moved, and the earlier department,
+      // keywords and the model's stale wording are all dropped. Without this the
+      // chat stayed on Strategy through construction, real estate and law.
+      const lastShown = [...priorTurns].reverse().find((turn) => turn.role === 'assistant' && turn.kind === 'matches');
+      const shownAt = lastShown ? priorTurns.lastIndexOf(lastShown) : -1;
+      const askedFor = shownAt > 0 ? priorTurns.slice(0, shownAt).reverse().find((turn) => turn.role === 'user') : undefined;
+      const placeWordSet = new Set([...knownLocations.flatMap((place) => wordsOf(place)), ...Object.keys(REGION_CITIES).flatMap((key) => wordsOf(key))]);
+      const latestSubjectWords = latestContent.filter((word) => !QUALIFIER_WORDS.has(word) && !placeWordSet.has(word));
+      const topicWords = [lastShown?.search_request, lastShown?.department, askedFor?.content]
+        .flatMap((text) => contentWords(expandAbbreviations(cleanText(text, 1000))));
+      const sameTopic = (word: string) => topicWords.some((known) => known === word
+        || (known.length >= 5 && word.length >= 5 && known.slice(0, 5) === word.slice(0, 5)));
+      const switching = SWITCH_PATTERN.test(latestRaw.toLowerCase());
+      const topicShift = latestSubjectWords.length > 0 && (
+        (Boolean(lastShown) && !answeringOurQuestion && latestSubjectWords.some((word) => !sameTopic(word)))
+        || (answeringOurQuestion && switching));
+      const groundedInLatest = (value: string) => contentWords(value).some((word) => latestContent.includes(word));
       const rawSubject = cleanText(result.value?.named_subject, 80);
-      const namedSubject = vague || !contentWords(rawSubject).length || !grounded(rawSubject) ? '' : rawSubject;
+      const namedSubject = topicShift
+        ? (groundedInLatest(rawSubject) ? rawSubject : latestSubjectWords.slice(0, 3).join(' '))
+        : vague || !contentWords(rawSubject).length || !grounded(rawSubject) ? '' : rawSubject;
+      const termHits = topicShift ? latestHits : hits;
       const subjectWithin = (name: string) => !namedSubject || contentWords(namedSubject).every((word) => wordsOf(name).includes(word));
       const lastResults = priorTurns.map((turn) => turn.role === 'assistant' && (turn.kind === 'matches' || turn.kind === 'no_match')).lastIndexOf(true);
       const questionsAsked = priorTurns.slice(lastResults + 1)
         .filter((turn) => turn.role === 'assistant' && turn.kind === 'clarification').length;
       const previous = priorTurns.at(-1);
       const answering = previous?.role === 'assistant' && previous?.kind === 'clarification';
-      const earlierDepartment = answering
+      const earlierDepartment = answering && !topicShift
         ? cleanText(previous?.department, 80) || userTurns.slice(0, -1).reverse().map((turn) => pureDepartment(contentWords(turn).filter((word) => vocabularyWords.has(word)))).find(Boolean) || ''
         : '';
       // A place is never filler, and an answer to one of our questions is read
       // strictly: "any finance skill is fine" answers, it does not restart.
       const placeWords = new Set(knownLocations.flatMap((place) => wordsOf(place)));
       const namesPlace = Boolean(namedLocation) || latestContent.some((word) => placeWords.has(word));
-      const candidateDepartment = answering ? pureDepartment(latestContent) : pureDepartment(meaningfulLatest);
+      const candidateDepartment = answering && !topicShift ? pureDepartment(latestContent) : pureDepartment(meaningfulLatest);
       const latestDepartment = candidateDepartment && subjectWithin(candidateDepartment) && !namesPlace ? candidateDepartment : '';
       requiredDepartment = latestDepartment || mentionedDepartment(meaningfulLatest) || earlierDepartment;
       // Nothing asked for beyond a department and a place: if the results carry
@@ -756,8 +798,8 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
       // named, can make a result exact. A synonym the model proposes still
       // finds people, but they are shown as closest: the model called due
       // diligence a synonym of audit and the result was labelled exact.
-      const lexicalConfirmed = confirmed ? confirmed.filter((term) => hits.includes(term)) : hits;
-      const proposed = confirmed ? confirmed.filter((term) => !hits.includes(term)) : [];
+      const lexicalConfirmed = confirmed ? confirmed.filter((term) => termHits.includes(term)) : termHits;
+      const proposed = confirmed ? confirmed.filter((term) => !termHits.includes(term)) : [];
       const matchingTerms = [...new Set([...(exactTerm ? [exactTerm] : []), ...(requiredDepartment ? [requiredDepartment] : []), ...lexicalConfirmed])];
       const subjectAbsent = Boolean(namedSubject) && !matchingTerms.length;
       if (!locationMissing && subjectAbsent) {
@@ -769,6 +811,12 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
 
       const clarifiedRequest = cleanText(result.value?.search_request, 1000);
       requestForMatch = clarifiedRequest || query;
+      // After a switch, the model's request is kept only when it is about the
+      // new subject and carries nothing of the old one; otherwise the user's
+      // own words are the request ("strategic consulting in construction"
+      // mixed both).
+      const carriesOldTopic = contentWords(clarifiedRequest).some((word) => sameTopic(word) && !latestContent.includes(word));
+      if (topicShift && (!groundedInLatest(clarifiedRequest) || carriesOldTopic)) requestForMatch = latestRaw;
       // Nothing to interpret: the model once read "finance in Milan" as a
       // career-change request and rejected everyone who qualified.
       // The user's own words ride along so "senior" survives; the model's
@@ -785,9 +833,29 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
       // What the message is doing. Choosing from a fixed list is reliable; acting
       // on it is code. Chat intents are honoured only when the message names
       // nothing this network has, so "hi, someone in finance" is still a search.
-      const lastShown = [...priorTurns].reverse().find((turn) => turn.role === 'assistant' && turn.kind === 'matches');
       const namesSomething = meaningfulLatest.length > 0 || namesPlace;
-      const intent = messageIntent(latestRaw, Boolean(lastShown), namesSomething);
+      const detected = messageIntent(latestRaw, Boolean(lastShown), namesSomething);
+      // Pushback stays pushback; any other follow-up naming a new subject is a
+      // fresh search rather than a refinement of the old one.
+      const intent = detected === 'reject' ? 'reject' : topicShift && (detected === 'refine' || detected === 'more' || detected === '') ? '' : detected;
+      if (intent === 'reject' && lastShown) {
+        // "None of these have anything to do with construction": search again
+        // without the people just shown -- for the subject named now if there
+        // is one, else for the same request.
+        const shownBefore = priorTurns.filter((turn) => turn.role === 'assistant' && turn.kind === 'matches')
+          .flatMap((turn) => Array.isArray(turn.matches) ? turn.matches.map((match: { id?: string }) => String(match?.id || '')) : []);
+        excludeIds = new Set(shownBefore.filter(Boolean));
+        followUp = 'reject';
+        rejectedSubject = namedSubject || latestSubjectWords.slice(0, 3).join(' ');
+        if (latestSubjectWords.length) {
+          requestForMatch = latestRaw;
+        } else {
+          requestForMatch = cleanText(lastShown.search_request, 1000) || requestForMatch;
+          requiredDepartment = cleanText(lastShown.department, 80);
+        }
+        anchorTerms = requiredDepartment ? [requiredDepartment] : anchorTerms;
+        constraintsOnly = false;
+      }
       if (intent === 'greeting' || intent === 'thanks' || intent === 'smalltalk') {
         const reply = intent === 'smalltalk'
           ? await smallTalkReply(language, latestRaw)
@@ -797,7 +865,7 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
         return jsonOk({ matches: [], clarification: reply, suggestions: choices, thread_id: threadId });
       }
       const answeringNarrow = answering && previous?.stage === 'narrow';
-      const following = (intent === 'more' || intent === 'refine' || answeringNarrow) && lastShown && !latestDepartment;
+      const following = (intent === 'more' || intent === 'refine' || answeringNarrow) && lastShown && !latestDepartment && !topicShift;
       if (following) {
         // Build on the results already shown instead of searching the words
         // "more options" as if they were a request.
@@ -989,7 +1057,7 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
     if (carrying.length) {
       candidates = carrying;
       departmentFilterApplied = Boolean(requiredDepartment);
-    } else if (followUp === 'more') {
+    } else if (followUp === 'more' || followUp === 'reject') {
       // Out of people in scope: say so, rather than widening silently.
       candidates = [];
     }
@@ -1002,7 +1070,8 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
       const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'matches', content: message, framed: true, search_request: requestForMatch, matches: refineFallback, nearest: true });
       return jsonOk({ matches: refineFallback, clarification: '', nearest: true, message, no_match_reason: message, resolved_request: requestForMatch, thread_id: threadId });
     }
-    const reason = followUp === 'more' ? frameExhausted(language) : EMPTY_POOL_MESSAGES[language];
+    const reason = followUp === 'reject' ? frameRejectedNone(language, rejectedSubject)
+      : followUp === 'more' ? frameExhausted(language) : EMPTY_POOL_MESSAGES[language];
     const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'no_match', content: reason, search_request: requestForMatch });
     return jsonOk({ matches: [], clarification: '', no_match: true, no_match_reason: reason, resolved_request: requestForMatch, thread_id: threadId });
   }
@@ -1119,7 +1188,8 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
       // Wording only: when the model extracted no subject, name the user's own
       // unfamiliar words rather than a generic "no exact match".
       const shownGap = gapInOwnWords(gapState, query, language);
-      const reason = followUp === 'more' ? frameExhausted(language) : frameNoMatch(language, shownGap, topDepartments(networkCandidates));
+      const reason = followUp === 'reject' ? frameRejectedNone(language, rejectedSubject)
+        : followUp === 'more' ? frameExhausted(language) : frameNoMatch(language, shownGap, topDepartments(networkCandidates));
       const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'no_match', content: reason, search_request: requestForMatch });
       return jsonOk({ matches: [], clarification: '', no_match: true, no_match_reason: reason, resolved_request: requestForMatch, thread_id: threadId, model: result.model });
     }

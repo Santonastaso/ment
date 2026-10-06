@@ -429,3 +429,60 @@ test('a mix of new and repeated people says how many are new', async () => {
   const result = await say(fixture, 'someone with more experience', 'thread');
   assert.match(result.message, /One of these is new; the others you have already seen\.$/);
 });
+
+// Changing the subject: the co-founder's conversation, turn by turn.
+const strategist = { ...finance, id: 'strat', name: 'Strategist', department: 'Strategy', job_title: 'Strategy Manager', skills: ['strategic consulting'] };
+const operator = { ...finance, id: 'ops', name: 'Operator', department: 'Operations', job_title: 'Supply Chain Manager', skills: ['logistics'] };
+const shownStrategy = [
+  { role: 'user', content: 'strategic consulting, to be precise' },
+  { role: 'assistant', kind: 'matches', framed: true, content: 'These people look like a great fit.', search_request: 'strategic consulting', department: 'Strategy', location: '',
+    matches: [{ id: strategist.id, name: strategist.name }] },
+];
+
+for (const [label, message, subject] of [
+  ['"what about construction instead"', 'What about somebody in construction instead?', /construction/],
+  ['"try the angle of real estate"', 'yes, try the angle of real estate', /real estate/],
+  ['"anything related to law"', 'anything related to law?', /law/],
+]) {
+  test(`a new subject drops the old topic: ${label}`, async () => {
+    const fixture = discoveryFixture({ candidates: [strategist, operator], turns: shownStrategy, responses: [
+      clarify({ named_subject: 'strategic consulting', search_request: 'strategic consulting with a twist' }),
+      { outcome: 'no_match', matches: [] },
+    ] });
+    const result = await say(fixture, message, 'thread');
+    const sent = payload(fixture, 1);
+    assert.equal(sent.request, message, 'the request is the new message, not the old topic');
+    assert.deepEqual(sent.candidates.map((c) => c.id).sort(), ['ops', 'strat'], 'no Strategy filter carried over');
+    const [gapSentence] = result.no_match_reason.split(' — ');
+    assert.match(gapSentence, subject, 'the gap names the new subject');
+    assert.doesNotMatch(gapSentence, /strateg/i, 'and not the old one');
+  });
+}
+
+test('pushback searches again without the people already shown', async () => {
+  const turns = [
+    { role: 'user', content: 'What about somebody in construction instead?' },
+    { role: 'assistant', kind: 'matches', framed: true, content: 'I couldn\'t find anyone working in construction here.', search_request: 'What about somebody in construction instead?', department: '', location: '',
+      matches: [{ id: operator.id, name: operator.name }] },
+  ];
+  const fixture = discoveryFixture({ candidates: [strategist, operator], turns, responses: [clarify(), { outcome: 'no_match', matches: [] }] });
+  const result = await say(fixture, 'none of these have anything to do with construction', 'thread');
+  assert.ok(!payload(fixture, 1).candidates.some((c) => c.id === operator.id), 'the rejected person is not offered again');
+  assert.match(result.no_match_reason, /^Sorry about that — nobody here works in construction directly/);
+});
+
+test('switching while answering our own question restarts the funnel on the new subject', async () => {
+  const turns = [{ role: 'user', content: 'finance' }, { role: 'assistant', kind: 'clarification', content: 'What in finance would help most?', stage: 'department', department: 'Finance' }];
+  const marketer = { ...finance, id: 'mkt', department: 'Marketing', job_title: 'Brand Manager', skills: ['brand positioning'] };
+  const fixture = discoveryFixture({ candidates: [finance, marketer], turns, responses: [clarify({ named_subject: 'marketing' })] });
+  const result = await say(fixture, 'actually marketing instead', 'thread');
+  assert.match(result.clarification, /What in marketing would help most/);
+});
+
+test('a qualifier is still a refinement, not a new topic', async () => {
+  const fixture = discoveryFixture({ candidates: [strategist, operator], turns: shownStrategy, responses: [
+    clarify(), { outcome: 'matches', matches: [{ profile_id: strategist.id, confidence: 0.9, reasons: ['Senior strategist.'], matched_expertise: ['strategic consulting'] }] },
+  ] });
+  await say(fixture, 'is there someone with more than 5 years of experience?', 'thread');
+  assert.match(payload(fixture, 1).request, /^strategic consulting; /, 'it narrows the strategy search');
+});

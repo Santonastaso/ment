@@ -59,6 +59,18 @@ const SCENARIOS = [
         t[2].people.every((p) => europe.includes(p.location)) || /^Nobody here matches that extra requirement/.test(t[2].said),
         !/industry, a job title/.test(t[2].said)];
     } },
+  { name: 'co-founder: strategy, then construction, real estate, law',
+    turns: ["I'm looking for someone working in Strategy?", 'strategic consulting, to be precise', 'What about somebody in construction instead?',
+      'none of these have anything to do with construction', 'yes, try the angle of real estate', 'anything related to law?'],
+    check: (t) => {
+      const notStrategyOnly = (x) => x.people.length === 0 || !x.people.every((p) => p.department === 'Strategy');
+      const gap = (x) => x.said.split(' — ')[0];
+      return [/What in strategy/.test(t[0].ask), t[1].people.length > 0,
+        notStrategyOnly(t[2]) && /construction/i.test(t[2].said),
+        /construction/i.test(t[3].said) || t[3].people.every((p) => !t[2].people.some((q) => q.id === p.id)),
+        notStrategyOnly(t[4]) && /real estate/i.test(gap(t[4])),
+        notStrategyOnly(t[5]) && /\blaw\b/i.test(gap(t[5]))];
+    } },
   { name: 'thanks', turns: ['thanks!'], check: (t) => [/welcome|happy to help/i.test(t[0].ask), t[0].people.length === 0] },
   { name: 'department alone: marketing', turns: ['someone in marketing'], check: (t) => [/What in marketing/.test(t[0].ask)] },
   { name: 'vague: I need help', turns: ['I need help'], check: (t) => [/What would you like help with/.test(t[0].ask)] },
