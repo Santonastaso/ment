@@ -17,7 +17,13 @@ test('Home greeting uses four borderless faces and turns each 15 seconds', async
 
 test('Messages rail moves smoothly and compact menus remain usable', async ({ page }) => {
   await page.goto('/conversations?session=1');
+  await expect(page.locator('.conversation-messages')).toBeVisible();
+  expect(await page.locator('main').evaluate(element => element.scrollHeight <= element.clientHeight + 1)).toBe(true);
   const sidebar = page.locator('.app-sidebar');
+  const centerY = async locator => {
+    const box = await locator.boundingBox();
+    return box.y + box.height / 2;
+  };
   await expect(sidebar.getByRole('button', { name: 'Close sidebar' })).toHaveCount(2);
   await expect(sidebar.getByRole('button', { name: 'Open sidebar' })).toHaveCount(0);
   const anchorCenters = async () => {
@@ -48,6 +54,7 @@ test('Messages rail moves smoothly and compact menus remain usable', async ({ pa
   const rail = page.locator('.conversation-list');
   const close = page.getByRole('button', { name: 'Hide message list' });
   await expect(close).toBeVisible();
+  expect(Math.abs(await centerY(close) - await centerY(sidebar.getByRole('button', { name: 'Close sidebar' }).last()))).toBeLessThan(3);
   expect(await rail.evaluate(element => getComputedStyle(element.parentElement).transitionDuration)).toBe('0.48s');
   await close.click();
   await page.waitForTimeout(100);
@@ -56,6 +63,8 @@ test('Messages rail moves smoothly and compact menus remain usable', async ({ pa
   expect(movingWidth).toBeLessThan(340);
   await expect.poll(() => rail.evaluate(element => Math.round(element.getBoundingClientRect().width))).toBe(64);
   const compact = page.getByRole('group', { name: 'Messages' });
+  expect(Math.abs(await centerY(compact.getByRole('button', { name: 'Filter conversations' })) - await centerY(sidebar.getByRole('link', { name: 'Home' })))).toBeLessThan(3);
+  expect(Math.abs(await centerY(compact.getByRole('button', { name: 'Messages' })) - await centerY(sidebar.getByRole('link', { name: 'Explorer' })))).toBeLessThan(3);
   await compact.getByRole('button', { name: 'Messages' }).click();
   await expect(page.locator('.conversation-list-content.menu-chats')).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('messages-compact-rail.png'), animations: 'disabled' });
@@ -69,6 +78,15 @@ test('Messages rail moves smoothly and compact menus remain usable', async ({ pa
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByRole('button', { name: 'Hide message list' })).toBeHidden();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+});
+
+test('Groups heading aligns with the sidebar toggle without an empty card', async ({ page }) => {
+  await page.goto('/groups');
+  const heading = page.getByRole('heading', { name: 'Campus groups' });
+  const toggle = page.locator('.app-sidebar').getByRole('button', { name: 'Close sidebar' }).last();
+  const [headingBox, toggleBox] = await Promise.all([heading.boundingBox(), toggle.boundingBox()]);
+  expect(Math.abs(headingBox.y + headingBox.height / 2 - toggleBox.y - toggleBox.height / 2)).toBeLessThan(4);
+  await expect(page.locator('.group-list-card')).toHaveCount(0);
 });
 
 test('Explorer sticky panel rules share the same width', async ({ page }) => {
