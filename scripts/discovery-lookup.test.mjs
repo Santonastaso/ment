@@ -561,3 +561,119 @@ test('pushback that finds new people says they are different, with no invented p
   assert.match(result.message, /^Got it — here's someone different\./);
   assert.doesNotMatch(result.message, /based in/);
 });
+
+// The request read as parts -- role, field, employer, place, what to drop --
+// each checked against the user's words before anything acts on it.
+const marketer = { ...finance, id: 'mkt', name: 'Brand Lead', department: 'Marketing', job_title: 'Brand Manager', skills: ['brand positioning'] };
+const policy = { ...finance, id: 'policy', name: 'Policy Advisor', department: 'Public Policy', job_title: 'Policy Advisor', skills: ['EU policy analysis'] };
+const ops = { ...finance, id: 'ops', name: 'Ops Lead', department: 'Operations', job_title: 'Operations Manager', skills: ['supply chain'], location: 'Madrid' };
+const consultant = { ...finance, id: 'mck', name: 'Ex McKinsey', department: 'Consulting', job_title: 'Strategy Consultant', skills: ['market entry'],
+  experience: ['Associate at McKinsey (2015-2019)'], experience_facts: ['Associate', 'McKinsey'] };
+const otherConsultant = { ...consultant, id: 'bcg', name: 'Ex BCG', experience: ['Associate at BCG (2016-2020)'], experience_facts: ['Associate', 'BCG'] };
+const picked = (id, expertise) => ({ outcome: 'matches', matches: [{ profile_id: id, confidence: 0.9, reasons: ['Works on this every day.'], matched_expertise: [expertise] }] });
+
+test('"forget finance, show me marketing" moves to marketing, even when the model names finance', async () => {
+  const turns = [{ role: 'user', content: 'a junior partner at McKinsey' }, { role: 'assistant', kind: 'no_match', content: 'Nobody here.' }];
+  const fixture = discoveryFixture({ candidates: [finance, marketer], turns, responses: [
+    clarify({ named_subject: 'finance', search_request: 'finance', parts: { field: 'marketing', exclude: ['finance'] } }),
+  ] });
+  const result = await say(fixture, 'actually forget finance, show me marketing people instead', 'thread');
+  assert.match(result.clarification, /What in marketing would help most/, 'the funnel continues on marketing, not finance');
+  assert.equal(result.understood.department, 'Marketing');
+});
+
+test('a ruled-out field is dropped by phrase even when the model misses it', async () => {
+  const fixture = discoveryFixture({ candidates: [finance, marketer], responses: [
+    clarify({ named_subject: 'marketing' }), { outcome: 'no_match', matches: [] },
+  ] });
+  const result = await chat(fixture, 'not finance, marketing please');
+  assert.equal(result.understood.department, 'Marketing');
+  assert.deepEqual(result.understood.exclude, ['finance']);
+});
+
+test('a field in another language reaches its department, and the reply invents no place', async () => {
+  const fixture = discoveryFixture({ candidates: [finance, policy], responses: [
+    clarify({ named_subject: 'politique publique', subject_label: 'a policy expert in France or remote',
+      parts: { field: 'politique publique', department: 'Public Policy' } }),
+    picked('policy', 'EU policy analysis'),
+  ] });
+  const result = await chat(fixture, "en fait plutôt quelqu'un en politique publique");
+  assert.deepEqual(result.matches.map((m) => m.id), ['policy']);
+  assert.equal(result.nearest, false);
+  assert.doesNotMatch(result.message, /France|remote/);
+});
+
+test('a department the user gave no reason for is ignored', async () => {
+  const fixture = discoveryFixture({ candidates: [finance, policy], responses: [
+    clarify({ named_subject: 'Financial modelling', parts: { department: 'Public Policy' } }), directMatch,
+  ] });
+  const result = await chat(fixture, 'help with Financial modelling');
+  assert.equal(result.understood.department, '');
+});
+
+test('a field nobody does in the city named is shown elsewhere, saying so', async () => {
+  const lisbonFinance = { ...finance, location: 'Lisbon' };
+  const fixture = withLocations(discoveryFixture({ candidates: [lisbonFinance, ops], responses: [
+    clarify({ named_subject: 'operations', named_location: 'lisbon', parts: { field: 'operations', department: 'Operations' } }),
+    { outcome: 'no_match', matches: [] },
+  ] }), ['Lisbon', 'Madrid']);
+  const result = await chat(fixture, 'someone in operations in lisbon');
+  assert.deepEqual(result.matches.map((m) => m.id), ['ops'], 'operations people elsewhere, not Lisbon people in finance');
+  assert.equal(result.nearest, true);
+  assert.match(result.message, /^I couldn't find anyone in operations in Lisbon right now/);
+});
+
+test('an employer is a filter on career history', async () => {
+  const fixture = discoveryFixture({ candidates: [otherConsultant, consultant], responses: [
+    clarify({ named_subject: 'consulting', parts: { company: 'McKinsey', department: 'Consulting' } }), picked('mck', 'McKinsey'),
+  ] });
+  const result = await chat(fixture, 'someone who worked at McKinsey');
+  assert.deepEqual(payload(fixture, 1).candidates.map((c) => c.id), ['mck']);
+  assert.equal(payload(fixture, 1).wanted.company, 'McKinsey');
+  assert.deepEqual(result.matches.map((m) => m.id), ['mck']);
+});
+
+test('an employer nobody worked at is let go, and the reply names it', async () => {
+  const fixture = discoveryFixture({ candidates: [finance, otherConsultant], responses: [
+    clarify({ named_subject: 'consulting', parts: { company: 'Bain', department: 'Consulting' } }), { outcome: 'no_match', matches: [] },
+  ] });
+  const result = await chat(fixture, 'someone who worked at Bain');
+  assert.deepEqual(result.matches.map((m) => m.id), ['bcg'], 'consultants, not anyone');
+  assert.match(result.message, /^I couldn't find anyone who has worked at Bain/);
+});
+
+test('an employer the user never named is discarded', async () => {
+  const fixture = discoveryFixture({ candidates: [otherConsultant, consultant], responses: [
+    clarify({ named_subject: 'consulting', parts: { company: 'McKinsey', field: 'consulting', department: 'Consulting' } }),
+    { outcome: 'no_match', matches: [] },
+  ] });
+  const result = await chat(fixture, 'someone in strategy consulting');
+  assert.equal(result.understood.company, '');
+  assert.deepEqual(payload(fixture, 1).candidates.map((c) => c.id).sort(), ['bcg', 'mck']);
+});
+
+test('two parts that cannot describe one person are asked about, once', async () => {
+  const fixture = discoveryFixture({ candidates: [consultant], responses: [
+    clarify({ named_subject: 'junior partner', parts: { role: 'junior partner', company: 'McKinsey', conflict: ['a junior partner at McKinsey', 'still at school'] } }),
+  ] });
+  const result = await say(fixture, 'a junior partner at McKinsey who is still at school');
+  assert.match(result.clarification, /"a junior partner at McKinsey" and "still at school" don't usually describe the same person/);
+  assert.deepEqual(result.suggestions.map((c) => c.message), ['a junior partner at McKinsey', 'still at school']);
+  assert.equal(fixture.calls.length, 1, 'nothing is searched yet');
+});
+
+test('a conflict the user never wrote is ignored', async () => {
+  const fixture = discoveryFixture({ responses: [
+    clarify({ named_subject: 'Financial modelling', parts: { conflict: ['a CEO', 'an astronaut'] } }), directMatch,
+  ] });
+  const result = await chat(fixture, 'help with Financial modelling');
+  assert.equal(result.matches.length, 1);
+});
+
+test('a failed match names other strengths, not the field just asked for', async () => {
+  const fixture = discoveryFixture({ candidates: [finance, marketer], responses: [
+    clarify({ named_subject: 'brand strategy for luxury', parts: { field: 'marketing', department: 'Marketing' } }), { outcome: 'no_match', matches: [] },
+  ] });
+  const result = await chat(fixture, 'brand strategy for luxury in marketing');
+  if (result.no_match) assert.doesNotMatch(result.no_match_reason, /most people.*marketing/);
+});

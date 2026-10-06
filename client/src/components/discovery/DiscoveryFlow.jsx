@@ -146,6 +146,16 @@ function MatchCard({ match, index, selected, onSelect, copy, style, profileHref,
   );
 }
 
+// Development only: how the chat read the last message, to check the parsing
+// while testing. Never shown in a production build.
+function describeUnderstood(parts) {
+  const entries = [['role', parts.role], ['seniority', parts.seniority], ['field', parts.field], ['department', parts.department],
+    ['company', parts.company], ['skills', (parts.skills || []).join(', ')], ['place', parts.location],
+    ['dropped', (parts.exclude || []).join(', ')], ['conflict', (parts.conflict || []).join(' / ')]];
+  const shown = entries.filter(([, value]) => value).map(([key, value]) => `${key}: ${value}`);
+  return `Understood — ${shown.length ? shown.join(' · ') : 'nothing specific'}`;
+}
+
 export default function DiscoveryFlow() {
   const { user } = useAuth();
   const { lang, t } = useT();
@@ -250,7 +260,7 @@ export default function DiscoveryFlow() {
       setMatches(nextMatches);
       if (data.clarification) {
         setClarification(data.clarification);
-        setTurns(current => [...current, { role: 'assistant', kind: 'clarification', content: data.clarification, suggestions: Array.isArray(data.suggestions) ? data.suggestions : [], at: new Date().toISOString() }]);
+        setTurns(current => [...current, { role: 'assistant', kind: 'clarification', content: data.clarification, suggestions: Array.isArray(data.suggestions) ? data.suggestions : [], understood: data.understood, at: new Date().toISOString() }]);
         setStage('clarify');
       } else {
         setSubmittedQuery(requestText(data.resolved_request, message));
@@ -265,6 +275,7 @@ export default function DiscoveryFlow() {
             ? (data.message || (data.nearest && data.no_match_reason ? data.no_match_reason : 'matches_ready'))
             : (data.no_match_reason || copy.noMatches),
           matches: Array.isArray(data.matches) ? data.matches : [],
+          understood: data.understood,
           at: new Date().toISOString(),
         }]);
         setStage(nextMatches.length ? 'choose' : 'empty');
@@ -530,7 +541,7 @@ export default function DiscoveryFlow() {
         : turn.content;
       // One agent mark per run of assistant turns.
       const continues = renderedTurns[index - 1]?.role === 'assistant';
-      return <div className={`discovery-chat-turn is-assistant ${turn.kind === 'error' ? 'is-error' : ''}`} key={`${turn.at || index}-${index}`}>{continues ? <span className="discovery-agent-mark-spacer" aria-hidden="true" /> : <span className="discovery-agent-mark" aria-label="Ment">M</span>}<div className="discovery-assistant-stack"><p className="discovery-assistant-bubble">{renderInline(response)}</p>{(() => {
+      return <div className={`discovery-chat-turn is-assistant ${turn.kind === 'error' ? 'is-error' : ''}`} key={`${turn.at || index}-${index}`}>{continues ? <span className="discovery-agent-mark-spacer" aria-hidden="true" /> : <span className="discovery-agent-mark" aria-label="Ment">M</span>}<div className="discovery-assistant-stack"><p className="discovery-assistant-bubble">{renderInline(response)}</p>{import.meta.env.DEV && turn.understood && <p className="discovery-understood">{describeUnderstood(turn.understood)}</p>}{(() => {
         const people = turn.kind === 'matches' && Array.isArray(turn.matches) ? turn.matches : [];
         const latestResults = renderedTurns.map(entry => entry.kind === 'matches').lastIndexOf(true);
         if (!people.length || (index === latestResults && stage === 'choose')) return null;

@@ -10,8 +10,11 @@ export type Gap = {
   // busy: the city is here but nobody there is free; none: no exact match.
   // phrase: Mistral's checked description of the request ("a CFO who is
   // still a student"), which completes "I couldn't find ___ here".
-  kind: 'subject' | 'place' | 'busy' | 'none' | 'phrase';
+  // company: nobody here has worked at the employer named; elsewhere: the
+  // field is here, just not in the place named (scope holds the field).
+  kind: 'subject' | 'place' | 'busy' | 'none' | 'phrase' | 'company' | 'elsewhere';
   value: string;
+  scope?: string;
   // "a painter" (a role) reads differently from "audit" (a field).
   role: boolean;
 };
@@ -54,6 +57,8 @@ const COPY: Record<string, Copy> = {
           : `I couldn't find anyone working in ${gap.value} here`;
       }
       if (gap.kind === 'phrase') return `I couldn't find ${gap.value} here`;
+      if (gap.kind === 'company') return `I couldn't find anyone who has worked at ${gap.value}`;
+      if (gap.kind === 'elsewhere') return `I couldn't find anyone in ${gap.scope} in ${gap.value} right now`;
       if (gap.kind === 'place') return `I couldn't find anyone based in ${gap.value}`;
       if (gap.kind === 'busy') return `Nobody in ${gap.value} is free to talk right now`;
       return "I couldn't find an exact match";
@@ -101,6 +106,8 @@ const COPY: Record<string, Copy> = {
           : `Non ho trovato nessuno che lavori in ambito ${gap.value}`;
       }
       if (gap.kind === 'phrase') return `Non ho trovato ${gap.value} qui`;
+      if (gap.kind === 'company') return `Non ho trovato nessuno che abbia lavorato in ${gap.value}`;
+      if (gap.kind === 'elsewhere') return `Al momento non ho trovato nessuno in ambito ${gap.scope} a ${gap.value}`;
       if (gap.kind === 'place') return `Non ho trovato nessuno a ${gap.value}`;
       if (gap.kind === 'busy') return `Al momento nessuno a ${gap.value} è disponibile`;
       return 'Non ho trovato una corrispondenza esatta';
@@ -148,6 +155,8 @@ const COPY: Record<string, Copy> = {
           : `Je n'ai trouvé personne qui travaille en ${gap.value}`;
       }
       if (gap.kind === 'phrase') return `Je n'ai pas trouvé ${gap.value} ici`;
+      if (gap.kind === 'company') return `Je n'ai trouvé personne ayant travaillé chez ${gap.value}`;
+      if (gap.kind === 'elsewhere') return `Je n'ai trouvé personne en ${gap.scope} à ${gap.value} pour le moment`;
       if (gap.kind === 'place') return `Je n'ai trouvé personne basé à ${gap.value}`;
       if (gap.kind === 'busy') return `Personne à ${gap.value} n'est disponible pour le moment`;
       return "Je n'ai pas trouvé de correspondance exacte";
@@ -193,7 +202,8 @@ function listOf(items: string[], join: string) {
 }
 
 // Fields and skills read in lower case mid-sentence; places keep their capitals.
-const asWritten = (gap: Gap): Gap => (gap.kind === 'subject' ? { ...gap, value: inSentence(gap.value) } : gap);
+const asWritten = (gap: Gap): Gap => (gap.kind === 'subject' ? { ...gap, value: inSentence(gap.value) }
+  : gap.kind === 'elsewhere' ? { ...gap, scope: inSentence(gap.scope || '') } : gap);
 
 function copyFor(language: string) {
   return COPY[language] || COPY.English;
@@ -239,7 +249,7 @@ export function frameNoMatch(language: string, gap: Gap, strengths: string[], ra
   const shown = asWritten(gap);
   // A missing place is about the place: asking for an industry the user has
   // already given made the reply read like it had not been listening.
-  if (gap.kind === 'place' || gap.kind === 'busy') return `${copy.missing(shown)}${PLACE_RETRY[language] || PLACE_RETRY.English}`;
+  if (gap.kind === 'place' || gap.kind === 'busy' || gap.kind === 'elsewhere') return `${copy.missing(shown)}${PLACE_RETRY[language] || PLACE_RETRY.English}`;
   return `${copy.missing(shown)}${pick(copy.retry(listOf(strengths, copy.join)), random)}`;
 }
 
@@ -438,4 +448,18 @@ export function framePerson(language: string, name: string) { return (PERSON[lan
 export function frameWhichFirst(language: string) { return WHICH_FIRST[language] || WHICH_FIRST.English; }
 export function exploreChoice(language: string, name: string): Choice {
   return { label: (EXPLORE_LABEL[language] || EXPLORE_LABEL.English)(name), message: '', href: name ? `/explorer?q=${encodeURIComponent(name)}` : '/explorer' };
+}
+
+// Two parts of one request that do not fit one person: ask which matters,
+// with each part as a choice, rather than searching for the impossible.
+const CONFLICT: Record<string, (a: string, b: string) => string> = {
+  English: (a, b) => `Just checking — "${a}" and "${b}" don't usually describe the same person. Which matters more to you?`,
+  Italian: (a, b) => `Una verifica: "${a}" e "${b}" di solito non descrivono la stessa persona. Cosa conta di più per te?`,
+  French: (a, b) => `Petite vérification : « ${a} » et « ${b} » décrivent rarement la même personne. Qu'est-ce qui compte le plus pour vous ?`,
+};
+export function frameConflict(language: string, parts: string[]) {
+  return (CONFLICT[language] || CONFLICT.English)(parts[0], parts[1]);
+}
+export function conflictChoices(parts: string[]): Choice[] {
+  return parts.map((part) => ({ label: part, message: part }));
 }
