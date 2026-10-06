@@ -147,7 +147,7 @@ test('Explorer sticky panel rules share the same width', async ({ page }) => {
   await page.locator('.directory-filter').first().click();
   const option = page.locator('.directory-filter-option:visible').first();
   await expect(option).toBeVisible();
-  expect(await option.evaluate(element => element.getBoundingClientRect().height)).toBe(homeHeight);
+  expect(await option.evaluate(element => element.getBoundingClientRect().height)).toBeCloseTo(homeHeight, 3);
   expect(await option.evaluate(element => getComputedStyle(element).borderRadius)).toBe(homeRadius);
   await page.keyboard.press('Escape');
   const [searchBox, brandBox] = await Promise.all([

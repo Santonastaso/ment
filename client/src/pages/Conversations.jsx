@@ -105,8 +105,8 @@ export default function Conversations() {
   const queryGroupId = Number(params.get('group')) || null;
   const [sessions, setSessions] = useState([]);
   const [groups, setGroups] = useState([]);
-  const selectedId = sessions.find(session => session.route_token === sessionToken)?.id || querySessionId;
-  const selectedGroupId = groups.find(group => group.route_token === groupToken)?.id || queryGroupId;
+  const selectedId = sessionToken ? sessions.find(session => session.route_token === sessionToken)?.id : querySessionId;
+  const selectedGroupId = groupToken ? groups.find(group => group.route_token === groupToken)?.id : queryGroupId;
   const [railCollapsed, setRailCollapsed] = useState(false);
   const [railMenu, setRailMenu] = useState(null);
   const railRef = useRef(null);
