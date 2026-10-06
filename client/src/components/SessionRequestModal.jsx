@@ -175,6 +175,7 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
                       <button
                         key={skill}
                         type="button"
+                        aria-pressed={active}
                         onClick={() => toggleTopic(skill)}
                         className={`rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ${
                           active
@@ -182,7 +183,6 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
                             : 'bg-card text-foreground border-border hover:bg-muted'
                         }`}
                       >
-                        {active && <span className="mr-1.5" aria-hidden="true">+</span>}
                         {skill}
                       </button>
                     );

@@ -329,7 +329,14 @@ test('onboarding to discovery, request, acceptance, chat and meeting', async ({ 
   await composer.press('Enter');
   await page.getByRole('button', { name: 'Choose Peer Mentor' }).click();
   await page.getByRole('textbox', { name: 'Suggested draft' }).fill('Please help me with financial modelling.');
-  await page.getByRole('group', { name: 'What kind of support?' }).getByRole('button', { name: 'Ongoing support' }).click();
+  const draftBox = await page.locator('.discovery-draft').boundingBox();
+  const sendBox = await page.getByRole('button', { name: 'Send request', exact: true }).boundingBox();
+  const backBox = await page.getByRole('button', { name: 'Back to matches' }).boundingBox();
+  expect(Math.abs(draftBox.x + draftBox.width - sendBox.x - sendBox.width)).toBeLessThan(2);
+  expect(backBox.x).toBeLessThan(sendBox.x);
+  await page.getByRole('combobox', { name: 'What kind of support?' }).click();
+  await page.getByRole('option', { name: 'Ongoing support' }).click();
+  await expect(page.getByRole('combobox', { name: 'What kind of support?' })).toContainText('Ongoing support');
   await page.getByRole('button', { name: 'Send request', exact: true }).click();
   expect(await page.evaluate(() => window.fixture.calls.find(call => call.method === 'post' && call.path === '/sessions')?.body.follow_up_intent)).toBe('ongoing');
   await page.getByRole('link', { name: 'Open chat', exact: true }).click();

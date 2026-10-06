@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { useT } from '../../i18n/index.jsx';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog.jsx';
 import { Button } from '../ui/button.jsx';
+import DirectoryFilter from '../DirectoryFilter.jsx';
 import { CONVERSATION_FILTERS, conversationState, requestText, resumableSearch } from '../../lib/conversations.mjs';
 import { sessionPath } from '../../lib/conversationLinks.mjs';
 import { homeCopy } from '../demo/homeCopy.js';
@@ -586,13 +587,13 @@ export default function DiscoveryFlow() {
             </div>
             {stage === 'reachout' ? (
               <div className="discovery-actions">
-                <div role="group" aria-label={intentCopy.intent} className="flex flex-wrap gap-2">
-                  {[{ value: 'one_off', label: intentCopy.oneOff }, { value: 'ongoing', label: intentCopy.ongoing }].map(option => <Button key={option.value} type="button" size="sm" variant={requestIntent === option.value ? 'default' : 'outline'} aria-pressed={requestIntent === option.value} disabled={sending} onClick={() => setRequestIntent(option.value)}>{option.label}</Button>)}
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button type="button" variant="link" onClick={() => setStage('choose')}><ArrowLeft />{copy.back}</Button>
-                  <Button type="button" onClick={sendRequest} disabled={sending || !draft.trim()}>{sending ? <RefreshCw className="animate-spin" /> : <Send />}{copy.send}</Button>
+                <Button type="button" variant="link" onClick={() => setStage('choose')}><ArrowLeft />{copy.back}</Button>
+                <div className="discovery-action-controls">
+                  <div className="discovery-intent-select">
+                    <DirectoryFilter label={intentCopy.intent} value={requestIntent} onChange={setRequestIntent} disabled={sending} options={[{ value: 'one_off', label: intentCopy.oneOff }, { value: 'ongoing', label: intentCopy.ongoing }]} renderValue={requestIntent === 'ongoing' ? intentCopy.ongoing : intentCopy.oneOff} />
+                  </div>
                   <Button type="button" variant="ghost" onClick={regenerate}><RefreshCw />{copy.regenerate}</Button>
+                  <Button type="button" onClick={sendRequest} disabled={sending || !draft.trim()}>{sending ? <RefreshCw className="animate-spin" /> : <Send />}{copy.send}</Button>
                 </div>
               </div>
             ) : (
