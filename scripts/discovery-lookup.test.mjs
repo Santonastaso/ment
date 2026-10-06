@@ -746,6 +746,7 @@ test('answering a scoping question keeps the field: other companies still means 
   const result = await say(fixture, choice.message, first.thread_id);
   assert.deepEqual(lastPayload(fixture).candidates.map((c) => c.id), ['hr'], 'only HR people are considered');
   assert.deepEqual(result.matches.map((m) => m.id), ['hr']);
+  assert.match(result.message, /^I couldn't find an exact match for your original request, but with your clarification I think this person is a good fit\./);
 });
 
 test('many people for a one-part request are scoped first, with choices from the people here', async () => {
@@ -771,4 +772,29 @@ test('cards carry the current employer, never a past one', async () => {
   ] });
   const result = await chat(fixture, 'help with Financial modelling');
   assert.deepEqual(result.matches.map((m) => m.current_company), ['Google', null]);
+});
+
+test('a skill typed in full is shown even when the model vetoes it and declines everyone', async () => {
+  const fixture = discoveryFixture({ candidates: [finance, hr], responses: [
+    clarify({ named_subject: 'modelling skills', matching_terms: [] }), { outcome: 'no_match', matches: [], no_match_reason: 'Nobody.' },
+  ] });
+  const result = await chat(fixture, 'someone who knows financial modelling');
+  assert.deepEqual(result.matches.map((m) => m.id), ['finance']);
+  assert.equal(result.nearest, false);
+});
+
+test('a made-up place is called made-up, and real cities are offered', async () => {
+  const fixture = withLocations(discoveryFixture({ candidates: [finance], responses: [
+    clarify({ named_subject: 'finance', named_location: 'Gotham', place_is_real: false }),
+  ] }), ['Paris']);
+  const result = await chat(fixture, 'someone in finance in Gotham');
+  assert.match(result.clarification, /^Gotham isn't a real city, so nobody here is based there\. Would Paris work, or anywhere\?/);
+});
+
+test('a real city the network lacks is never called made-up', async () => {
+  const fixture = withLocations(discoveryFixture({ candidates: [finance], responses: [
+    clarify({ named_subject: 'finance', named_location: 'Tokyo', place_is_real: false }),
+  ] }), ['Paris']);
+  const result = await chat(fixture, 'someone in finance in Tokyo');
+  assert.match(result.clarification, /^I couldn't find anyone based in Tokyo\./);
 });

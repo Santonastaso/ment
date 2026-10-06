@@ -12,7 +12,7 @@ export type Gap = {
   // still a student"), which completes "I couldn't find ___ here".
   // company: nobody here has worked at the employer named; elsewhere: the
   // field is here, just not in the place named (scope holds the field).
-  kind: 'subject' | 'place' | 'busy' | 'none' | 'phrase' | 'company' | 'elsewhere';
+  kind: 'subject' | 'place' | 'busy' | 'none' | 'phrase' | 'company' | 'elsewhere' | 'unreal';
   value: string;
   scope?: string;
   // "a painter" (a role) reads differently from "audit" (a field).
@@ -58,6 +58,7 @@ const COPY: Record<string, Copy> = {
       }
       if (gap.kind === 'phrase') return `I couldn't find ${gap.value} here`;
       if (gap.kind === 'company') return `I couldn't find anyone who has worked at ${gap.value}`;
+      if (gap.kind === 'unreal') return `${gap.value} isn't a real city, so nobody here is based there`;
       if (gap.kind === 'elsewhere') return `I couldn't find anyone in ${gap.scope} in ${gap.value} right now`;
       if (gap.kind === 'place') return `I couldn't find anyone based in ${gap.value}`;
       if (gap.kind === 'busy') return `Nobody in ${gap.value} is free to talk right now`;
@@ -107,6 +108,7 @@ const COPY: Record<string, Copy> = {
       }
       if (gap.kind === 'phrase') return `Non ho trovato ${gap.value} qui`;
       if (gap.kind === 'company') return `Non ho trovato nessuno che abbia lavorato in ${gap.value}`;
+      if (gap.kind === 'unreal') return `${gap.value} non è una città reale, quindi qui non c'è nessuno`;
       if (gap.kind === 'elsewhere') return `Al momento non ho trovato nessuno in ambito ${gap.scope} a ${gap.value}`;
       if (gap.kind === 'place') return `Non ho trovato nessuno a ${gap.value}`;
       if (gap.kind === 'busy') return `Al momento nessuno a ${gap.value} è disponibile`;
@@ -156,6 +158,7 @@ const COPY: Record<string, Copy> = {
       }
       if (gap.kind === 'phrase') return `Je n'ai pas trouvé ${gap.value} ici`;
       if (gap.kind === 'company') return `Je n'ai trouvé personne ayant travaillé chez ${gap.value}`;
+      if (gap.kind === 'unreal') return `${gap.value} n'est pas une vraie ville, donc personne ici n'y est basé`;
       if (gap.kind === 'elsewhere') return `Je n'ai trouvé personne en ${gap.scope} à ${gap.value} pour le moment`;
       if (gap.kind === 'place') return `Je n'ai trouvé personne basé à ${gap.value}`;
       if (gap.kind === 'busy') return `Personne à ${gap.value} n'est disponible pour le moment`;
@@ -210,7 +213,7 @@ function copyFor(language: string) {
 }
 
 export function frameResults(language: string, options: {
-  near: boolean; count: number; gap: Gap; closeTerms: string[]; more?: boolean; different?: boolean; random?: () => number;
+  near: boolean; count: number; gap: Gap; closeTerms: string[]; more?: boolean; different?: boolean; clarified?: boolean; random?: () => number;
 }) {
   const copy = copyFor(language);
   const random = options.random || Math.random;
@@ -218,6 +221,9 @@ export function frameResults(language: string, options: {
   // Every set of results ends on an open door, never a one-shot answer.
   const followUp = pick(copy.followUp, random);
   if (options.more) return `${pick(one ? copy.moreOne : copy.moreMany, random)} ${followUp}`;
+  // After the user answered a question asked because nothing matched
+  // exactly: say the first request had no exact match, and credit the answer.
+  if (options.clarified) return `${(CLARIFIED[language] || CLARIFIED.English)(one)} ${pick(one ? copy.actOne : copy.actMany, random)} ${followUp}`;
   if (options.different) return `${(DIFFERENT[language] || DIFFERENT.English)(one)} ${pick(one ? copy.actOne : copy.actMany, random)} ${followUp}`;
   if (!options.near) return `${pick(one ? copy.exactOne : copy.exactMany, random)} ${followUp}`;
   const gap = asWritten(options.gap);
@@ -249,7 +255,7 @@ export function frameNoMatch(language: string, gap: Gap, strengths: string[], ra
   const shown = asWritten(gap);
   // A missing place is about the place: asking for an industry the user has
   // already given made the reply read like it had not been listening.
-  if (gap.kind === 'place' || gap.kind === 'busy' || gap.kind === 'elsewhere') return `${copy.missing(shown)}${PLACE_RETRY[language] || PLACE_RETRY.English}`;
+  if (gap.kind === 'place' || gap.kind === 'busy' || gap.kind === 'elsewhere' || gap.kind === 'unreal') return `${copy.missing(shown)}${PLACE_RETRY[language] || PLACE_RETRY.English}`;
   return `${copy.missing(shown)}${pick(copy.retry(listOf(strengths, copy.join)), random)}`;
 }
 
@@ -409,6 +415,12 @@ export function frameRejectedNone(language: string, subject: string) {
   return (REJECTED_NONE[language] || REJECTED_NONE.English)(inSentence(subject));
 }
 
+const CLARIFIED: Record<string, (one: boolean) => string> = {
+  English: (one) => `I couldn't find an exact match for your original request, but with your clarification I think ${one ? 'this person is a good fit' : 'these people are a good fit'}.`,
+  Italian: (one) => `Non ho trovato una corrispondenza esatta per la tua richiesta iniziale, ma con il tuo chiarimento credo che ${one ? 'questa persona sia adatta' : 'queste persone siano adatte'}.`,
+  French: (one) => `Je n'ai pas trouvé de correspondance exacte pour votre demande initiale, mais avec votre précision, je pense que ${one ? 'cette personne convient bien' : 'ces personnes conviennent bien'}.`,
+};
+
 const DIFFERENT: Record<string, (one: boolean) => string> = {
   English: (one) => one ? "Got it — here's someone different." : 'Got it — here are some different people.',
   Italian: (one) => one ? 'Capito, ecco una persona diversa.' : 'Capito, ecco qualche persona diversa.',
@@ -533,7 +545,7 @@ export function frameScope(language: string, options: {
     const choices = scope ? [copy.otherCompanies(scope, options.place), copy.closest] : [copy.closest];
     return { question: `${missing}${copy.company(scope)}`, choices };
   }
-  if (options.gap.kind === 'place' || options.gap.kind === 'busy' || options.gap.kind === 'elsewhere') {
+  if (options.gap.kind === 'place' || options.gap.kind === 'busy' || options.gap.kind === 'elsewhere' || options.gap.kind === 'unreal') {
     if (!options.cities.length) return null;
     return {
       question: `${missing}${copy.place(joinPlaces(options.cities, copy.join))}`,

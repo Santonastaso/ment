@@ -6,7 +6,7 @@ import { canHelpWithCareerGoal, hasGroundedExpertise } from '../_shared/discover
 import { departmentChoices, frameChat, frameExhausted, frameNarrow, frameNoMatch, frameOpenAgain, frameRefineNone, frameSmallTalk, frameNudge, frameSamePeople, frameSomeRepeated, frameRejectedNone, framePrivacy, frameDirectory, framePerson, exploreChoice, frameWhichFirst, narrowChoices, ownWordsInvite, scopeChoices, type Choice, frameResults, namesARole, NO_GAP, type Gap, frameConflict, conflictChoices, frameScope, frameBroad } from './framing.ts';
 import { NO_PARTS, narrowStepwise, negatedWords, readParts, withoutExcluded, type Filter, type Parts } from './request.ts';
 
-const PROMPT_VERSION = 'discovery-v24';
+const PROMPT_VERSION = 'discovery-v25';
 
 // Written here rather than by the model, so the gap names the place the user
 // actually typed instead of drifting to a vaguer sentence about seniority.
@@ -87,6 +87,7 @@ type ClarificationResult = {
   matching_terms?: string[];
   nearest_terms?: string[];
   subject_label?: string;
+  place_is_real?: boolean;
   parts?: unknown;
 };
 
@@ -641,6 +642,11 @@ Deno.serve(async (req) => {
   let resumeScope = false;
   let scopeName = '';
   let specified = 0;
+  // Coverage terms the user typed in full: exact by definition, so the model
+  // can neither veto them nor decline the people who carry them.
+  let typedTerms: string[] = [];
+  // Answering a scoping question asked because nothing matched exactly.
+  let answeredScope = false;
   const answer = (data: Record<string, unknown>) => jsonOk(understood ? { ...data, understood } : data);
   // Set when this message is the user's answer to a question we asked. Having
   // spent their one question, returning nothing is the worst possible outcome:
@@ -736,9 +742,10 @@ Do not broaden explicit professions or domains into adjacent ones. For example, 
   "exclude": things the latest message says to drop or stop searching for, as written, else [].
   "conflict": two short phrases from the latest message that cannot both be true of one person, such as a very senior job and still being at school, else [].
 The language the user writes in is never a place: French words do not mean France.
+"place_is_real": false when named_location is a fictional or made-up place, such as one from a film, comic or novel; true for a real city, region or country.
 Every term you return is checked against the coverage and anything not found there is discarded, so copy exactly and never invent one. The examples in these instructions illustrate shape only: never reuse their wording or their subject in anything you return.
 
-Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one concise question or empty string","search_request":"concise grounded request or empty string","no_match_reason":"one plain sentence, or empty string","named_subject":"as written, or empty string","matching_terms":["exact coverage term"],"nearest_terms":["exact coverage term"],"named_location":"as written, or empty string","subject_label":"short phrase, or empty string","parts":{"role":"","seniority":"","field":"","department":"","company":"","skills":[],"exclude":[],"conflict":[]}}.`,
+Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one concise question or empty string","search_request":"concise grounded request or empty string","no_match_reason":"one plain sentence, or empty string","named_subject":"as written, or empty string","matching_terms":["exact coverage term"],"nearest_terms":["exact coverage term"],"named_location":"as written, or empty string","subject_label":"short phrase, or empty string","place_is_real":true,"parts":{"role":"","seniority":"","field":"","department":"","company":"","skills":[],"exclude":[],"conflict":[]}}.`,
         user: JSON.stringify({ conversation, coverage, answered: hasClarified, lexical_hits: hits }),
         temperature: 0.1,
         maxTokens: 800,
@@ -816,7 +823,10 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
         placeMissing = true;
         nearestOnly = true;
         exactGapReason = (LOCATION_GAP[language] || LOCATION_GAP.English)(namedLocation);
-        gapState = { kind: 'place', value: namedLocation, role: false };
+        // A place the model calls made-up, and that is no city or region we know
+        // of, is said to be unreal rather than offered as if nobody were there.
+        const fictional = result.value?.place_is_real === false && !WORLD_CITIES.has(namedLocation.toLowerCase()) && !regionIn(namedLocation);
+        gapState = { kind: fictional ? 'unreal' : 'place', value: namedLocation, role: false };
       } else if (namedLocation) {
         namedLocationFilter = knownLocations.find((known) => known.toLowerCase() === namedLocation.toLowerCase()) || namedLocation;
         locationCities = regionCities;
@@ -919,7 +929,10 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
       // named, can make a result exact. A synonym the model proposes still
       // finds people, but they are shown as closest: the model called due
       // diligence a synonym of audit and the result was labelled exact.
-      const lexicalConfirmed = confirmed ? confirmed.filter((term) => termHits.includes(term)) : termHits;
+      const typedWords = contentWords(latestHits.length ? latestRaw : withoutExcluded(userTurns.join(' '), parts.exclude));
+      const typedWord = (word: string) => typedWords.some((typed) => typed === word || (typed.length >= 5 && word.length >= 5 && typed.slice(0, 5) === word.slice(0, 5)));
+      typedTerms = termHits.filter((term) => contentWords(term).length > 0 && contentWords(term).every(typedWord));
+      const lexicalConfirmed = [...new Set([...typedTerms, ...(confirmed ? confirmed.filter((term) => termHits.includes(term)) : termHits)])];
       const proposed = confirmed ? confirmed.filter((term) => !termHits.includes(term)) : [];
       const matchingTerms = [...new Set([...(exactTerm ? [exactTerm] : []), ...(requiredDepartment ? [requiredDepartment] : []), ...lexicalConfirmed])];
       const subjectAbsent = Boolean(namedSubject) && !matchingTerms.length;
@@ -1056,7 +1069,7 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
         const storedGap = previous.gap as Gap | undefined;
         gapState = storedGap?.kind ? storedGap : NO_GAP;
         nearestOnly = Boolean(previous.near);
-        placeMissing = gapState.kind === 'place';
+        placeMissing = gapState.kind === 'place' || gapState.kind === 'unreal';
         constraintsOnly = false;
       }
 
@@ -1122,6 +1135,7 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
       }
       // A fresh request, with no question asked yet, may be scoped once the
       // people available are known; follow-ups and answers never are.
+      answeredScope = answering && previous?.stage === 'scope' && !resumeScope && Boolean(previous?.near);
       mayScope = !answering && !resumeScope && !following && intent === '' && questionsAsked < MAX_QUESTIONS;
       scopeName = parts.role || requiredDepartment || namedSubject;
       specified = [requiredDepartment || parts.field, parts.role, parts.skills.length > 0, companyFilter, namedLocation, parts.seniority].filter(Boolean).length;
@@ -1410,12 +1424,18 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
     // After letting go of a place or employer, everyone left still carries the
     // subject, so they are the answer even if the matcher declines.
     const keptSubject = relaxedParts.length > 0 && narrowed.active.includes('subject');
+    // People carrying a term the user typed in full are a match even when
+    // the matcher declines them: "financial modelling" came back empty.
+    const typedCarriers = !matches.length && !nearestOnly && typedTerms.length
+      ? candidates.filter((candidate) => carries(candidate, typedTerms)).slice(0, 3)
+        .map((candidate) => publicCandidate(candidate, { reasons: [], matched_expertise: typedTerms }, redactInterOrg && !established.has(candidate.id)))
+      : [];
     const fallback = (answeredClarification || nearestTerms.length > 0 || constraintsMet || keptSubject) && !matches.length
       ? candidates.filter((candidate) => constraintsMet || keptSubject || overlapsRequest(candidate, [requestForMatch, ...relatedTerms].join(' '))).slice(0, 3)
         .map((candidate) => publicCandidate(candidate, { reasons: [], matched_expertise: [] },
           redactInterOrg && !established.has(candidate.id)))
       : [];
-    if (!matches.length && !fallback.length && refineFallback.length) {
+    if (!matches.length && !fallback.length && !typedCarriers.length && refineFallback.length) {
       const message = frameRefineNone(language);
       const threadId = await persistTurns(ctx, body.thread_id, query, {
         kind: 'matches', content: message, framed: true, search_request: requestForMatch,
@@ -1424,7 +1444,7 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
       });
       return answer({ matches: refineFallback, clarification: '', nearest: true, message, no_match_reason: message, resolved_request: requestForMatch, thread_id: threadId, model: result.model });
     }
-    if (!matches.length && !fallback.length) {
+    if (!matches.length && !fallback.length && !typedCarriers.length) {
       // Even with nothing to offer, say what the network does have.
       // Wording only: when the model extracted no subject, name the user's own
       // unfamiliar words rather than a generic "no exact match".
@@ -1436,8 +1456,8 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
     }
     // A near result is still a result: the people render as cards, under the
     // sentence that says nothing matched exactly.
-    const shown = matches.length ? matches : fallback;
-    const isNear = constraintsMet ? false : (!matches.length || nearest || (nearestOnly && !locationFilterApplied) || relaxedParts.length > 0);
+    const shown = matches.length ? matches : typedCarriers.length ? typedCarriers : fallback;
+    const isNear = constraintsMet || (!matches.length && typedCarriers.length > 0) ? false : (!matches.length || nearest || (nearestOnly && !locationFilterApplied) || relaxedParts.length > 0);
     const shownIds = new Set(shown.map((person) => person.id));
     const shownPeople = candidates.filter((candidate) => shownIds.has(candidate.id));
     const closeTerms = nearestTerms.filter((term) => shownPeople.some((person) => carries(person, [term])));
@@ -1447,7 +1467,7 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
     // Being transparent about repeats: the same people coming back after a
     // follow-up otherwise reads as if the follow-up found them afresh.
     const repeated = shown.filter((person) => seenBefore.has(person.id)).length;
-    const framed = frameResults(language, { near: isNear, count: shown.length, gap: resultGap, closeTerms, more: followUp === 'more', different: followUp === 'reject' });
+    const framed = frameResults(language, { near: isNear, count: shown.length, gap: resultGap, closeTerms, more: followUp === 'more', different: followUp === 'reject', clarified: answeredScope });
     const message = repeated && repeated === shown.length ? frameSamePeople(language, shown.length)
       : repeated ? `${framed} ${frameSomeRepeated(language, shown.length - repeated)}` : framed;
     const threadId = await persistTurns(ctx, body.thread_id, query, {
