@@ -48,7 +48,7 @@ test('pilot feedback migrations: group lifecycle, tenant boundaries, capacity an
     await db.exec(groups.split('create table if not exists public.notification_outbox')[0]);
     const core = await migration('20260917120000_0038_production_core.sql');
     await db.exec(core.slice(core.indexOf('create or replace function public.is_active_connection'), core.indexOf('create or replace function public.expire_pending_requests')));
-    for (const name of ['20261001100000_0056_discovery_availability.sql', '20261001101000_0057_group_join_requests.sql', '20261001102000_0058_directory_relevance.sql']) await db.exec(await migration(name));
+    for (const name of ['20261001100000_0056_discovery_availability.sql', '20261001101000_0057_group_join_requests.sql', '20261001102000_0058_directory_relevance.sql', '20261006100000_0074_directory_multiple_languages.sql']) await db.exec(await migration(name));
 
     await as(owner);
     const { value: created } = await one("select create_group('Finance group', 'Learn finance') value");
@@ -85,6 +85,12 @@ test('pilot feedback migrations: group lifecycle, tenant boundaries, capacity an
     assert.equal((await one('select directory_browse() value')).value.people[0].id, owner);
     assert.equal((await one("select directory_browse(p_query => 'financial modelling') value")).value.total, 1);
     assert.equal((await one('select directory_browse() value')).value.total, 1);
+    await db.query("update profiles set working_language = 'fr' where id = $1", [owner]);
+    await db.query("update profiles set organization_id = $1, working_language = 'it' where id = $2", [organization, outsider]);
+    assert.equal((await one("select directory_browse(p_working_language => 'fr,it') value")).value.total, 2);
+    assert.equal((await one("select directory_browse(p_working_language => 'fr') value")).value.total, 1);
+    assert.equal((await one("select directory_browse(p_working_language => 'de') value")).value.total, 0);
+    await db.query("update profiles set organization_id = '20000000-0000-0000-0000-000000000002' where id = $1", [outsider]);
     await db.exec(`insert into sessions(mentor_id, mentee_id, title, status, accepted_at)
       select '${owner}', '${applicant}', 'Capacity test', 'scheduled', now() from generate_series(1,5)`);
     assert.equal((await one('select is_currently_available_mentor($1) value', [owner])).value, false);

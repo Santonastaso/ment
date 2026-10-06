@@ -442,7 +442,7 @@ async function get(url) {
       program: params.get('program'),
       cohortYear: params.get('cohort'),
       location: params.get('location'),
-      language: params.get('language'),
+      language: params.getAll('language').join(','),
       q: params.get('q'),
       sort: params.get('sort'),
     }));

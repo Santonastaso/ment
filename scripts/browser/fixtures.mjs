@@ -16,7 +16,7 @@ function fixtureApi(state) {
       if (path === '/reflections') return { entries: state.reflections || [] };
       if (path === '/sessions') return state.sessions.map(payload);
       if (path === '/groups') return state.groups;
-      if (path.startsWith('/directory?')) return { people: [state.peer], total: 1, facets: {} };
+      if (path.startsWith('/directory?')) return { people: [state.peer], total: 1, facets: { languages: ['fr', 'it'] } };
       // A saved conversation and a peer profile, for the view-profile round trip.
       if (path === '/discovery/threads/thread') return { id: 'thread', turns: [
         { role: 'user', content: 'Financial modelling' },

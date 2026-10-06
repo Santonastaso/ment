@@ -105,7 +105,11 @@ test('Groups heading aligns with the sidebar toggle without an empty card', asyn
 test('Explorer sticky panel rules share the same width', async ({ page }) => {
   await page.goto('/explorer');
   await expect(page.locator('.directory-pagination')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Clear filters' })).toHaveCount(0);
+  await page.goto('/explorer?persona=student');
+  await expect(page.locator('.directory-pagination')).toBeVisible();
   const home = page.locator('.app-sidebar').getByRole('link', { name: 'Home' });
+  const explorerLink = page.locator('.app-sidebar').getByRole('link', { name: 'Explorer' });
   const [homeHeight, homeRadius] = await home.evaluate(element => {
     const style = getComputedStyle(element);
     return [element.getBoundingClientRect().height, style.borderRadius];
@@ -118,8 +122,30 @@ test('Explorer sticky panel rules share the same width', async ({ page }) => {
     expect(height).toBe(homeHeight);
     expect(radius).toBe(homeRadius);
   }
+  const [homeBox, explorerBox, filterBox, clearBox] = await Promise.all([
+    home.boundingBox(), explorerLink.boundingBox(),
+    page.locator('.directory-filter').first().boundingBox(),
+    page.getByRole('button', { name: 'Clear filters' }).boundingBox(),
+  ]);
+  expect(Math.abs(filterBox.y - homeBox.y)).toBeLessThan(2);
+  expect(Math.abs(clearBox.y + clearBox.height / 2 - explorerBox.y - explorerBox.height / 2)).toBeLessThan(2);
+  expect(clearBox.height).toBeLessThan(explorerBox.height);
+  const languageFilter = page.getByRole('combobox', { name: 'Languages' });
+  await expect(languageFilter).toHaveText('Languages');
+  await languageFilter.click();
+  await page.getByRole('option', { name: 'French' }).click();
+  await page.getByRole('option', { name: 'Italian' }).click();
+  await expect(languageFilter).toHaveText('French, Italian');
+  expect(await languageFilter.locator('span').first().evaluate(value => value.scrollWidth <= value.clientWidth + 1)).toBe(true);
+  expect(await page.evaluate(() => new URLSearchParams(location.search).getAll('language'))).toEqual(['fr', 'it']);
+  await page.getByRole('option', { name: 'French' }).click();
+  await expect(languageFilter).toHaveText('Italian');
+  await page.getByRole('option', { name: 'Italian' }).click();
+  await expect(languageFilter).toHaveText('Languages');
+  expect(await page.evaluate(() => new URLSearchParams(location.search).getAll('language'))).toEqual([]);
+  await page.keyboard.press('Escape');
   await page.locator('.directory-filter').first().click();
-  const option = page.locator('.directory-filter-option').first();
+  const option = page.locator('.directory-filter-option:visible').first();
   await expect(option).toBeVisible();
   expect(await option.evaluate(element => element.getBoundingClientRect().height)).toBe(homeHeight);
   expect(await option.evaluate(element => getComputedStyle(element).borderRadius)).toBe(homeRadius);
@@ -137,6 +163,33 @@ test('Explorer sticky panel rules share the same width', async ({ page }) => {
   });
   expect(edges[0]).toBeCloseTo(edges[2], 0);
   expect(edges[1]).toBeCloseTo(edges[3], 0);
+  await page.setViewportSize({ width: 390, height: 700 });
+  expect(await page.locator('.directory-search-panel').evaluate(panel => getComputedStyle(panel).position)).toBe('static');
+});
+
+test('Explorer keeps its clear action for active search and sort', async ({ page }) => {
+  await page.goto('/explorer?q=finance');
+  await expect(page.getByRole('button', { name: 'Clear filters' })).toBeVisible();
+  await page.getByRole('button', { name: 'Clear filters' }).click();
+  await expect(page.getByRole('button', { name: 'Clear filters' })).toHaveCount(0);
+});
+
+test('a proposed time is checked again before sending a request', async ({ page }) => {
+  await page.goto('/explorer');
+  await page.getByRole('button', { name: 'Request a session' }).first().click();
+  const dialog = page.getByRole('dialog', { name: 'Request a session' });
+  await dialog.getByRole('button', { name: 'Skip' }).click();
+  await dialog.getByRole('textbox').fill('How can I improve my project planning?');
+  await dialog.getByRole('button', { name: 'Next' }).click();
+  await dialog.getByRole('button', { name: 'Suggest a time', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Review request' }).click();
+  await expect(dialog.getByText('Review your request')).toBeVisible();
+  const now = await page.evaluate(() => Date.now());
+  await page.clock.setFixedTime(new Date(now + 40 * 60 * 1000));
+  await dialog.getByRole('button', { name: 'Confirm and send' }).click();
+  await expect(dialog.getByRole('alert')).toHaveText('Choose a date and time at least one hour from now.');
+  await expect(dialog.getByText('3 / 4')).toBeVisible();
+  expect(await page.evaluate(() => window.fixture.calls.some(call => call.method === 'post' && call.path === '/sessions'))).toBe(false);
 });
 
 test('Quick reflection opens a card without shifting the profile and preserves drafts', async ({ page }) => {
@@ -390,6 +443,19 @@ test('failed send preserves the draft and can be retried', async ({ page }) => {
   await expect(composer).toHaveValue('Keep my message');
   await page.getByRole('button', { name: 'Send message', exact: true }).click();
   await expect(page.getByText('Keep my message', { exact: true })).toBeVisible();
+  await expect(composer).toHaveValue('');
+});
+
+test('chat composer grows for multiline drafts and Enter sends', async ({ page }) => {
+  await page.goto('/conversations?session=1');
+  const composer = page.getByRole('textbox', { name: 'Message', exact: true });
+  const initialHeight = await composer.evaluate(field => field.getBoundingClientRect().height);
+  await composer.fill('First line\nSecond line\nThird line');
+  expect(await composer.evaluate(field => field.getBoundingClientRect().height)).toBeGreaterThan(initialHeight);
+  await composer.press('Shift+Enter');
+  await expect(composer).toHaveValue('First line\nSecond line\nThird line\n');
+  await composer.press('Enter');
+  await expect(page.locator('.conversation-messages').getByText('First line')).toBeVisible();
   await expect(composer).toHaveValue('');
 });
 
