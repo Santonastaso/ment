@@ -54,7 +54,7 @@ test('an absent subject goes to its nearest terms, and invented terms are discar
     { outcome: 'no_match', matches: [], no_match_reason: 'Nobody here works in audit.' },
   ] });
   const result = await throughScope(fixture, 'someone in audit', (question) => {
-    assert.match(question.clarification, /^I couldn't find anyone working in audit here\. Would one of these be close enough\?/);
+    assert.match(question.clarification, /^I couldn't find anyone working in audit here\. Could one of these nearby areas do the trick\?/);
     assert.deepEqual(question.suggestions.map((c) => c.label), ['Financial modelling', 'Show me the closest']);
   });
   assert.equal(result.clarification, '');
@@ -424,7 +424,7 @@ test('a place the network does not cover is answered about the place', async () 
     { outcome: 'no_match', matches: [] },
   ] }), ['Paris']);
   const result = await chat(fixture, 'someone in finance in Tokyo');
-  assert.match(result.clarification, /^I couldn't find anyone based in Tokyo\. Would Paris work, or anywhere\?/);
+  assert.match(result.clarification, /^I couldn't find anyone based in Tokyo\. Would Paris work for you, or shall I look anywhere\?/);
   assert.deepEqual(result.suggestions.map((c) => c.message), ['finance in Paris', 'finance, anywhere']);
 });
 
@@ -640,7 +640,7 @@ test('a field nobody does in the city named is shown elsewhere, saying so', asyn
     { outcome: 'no_match', matches: [] },
   ] }), ['Lisbon', 'Madrid']);
   const result = await throughScope(fixture, 'someone in operations in lisbon', (question) => {
-    assert.match(question.clarification, /^I couldn't find anyone in operations in Lisbon right now\. Would Madrid work, or anywhere\?/);
+    assert.match(question.clarification, /^I couldn't find anyone in operations in Lisbon right now\. Would Madrid work for you, or shall I look anywhere\?/);
     assert.deepEqual(question.suggestions.map((c) => c.message), ['operations in Madrid', 'operations, anywhere']);
   });
   assert.deepEqual(result.matches.map((m) => m.id), ['ops'], 'operations people elsewhere, not Lisbon people in finance');
@@ -663,7 +663,7 @@ test('an employer nobody worked at is let go, and the reply names it', async () 
     clarify({ named_subject: 'consulting', parts: { company: 'Bain', department: 'Consulting' } }), { outcome: 'no_match', matches: [] },
   ] });
   const result = await throughScope(fixture, 'someone who worked at Bain', (question) => {
-    assert.match(question.clarification, /^I couldn't find anyone who has worked at Bain\. Would consulting from other companies work/);
+    assert.match(question.clarification, /^I couldn't find anyone who has worked at Bain\. Would consulting from another company do the trick/);
     assert.deepEqual(question.suggestions.map((c) => c.message), ['consulting, any company', 'Show me the closest people']);
   });
   assert.deepEqual(result.matches.map((m) => m.id), ['bcg'], 'consultants, not anyone');
@@ -685,7 +685,7 @@ test('two parts that cannot describe one person are asked about, once', async ()
     clarify({ named_subject: 'junior partner', parts: { role: 'junior partner', company: 'McKinsey', conflict: ['a junior partner at McKinsey', 'still at school'] } }),
   ] });
   const result = await say(fixture, 'a junior partner at McKinsey who is still at school');
-  assert.match(result.clarification, /"a junior partner at McKinsey" and "still at school" don't usually describe the same person/);
+  assert.match(result.clarification, /"a junior partner at McKinsey" and "still at school" rarely describe the same person/);
   assert.deepEqual(result.suggestions.map((c) => c.message), ['a junior partner at McKinsey', 'still at school']);
   assert.equal(fixture.calls.length, 1, 'nothing is searched yet');
 });
@@ -740,13 +740,13 @@ test('answering a scoping question keeps the field: other companies still means 
     { outcome: 'matches', matches: [{ profile_id: hr.id, confidence: 0.9, reasons: ['Leads talent acquisition.'], matched_expertise: ['talent acquisition'] }] },
   ] });
   const first = await say(fixture, 'an HR director who worked at Google');
-  assert.match(first.clarification, /^I couldn't find anyone who has worked at Google\. Would HR director from other companies work/);
+  assert.match(first.clarification, /^I couldn't find anyone who has worked at Google\. Would HR director from another company do the trick/);
   const choice = first.suggestions[0];
   assert.equal(choice.label, 'HR director at other companies');
   const result = await say(fixture, choice.message, first.thread_id);
   assert.deepEqual(lastPayload(fixture).candidates.map((c) => c.id), ['hr'], 'only HR people are considered');
   assert.deepEqual(result.matches.map((m) => m.id), ['hr']);
-  assert.match(result.message, /^I couldn't find an exact match for your original request, but with your clarification I think this person is a good fit\./);
+  assert.match(result.message, /^Your first request had no exact match — but with your clarification, I think this person is a really good fit!/);
 });
 
 test('many people for a one-part request are scoped first, with choices from the people here', async () => {
@@ -757,7 +757,7 @@ test('many people for a one-part request are scoped first, with choices from the
     { outcome: 'matches', matches: [{ profile_id: 'f0', confidence: 0.9, reasons: ['Teaches modelling.'], matched_expertise: ['Financial modelling'] }] },
   ] });
   const result = await throughScope(fixture, 'someone who knows Financial modelling', (question) => {
-    assert.match(question.clarification, /^Quite a few people fit that/);
+    assert.match(question.clarification, /^Good news — quite a few people fit that!/);
     assert.deepEqual(question.suggestions.map((c) => c.label), ['Budgeting', 'Valuation', 'Paris', 'Show me the best matches']);
   });
   assert.deepEqual(result.matches.map((m) => m.id), ['f0']);
@@ -788,7 +788,7 @@ test('a made-up place is called made-up, and real cities are offered', async () 
     clarify({ named_subject: 'finance', named_location: 'Gotham', place_is_real: false }),
   ] }), ['Paris']);
   const result = await chat(fixture, 'someone in finance in Gotham');
-  assert.match(result.clarification, /^Gotham isn't a real city, so nobody here is based there\. Would Paris work, or anywhere\?/);
+  assert.match(result.clarification, /^Good one! I'm fairly sure Gotham isn't a real place, so nobody here is based there\. Would Paris work for you, or shall I look anywhere\?/);
 });
 
 test('a real city the network lacks is never called made-up', async () => {
@@ -798,3 +798,27 @@ test('a real city the network lacks is never called made-up', async () => {
   const result = await chat(fixture, 'someone in finance in Tokyo');
   assert.match(result.clarification, /^I couldn't find anyone based in Tokyo\./);
 });
+
+// The voice pass: Mistral re-says each reply; code keeps the rewrite only if
+// every fact survived and nothing was added.
+const gotham = (voiceReply) => withLocations(discoveryFixture({ voice: true, candidates: [finance], responses: [
+  clarify({ named_subject: 'finance', named_location: 'Gotham', place_is_real: false }), { text: voiceReply },
+] }), ['Paris']);
+
+test('a warm rewrite that keeps every fact is used', async () => {
+  const reply = "Ha, good one — Gotham sounds straight out of a comic, so nobody here lives there! Would Paris suit you, or should I look anywhere? Pick an option below or tell me in your own words.";
+  const result = await chat(gotham(reply), 'someone in finance in Gotham');
+  assert.equal(result.clarification, reply);
+});
+
+for (const [label, reply] of [
+  ['invents a city', 'Good one — Gotham is fictional! Would Paris or Milan suit you, or anywhere? Pick one below or tell me.'],
+  ['drops a place', 'Good one — Gotham is fictional, so nobody lives there! Where should I look instead? Pick one below or tell me.'],
+  ['talks like a system', 'Gotham is fictional, so no profiles match. Would Paris work, or anywhere? Pick one below or tell me.'],
+  ['drops the question', 'Gotham is fictional, so nobody here lives there. Paris has people. Pick one below.'],
+]) {
+  test(`a rewrite that ${label} falls back to the template`, async () => {
+    const result = await chat(gotham(reply), 'someone in finance in Gotham');
+    assert.match(result.clarification, /^Good one! I'm fairly sure Gotham isn't a real place/);
+  });
+}

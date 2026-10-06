@@ -34,11 +34,11 @@ export async function discoveryHandler() {
 export const finance = { id: 'finance', name: 'Finance Mentor', job_title: 'Financial Analyst', department: 'Finance', program: 'Masters', skills: ['Financial modelling'], location: 'Paris' };
 export const directMatch = { outcome: 'matches', matches: [{ profile_id: finance.id, confidence: 0.9, reasons: ['Teaches financial modelling.'], matched_expertise: ['Financial modelling'] }] };
 
-export function discoveryFixture({ candidates = [finance], turns = [], responses = [], live = false } = {}) {
+export function discoveryFixture({ candidates = [finance], turns = [], responses = [], live = false, voice = false } = {}) {
   let thread = turns.length ? { id: 'thread', turns: structuredClone(turns) } : null;
   const context = {
     user: { id: 'viewer' }, telemetry: [], calls: [], queries: [],
-    env: live ? { ...process.env, AI_PROCESSING_ENABLED: 'true' } : { AI_PROCESSING_ENABLED: 'true', MISTRAL_API: 'fixture-only', MISTRAL_MODEL: 'fixture-model' },
+    env: live ? { ...process.env, AI_PROCESSING_ENABLED: 'true' } : { AI_PROCESSING_ENABLED: 'true', MISTRAL_API: 'fixture-only', MISTRAL_MODEL: 'fixture-model', DISCOVERY_VOICE: voice ? 'on' : 'off' },
     async fetch(url, options) {
       if (url !== 'https://api.mistral.ai/v1/chat/completions') throw new Error('Unexpected provider');
       const request = JSON.parse(options.body);

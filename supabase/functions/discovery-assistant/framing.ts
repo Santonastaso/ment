@@ -58,7 +58,7 @@ const COPY: Record<string, Copy> = {
       }
       if (gap.kind === 'phrase') return `I couldn't find ${gap.value} here`;
       if (gap.kind === 'company') return `I couldn't find anyone who has worked at ${gap.value}`;
-      if (gap.kind === 'unreal') return `${gap.value} isn't a real city, so nobody here is based there`;
+      if (gap.kind === 'unreal') return `Good one! I'm fairly sure ${gap.value} isn't a real place, so nobody here is based there`;
       if (gap.kind === 'elsewhere') return `I couldn't find anyone in ${gap.scope} in ${gap.value} right now`;
       if (gap.kind === 'place') return `I couldn't find anyone based in ${gap.value}`;
       if (gap.kind === 'busy') return `Nobody in ${gap.value} is free to talk right now`;
@@ -108,7 +108,7 @@ const COPY: Record<string, Copy> = {
       }
       if (gap.kind === 'phrase') return `Non ho trovato ${gap.value} qui`;
       if (gap.kind === 'company') return `Non ho trovato nessuno che abbia lavorato in ${gap.value}`;
-      if (gap.kind === 'unreal') return `${gap.value} non è una città reale, quindi qui non c'è nessuno`;
+      if (gap.kind === 'unreal') return `Bella questa! Sono abbastanza sicuro che ${gap.value} non sia un posto reale, quindi qui non c'è nessuno`;
       if (gap.kind === 'elsewhere') return `Al momento non ho trovato nessuno in ambito ${gap.scope} a ${gap.value}`;
       if (gap.kind === 'place') return `Non ho trovato nessuno a ${gap.value}`;
       if (gap.kind === 'busy') return `Al momento nessuno a ${gap.value} è disponibile`;
@@ -158,7 +158,7 @@ const COPY: Record<string, Copy> = {
       }
       if (gap.kind === 'phrase') return `Je n'ai pas trouvé ${gap.value} ici`;
       if (gap.kind === 'company') return `Je n'ai trouvé personne ayant travaillé chez ${gap.value}`;
-      if (gap.kind === 'unreal') return `${gap.value} n'est pas une vraie ville, donc personne ici n'y est basé`;
+      if (gap.kind === 'unreal') return `Bien essayé ! Je suis presque sûr que ${gap.value} n'est pas un vrai lieu, donc personne ici n'y est basé`;
       if (gap.kind === 'elsewhere') return `Je n'ai trouvé personne en ${gap.scope} à ${gap.value} pour le moment`;
       if (gap.kind === 'place') return `Je n'ai trouvé personne basé à ${gap.value}`;
       if (gap.kind === 'busy') return `Personne à ${gap.value} n'est disponible pour le moment`;
@@ -416,7 +416,7 @@ export function frameRejectedNone(language: string, subject: string) {
 }
 
 const CLARIFIED: Record<string, (one: boolean) => string> = {
-  English: (one) => `I couldn't find an exact match for your original request, but with your clarification I think ${one ? 'this person is a good fit' : 'these people are a good fit'}.`,
+  English: (one) => `Your first request had no exact match — but with your clarification, I think ${one ? 'this person is a really good fit' : 'these people are a really good fit'}!`,
   Italian: (one) => `Non ho trovato una corrispondenza esatta per la tua richiesta iniziale, ma con il tuo chiarimento credo che ${one ? 'questa persona sia adatta' : 'queste persone siano adatte'}.`,
   French: (one) => `Je n'ai pas trouvé de correspondance exacte pour votre demande initiale, mais avec votre précision, je pense que ${one ? 'cette personne convient bien' : 'ces personnes conviennent bien'}.`,
 };
@@ -465,7 +465,7 @@ export function exploreChoice(language: string, name: string): Choice {
 // Two parts of one request that do not fit one person: ask which matters,
 // with each part as a choice, rather than searching for the impossible.
 const CONFLICT: Record<string, (a: string, b: string) => string> = {
-  English: (a, b) => `Just checking — "${a}" and "${b}" don't usually describe the same person. Which matters more to you?`,
+  English: (a, b) => `I like the ambition! But "${a}" and "${b}" rarely describe the same person — which matters more to you?`,
   Italian: (a, b) => `Una verifica: "${a}" e "${b}" di solito non descrivono la stessa persona. Cosa conta di più per te?`,
   French: (a, b) => `Petite vérification : « ${a} » et « ${b} » décrivent rarement la même personne. Qu'est-ce qui compte le plus pour vous ?`,
 };
@@ -495,10 +495,10 @@ type ScopeCopy = {
 };
 const SCOPE: Record<string, ScopeCopy> = {
   English: {
-    company: (scope) => `. Would ${scope ? `${scope} from other companies` : 'people from other companies'} work, or shall I show you the closest people?`,
-    place: (cities) => `. Would ${cities} work, or anywhere?`,
-    subject: '. Would one of these be close enough?',
-    broad: "Quite a few people fit that. Does something specific matter to you — a skill, or where they're based?",
+    company: (scope) => `. Would ${scope ? `${scope} from another company` : 'someone from another company'} do the trick, or shall I show you the closest people I've got?`,
+    place: (cities) => `. Would ${cities} work for you, or shall I look anywhere?`,
+    subject: '. Could one of these nearby areas do the trick?',
+    broad: "Good news — quite a few people fit that! Want to narrow it down a little, say by a skill or where they're based?",
     closest: { label: 'Show me the closest', message: 'Show me the closest people' },
     best: { label: 'Show me the best matches', message: 'Show me the best matches' },
     anywhere: (scope) => ({ label: 'Anywhere', message: scope ? `${scope}, anywhere` : 'anywhere' }),
