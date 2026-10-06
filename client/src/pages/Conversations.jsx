@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Check, ChevronLeft, ChevronsLeft, ChevronsRight, CircleCheck, CircleX, Info, ListFilter, MessageCircle, MessageSquareText, Send, UserRound, UsersRound } from 'lucide-react';
 import api from '../api/index.js';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -18,6 +18,7 @@ import { CONVERSATION_FILTERS as FILTERS, conversationState as rowState, isExpir
 import { homeCopy } from '../components/demo/homeCopy.js';
 import SessionRequestModal from '../components/SessionRequestModal.jsx';
 import TimeSlotSelect from '../components/TimeSlotSelect.jsx';
+import { groupPath, sessionPath } from '../lib/conversationLinks.mjs';
 
 function initials(name = '') {
   return name.split(' ').map((part) => part[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || '?';
@@ -96,16 +97,27 @@ function sessionPreview(session, t) {
 export default function Conversations() {
   const { user, unreadCounts, refreshPendingAcceptances, refreshUnreadCounts } = useAuth();
   const { t, lang } = useT();
+  const navigate = useNavigate();
+  const { sessionToken, groupToken } = useParams();
   const copy = homeCopy(lang);
   const [params, setParams] = useSearchParams();
-  const selectedId = Number(params.get('session')) || null;
-  const selectedGroupId = Number(params.get('group')) || null;
+  const querySessionId = Number(params.get('session')) || null;
+  const queryGroupId = Number(params.get('group')) || null;
   const [sessions, setSessions] = useState([]);
+  const [groups, setGroups] = useState([]);
+  const selectedId = sessions.find(session => session.route_token === sessionToken)?.id || querySessionId;
+  const selectedGroupId = groups.find(group => group.route_token === groupToken)?.id || queryGroupId;
   const [railCollapsed, setRailCollapsed] = useState(false);
   const [railMenu, setRailMenu] = useState(null);
   const railRef = useRef(null);
   const filter = FILTERS.some(option => option.key === params.get('filter')) ? params.get('filter') : 'all';
   function selectThread(key, id) {
+    const item = key === 'session' ? sessions.find(session => session.id === id) : groups.find(group => group.id === id);
+    if (item?.route_token) {
+      navigate(key === 'session' ? sessionPath(item) : groupPath(item));
+      setRailMenu(null);
+      return;
+    }
     const next = new URLSearchParams(params);
     next.delete('session'); next.delete('group');
     next.set(key, String(id));
@@ -130,7 +142,6 @@ export default function Conversations() {
   }, [sessions, filter]);
   const showGroups = FILTERS.find(option => option.key === filter)?.groups === true;
 
-  const [groups, setGroups] = useState([]);
   const [messages, setMessages] = useState([]);
   const sessionsFetchRef = useRef(0);
   const [hasOlder, setHasOlder] = useState(false);
@@ -271,7 +282,7 @@ export default function Conversations() {
         if (cancelled) return;
         if (selectedId && nextSessions.some((item) => item.id === selectedId)) return;
         if (selectedGroupId && nextGroups.some((item) => item.id === selectedGroupId)) return;
-        if (params.has('filter')) return;
+        if (params.has('filter') || sessionToken || groupToken) return;
         if (nextSessions[0]) setParams({ session: String(nextSessions[0].id) }, { replace: true });
         else if (nextGroups[0]) setParams({ group: String(nextGroups[0].id) }, { replace: true });
         else if (selectedId || selectedGroupId) setParams({}, { replace: true });

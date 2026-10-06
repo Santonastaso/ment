@@ -7,6 +7,7 @@ import { useT } from '../../i18n/index.jsx';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog.jsx';
 import { Button } from '../ui/button.jsx';
 import { CONVERSATION_FILTERS, conversationState, requestText, resumableSearch } from '../../lib/conversations.mjs';
+import { sessionPath } from '../../lib/conversationLinks.mjs';
 import { homeCopy } from '../demo/homeCopy.js';
 
 const COPY = {
@@ -176,6 +177,7 @@ export default function DiscoveryFlow() {
   const [historyError, setHistoryError] = useState('');
   const [deleteTargetId, setDeleteTargetId] = useState(null);
   const [matchFeedback, setMatchFeedback] = useState(null);
+  const [sentSessionToken, setSentSessionToken] = useState('');
   const threadEndRef = useRef(null);
   const composerInputRef = useRef(null);
   const idempotencyKey = useRef(null);
@@ -325,6 +327,7 @@ export default function DiscoveryFlow() {
       idempotencyKey.current ||= crypto.randomUUID();
       const response = await api.post('/sessions', { mentor_id: selected.person.id, title: submittedQuery.slice(0, 80), pre_session_question: submittedQuery, message: draft.trim(), duration_minutes: 60, follow_up_intent: requestIntent, idempotency_key: idempotencyKey.current });
       setSessionId(response.data.id);
+      setSentSessionToken(response.data.route_token || '');
       setStage('sent');
       if (threadId) await api.put(`/discovery/threads/${threadId}`, { archived: true, selected_person_id: selected.person.id }).catch(() => {});
       refreshHistory().catch(() => {});
@@ -507,7 +510,8 @@ export default function DiscoveryFlow() {
                   {visibleConnections.length === 0 ? <p className="discovery-connection-empty">{t('conversations.filter.empty')}</p> : <div className="discovery-connection-cards">
                     {visibleConnections.map((session, index) => {
                       const peer = session.mentor_id === user?.id ? session.mentee : session.mentor;
-                      return <Link key={session.id} className="discovery-connection-card" to={`/conversations?filter=${connectionCategory}&session=${session.id}`} aria-label={`${copy.openChat}: ${peer?.name || ''}`}>
+                      const href = session.route_token ? sessionPath(session) : `${sessionPath(session)}&filter=${connectionCategory}`;
+                      return <Link key={session.id} className="discovery-connection-card" to={href} aria-label={`${copy.openChat}: ${peer?.name || ''}`}>
                         <span className="discovery-avatar" style={{ backgroundColor: avatarTints[index % avatarTints.length] }} aria-hidden="true">{initials(peer?.name)}</span>
                         <span><strong>{peer?.name}</strong><small>{requestText(session.title, t('conversations.requestTitle'))}</small></span>
                         <ArrowUpRight aria-hidden="true" />
@@ -594,7 +598,7 @@ export default function DiscoveryFlow() {
             ) : (
               <>
                 <div className="discovery-confirmation"><Check /><div><strong>{text(copy, 'sent', { name: selected.person.name.split(' ')[0] })}</strong><p>{copy.sentSubline}</p></div></div>
-                {sessionId && <Button variant="ghost" className="mt-4" render={<Link to={`/conversations?session=${sessionId}`} />}>{copy.openChat}</Button>}
+                {sessionId && <Button variant="ghost" className="mt-4" render={<Link to={sessionPath({ id: sessionId, route_token: sentSessionToken })} />}>{copy.openChat}</Button>}
                 <Button type="button" variant="ghost" onClick={reset}>{copy.again}</Button>
               </>
             )}

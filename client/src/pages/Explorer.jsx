@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import api from '../api/index.js';
 import { useT } from '../i18n/index.jsx';
+import { sessionPath } from '../lib/conversationLinks.mjs';
 import { languageOptions } from '../lib/languages.js';
 
 const PAGE_SIZE = 12;
@@ -183,7 +184,7 @@ export default function Explorer() {
             setDirData((current) => current ? {
               ...current,
               people: current.people.map((person) => person.id === requestingMentor.id
-                ? { ...person, relationship_status: session.status, session_id: session.id }
+                ? { ...person, relationship_status: session.status, session_id: session.id, session_token: session.route_token }
                 : person),
             } : current);
             setRequestingMentor(null);
@@ -221,7 +222,7 @@ function PersonCard({ person, onRequest }) {
       <span className="person-row-actions">
         <Link to={`/profile/${person.id}`} className="person-row-link">{t('explorer.viewProfile')}</Link>
         {person.session_id ? (
-          <Button variant="ghost" size="sm" render={<Link to={`/conversations?session=${person.session_id}`} />}>
+          <Button variant="ghost" size="sm" render={<Link to={sessionPath({ id: person.session_id, route_token: person.session_token })} />}>
             {t('explorer.openChat')}
           </Button>
         ) : (

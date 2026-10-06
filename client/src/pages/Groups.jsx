@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/index.js';
 import { useT } from '../i18n/index.jsx';
+import { groupPath } from '../lib/conversationLinks.mjs';
 import { PageShell } from '../components/PageShell.jsx';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -165,7 +166,7 @@ export default function Groups() {
                     {group.joined && (
                       <Button variant="ghost" size="sm"
                         type="button"
-                        onClick={() => navigate(`/conversations?group=${group.id}`)}
+                        onClick={() => navigate(groupPath(group))}
                       >
                         {t('groups.chat')}
                       </Button>

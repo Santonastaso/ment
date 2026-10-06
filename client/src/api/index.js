@@ -174,7 +174,7 @@ async function loadProfile(userId, viewerId) {
     if (error) throw new ApiError(error.message, 404);
     if (!data) throw new ApiError('User not found', 404);
     const relationship = relationships.get(userId);
-    return { ...data, ...linkedin, relationship_status: relationship?.status, session_id: relationship?.session_id };
+    return { ...data, ...linkedin, relationship_status: relationship?.status, session_id: relationship?.session_id, session_token: relationship?.session_token };
   }
 
   // After 0012 we no longer have direct SELECT on the full profiles row from
@@ -327,7 +327,7 @@ async function listDirectory(params = {}) {
     .filter((person) => person.mentorship_available !== false)
     .map((person) => {
       const relationship = relationships.get(person.id);
-      return { ...person, relationship_status: relationship?.status, session_id: relationship?.session_id };
+      return { ...person, relationship_status: relationship?.status, session_id: relationship?.session_id, session_token: relationship?.session_token };
     });
   return {
     total: Math.max(0, (data?.total ?? 0) - (sourcePeople.length - people.length)),
