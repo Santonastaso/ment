@@ -13,7 +13,7 @@ const wordList = (text: string) => [...text.matchAll(/[\p{L}\p{N}][\p{L}\p{N}&'�
 const properNouns = (text: string) => wordList(text)
   .filter(({ word, at }) => /\p{Lu}/u.test(word) && !STARTS_SENTENCE.test(text.slice(0, at)))
   .map(({ word }) => word);
-const numbers = (text: string) => text.match(/\d+/g) || [];
+const numbers = (text: string): string[] => text.match(/\d+/g) ?? [];
 const quoted = (text: string) => [...text.matchAll(/["“«]\s*([^"”»]+?)\s*["”»]/g)].map((match) => match[1]);
 
 export function keepsFacts(original: string, rewritten: string, userMessage: string) {
