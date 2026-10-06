@@ -352,5 +352,8 @@
   "components.calendarCallback.progress": "Completamento della connessione sicura…",
   "components.calendarCallback.invalidResponse": "La risposta di autorizzazione del calendario non è valida.",
   "components.calendarCallback.error": "Impossibile connettere il calendario. Riprova.",
-  "components.calendarCallback.return": "Torna ai messaggi"
+  "components.calendarCallback.return": "Torna ai messaggi",
+  "components.appError.title": "Si è verificato un errore",
+  "components.appError.description": "Impossibile caricare questa pagina. Ricaricala per riprovare.",
+  "components.appError.reload": "Ricarica la pagina"
 }

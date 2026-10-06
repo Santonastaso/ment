@@ -368,5 +368,8 @@
   "components.calendarCallback.progress": "Finishing the secure connection…",
   "components.calendarCallback.invalidResponse": "The calendar authorization response is invalid.",
   "components.calendarCallback.error": "Could not connect the calendar. Please try again.",
-  "components.calendarCallback.return": "Return to messages"
+  "components.calendarCallback.return": "Return to messages",
+  "components.appError.title": "Something went wrong",
+  "components.appError.description": "This page could not load. Reload to try again.",
+  "components.appError.reload": "Reload page"
 }

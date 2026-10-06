@@ -352,5 +352,8 @@
   "components.calendarCallback.progress": "Finalisation de la connexion sécurisée…",
   "components.calendarCallback.invalidResponse": "La réponse d'autorisation de l'agenda est invalide.",
   "components.calendarCallback.error": "Impossible de connecter l'agenda. Veuillez réessayer.",
-  "components.calendarCallback.return": "Retour aux messages"
+  "components.calendarCallback.return": "Retour aux messages",
+  "components.appError.title": "Une erreur s'est produite",
+  "components.appError.description": "Cette page n'a pas pu se charger. Rechargez-la pour réessayer.",
+  "components.appError.reload": "Recharger la page"
 }
