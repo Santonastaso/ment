@@ -10,9 +10,10 @@ const row = (topic, user_id, payload = { session_id: 42 }, created_at = '2026-09
   ({ topic, user_id, payload, created_at });
 
 test('templates link to the conversation without trusting user text', () => {
-  const message = messageFor('session_request_received', { session_id: 42 }, 'https://ment-labs.com');
+  const message = messageFor('session_request_received', { session_id: 42 }, 'https://ment-labs.com', 'abcdefghijklmnop');
   assert.equal(message.subject, 'You have a new MENT request');
-  assert.match(message.text, /conversations\?session=42/);
+  assert.match(message.text, /\/c\/abcdefghijklmnop/);
+  assert.doesNotMatch(messageFor('session_request_received', { session_id: 42 }, 'https://ment-labs.com').text, /session=42/);
   assert.equal(messageFor('session_request_received', { session_id: 'bad' }, 'https://ment-labs.com'), null);
 });
 
