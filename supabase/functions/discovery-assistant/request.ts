@@ -39,6 +39,8 @@ export function negatedWords(text: string, ignore: Set<string> = new Set()) {
   return [...text.matchAll(NEGATION)].map((match) => match[1].toLowerCase()).filter((word) => !ignore.has(word));
 }
 
+const EXCLUSION_CUE = /\b(forget|not|no longer|except|without|excluding|instead|rather|apart from|other than|invece|piuttosto|lascia perdere|dimentica|tranne|senza|plut[oô]t|oublie[rz]?|sans|sauf|pas)\b/iu;
+
 const SENIORITY = new Set(['junior', 'mid', 'senior']);
 
 export function readParts(raw: unknown, context: {
@@ -50,7 +52,13 @@ export function readParts(raw: unknown, context: {
   const list = (entry: unknown, limit: number) => (Array.isArray(entry) ? entry : typeof entry === 'string' ? [entry] : [])
     .map((item) => clean(item)).filter(Boolean).slice(0, limit);
 
-  const exclude = [...new Set([...list(value.exclude, 4).filter(inLatest).map((item) => item.toLowerCase()),
+  // The model's exclusions count only when the message actually rules
+  // something out, and never as "non-finance roles": asked for "someone in
+  // finance", the model excluded non-finance roles and code read that as
+  // excluding finance.
+  const rulesOut = EXCLUSION_CUE.test(context.latest);
+  const modelExclude = rulesOut ? list(value.exclude, 4).filter((item) => !/^(non|not|no|anything but)[\s-]/i.test(item)).filter(inLatest) : [];
+  const exclude = [...new Set([...modelExclude.map((item) => item.toLowerCase()),
     ...negatedWords(context.latest, context.ignore)])];
   const excluded = (text: string) => words(text).some((word) => exclude.some((gone) => words(gone).some((other) => sameWord(word, other))));
   const keep = (text: string) => text && said(text) && !excluded(text) ? text : '';

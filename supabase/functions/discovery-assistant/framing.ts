@@ -463,3 +463,97 @@ export function frameConflict(language: string, parts: string[]) {
 export function conflictChoices(parts: string[]): Choice[] {
   return parts.map((part) => ({ label: part, message: part }));
 }
+
+// Scoping before answering. When the search can only offer people who are
+// close rather than exact -- the employer, the city or the field is not
+// here -- or when many people fit a one-word request, ask which way to go,
+// with choices taken from the people actually available, instead of showing
+// a "no exact match" result straight away.
+type ScopeCopy = {
+  company: (scope: string) => string;
+  place: (cities: string) => string;
+  subject: string;
+  broad: string;
+  closest: Choice;
+  best: Choice;
+  anywhere: (scope: string) => Choice;
+  otherCompanies: (scope: string, place: string) => Choice;
+  inCity: (scope: string, city: string) => Choice;
+  join: string;
+};
+const SCOPE: Record<string, ScopeCopy> = {
+  English: {
+    company: (scope) => `. Would ${scope ? `${scope} from other companies` : 'people from other companies'} work, or shall I show you the closest people?`,
+    place: (cities) => `. Would ${cities} work, or anywhere?`,
+    subject: '. Would one of these be close enough?',
+    broad: "Quite a few people fit that. Does something specific matter to you — a skill, or where they're based?",
+    closest: { label: 'Show me the closest', message: 'Show me the closest people' },
+    best: { label: 'Show me the best matches', message: 'Show me the best matches' },
+    anywhere: (scope) => ({ label: 'Anywhere', message: scope ? `${scope}, anywhere` : 'anywhere' }),
+    otherCompanies: (scope, place) => ({ label: `${scope} at other companies`, message: `${scope}${place ? ` in ${place}` : ''}, any company` }),
+    inCity: (scope, city) => ({ label: city, message: scope ? `${scope} in ${city}` : `in ${city}` }),
+    join: 'or',
+  },
+  Italian: {
+    company: (scope) => `. Andrebbe bene ${scope ? `${scope} di altre aziende` : 'qualcuno di altre aziende'}, o ti mostro le persone più vicine?`,
+    place: (cities) => `. Va bene ${cities}, o ovunque?`,
+    subject: '. Una di queste potrebbe andare bene?',
+    broad: "Ci sono parecchie persone adatte. C'è qualcosa che conta di più per te, una competenza o la città?",
+    closest: { label: 'Mostrami i più vicini', message: 'Mostrami i più vicini' },
+    best: { label: 'Mostrami i migliori', message: 'Mostrami i migliori' },
+    anywhere: (scope) => ({ label: 'Ovunque', message: scope ? `${scope}, ovunque` : 'ovunque' }),
+    otherCompanies: (scope, place) => ({ label: `${scope} in altre aziende`, message: `${scope}${place ? ` a ${place}` : ''}, qualsiasi azienda` }),
+    inCity: (scope, city) => ({ label: city, message: scope ? `${scope} a ${city}` : `a ${city}` }),
+    join: 'o',
+  },
+  French: {
+    company: (scope) => `. Des profils ${scope ? `${scope} d'autres entreprises` : "d'autres entreprises"} vous conviendraient-ils, ou je vous montre les plus proches ?`,
+    place: (cities) => `. ${cities} vous conviendrait, ou n'importe où ?`,
+    subject: '. L’une de ces pistes pourrait-elle convenir ?',
+    broad: "Plusieurs personnes correspondent. Qu'est-ce qui compte le plus pour vous — une compétence, ou la ville ?",
+    closest: { label: 'Montrez-moi les plus proches', message: 'Montrez-moi les plus proches' },
+    best: { label: 'Montrez-moi les meilleurs', message: 'Montrez-moi les meilleurs' },
+    anywhere: (scope) => ({ label: "N'importe où", message: scope ? `${scope}, n'importe où` : "n'importe où" }),
+    otherCompanies: (scope, place) => ({ label: `${scope} dans d'autres entreprises`, message: `${scope}${place ? ` à ${place}` : ''}, n'importe quelle entreprise` }),
+    inCity: (scope, city) => ({ label: city, message: scope ? `${scope} à ${city}` : `à ${city}` }),
+    join: 'ou',
+  },
+};
+
+// Places keep their capitals, unlike fields in listOf.
+const joinPlaces = (items: string[], join: string) => (items.length > 1 ? `${items.slice(0, -1).join(', ')} ${join} ${items[items.length - 1]}` : items.join(''));
+
+export function frameScope(language: string, options: {
+  gap: Gap; scope: string; place: string; cities: string[]; terms: string[]; skills: string[];
+}): { question: string; choices: Choice[] } | null {
+  const copy = SCOPE[language] || SCOPE.English;
+  const missing = copyFor(language).missing(asWritten(options.gap));
+  const scope = options.scope ? inSentence(options.scope) : '';
+  if (options.gap.kind === 'company') {
+    const choices = scope ? [copy.otherCompanies(scope, options.place), copy.closest] : [copy.closest];
+    return { question: `${missing}${copy.company(scope)}`, choices };
+  }
+  if (options.gap.kind === 'place' || options.gap.kind === 'busy' || options.gap.kind === 'elsewhere') {
+    if (!options.cities.length) return null;
+    return {
+      question: `${missing}${copy.place(joinPlaces(options.cities, copy.join))}`,
+      choices: [...options.cities.map((city) => copy.inCity(scope, city)), copy.anywhere(scope)],
+    };
+  }
+  if (options.gap.kind === 'subject' || options.gap.kind === 'phrase' || options.gap.kind === 'none') {
+    if (!options.terms.length) return null;
+    return { question: `${missing}${copy.subject}`, choices: [...options.terms.map((term) => ({ label: term, message: term })), copy.closest] };
+  }
+  return null;
+}
+
+export function frameBroad(language: string, options: { scope: string; skills: string[]; cities: string[] }) {
+  const copy = SCOPE[language] || SCOPE.English;
+  const scope = options.scope ? inSentence(options.scope) : '';
+  const choices = [
+    ...options.skills.map((skill) => ({ label: skill, message: skill })),
+    ...options.cities.map((city) => copy.inCity(scope, city)),
+    copy.best,
+  ];
+  return { question: copy.broad, choices };
+}

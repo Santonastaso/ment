@@ -737,4 +737,3 @@ a.person-row-name:hover { color: var(--primary); text-decoration: underline; }
 
 }
 
-.discovery-understood { margin: 4px 0 0; font-size: 12px; color: var(--muted-foreground, #8a8580); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }

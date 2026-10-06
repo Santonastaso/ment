@@ -15,7 +15,7 @@ const COPY = {
     finding: 'Having a look', chooseLead: 'Here are the people who fit.', chooseBold: 'Pick one and I will write the message.',
     why: 'Why this match', choose: 'Choose', selected: 'Selected', different: 'Ask for different people', browse: 'browse the full directory', notRight: 'Not quite right?', or: 'or',
     to: 'To', intro: "Here's a suggested intro. Edit anything, then send when it feels like you.", suggested: 'Suggested draft', send: 'Send request', regenerate: 'Regenerate',
-    sent: 'Request sent to {name}.', sentSubline: "The conversation is ready. Continue there when they reply.", openChat: 'Open chat', again: 'Ask about something else', newChat: 'New chat', recentSearches: 'Recent searches', deleteSearch: 'Delete search', confirmDeleteSearch: 'Delete this search and its saved conversation?', cancel: 'Keep search', retry: 'Start a new search', error: 'We could not complete that request. Please try again.', aiMissing: 'Matching is not configured yet. Ask an administrator to connect Mistral.', aiBusy: 'Matching is temporarily rate-limited. Please try again in a moment.', aiAdmin: 'Matching needs an administrator to check the Mistral connection.', noMatches: 'There is no relevant professional in the current network for this request.', nearestLead: 'These are the closest I could find \u2014 pick one and I will write the message.', snapshot: 'Your connections', upcoming: 'Upcoming', pending: 'Pending', completed: 'Completed', viewAll: 'View conversations', viewProfile: 'View profile', showEarlier: 'Show these {count} people again', showEarlierOne: 'Show this person again', hideEarlier: 'Hide these people', shownBefore: 'Shown before', back: 'Back to matches', drafting: 'Preparing your request', useful: 'Were these matches useful?', yes: 'Yes', no: 'No', feedbackSaved: 'Thanks — this helps improve matching.',
+    sent: 'Request sent to {name}.', sentSubline: "The conversation is ready. Continue there when they reply.", openChat: 'Open chat', again: 'Ask about something else', newChat: 'New chat', recentSearches: 'Recent searches', deleteSearch: 'Delete search', confirmDeleteSearch: 'Delete this search and its saved conversation?', cancel: 'Keep search', retry: 'Start a new search', error: 'We could not complete that request. Please try again.', aiMissing: 'Matching is not configured yet. Ask an administrator to connect Mistral.', aiBusy: 'Matching is temporarily rate-limited. Please try again in a moment.', aiAdmin: 'Matching needs an administrator to check the Mistral connection.', noMatches: 'There is no relevant professional in the current network for this request.', nearestLead: 'These are the closest I could find \u2014 pick one and I will write the message.', snapshot: 'Your connections', upcoming: 'Upcoming', pending: 'Pending', completed: 'Completed', viewAll: 'View conversations', viewProfile: 'View profile', showEarlier: 'Show these {count} people again', showEarlierOne: 'Show this person again', hideEarlier: 'Hide these people', roleAt: '{role} at {company}', shownBefore: 'Shown before', back: 'Back to matches', drafting: 'Preparing your request', useful: 'Were these matches useful?', yes: 'Yes', no: 'No', feedbackSaved: 'Thanks — this helps improve matching.',
   },
   it: {
     history: 'Cronologia',
@@ -23,7 +23,7 @@ const COPY = {
     finding: 'Do un’occhiata', chooseLead: 'Ecco le persone adatte.', chooseBold: 'Scegline una e scrivo io il messaggio.',
     why: 'Perché è adatto', choose: 'Scegli', selected: 'Scelto', different: 'Mostra altre persone', browse: 'sfoglia la directory', notRight: 'Non è quello che cercavi?', or: 'oppure',
     to: 'A', intro: 'Ecco un messaggio proposto. Modifica tutto quello che vuoi, poi invialo quando ti sembra giusto.', suggested: 'Messaggio proposto', send: 'Invia richiesta', regenerate: 'Rigenera',
-    sent: 'Richiesta inviata a {name}.', sentSubline: 'La conversazione è pronta. Continua da lì quando risponderà.', openChat: 'Apri chat', again: "Chiedi qualcos'altro", newChat: 'Nuova chat', recentSearches: 'Ricerche recenti', deleteSearch: 'Elimina ricerca', confirmDeleteSearch: 'Eliminare questa ricerca e la conversazione salvata?', cancel: 'Mantieni la ricerca', retry: 'Inizia una nuova ricerca', error: 'Non siamo riusciti a completare la richiesta. Riprova.', aiMissing: 'Il matching non è ancora configurato. Chiedi a un amministratore di collegare Mistral.', aiBusy: 'Il matching è temporaneamente limitato. Riprova tra poco.', aiAdmin: 'Un amministratore deve verificare la connessione a Mistral.', noMatches: 'Nella rete attuale non c’è un professionista pertinente per questa richiesta.', nearestLead: 'Queste sono le più vicine che ho trovato: scegline una e scrivo io il messaggio.', snapshot: 'Le tue connessioni', upcoming: 'In programma', pending: 'In attesa', completed: 'Completate', viewAll: 'Vedi conversazioni', viewProfile: 'Vedi profilo', showEarlier: 'Mostra di nuovo queste {count} persone', showEarlierOne: 'Mostra di nuovo questa persona', hideEarlier: 'Nascondi', shownBefore: 'Già mostrato', back: 'Torna ai risultati', drafting: 'Preparo la richiesta', useful: 'Questi match sono utili?', yes: 'Sì', no: 'No', feedbackSaved: 'Grazie — ci aiuta a migliorare il matching.',
+    sent: 'Richiesta inviata a {name}.', sentSubline: 'La conversazione è pronta. Continua da lì quando risponderà.', openChat: 'Apri chat', again: "Chiedi qualcos'altro", newChat: 'Nuova chat', recentSearches: 'Ricerche recenti', deleteSearch: 'Elimina ricerca', confirmDeleteSearch: 'Eliminare questa ricerca e la conversazione salvata?', cancel: 'Mantieni la ricerca', retry: 'Inizia una nuova ricerca', error: 'Non siamo riusciti a completare la richiesta. Riprova.', aiMissing: 'Il matching non è ancora configurato. Chiedi a un amministratore di collegare Mistral.', aiBusy: 'Il matching è temporaneamente limitato. Riprova tra poco.', aiAdmin: 'Un amministratore deve verificare la connessione a Mistral.', noMatches: 'Nella rete attuale non c’è un professionista pertinente per questa richiesta.', nearestLead: 'Queste sono le più vicine che ho trovato: scegline una e scrivo io il messaggio.', snapshot: 'Le tue connessioni', upcoming: 'In programma', pending: 'In attesa', completed: 'Completate', viewAll: 'Vedi conversazioni', viewProfile: 'Vedi profilo', showEarlier: 'Mostra di nuovo queste {count} persone', showEarlierOne: 'Mostra di nuovo questa persona', hideEarlier: 'Nascondi', roleAt: '{role} presso {company}', shownBefore: 'Già mostrato', back: 'Torna ai risultati', drafting: 'Preparo la richiesta', useful: 'Questi match sono utili?', yes: 'Sì', no: 'No', feedbackSaved: 'Grazie — ci aiuta a migliorare il matching.',
   },
   fr: {
     history: 'Historique',
@@ -31,7 +31,7 @@ const COPY = {
     finding: 'Je regarde', chooseLead: 'Voici les personnes qui conviennent.', chooseBold: 'Choisissez-en une et j’écris le message.',
     why: 'Pourquoi ce profil', choose: 'Choisir', selected: 'Sélectionné', different: 'Voir d’autres personnes', browse: 'parcourir l’annuaire', notRight: 'Pas tout à fait ?', or: 'ou',
     to: 'À', intro: 'Voici un message proposé. Modifiez ce que vous voulez, puis envoyez-le lorsqu’il vous convient.', suggested: 'Message proposé', send: 'Envoyer la demande', regenerate: 'Régénérer',
-    sent: 'Demande envoyée à {name}.', sentSubline: 'La conversation est prête. Continuez là lorsqu’une réponse arrive.', openChat: 'Ouvrir le chat', again: 'Poser une autre question', newChat: 'Nouveau chat', recentSearches: 'Recherches récentes', deleteSearch: 'Supprimer la recherche', confirmDeleteSearch: 'Supprimer cette recherche et la conversation enregistrée ?', cancel: 'Garder la recherche', retry: 'Lancer une nouvelle recherche', error: 'Nous n’avons pas pu finaliser cette demande. Réessayez.', aiMissing: 'Le matching n’est pas encore configuré. Demandez à un administrateur de connecter Mistral.', aiBusy: 'Le matching est temporairement limité. Réessayez dans un instant.', aiAdmin: 'Un administrateur doit vérifier la connexion à Mistral.', noMatches: 'Le réseau actuel ne contient aucun professionnel pertinent pour cette demande.', nearestLead: 'Voici les plus proches que j’ai trouvées : choisissez-en une et j’écris le message.', snapshot: 'Vos connexions', upcoming: 'À venir', pending: 'En attente', completed: 'Terminées', viewAll: 'Voir les conversations', viewProfile: 'Voir le profil', showEarlier: 'Revoir ces {count} personnes', showEarlierOne: 'Revoir cette personne', hideEarlier: 'Masquer', shownBefore: 'Déjà proposé', back: 'Retour aux résultats', drafting: 'Préparation de la demande', useful: 'Ces profils sont-ils utiles ?', yes: 'Oui', no: 'Non', feedbackSaved: 'Merci — cela nous aide à améliorer les suggestions.',
+    sent: 'Demande envoyée à {name}.', sentSubline: 'La conversation est prête. Continuez là lorsqu’une réponse arrive.', openChat: 'Ouvrir le chat', again: 'Poser une autre question', newChat: 'Nouveau chat', recentSearches: 'Recherches récentes', deleteSearch: 'Supprimer la recherche', confirmDeleteSearch: 'Supprimer cette recherche et la conversation enregistrée ?', cancel: 'Garder la recherche', retry: 'Lancer une nouvelle recherche', error: 'Nous n’avons pas pu finaliser cette demande. Réessayez.', aiMissing: 'Le matching n’est pas encore configuré. Demandez à un administrateur de connecter Mistral.', aiBusy: 'Le matching est temporairement limité. Réessayez dans un instant.', aiAdmin: 'Un administrateur doit vérifier la connexion à Mistral.', noMatches: 'Le réseau actuel ne contient aucun professionnel pertinent pour cette demande.', nearestLead: 'Voici les plus proches que j’ai trouvées : choisissez-en une et j’écris le message.', snapshot: 'Vos connexions', upcoming: 'À venir', pending: 'En attente', completed: 'Terminées', viewAll: 'Voir les conversations', viewProfile: 'Voir le profil', showEarlier: 'Revoir ces {count} personnes', showEarlierOne: 'Revoir cette personne', hideEarlier: 'Masquer', roleAt: '{role} chez {company}', shownBefore: 'Déjà proposé', back: 'Retour aux résultats', drafting: 'Préparation de la demande', useful: 'Ces profils sont-ils utiles ?', yes: 'Oui', no: 'Non', feedbackSaved: 'Merci — cela nous aide à améliorer les suggestions.',
   },
 };
 
@@ -90,7 +90,8 @@ function visibleTurns(storedTurns) {
 function MatchCard({ match, index, selected, onSelect, copy, style, profileHref, onViewProfile, seenBefore = false }) {
   const person = match.person;
   const jobTitle = person.job_title || person.current_role;
-  const role = [jobTitle, person.department].filter(Boolean).join(' · ');
+  const titleAt = jobTitle && person.current_company ? copy.roleAt.replace('{role}', jobTitle).replace('{company}', person.current_company) : jobTitle;
+  const role = [titleAt, person.department].filter(Boolean).join(' · ');
 
   // The subtitle already names the role and department, and the server falls
   // back to exactly those when it has no matched expertise — so drop anything
@@ -144,16 +145,6 @@ function MatchCard({ match, index, selected, onSelect, copy, style, profileHref,
       )}
     </article>
   );
-}
-
-// Development only: how the chat read the last message, to check the parsing
-// while testing. Never shown in a production build.
-function describeUnderstood(parts) {
-  const entries = [['role', parts.role], ['seniority', parts.seniority], ['field', parts.field], ['department', parts.department],
-    ['company', parts.company], ['skills', (parts.skills || []).join(', ')], ['place', parts.location],
-    ['dropped', (parts.exclude || []).join(', ')], ['conflict', (parts.conflict || []).join(' / ')]];
-  const shown = entries.filter(([, value]) => value).map(([key, value]) => `${key}: ${value}`);
-  return `Understood — ${shown.length ? shown.join(' · ') : 'nothing specific'}`;
 }
 
 export default function DiscoveryFlow() {
@@ -260,7 +251,7 @@ export default function DiscoveryFlow() {
       setMatches(nextMatches);
       if (data.clarification) {
         setClarification(data.clarification);
-        setTurns(current => [...current, { role: 'assistant', kind: 'clarification', content: data.clarification, suggestions: Array.isArray(data.suggestions) ? data.suggestions : [], understood: data.understood, at: new Date().toISOString() }]);
+        setTurns(current => [...current, { role: 'assistant', kind: 'clarification', content: data.clarification, suggestions: Array.isArray(data.suggestions) ? data.suggestions : [], at: new Date().toISOString() }]);
         setStage('clarify');
       } else {
         setSubmittedQuery(requestText(data.resolved_request, message));
@@ -275,7 +266,6 @@ export default function DiscoveryFlow() {
             ? (data.message || (data.nearest && data.no_match_reason ? data.no_match_reason : 'matches_ready'))
             : (data.no_match_reason || copy.noMatches),
           matches: Array.isArray(data.matches) ? data.matches : [],
-          understood: data.understood,
           at: new Date().toISOString(),
         }]);
         setStage(nextMatches.length ? 'choose' : 'empty');
@@ -541,7 +531,7 @@ export default function DiscoveryFlow() {
         : turn.content;
       // One agent mark per run of assistant turns.
       const continues = renderedTurns[index - 1]?.role === 'assistant';
-      return <div className={`discovery-chat-turn is-assistant ${turn.kind === 'error' ? 'is-error' : ''}`} key={`${turn.at || index}-${index}`}>{continues ? <span className="discovery-agent-mark-spacer" aria-hidden="true" /> : <span className="discovery-agent-mark" aria-label="Ment">M</span>}<div className="discovery-assistant-stack"><p className="discovery-assistant-bubble">{renderInline(response)}</p>{import.meta.env.DEV && turn.understood && <p className="discovery-understood">{describeUnderstood(turn.understood)}</p>}{(() => {
+      return <div className={`discovery-chat-turn is-assistant ${turn.kind === 'error' ? 'is-error' : ''}`} key={`${turn.at || index}-${index}`}>{continues ? <span className="discovery-agent-mark-spacer" aria-hidden="true" /> : <span className="discovery-agent-mark" aria-label="Ment">M</span>}<div className="discovery-assistant-stack"><p className="discovery-assistant-bubble">{renderInline(response)}</p>{(() => {
         const people = turn.kind === 'matches' && Array.isArray(turn.matches) ? turn.matches : [];
         const latestResults = renderedTurns.map(entry => entry.kind === 'matches').lastIndexOf(true);
         if (!people.length || (index === latestResults && stage === 'choose')) return null;

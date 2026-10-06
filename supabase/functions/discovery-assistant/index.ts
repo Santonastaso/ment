@@ -3,10 +3,10 @@ import { recordAiRun } from '../_shared/ai-telemetry.ts';
 import { aiErrorResponse, mistralJson } from '../_shared/mistral.ts';
 import { enforceRateLimit } from '../_shared/rate-limit.ts';
 import { canHelpWithCareerGoal, hasGroundedExpertise } from '../_shared/discovery-guards.mjs';
-import { departmentChoices, frameChat, frameExhausted, frameNarrow, frameNoMatch, frameOpenAgain, frameRefineNone, frameSmallTalk, frameNudge, frameSamePeople, frameSomeRepeated, frameRejectedNone, framePrivacy, frameDirectory, framePerson, exploreChoice, frameWhichFirst, narrowChoices, ownWordsInvite, scopeChoices, type Choice, frameResults, namesARole, NO_GAP, type Gap, frameConflict, conflictChoices } from './framing.ts';
+import { departmentChoices, frameChat, frameExhausted, frameNarrow, frameNoMatch, frameOpenAgain, frameRefineNone, frameSmallTalk, frameNudge, frameSamePeople, frameSomeRepeated, frameRejectedNone, framePrivacy, frameDirectory, framePerson, exploreChoice, frameWhichFirst, narrowChoices, ownWordsInvite, scopeChoices, type Choice, frameResults, namesARole, NO_GAP, type Gap, frameConflict, conflictChoices, frameScope, frameBroad } from './framing.ts';
 import { NO_PARTS, narrowStepwise, negatedWords, readParts, withoutExcluded, type Filter, type Parts } from './request.ts';
 
-const PROMPT_VERSION = 'discovery-v23';
+const PROMPT_VERSION = 'discovery-v24';
 
 // Written here rather than by the model, so the gap names the place the user
 // actually typed instead of drifting to a vaguer sentence about seniority.
@@ -302,6 +302,10 @@ function humanize(text: string) {
 // count when the message names nothing this network has, so "thanks, now
 // someone in finance" is a search. Anything unrecognised is a search.
 const INTENT_PATTERNS: Array<[string, RegExp[]]> = [
+  // The "show me the closest" choice under a scoping question, and its
+  // natural variants: run the search that was about to run.
+  ['closest', [/\bclosest\b/, /\bbest matches\b/, /\bshow me (them|anyway|what you have)\b/, /\banyway\b/, /\bpi[uù] vicin/, /\bi migliori\b/,
+    /\bcomunque\b/, /\bplus proches\b/, /\bles meilleurs\b/, /\bquand m[eê]me\b/]],
   ['ask_me', [/\bask me\b/, /\bclarifying questions?\b/, /\b(some|more|a few) questions\b/, /\bnarrow (it|this|things) down\b/,
     /\bfammi (delle |qualche )?domand/, /\bpose[sz]?[- ]moi\b/]],
   ['more', [/\bmore (options|people|profiles|results|matches|suggestions|names)\b/, /\b(other|different) (options|people|profiles|matches)\b/,
@@ -439,6 +443,9 @@ function namedPerson(text: string) {
   return '';
 }
 
+// "Anywhere" lets go of a place given earlier in the conversation.
+const ANYWHERE = /\b(anywhere|any (city|location|place)|ovunque|qualsiasi citt[aà]|n'importe o[uù]|partout)\b/i;
+
 // Grammar a description may add around the user's own words.
 const LABEL_GLUE = ['still', 'already', 'works', 'worked', 'working', 'been', 'ancora', 'già', 'lavora', 'encore', 'déjà', 'travaille'];
 
@@ -481,6 +488,14 @@ function grounding(candidate: Candidate): Candidate {
   return { ...candidate, skills: [...(candidate.skills || []), ...(candidate.experience_facts || [])] };
 }
 
+// The employer of the most recent role, when it is still ongoing. Career
+// lines arrive newest first as "Role at Company (2019)" -- a single year means
+// no end year, i.e. current -- or "(2015-2019)" for a finished role.
+function currentCompany(candidate: Candidate) {
+  const latest = cleanText((candidate.experience || [])[0], 400);
+  return latest.match(/^.* at (.+?) \(\d{4}\)(?:\s|$)/)?.[1]?.trim().slice(0, 80) || '';
+}
+
 function publicCandidate(candidate: Candidate, ranked?: RankedMatch, redactIdentity = false) {
   const pool = [...new Set([...(candidate.skills || []), redactIdentity ? null : candidate.job_title, candidate.department].filter(Boolean))].slice(0, EXPERTISE_POOL);
   // Past roles and employers are citable evidence but are not "expertise", so
@@ -494,6 +509,8 @@ function publicCandidate(candidate: Candidate, ranked?: RankedMatch, redactIdent
     id: candidate.id,
     name: redactIdentity ? 'Network member' : candidate.name,
     job_title: redactIdentity ? null : candidate.job_title,
+    // Employer plus role identifies a person, so redacted candidates have none.
+    current_company: redactIdentity ? null : (currentCompany(candidate) || null),
     department: candidate.department,
     program: candidate.program,
     cohort_year: candidate.cohort_year,
@@ -618,6 +635,12 @@ Deno.serve(async (req) => {
   // What the chat understood, returned alongside every chat reply so the
   // parsing can be inspected in development. The user's own words only.
   let understood: Record<string, unknown> | null = null;
+  // Whether this message may get a scoping question before results, and
+  // whether it is the "show me the closest" answer to one.
+  let mayScope = false;
+  let resumeScope = false;
+  let scopeName = '';
+  let specified = 0;
   const answer = (data: Record<string, unknown>) => jsonOk(understood ? { ...data, understood } : data);
   // Set when this message is the user's answer to a question we asked. Having
   // spent their one question, returning nothing is the worst possible outcome:
@@ -776,7 +799,13 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
         || placeCities(value, knownLocations).length > 0
         || WORLD_CITIES.has(value.toLowerCase())
         || capitalised(value));
-      const namedLocation = (grounded(extractedLocation) && !isVocabulary && plausiblePlace(extractedLocation) ? extractedLocation : '') || regionIn(latestOriginal);
+      // A place counts when this message names it, or when it answers one of
+      // our questions; otherwise a city from an earlier search would make
+      // "give me more options" look like a new request.
+      const latestWords = new Set(wordsOf(latestOriginal));
+      const placeHere = (value: string) => (answeringOurQuestion ? grounded(value) : wordsOf(value).some((word) => latestWords.has(word)));
+      const namedLocation = ANYWHERE.test(latestOriginal) ? ''
+        : (placeHere(extractedLocation) && !isVocabulary && plausiblePlace(extractedLocation) ? extractedLocation : '') || regionIn(latestOriginal);
       const regionCities = placeCities(namedLocation, knownLocations);
       const locationMissing = Boolean(namedLocation) && !regionCities.length && !knownLocations.some((known) => {
         const a = known.toLowerCase();
@@ -1011,6 +1040,26 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
         constraintsOnly = false;
       }
 
+      // "Show me the closest" under a scoping question: run exactly the search
+      // that question interrupted.
+      if (intent === 'closest' && answering && previous?.stage === 'scope') {
+        resumeScope = true;
+        requestForMatch = cleanText(previous.search_request, 1000) || requestForMatch;
+        requiredDepartment = cleanText(previous.department, 80);
+        companyFilter = cleanText(previous.company, 60);
+        namedLocationFilter = cleanText(previous.location, 80);
+        locationCities = placeCities(namedLocationFilter, knownLocations);
+        const storedTerms = (value: unknown) => (Array.isArray(value) ? value.map((term) => cleanText(term, 80)).filter(Boolean) : []);
+        nearestTerms = storedTerms(previous.nearest_terms);
+        anchorTerms = storedTerms(previous.anchor_terms);
+        relatedTerms = nearestTerms;
+        const storedGap = previous.gap as Gap | undefined;
+        gapState = storedGap?.kind ? storedGap : NO_GAP;
+        nearestOnly = Boolean(previous.near);
+        placeMissing = gapState.kind === 'place';
+        constraintsOnly = false;
+      }
+
       // One level down the funnel per answer, while the answer narrows nothing.
       let step: { stage: string; question: string; department?: string; suggestions?: Choice[] } | null = null;
       // Two separate requests in one message ("someone in marketing and also
@@ -1028,10 +1077,10 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
       }
       // Two parts that cannot both describe one person: ask which matters
       // rather than searching for someone who cannot exist. Asked once.
-      if (!step && parts.conflict.length === 2 && previous?.stage !== 'conflict' && intent !== 'reject' && !following) {
+      if (!step && !resumeScope && parts.conflict.length === 2 && previous?.stage !== 'conflict' && intent !== 'reject' && !following) {
         step = { stage: 'conflict', question: frameConflict(language, parts.conflict), suggestions: conflictChoices(parts.conflict) };
       }
-      if (step) {
+      if (step || resumeScope) {
         // already decided above
       } else if (intent === 'ask_me' && questionsAsked < MAX_QUESTIONS) {
         const known = cleanText(lastShown?.department, 80) || earlierDepartment || requiredDepartment;
@@ -1057,7 +1106,7 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
         }
       }
       // Nothing to search yet: keep guiding instead of running an empty search.
-      if (!step && !latestContent.length && !earlierDepartment && !following && !lastShown && !locationMissing) {
+      if (!step && !resumeScope && !latestContent.length && !earlierDepartment && !following && !lastShown && !locationMissing) {
         step = { stage: 'open', question: questionsAsked > 0 ? frameOpenAgain(language) : askTemplate(language, coverage) };
       }
       if (step) {
@@ -1071,6 +1120,11 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
         const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'clarification', content: question, stage: step.stage, department: step.department || '', suggestions: choices });
         return answer({ matches: [], clarification: question, suggestions: choices, thread_id: threadId });
       }
+      // A fresh request, with no question asked yet, may be scoped once the
+      // people available are known; follow-ups and answers never are.
+      mayScope = !answering && !resumeScope && !following && intent === '' && questionsAsked < MAX_QUESTIONS;
+      scopeName = parts.role || requiredDepartment || namedSubject;
+      specified = [requiredDepartment || parts.field, parts.role, parts.skills.length > 0, companyFilter, namedLocation, parts.seniority].filter(Boolean).length;
     } catch (error) {
       const mapped = aiErrorResponse(error);
       return jsonError(mapped.message, mapped.status);
@@ -1210,6 +1264,47 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
     const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'no_match', content: reason, search_request: requestForMatch });
     return answer({ matches: [], clarification: '', no_match: true, no_match_reason: reason, resolved_request: requestForMatch, thread_id: threadId });
   }
+  // Scope before answering. If the only honest answer is "nothing exact, but
+  // these are close", or many people fit a one-part request, ask which way
+  // to go -- with choices from the people actually here -- before showing
+  // anyone. The answer then makes the result exact, or the user asks for the
+  // closest and gets exactly what would have been shown.
+  if (mayScope && candidates.length) {
+    const count = (values: string[]) => {
+      const tally = new Map<string, number>();
+      for (const value of values) if (value) tally.set(value, (tally.get(value) || 0) + 1);
+      return [...tally.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([value]) => value);
+    };
+    const cities = count(candidates.map((candidate) => cleanText(candidate.location, 80)))
+      .filter((city) => city.toLowerCase() !== namedLocationFilter.toLowerCase()).slice(0, 2);
+    const near = nearestOnly || relaxedParts.length > 0;
+    const scope = near
+      ? frameScope(language, {
+        gap: gapState, scope: gapState.kind === 'elsewhere' ? gapState.scope || '' : scopeName,
+        place: locationFilterApplied ? namedLocationFilter : '', cities, skills: [],
+        terms: nearestTerms.filter((term) => candidates.some((candidate) => carries(candidate, [term]))).slice(0, 3),
+      })
+      : narrowed.active.includes('subject') && candidates.length >= 6 && specified <= 1
+        ? frameBroad(language, {
+          scope: scopeName,
+          skills: count(candidates.flatMap((candidate) => candidate.skills || []))
+            .filter((skill) => !required.some((term) => term.toLowerCase() === skill.toLowerCase())).slice(0, 3),
+          cities: count(candidates.map((candidate) => cleanText(candidate.location, 80))).slice(0, 1),
+        })
+        : null;
+    if (scope) {
+      const question = `${scope.question} ${ownWordsInvite(language)}`;
+      const threadId = await persistTurns(ctx, body.thread_id, query, {
+        kind: 'clarification', content: question, stage: 'scope', suggestions: scope.choices,
+        // What "show me the closest" will run, and the scope an answer keeps.
+        department: requiredDepartment, company: companyFilter, location: namedLocationFilter,
+        search_request: requestForMatch, nearest_terms: nearestTerms, anchor_terms: anchorTerms,
+        gap: gapState, near: nearestOnly,
+      });
+      return answer({ matches: [], clarification: question, suggestions: scope.choices, thread_id: threadId });
+    }
+  }
+
   const startedAt = Date.now();
   // Only the parts that survived the checks, and only those still in force.
   const wantedEntries = Object.entries({
