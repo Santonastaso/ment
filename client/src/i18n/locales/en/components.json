@@ -371,5 +371,8 @@
   "components.calendarCallback.return": "Return to messages",
   "components.appError.title": "Something went wrong",
   "components.appError.description": "This page could not load. Reload to try again.",
-  "components.appError.reload": "Reload page"
+  "components.appError.reload": "Reload page",
+  "components.appError.report": "Report problem",
+  "components.appError.reported": "The team received your report.",
+  "components.appError.reportFailed": "Could not send the report. Please try again."
 }

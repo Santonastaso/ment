@@ -355,5 +355,8 @@
   "components.calendarCallback.return": "Retour aux messages",
   "components.appError.title": "Une erreur s'est produite",
   "components.appError.description": "Cette page n'a pas pu se charger. Rechargez-la pour réessayer.",
-  "components.appError.reload": "Recharger la page"
+  "components.appError.reload": "Recharger la page",
+  "components.appError.report": "Signaler le problème",
+  "components.appError.reported": "L'équipe a reçu votre signalement.",
+  "components.appError.reportFailed": "Impossible d'envoyer le signalement. Réessayez."
 }
