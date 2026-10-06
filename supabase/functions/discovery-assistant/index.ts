@@ -3,9 +3,9 @@ import { recordAiRun } from '../_shared/ai-telemetry.ts';
 import { aiErrorResponse, mistralJson } from '../_shared/mistral.ts';
 import { enforceRateLimit } from '../_shared/rate-limit.ts';
 import { canHelpWithCareerGoal, hasGroundedExpertise } from '../_shared/discovery-guards.mjs';
-import { departmentChoices, frameChat, frameExhausted, frameNarrow, frameNoMatch, frameOpenAgain, frameRefineNone, frameSmallTalk, frameNudge, frameSamePeople, frameSomeRepeated, frameRejectedNone, narrowChoices, ownWordsInvite, scopeChoices, type Choice, frameResults, namesARole, NO_GAP, type Gap } from './framing.ts';
+import { departmentChoices, frameChat, frameExhausted, frameNarrow, frameNoMatch, frameOpenAgain, frameRefineNone, frameSmallTalk, frameNudge, frameSamePeople, frameSomeRepeated, frameRejectedNone, framePrivacy, frameDirectory, framePerson, exploreChoice, frameWhichFirst, narrowChoices, ownWordsInvite, scopeChoices, type Choice, frameResults, namesARole, NO_GAP, type Gap } from './framing.ts';
 
-const PROMPT_VERSION = 'discovery-v21';
+const PROMPT_VERSION = 'discovery-v22';
 
 // Written here rather than by the model, so the gap names the place the user
 // actually typed instead of drifting to a vaguer sentence about seniority.
@@ -195,7 +195,8 @@ const LOOKUP_STOPWORDS = new Set(['someone', 'somebody', 'person', 'people', 'lo
   // Words around a change of subject, not subjects themselves.
   'instead', 'rather', 'about', 'related', 'relating', 'regarding', 'try', 'trying', 'angle', 'asked', 'ask', 'mean',
   'meant', 'none', 'matters', 'matter', 'actually', 'think', 'thinking', 'stuff', 'things', 'thing', 'else',
-  'different', 'another', 'totally', 'completely', 'forget', 'invece', 'piuttosto', 'plutôt', 'plutot',
+  'different', 'another', 'totally', 'completely', 'forget', 'invece', 'piuttosto', 'plutôt', 'plutot', 'realta', 'realtà',
+  'knows', 'currently', 'wants', 'want', 'likes',
   // Italian and French filler, so "una competenza precisa" reads as a category.
   'una', 'uno', 'dei', 'delle', 'degli', 'della', 'del', 'per', 'con', 'che', 'non', 'sono', 'vorrei', 'voglio',
   'cerco', 'cercando', 'qualcuno', 'persona', 'persone', 'posso', 'puoi', 'proposta', 'proposte', 'precisa',
@@ -333,10 +334,11 @@ function shownLocations(turn: Record<string, unknown> | undefined) {
 
 // Wording only: when nothing was extracted, name the user's own unfamiliar
 // words rather than a generic "no exact match".
-function gapInOwnWords(gap: Gap, text: string, language: string): Gap {
-  if (gap.kind !== 'none') return gap;
-  const own = contentWords(text).slice(0, 2).join(' ');
-  return own ? { kind: 'subject', value: own, role: namesARole(language, text, own) } : gap;
+function describedGap(gap: Gap, label: string): Gap {
+  // Mistral's checked phrase beats a bare subject word; with neither, the
+  // sentence stays generic rather than repeating the user's words back.
+  if (label && (gap.kind === 'none' || gap.kind === 'subject')) return { kind: 'phrase', value: label, role: false };
+  return gap;
 }
 
 // Small talk is the one place Mistral writes freely: a short social reply
@@ -410,13 +412,35 @@ function expandAbbreviations(text: string) {
   return ABBREVIATIONS.reduce((current, [pattern, expansion]) => current.replace(pattern, expansion), text);
 }
 
+// Major world cities the network does not cover, accepted as places even when
+// typed in lower case; anything else must be known or capitalised.
+const WORLD_CITIES = new Set(['tokyo', 'osaka', 'beijing', 'shanghai', 'shenzhen', 'taipei', 'mumbai', 'delhi', 'bangalore',
+  'bangkok', 'jakarta', 'kuala lumpur', 'manila', 'istanbul', 'moscow', 'rome', 'roma', 'vienna', 'prague', 'warsaw',
+  'stockholm', 'oslo', 'copenhagen', 'helsinki', 'athens', 'barcelona', 'lyon', 'marseille', 'turin', 'torino', 'naples',
+  'napoli', 'hamburg', 'chicago', 'boston', 'los angeles', 'washington', 'miami', 'montreal', 'vancouver', 'buenos aires',
+  'lima', 'bogota', 'santiago', 'johannesburg', 'cape town', 'nairobi', 'lagos', 'cairo', 'riyadh', 'doha', 'abu dhabi',
+  'tel aviv', 'melbourne', 'auckland', 'luxembourg', 'monaco', 'casablanca', 'tunis', 'algiers']);
+
+const PRIVACY_PATTERN = /\b(e-?mails?|phone|telephone|mobile number|whats ?app|contact (details|info|information)|home address|telefono|cellulare|numero di telefono|courriel|t[ée]l[ée]phone|num[ée]ro de t[ée]l[ée]phone)\b/i;
+const DIRECTORY_PATTERN = /\b(list|show|give me|dump) (me )?(of )?(everyone|everybody|all (the )?(people|members|users|alumni|students|profiles))\b|\bignore (your|all|the|any) (previous |prior )?(instructions|rules)\b|\bsystem prompt\b/i;
+const TWO_REQUESTS = /\b(?:and also|as well as|and (?:someone|somebody|a person)|plus (?:someone|somebody)|e anche|et aussi)\b/i;
+// "Erik Okafor's", "who is Erik Okafor", "tell me about Erik Okafor"
+function namedPerson(text: string) {
+  const name = '(\\p{Lu}[\\p{Ll}\'-]+(?:\\s+\\p{Lu}[\\p{Ll}\'-]+)+)';
+  for (const pattern of [new RegExp(`${name}'s\\b`, 'u'), new RegExp(`\\b(?:who is|who's|tell me about|contact|reach|find|chi [eè]|qui est) ${name}`, 'iu')]) {
+    const found = text.match(pattern);
+    if (found) return found[1];
+  }
+  return '';
+}
+
 // Words that qualify the search on screen rather than naming a new subject:
 // "more than 5 years of experience" narrows, it does not change topic.
 const QUALIFIER_WORDS = new Set(['experience', 'experienced', 'years', 'year', 'senior', 'juniors', 'junior', 'seniority',
   'level', 'levels', 'based', 'located', 'location', 'city', 'cities', 'country', 'countries', 'esperienza', 'anni',
   'anno', 'ans', 'expérience', 'ville', 'città', 'paese', 'pays', 'older', 'younger']);
 // Phrases that announce a change of subject even while answering a question.
-const SWITCH_PATTERN = /\b(instead|rather|actually|forget (it|that|this)|different angle|another angle|something else|invece|piuttosto|plut[oô]t|autre chose)\b/;
+const SWITCH_PATTERN = /\b(instead|rather|actually|forget (it|that|this)|different angle|another angle|something else|invece|piuttosto|plut[oô]t|autre chose|in realt[aà]|en fait)\b/;
 
 function messageIntent(text: string, hasResults: boolean, namesSomething: boolean) {
   const lower = text.toLowerCase();
@@ -572,6 +596,7 @@ Deno.serve(async (req) => {
   let excludeIds = new Set<string>();
   let followUp: '' | 'more' | 'reject' = '';
   let rejectedSubject = '';
+  let subjectLabel = '';
   let refineFallback: Array<Record<string, unknown>> = [];
   // Cities a named region or country stands for; empty for a single city.
   let locationCities: string[] = [];
@@ -661,10 +686,11 @@ Do not broaden explicit professions or domains into adjacent ones. For example, 
 "named_subject": the field, role or skill they asked for, copied as they wrote it, one or two words. Empty when they named none, as in "I need help" or "someone senior".
 "matching_terms": terms copied exactly from the coverage that mean the same thing as named_subject. You are given "lexical_hits", the coverage terms that share a word with the request. Keep the ones that genuinely mean the same, drop the ones that only share a word, and add any coverage term that means the same despite different wording. "HR" and "Human Resources" mean the same; "pilot" and "pilot programme management" only share a word. Empty when nothing in the coverage means the same.
 "nearest_terms": only when matching_terms is empty, up to three coverage terms closest in meaning, copied exactly, such that someone carrying them could still credibly help. Empty when the request is outside this network's world entirely, such as a painter or a nurse.
-"named_location": the city, country or region the user named, copied exactly as they wrote it, or empty. Copy it even when you believe nobody is there; the application does that check.
+"named_location": the city, country or region the user named, copied exactly as they wrote it, or empty. Copy it even when you believe nobody is there; the application does that check. Words that only look like places ("in realtà", "this is not what I want") are not places.
+"subject_label": a short, natural phrase in the reply language that completes the sentence "I couldn't find ___ here", describing what the user is looking for in their own terms -- for example "anyone in construction" or "a CFO who is still a student". At most eight words. Empty when they named nothing.
 Every term you return is checked against the coverage and anything not found there is discarded, so copy exactly and never invent one. The examples in these instructions illustrate shape only: never reuse their wording or their subject in anything you return.
 
-Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one concise question or empty string","search_request":"concise grounded request or empty string","no_match_reason":"one plain sentence, or empty string","named_subject":"as written, or empty string","matching_terms":["exact coverage term"],"nearest_terms":["exact coverage term"],"named_location":"as written, or empty string"}.`,
+Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one concise question or empty string","search_request":"concise grounded request or empty string","no_match_reason":"one plain sentence, or empty string","named_subject":"as written, or empty string","matching_terms":["exact coverage term"],"nearest_terms":["exact coverage term"],"named_location":"as written, or empty string","subject_label":"short phrase, or empty string"}.`,
         user: JSON.stringify({ conversation, coverage, answered: hasClarified, lexical_hits: hits }),
         temperature: 0.1,
         maxTokens: 800,
@@ -700,7 +726,20 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
       const isVocabulary = wordsOf(extractedLocation).filter((word) => word.length >= 3).some((word) => vocabularyWords.has(word));
       const knownLocations: string[] = Array.isArray((coverage as { locations?: string[] })?.locations)
         ? (coverage as { locations: string[] }).locations : [];
-      const namedLocation = (grounded(extractedLocation) && !isVocabulary ? extractedLocation : '') || regionIn(userTurns.at(-1) || '');
+      // A place counts only if it is one: a city or region the network knows, a
+      // major world city, or a name the user capitalised. The model returned
+      // "realta" (Italian for "actually") and a whole sentence as locations.
+      const latestOriginal = userTurns.at(-1) || '';
+      const capitalised = (value: string) => {
+        const at = latestOriginal.toLowerCase().indexOf(value.toLowerCase());
+        return at >= 0 && /\p{Lu}/u.test(latestOriginal[at]);
+      };
+      const plausiblePlace = (value: string) => Boolean(value) && wordsOf(value).length <= 3 && (
+        knownLocations.some((known) => known.toLowerCase() === value.toLowerCase())
+        || placeCities(value, knownLocations).length > 0
+        || WORLD_CITIES.has(value.toLowerCase())
+        || capitalised(value));
+      const namedLocation = (grounded(extractedLocation) && !isVocabulary && plausiblePlace(extractedLocation) ? extractedLocation : '') || regionIn(latestOriginal);
       const regionCities = placeCities(namedLocation, knownLocations);
       const locationMissing = Boolean(namedLocation) && !regionCities.length && !knownLocations.some((known) => {
         const a = known.toLowerCase();
@@ -769,6 +808,13 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
         ? (groundedInLatest(rawSubject) ? rawSubject : latestSubjectWords.slice(0, 3).join(' '))
         : vague || !contentWords(rawSubject).length || !grounded(rawSubject) ? '' : rawSubject;
       const termHits = topicShift ? latestHits : hits;
+      // Mistral phrases what was asked for; code keeps it only if it is short,
+      // grounded in the user's words and free of system vocabulary. It replaces
+      // pasting the user's raw words into the sentence ("working in cfo
+      // currently", "working in ignore previous").
+      const label = humanize(cleanText(result.value?.subject_label, 80)).replace(/^["'“]+|["'”]+$/g, '').replace(/[.!?]+$/, '');
+      subjectLabel = label && wordsOf(label).length <= 8 && contentWords(label).some((word) => latestContent.includes(word) || userWords.has(word))
+        && !/\b(database|profile|candidate|network|coverage|json)\b/i.test(label) ? label : '';
       const subjectWithin = (name: string) => !namedSubject || contentWords(namedSubject).every((word) => wordsOf(name).includes(word));
       const lastResults = priorTurns.map((turn) => turn.role === 'assistant' && (turn.kind === 'matches' || turn.kind === 'no_match')).lastIndexOf(true);
       const questionsAsked = priorTurns.slice(lastResults + 1)
@@ -833,6 +879,18 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
       // What the message is doing. Choosing from a fixed list is reliable; acting
       // on it is code. Chat intents are honoured only when the message names
       // nothing this network has, so "hi, someone in finance" is still a search.
+      // Contact details, a named person, or "list everyone" are never searched:
+      // the chat says what it can do and points to Explore, pre-filled with the
+      // name when there is one.
+      const personName = namedPerson(latestOriginal);
+      const asksPrivate = PRIVACY_PATTERN.test(latestOriginal);
+      const asksEveryone = DIRECTORY_PATTERN.test(latestOriginal);
+      if (asksPrivate || asksEveryone || (personName && !meaningfulLatest.length)) {
+        const reply = asksPrivate ? framePrivacy(language, personName) : asksEveryone ? frameDirectory(language) : framePerson(language, personName);
+        const choices = [exploreChoice(language, personName), ...departmentChoices(language, preferredDepartments(departments)).slice(0, 3)];
+        const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'chat', content: reply, suggestions: choices });
+        return jsonOk({ matches: [], clarification: reply, suggestions: choices, thread_id: threadId });
+      }
       const namesSomething = meaningfulLatest.length > 0 || namesPlace;
       const detected = messageIntent(latestRaw, Boolean(lastShown), namesSomething);
       // Pushback stays pushback; any other follow-up naming a new subject is a
@@ -906,7 +964,22 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
 
       // One level down the funnel per answer, while the answer narrows nothing.
       let step: { stage: string; question: string; department?: string; suggestions?: Choice[] } | null = null;
-      if (intent === 'ask_me' && questionsAsked < MAX_QUESTIONS) {
+      // Two separate requests in one message ("someone in marketing and also
+      // someone who knows LBO modelling"): ask which to start with rather than
+      // searching for one person who is both.
+      const parts = answeringOurQuestion ? [] : latestOriginal.split(TWO_REQUESTS).map((part) => part.trim()).filter(Boolean);
+      const partLabels = parts.map((part) => {
+        const words = contentWords(part).filter((word) => vocabularyWords.has(word));
+        return mentionedDepartment(words) || lexicalHits(part, vocabulary)[0] || '';
+      });
+      const distinctParts = parts.filter((_, index) => partLabels[index] && partLabels.indexOf(partLabels[index]) === index);
+      if (distinctParts.length >= 2) {
+        step = { stage: 'which', question: frameWhichFirst(language),
+          suggestions: distinctParts.slice(0, 3).map((part) => ({ label: partLabels[parts.indexOf(part)], message: part })) };
+      }
+      if (step) {
+        // already decided above
+      } else if (intent === 'ask_me' && questionsAsked < MAX_QUESTIONS) {
         const known = cleanText(lastShown?.department, 80) || earlierDepartment || requiredDepartment;
         // After results, questions narrow what is already on screen rather
         // than starting over.
@@ -915,7 +988,7 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
           : known
             ? { stage: 'department', department: known, question: broadQuestion(language, known) }
             : { stage: 'open', question: askTemplate(language, coverage) };
-      } else if (!following && questionsAsked < MAX_QUESTIONS && !locationMissing) {
+      } else if (!following && intent !== 'reject' && questionsAsked < MAX_QUESTIONS && !locationMissing) {
         const meta = metaKind(latestRaw);
         if (latestDepartment && latestDepartment !== earlierDepartment) {
           step = { stage: 'department', department: latestDepartment, question: broadQuestion(language, latestDepartment) };
@@ -935,7 +1008,7 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
       }
       if (step) {
         // Tappable choices under the question, with room for the user's own words.
-        const choices = step.stage === 'open' || step.stage === 'field'
+        const choices = step.suggestions ? step.suggestions : step.stage === 'open' || step.stage === 'field'
           ? departmentChoices(language, preferredDepartments(departments))
           : step.stage === 'department' ? scopeChoices(language)
             : step.stage === 'narrow' ? narrowChoices(language, shownLocations(lastShown)) : [];
@@ -1187,7 +1260,7 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
       // Even with nothing to offer, say what the network does have.
       // Wording only: when the model extracted no subject, name the user's own
       // unfamiliar words rather than a generic "no exact match".
-      const shownGap = gapInOwnWords(gapState, query, language);
+      const shownGap = describedGap(gapState, subjectLabel);
       const reason = followUp === 'reject' ? frameRejectedNone(language, rejectedSubject)
         : followUp === 'more' ? frameExhausted(language) : frameNoMatch(language, shownGap, topDepartments(networkCandidates));
       const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'no_match', content: reason, search_request: requestForMatch });
@@ -1202,11 +1275,11 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
     const closeTerms = nearestTerms.filter((term) => shownPeople.some((person) => carries(person, [term])));
     // Inside a chosen department the user's follow-up words ("career advice")
     // are not a field of their own, so they are never named as missing.
-    const resultGap = isNear && !requiredDepartment ? gapInOwnWords(gapState, query, language) : gapState;
+    const resultGap = isNear && !requiredDepartment ? describedGap(gapState, subjectLabel) : gapState;
     // Being transparent about repeats: the same people coming back after a
     // follow-up otherwise reads as if the follow-up found them afresh.
     const repeated = shown.filter((person) => seenBefore.has(person.id)).length;
-    const framed = frameResults(language, { near: isNear, count: shown.length, gap: resultGap, closeTerms, more: followUp === 'more' });
+    const framed = frameResults(language, { near: isNear, count: shown.length, gap: resultGap, closeTerms, more: followUp === 'more', different: followUp === 'reject' });
     const message = repeated && repeated === shown.length ? frameSamePeople(language, shown.length)
       : repeated ? `${framed} ${frameSomeRepeated(language, shown.length - repeated)}` : framed;
     const threadId = await persistTurns(ctx, body.thread_id, query, {

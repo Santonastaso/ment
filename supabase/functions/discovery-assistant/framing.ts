@@ -8,7 +8,9 @@
 export type Gap = {
   // subject: the thing asked for is not here; place: the city is not here;
   // busy: the city is here but nobody there is free; none: no exact match.
-  kind: 'subject' | 'place' | 'busy' | 'none';
+  // phrase: Mistral's checked description of the request ("a CFO who is
+  // still a student"), which completes "I couldn't find ___ here".
+  kind: 'subject' | 'place' | 'busy' | 'none' | 'phrase';
   value: string;
   // "a painter" (a role) reads differently from "audit" (a field).
   role: boolean;
@@ -51,6 +53,7 @@ const COPY: Record<string, Copy> = {
           ? `I couldn't find anyone working as ${/^[aeiou]/i.test(gap.value) ? 'an' : 'a'} ${gap.value} here`
           : `I couldn't find anyone working in ${gap.value} here`;
       }
+      if (gap.kind === 'phrase') return `I couldn't find ${gap.value} here`;
       if (gap.kind === 'place') return `I couldn't find anyone based in ${gap.value}`;
       if (gap.kind === 'busy') return `Nobody in ${gap.value} is free to talk right now`;
       return "I couldn't find an exact match";
@@ -97,6 +100,7 @@ const COPY: Record<string, Copy> = {
           ? `Non ho trovato nessuno che lavori come ${gap.value}`
           : `Non ho trovato nessuno che lavori in ambito ${gap.value}`;
       }
+      if (gap.kind === 'phrase') return `Non ho trovato ${gap.value} qui`;
       if (gap.kind === 'place') return `Non ho trovato nessuno a ${gap.value}`;
       if (gap.kind === 'busy') return `Al momento nessuno a ${gap.value} è disponibile`;
       return 'Non ho trovato una corrispondenza esatta';
@@ -143,6 +147,7 @@ const COPY: Record<string, Copy> = {
           ? `Je n'ai trouvé personne qui travaille comme ${gap.value}`
           : `Je n'ai trouvé personne qui travaille en ${gap.value}`;
       }
+      if (gap.kind === 'phrase') return `Je n'ai pas trouvé ${gap.value} ici`;
       if (gap.kind === 'place') return `Je n'ai trouvé personne basé à ${gap.value}`;
       if (gap.kind === 'busy') return `Personne à ${gap.value} n'est disponible pour le moment`;
       return "Je n'ai pas trouvé de correspondance exacte";
@@ -195,7 +200,7 @@ function copyFor(language: string) {
 }
 
 export function frameResults(language: string, options: {
-  near: boolean; count: number; gap: Gap; closeTerms: string[]; more?: boolean; random?: () => number;
+  near: boolean; count: number; gap: Gap; closeTerms: string[]; more?: boolean; different?: boolean; random?: () => number;
 }) {
   const copy = copyFor(language);
   const random = options.random || Math.random;
@@ -203,6 +208,7 @@ export function frameResults(language: string, options: {
   // Every set of results ends on an open door, never a one-shot answer.
   const followUp = pick(copy.followUp, random);
   if (options.more) return `${pick(one ? copy.moreOne : copy.moreMany, random)} ${followUp}`;
+  if (options.different) return `${(DIFFERENT[language] || DIFFERENT.English)(one)} ${pick(one ? copy.actOne : copy.actMany, random)} ${followUp}`;
   if (!options.near) return `${pick(one ? copy.exactOne : copy.exactMany, random)} ${followUp}`;
   const gap = asWritten(options.gap);
   const terms = listOf(options.closeTerms.slice(0, 2), copy.join);
@@ -250,7 +256,8 @@ export function namesARole(language: string, userText: string, subject: string) 
 
 // Tappable choices shown under a question. The label is what the button says;
 // the message is what gets sent, phrased so the funnel reads it like typed text.
-export type Choice = { label: string; message: string };
+// href makes it a link (to Explore) instead of a reply.
+export type Choice = { label: string; message: string; href?: string };
 
 const CHOICE_COPY: Record<string, {
   invite: string;
@@ -390,4 +397,45 @@ const REJECTED_NONE: Record<string, (subject: string) => string> = {
 };
 export function frameRejectedNone(language: string, subject: string) {
   return (REJECTED_NONE[language] || REJECTED_NONE.English)(inSentence(subject));
+}
+
+const DIFFERENT: Record<string, (one: boolean) => string> = {
+  English: (one) => one ? "Got it — here's someone different." : 'Got it — here are some different people.',
+  Italian: (one) => one ? 'Capito, ecco una persona diversa.' : 'Capito, ecco qualche persona diversa.',
+  French: (one) => one ? 'Compris — voici quelqu’un d’autre.' : 'Compris — voici d’autres personnes.',
+};
+
+// Contact details, a named person, or the whole directory: say what the chat
+// is for and point to Explore, never search.
+const PRIVACY: Record<string, (name: string) => string> = {
+  English: (name) => `I can't share anyone's contact details${name ? `, including ${name}'s` : ''} — if you want to reach someone, I can draft an intro you send through Ment. To look someone up by name, use Explore. Or tell me what you need help with — a skill, a role or an industry.`,
+  Italian: (name) => `Non posso condividere i contatti di nessuno${name ? `, nemmeno di ${name}` : ''}: se vuoi contattare qualcuno, preparo io una presentazione da inviare tramite Ment. Per cercare una persona per nome usa Esplora. Oppure dimmi con cosa ti serve aiuto: una competenza, un ruolo o un settore.`,
+  French: (name) => `Je ne peux partager les coordonnées de personne${name ? `, y compris celles de ${name}` : ''} — si vous voulez contacter quelqu’un, je rédige une présentation à envoyer via Ment. Pour chercher quelqu’un par son nom, utilisez Explorer. Ou dites-moi sur quoi vous voulez de l’aide : une compétence, un poste ou un secteur.`,
+};
+const DIRECTORY: Record<string, string> = {
+  English: "I can't list everyone or share contact details — to browse the whole network, use Explore. I'm here to find the right people by skill, experience or industry. What are you looking for?",
+  Italian: 'Non posso elencare tutti né condividere contatti: per sfogliare tutta la rete usa Esplora. Io ti aiuto a trovare le persone giuste per competenza, esperienza o settore. Cosa stai cercando?',
+  French: 'Je ne peux pas lister tout le monde ni partager de coordonnées — pour parcourir tout le réseau, utilisez Explorer. Je suis là pour trouver les bonnes personnes par compétence, expérience ou secteur. Que cherchez-vous ?',
+};
+const PERSON: Record<string, (name: string) => string> = {
+  English: (name) => `Looking for ${name} specifically? You can find them by name in Explore. I'm best at finding people by skill, experience or industry — tell me what you need help with.`,
+  Italian: (name) => `Cerchi proprio ${name}? Puoi trovarlo per nome in Esplora. Io do il meglio trovando persone per competenza, esperienza o settore: dimmi con cosa ti serve aiuto.`,
+  French: (name) => `Vous cherchez ${name} en particulier ? Vous pouvez le trouver par son nom dans Explorer. Je suis surtout utile pour trouver des personnes par compétence, expérience ou secteur — dites-moi ce dont vous avez besoin.`,
+};
+const EXPLORE_LABEL: Record<string, (name: string) => string> = {
+  English: (name) => name ? `Find ${name} in Explore` : 'Open Explore',
+  Italian: (name) => name ? `Cerca ${name} in Esplora` : 'Apri Esplora',
+  French: (name) => name ? `Chercher ${name} dans Explorer` : 'Ouvrir Explorer',
+};
+const WHICH_FIRST: Record<string, string> = {
+  English: 'Happy to help with both — which would you like to start with?',
+  Italian: 'Ti aiuto volentieri con entrambe: da quale vuoi partire?',
+  French: 'Avec plaisir pour les deux — par laquelle voulez-vous commencer ?',
+};
+export function framePrivacy(language: string, name: string) { return (PRIVACY[language] || PRIVACY.English)(name); }
+export function frameDirectory(language: string) { return DIRECTORY[language] || DIRECTORY.English; }
+export function framePerson(language: string, name: string) { return (PERSON[language] || PERSON.English)(name); }
+export function frameWhichFirst(language: string) { return WHICH_FIRST[language] || WHICH_FIRST.English; }
+export function exploreChoice(language: string, name: string): Choice {
+  return { label: (EXPLORE_LABEL[language] || EXPLORE_LABEL.English)(name), message: '', href: name ? `/explorer?q=${encodeURIComponent(name)}` : '/explorer' };
 }
