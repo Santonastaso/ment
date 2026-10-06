@@ -123,7 +123,7 @@
   "profile.fields.classOf": "Coorte {year}",
   "profile.persona.student": "Studente",
   "profile.persona.alumnus": "Alumni",
-  "profile.toast.skillSaveError": "",
+  "profile.toast.skillSaveError": "Impossibile salvare le competenze. Riprova.",
   "profile.reflection.continueTitle": "Continuerai a usare Ment il prossimo semestre?",
   "profile.reflection.continueHelp": "La risposta è privata e contribuisce solo ai dati aggregati sul programma.",
   "profile.reflection.continue.yes": "Sì",

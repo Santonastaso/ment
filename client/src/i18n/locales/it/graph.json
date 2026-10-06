@@ -37,10 +37,10 @@
   "graph.view.realLinks": "Connessioni reali",
   "graph.svgAria": "Grafo della conoscenza aziendale",
   "graph.hoverHint": "Trascina per spostarti, scorri per zoomare, trascina un nodo per riposizionarlo. Passa il mouse per evidenziare le connessioni. Le persone sono colorate per reparto; i rombi sono competenze.",
-  "graph.filter.all": "",
-  "graph.accessibleList": "",
-  "graph.details": "",
-  "graph.fit": "",
-  "graph.reset": "",
-  "graph.search": ""
+  "graph.filter.all": "Tutti",
+  "graph.accessibleList": "Sfoglia l'elenco accessibile dei nodi",
+  "graph.details": "Dettagli del nodo",
+  "graph.fit": "Adatta il grafico",
+  "graph.reset": "Reimposta filtri e vista",
+  "graph.search": "Trova una persona o una competenza"
 }
