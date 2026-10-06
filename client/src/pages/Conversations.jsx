@@ -159,6 +159,7 @@ export default function Conversations() {
   const messagesRef = useRef(null);
   const composerRef = useRef(null);
   const preserveScrollRef = useRef(null);
+  const scrolledThreadRef = useRef('');
   const senderNamesRef = useRef(new Map());
 
   const selected = sessions.find((session) => session.id === selectedId) || null;
@@ -372,6 +373,12 @@ export default function Conversations() {
 
   useLayoutEffect(() => {
     const box = messagesRef.current;
+    if (box && scrolledThreadRef.current !== threadKey) {
+      box.scrollTop = box.scrollHeight;
+      scrolledThreadRef.current = threadKey;
+      preserveScrollRef.current = null;
+      return;
+    }
     if (box && preserveScrollRef.current) {
       const { mode, height, top } = preserveScrollRef.current;
       box.scrollTop = mode === 'prepend' ? top + box.scrollHeight - height : top;
