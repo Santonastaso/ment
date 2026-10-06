@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, MapPin, Plus, X } from 'lucide-react';
 import api from '../api/index.js';
 import { useT } from '../i18n/index.jsx';
+import { sessionPath } from '../lib/conversationLinks.mjs';
 
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -500,7 +501,7 @@ export default function Profile() {
                   <Button variant="outline" onClick={() => setEditing(true)}>{t('profile.btn.editProfile')}</Button>
                 )
               ) : profile.session_id ? (
-                <Link to={`/conversations?session=${profile.session_id}`} className="inline-flex h-11 items-center rounded-full bg-[var(--control-surface)] px-5 text-sm font-semibold text-foreground hover:bg-[var(--control-surface-hover)]">
+                <Link to={sessionPath({ id: profile.session_id, route_token: profile.session_token })} className="inline-flex h-11 items-center rounded-full bg-[var(--control-surface)] px-5 text-sm font-semibold text-foreground hover:bg-[var(--control-surface-hover)]">
                   {t('profile.btn.openChat')}
                 </Link>
               ) : profile.mentorship_available === false ? (
@@ -845,7 +846,7 @@ export default function Profile() {
         <SessionRequestModal
           mentor={profile}
           onClose={() => setShowModal(false)}
-          onSuccess={(session) => { setProfile((current) => ({ ...current, session_id: session.id, relationship_status: session.status })); setShowModal(false); showToast(t('profile.toast.sessionRequestSent')); }}
+          onSuccess={(session) => { setProfile((current) => ({ ...current, session_id: session.id, session_token: session.route_token, relationship_status: session.status })); setShowModal(false); showToast(t('profile.toast.sessionRequestSent')); }}
         />
       )}
     </PageShell>

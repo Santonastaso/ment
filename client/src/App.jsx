@@ -33,7 +33,7 @@ const PUBLIC_META = {
 };
 
 const APP_TITLES = {
-  '/': 'nav.home', '/explorer': 'nav.explorer', '/conversations': 'nav.messages',
+  '/': 'nav.home', '/explorer': 'nav.explorer', '/conversations': 'nav.messages', '/c/': 'nav.messages', '/g/': 'nav.messages',
   '/groups': 'nav.groups', '/profile': 'nav.myProfile', '/admin': 'nav.admin',
   '/admin/ops': 'nav.platformOps', '/admin/graph': 'nav.knowledgeGraph',
 };
@@ -53,7 +53,7 @@ function PageMetadata() {
 
   useEffect(() => {
     const routeMeta = PUBLIC_META[pathname];
-    const titleKey = routeMeta?.[0] || APP_TITLES[pathname]
+    const titleKey = routeMeta?.[0] || APP_TITLES[pathname] || (pathname.startsWith('/c/') || pathname.startsWith('/g/') ? 'nav.messages' : null)
       || (pathname.startsWith('/profile/') ? 'nav.myProfile' : null);
     const title = titleKey ? `${t(titleKey)} | Ment` : 'Ment';
     const description = routeMeta ? t(routeMeta[1]) : '';
@@ -230,6 +230,8 @@ export default function App() {
         <Route path="/" element={<UserRoute>{page(<Dashboard />)}</UserRoute>} />
         <Route path="/explorer" element={<UserRoute>{page(<Explorer />)}</UserRoute>} />
         <Route path="/conversations" element={<UserRoute>{page(<Conversations />)}</UserRoute>} />
+        <Route path="/c/:sessionToken" element={<UserRoute>{page(<Conversations />)}</UserRoute>} />
+        <Route path="/g/:groupToken" element={<UserRoute>{page(<Conversations />)}</UserRoute>} />
         <Route path="/groups" element={<UserRoute>{page(<Groups />)}</UserRoute>} />
         <Route path="/profile" element={<UserRoute>{page(<Profile />)}</UserRoute>} />
         <Route path="/profile/:id" element={<UserRoute>{page(<Profile />)}</UserRoute>} />

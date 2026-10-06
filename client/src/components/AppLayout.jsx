@@ -7,7 +7,7 @@ export default function AppLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.matchMedia('(max-width: 700px)').matches);
   const location = useLocation();
   const isDiscovery = location.pathname === '/';
-  const isConversation = location.pathname === '/conversations';
+  const isConversation = location.pathname === '/conversations' || location.pathname.startsWith('/c/') || location.pathname.startsWith('/g/');
   const isDirectory = location.pathname === '/explorer';
   const closeNarrowSidebar = () => {
     if (window.matchMedia('(max-width: 700px)').matches) setSidebarCollapsed(true);
