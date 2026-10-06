@@ -7,6 +7,7 @@ import { useT } from '../../i18n/index.jsx';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog.jsx';
 import { Button } from '../ui/button.jsx';
 import { CONVERSATION_FILTERS, conversationState, requestText, resumableSearch } from '../../lib/conversations.mjs';
+import { homeCopy } from '../demo/homeCopy.js';
 
 const COPY = {
   en: {
@@ -151,6 +152,7 @@ export default function DiscoveryFlow() {
   const { user } = useAuth();
   const { lang, t } = useT();
   const copy = COPY[lang] || COPY.en;
+  const intentCopy = homeCopy(lang);
   const [stage, setStage] = useState('ask');
   const [greetingIndex, setGreetingIndex] = useState(0);
   const [query, setQuery] = useState('');
@@ -160,6 +162,7 @@ export default function DiscoveryFlow() {
   const [selected, setSelected] = useState(null);
   const [draftVariant, setDraftVariant] = useState(0);
   const [draft, setDraft] = useState('');
+  const [requestIntent, setRequestIntent] = useState('one_off');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [connections, setConnections] = useState([]);
@@ -320,7 +323,7 @@ export default function DiscoveryFlow() {
     setSending(true); setError('');
     try {
       idempotencyKey.current ||= crypto.randomUUID();
-      const response = await api.post('/sessions', { mentor_id: selected.person.id, title: submittedQuery.slice(0, 80), pre_session_question: submittedQuery, message: draft.trim(), duration_minutes: 60, follow_up_intent: 'one_off', idempotency_key: idempotencyKey.current });
+      const response = await api.post('/sessions', { mentor_id: selected.person.id, title: submittedQuery.slice(0, 80), pre_session_question: submittedQuery, message: draft.trim(), duration_minutes: 60, follow_up_intent: requestIntent, idempotency_key: idempotencyKey.current });
       setSessionId(response.data.id);
       setStage('sent');
       if (threadId) await api.put(`/discovery/threads/${threadId}`, { archived: true, selected_person_id: selected.person.id }).catch(() => {});
@@ -414,7 +417,7 @@ export default function DiscoveryFlow() {
     flowVersion.current += 1;
     const currentThread = threadId;
     setConnectionCategory(null);
-    setStage('ask'); setQuery(''); setSubmittedQuery(''); setTurns([]); setMatches([]); setSelected(null); setDraft(''); setSending(false); setError(''); setSessionId(null); setThreadId(null); setClarification(''); setNoMatchReason(''); setMatchFeedback(null); idempotencyKey.current = null;
+    setStage('ask'); setQuery(''); setSubmittedQuery(''); setTurns([]); setMatches([]); setSelected(null); setDraft(''); setRequestIntent('one_off'); setSending(false); setError(''); setSessionId(null); setThreadId(null); setClarification(''); setNoMatchReason(''); setMatchFeedback(null); idempotencyKey.current = null;
     if (currentThread) api.put(`/discovery/threads/${currentThread}`, { archived: true }).then(refreshHistory).catch(() => {});
   }
 
@@ -579,6 +582,9 @@ export default function DiscoveryFlow() {
             </div>
             {stage === 'reachout' ? (
               <div className="discovery-actions">
+                <div role="group" aria-label={intentCopy.intent} className="flex flex-wrap gap-2">
+                  {[{ value: 'one_off', label: intentCopy.oneOff }, { value: 'ongoing', label: intentCopy.ongoing }].map(option => <Button key={option.value} type="button" size="sm" variant={requestIntent === option.value ? 'default' : 'outline'} aria-pressed={requestIntent === option.value} disabled={sending} onClick={() => setRequestIntent(option.value)}>{option.label}</Button>)}
+                </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <Button type="button" variant="link" onClick={() => setStage('choose')}><ArrowLeft />{copy.back}</Button>
                   <Button type="button" onClick={sendRequest} disabled={sending || !draft.trim()}>{sending ? <RefreshCw className="animate-spin" /> : <Send />}{copy.send}</Button>

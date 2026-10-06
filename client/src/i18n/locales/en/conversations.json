@@ -9,6 +9,7 @@
   "conversations.profile": "View profile",
   "conversations.requestTitle": "New mentoring request",
   "conversations.requestCard": "Session request",
+  "conversations.newRequest": "Request another session",
   "conversations.requestDetails": "Request overview",
   "conversations.accept": "Accept",
   "conversations.decline": "Decline",

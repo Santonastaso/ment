@@ -5,7 +5,11 @@ const peer = { id: 'peer', name: 'Peer Mentor', department: 'Finance', job_title
 
 // Only the network boundary is replaced. Router, auth gates, layout and screens are real.
 function fixtureApi(state) {
-  const payload = session => ({ ...session, isMentor: session.mentor_id === state.user.id, isMentee: session.mentee_id === state.user.id });
+  const payload = session => {
+    const latest = state.messages[`/sessions/${session.id}/messages`]?.at(-1);
+    return { ...session, isMentor: session.mentor_id === state.user.id, isMentee: session.mentee_id === state.user.id,
+      latest_message: latest?.body || null, latest_message_kind: latest?.kind || null };
+  };
   const call = async (method, path, body) => {
     state.calls.push({ method, path, body });
     if (method === 'post' && state.failNext === path) { state.failNext = null; throw new Error('Fixture network failure'); }
@@ -15,7 +19,7 @@ function fixtureApi(state) {
       if (path === '/users/me/capacity') return {};
       if (path === '/reflections') return { entries: state.reflections || [] };
       if (path === '/sessions') return state.sessions.map(payload);
-      if (path === '/groups') return state.groups;
+      if (path === '/groups') return state.groups.map(group => ({ ...group, latest_message: state.messages[`/groups/${group.id}/messages`]?.at(-1)?.body || null }));
       if (path.startsWith('/directory?')) return { people: [state.peer], total: 1, facets: { languages: ['fr', 'it'] } };
       // A saved conversation and a peer profile, for the view-profile round trip.
       if (path === '/discovery/threads/thread') return { id: 'thread', turns: [

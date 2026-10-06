@@ -99,6 +99,7 @@ export default function IcsDownloadButton({ sessionId, session, className = '', 
           <DialogDescription>{t('components.ics.chooseMethod')}</DialogDescription>
         </DialogHeader>
         <div className="grid gap-2">
+          {providers.length === 0 && <p className="text-sm text-muted-foreground">{t('components.ics.noProvider')}</p>}
           {providers.map(provider => <Button key={provider} type="button" variant="outline" className="w-full justify-start" disabled={!!loading} onClick={() => connected.has(provider) ? createEvent(provider) : connect(provider)}><CalendarDays aria-hidden="true" />{loading === provider ? t('common.loading') : t(`components.ics.${connected.has(provider) ? 'add' : 'connect'}.${provider}`)}</Button>)}
           <Button type="button" variant="outline" className="w-full justify-start" disabled={!!loading} onClick={download}><Download aria-hidden="true" />{loading === 'ics' ? t('components.ics.downloading') : t('components.ics.download')}</Button>
           {(created?.html_url || created?.join_url || meetingUrl) && <a className="inline-flex items-center gap-2 rounded-[var(--control-radius)] px-4 py-2 text-sm font-medium hover:bg-[var(--control-surface)]" href={created?.html_url || created?.join_url || meetingUrl} target="_blank" rel="noreferrer"><ExternalLink className="size-4" aria-hidden="true" />{created?.html_url ? t('components.ics.openEvent') : t('components.ics.join')}</a>}

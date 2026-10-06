@@ -2,8 +2,8 @@
   "components.ics.ready": "Meeting ready",
   "components.ics.join": "Join meeting",
   "components.ics.changeTime": "Change time",
-  "components.ics.add.google": "Add with Google",
-  "components.ics.add.microsoft": "Add with Outlook",
+  "components.ics.add.google": "Send Google Meet invite",
+  "components.ics.add.microsoft": "Send Outlook / Teams invite",
   "components.ics.connect.google": "Connect Google Calendar",
   "components.ics.connect.microsoft": "Connect Outlook",
   "components.ics.download": "Download .ics",
@@ -321,6 +321,7 @@
   "components.ics.downloading": "Downloading…",
   "components.ics.addToCalendar": "Add to calendar",
   "components.ics.chooseMethod": "Choose a calendar to send the invite, or download a calendar file.",
+  "components.ics.noProvider": "Calendar email invitations are not configured yet. A downloaded .ics file is not sent to the other person.",
 
   "components.suggested.heuristic": "Heuristic",
 

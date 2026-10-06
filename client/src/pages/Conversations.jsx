@@ -16,6 +16,8 @@ import { cn } from '@/lib/utils';
 import { supabase } from '../lib/supabase.js';
 import { CONVERSATION_FILTERS as FILTERS, conversationState as rowState, isExpired, requestText, clearSentDraft } from '../lib/conversations.mjs';
 import { homeCopy } from '../components/demo/homeCopy.js';
+import SessionRequestModal from '../components/SessionRequestModal.jsx';
+import TimeSlotSelect from '../components/TimeSlotSelect.jsx';
 
 function initials(name = '') {
   return name.split(' ').map((part) => part[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || '?';
@@ -85,6 +87,12 @@ function timelineEvent(message, t) {
   return { title: message.body, icon: Info };
 }
 
+function sessionPreview(session, t) {
+  if (!session.latest_message) return requestText(session.title, t('conversations.requestTitle'));
+  if (session.latest_message_kind === 'system') return timelineEvent({ body: session.latest_message }, t).title;
+  return session.latest_message;
+}
+
 export default function Conversations() {
   const { user, unreadCounts, refreshPendingAcceptances, refreshUnreadCounts } = useAuth();
   const { t, lang } = useT();
@@ -138,6 +146,7 @@ export default function Conversations() {
   const draft = drafts[threadKey] || '';
   const sending = !!sendingThreads[threadKey];
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [newRequestOpen, setNewRequestOpen] = useState(false);
   const [overviewOpen, setOverviewOpen] = useState(false);
   const [groupOverviewOpen, setGroupOverviewOpen] = useState(false);
   const [groupMembers, setGroupMembers] = useState([]);
@@ -278,6 +287,7 @@ export default function Conversations() {
     const channel = supabase.channel('conversation-group-list')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'groups' }, refreshGroups)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members' }, refreshGroups)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_messages' }, refreshGroups)
       .subscribe();
     window.addEventListener('focus', refreshGroups);
     return () => {
@@ -292,6 +302,7 @@ export default function Conversations() {
     });
     const channel = supabase.channel('conversation-session-list')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions' }, refreshSessions)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'session_messages' }, refreshSessions)
       .subscribe();
     window.addEventListener('focus', refreshSessions);
     return () => {
@@ -376,6 +387,7 @@ export default function Conversations() {
   useEffect(() => {
     setOverviewOpen(false);
     setWithdrawOpen(false);
+    setNewRequestOpen(false);
   }, [threadKey]);
   useEffect(() => {
     if (selectedGroupId) return;
@@ -436,6 +448,7 @@ export default function Conversations() {
       }
       setDrafts(items => clearSentDraft(items, key, sentDraft));
       if (selected) loadSessions().catch(() => {});
+      if (selectedGroup) loadGroups().catch(() => {});
     } catch (requestError) {
       if (activeThreadRef.current === key) setError(requestError.response?.data?.error || t('conversations.error'));
     } finally {
@@ -446,6 +459,7 @@ export default function Conversations() {
 
   async function saveSchedule() {
     if (!scheduledAt) return;
+    if (new Date(scheduledAt).getTime() < Date.now() + 60 * 60 * 1000) { setError(t('components.sessionRequest.step3Invalid')); return; }
     setSavingSchedule(true);
     try {
       await mutateSession({ scheduled_at: new Date(scheduledAt).toISOString() });
@@ -532,8 +546,7 @@ export default function Conversations() {
                   <strong>{peer?.name}</strong>
                   <em className={`conversation-state is-${state}`}>{stateLabel(session, state, t)}</em>
                 </span>
-                {/* What they actually asked about. */}
-                <small>{requestText(session.title, t('conversations.requestTitle'))}</small>
+                <small>{sessionPreview(session, t)}</small>
               </span>
               {unreadCount > 0 && <span className="conversation-unread-badge" aria-label={t('conversations.unreadCount', { count: unreadCount })}>{unreadCount > 99 ? '99+' : unreadCount}</span>}
             </button>
@@ -546,7 +559,7 @@ export default function Conversations() {
               <span className="conversation-list-top">
                 <strong>{group.name}</strong>
               </span>
-            <small>{group.description || t('nav.groups')}</small>
+            <small>{group.latest_message || group.description || t('nav.groups')}</small>
           </span>
           {(unreadCounts.groupMessages[group.id] || 0) > 0 && <span className="conversation-unread-badge" aria-label={t('conversations.unreadCount', { count: unreadCounts.groupMessages[group.id] })}>{unreadCounts.groupMessages[group.id] > 99 ? '99+' : unreadCounts.groupMessages[group.id]}</span>}
         </button>
@@ -608,6 +621,7 @@ export default function Conversations() {
                     <Button type="button" variant="ghost" size="sm" onClick={() => { setOverviewOpen(true); setScheduleOpen(true); }}>{t(selected.scheduled_at ? 'conversations.reschedule' : 'conversations.schedule')}</Button>
                   </>}
                 </div>}
+                {(['cancelled', 'declined', 'completed'].includes(selected.status) || isExpired(selected)) && selected.isMentee && <div className="conversation-request-actions"><Button type="button" size="sm" onClick={() => setNewRequestOpen(true)}>{t('conversations.newRequest')}</Button></div>}
               </article> : event ? <div className="conversation-event"><EventIcon aria-hidden="true" /><strong>{event.title}</strong><time dateTime={message.created_at}>{formatChatClock(message.created_at)}</time></div>
                     : <div className={cn('conversation-message', message.sender_id === user?.id ? 'is-mine' : 'is-theirs')}>
                       {selectedGroup && message.sender_id !== user?.id && <strong>{message.sender_name}</strong>}<p>{message.body}</p><time dateTime={message.created_at}>{formatChatClock(message.created_at)}</time>
@@ -624,6 +638,7 @@ export default function Conversations() {
         )}
         {error && <p className="conversation-error" role="alert">{error}</p>}
       </div>
+      {newRequestOpen && person && <SessionRequestModal mentor={person} onClose={() => setNewRequestOpen(false)} onSuccess={async (session) => { setNewRequestOpen(false); await loadSessions(); selectThread('session', session.id); }} />}
       {selected && <Dialog open={overviewOpen} onOpenChange={value => { setOverviewOpen(value); if (!value) setScheduleOpen(false); }}>
         <DialogContent className="conversation-overview sm:max-w-md">
           <DialogHeader>
@@ -648,7 +663,8 @@ export default function Conversations() {
               {selected.status === 'scheduled' && !scheduleOpen && <Button size="sm" variant="ghost" className="mt-3" onClick={() => setScheduleOpen(true)}>{t(selected.scheduled_at ? 'conversations.reschedule' : 'conversations.schedule')}</Button>}
             </div>
             {selected.status === 'scheduled' && scheduleOpen && <div className="conversation-scheduler">
-              <Field label={t('conversations.newTime')} type="datetime-local" value={scheduledAt} min={localDateTime(new Date(Date.now() + 3600000))} onChange={event => setScheduledAt(event.target.value)} />
+              <Field label={t('conversations.newTime')} type="date" value={scheduledAt.slice(0, 10)} min={localDateTime(new Date(Date.now() + 3600000)).slice(0, 10)} onChange={event => setScheduledAt(`${event.target.value}T${scheduledAt.slice(11, 16) || '14:00'}`)} />
+              <TimeSlotSelect label={t('components.sessionRequest.time')} value={scheduledAt} min={localDateTime(new Date(Date.now() + 3600000))} onChange={setScheduledAt} />
               <Button size="sm" onClick={saveSchedule} disabled={!scheduledAt || savingSchedule}>{t('common.save')}</Button>
               <Button size="sm" variant="ghost" disabled={savingSchedule} onClick={() => setScheduleOpen(false)}>{t('common.cancel')}</Button>
             </div>}
