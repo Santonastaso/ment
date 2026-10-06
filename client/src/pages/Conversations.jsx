@@ -148,6 +148,7 @@ export default function Conversations() {
   const [scheduledAt, setScheduledAt] = useState('');
   const [savingSchedule, setSavingSchedule] = useState(false);
   const messagesRef = useRef(null);
+  const composerRef = useRef(null);
   const preserveScrollRef = useRef(null);
   const senderNamesRef = useRef(new Map());
 
@@ -366,6 +367,12 @@ export default function Conversations() {
       preserveScrollRef.current = null;
     } else if (box) box.scrollTop = box.scrollHeight;
   }, [messages, selectedId, selectedGroupId]);
+  useLayoutEffect(() => {
+    const field = composerRef.current;
+    if (!field) return;
+    field.style.height = 'auto';
+    field.style.height = `${Math.min(field.scrollHeight, 160)}px`;
+  }, [draft, threadKey]);
   useEffect(() => {
     setOverviewOpen(false);
     setWithdrawOpen(false);
@@ -610,7 +617,7 @@ export default function Conversations() {
             </div>
 
             <form className="conversation-composer" onSubmit={sendMessage}>
-              <input value={draft} onChange={(event) => setDrafts(items => ({ ...items, [threadKey]: event.target.value }))} placeholder={t('conversations.messagePlaceholder')} maxLength={6000} aria-label={t('conversations.messagePlaceholder')} />
+              <textarea ref={composerRef} rows={1} value={draft} onChange={(event) => setDrafts(items => ({ ...items, [threadKey]: event.target.value }))} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.form.requestSubmit(); } }} placeholder={t('conversations.messagePlaceholder')} maxLength={6000} aria-label={t('conversations.messagePlaceholder')} />
               <Button type="submit" size="icon" disabled={!draft.trim() || sending} aria-label={t('conversations.send')}><Send /></Button>
             </form>
           </>

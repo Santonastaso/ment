@@ -55,8 +55,12 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
     setScheduledAt(new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16));
   }
 
+  function hasInvalidTime() {
+    return scheduledAt && (!Number.isFinite(new Date(scheduledAt).getTime()) || new Date(scheduledAt).getTime() < Date.now() + 60 * 60 * 1000);
+  }
+
   async function reviewDraft() {
-    if (scheduledAt && (!Number.isFinite(new Date(scheduledAt).getTime()) || new Date(scheduledAt).getTime() < Date.now() + 60 * 60 * 1000)) { setError(t('components.sessionRequest.step3Invalid')); return; }
+    if (hasInvalidTime()) { setError(t('components.sessionRequest.step3Invalid')); return; }
     setError('');
     if (!draftEdited) {
       setGeneratingDraft(true);
@@ -98,6 +102,7 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
 
   async function handleSubmit() {
     if (step !== 4 || submitLock.current) return;
+    if (hasInvalidTime()) { setError(t('components.sessionRequest.step3Invalid')); setStep(3); return; }
     if (!draft.trim() || !requestTitle.trim()) { setError(copy.emptyDraft); return; }
     if (!question.trim()) {
       setError(t('components.sessionRequest.errorFocusQuestion'));

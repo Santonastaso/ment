@@ -24,7 +24,8 @@ export default function Explorer() {
   const program = searchParams.get('program') || '';
   const cohort = searchParams.get('cohort') || '';
   const location = searchParams.get('location') || '';
-  const language = searchParams.get('language') || '';
+  const language = searchParams.getAll('language');
+  const languageKey = language.join(',');
   const sort = searchParams.get('sort') === 'name' ? 'name' : 'relevance';
   const page = Number.isSafeInteger(Number(searchParams.get('page'))) && Number(searchParams.get('page')) > 0 ? Number(searchParams.get('page')) : 1;
   const requestKey = JSON.stringify([query, persona, program, cohort, location, language, sort, page]);
@@ -50,6 +51,14 @@ export default function Explorer() {
     });
   }
 
+  function setLanguages(values) {
+    updateParams(next => {
+      next.delete('language');
+      values.forEach(value => next.append('language', value));
+      next.delete('page');
+    });
+  }
+
   // Keep the input in sync when ?q= changes externally (top-bar search).
   useEffect(() => { setInputValue(query); }, [query]);
 
@@ -67,7 +76,7 @@ export default function Explorer() {
     if (program) params.set('program', program);
     if (cohort) params.set('cohort', cohort);
     if (location) params.set('location', location);
-    if (language) params.set('language', language);
+    language.forEach(value => params.append('language', value));
     params.set('sort', sort);
     api.get(`/directory?${params.toString()}`)
       .then(res => {
@@ -83,7 +92,7 @@ export default function Explorer() {
       .catch(() => { if (!cancelled) setDirError(true); })
       .finally(() => { if (!cancelled) setDirLoading(false); });
     return () => { cancelled = true; };
-  }, [query, persona, program, cohort, location, language, sort, page, retry]);
+  }, [query, persona, program, cohort, location, languageKey, sort, page, retry]);
 
   function submitSearch(e) {
     e?.preventDefault();
@@ -99,29 +108,31 @@ export default function Explorer() {
   const to = Math.min(page * PAGE_SIZE, total);
   const pageCount = Math.max(Math.ceil(total / PAGE_SIZE), 1);
   const updatingResults = dirLoading || Boolean(dirData && dirData.requestKey !== requestKey);
+  const languageChoices = languageOptions(facets.languages, lang);
+  const hasActiveFilters = Boolean(query || persona || program || cohort || location || language.length || sort !== 'relevance');
 
   return (
     <PageShell className="gap-6">
 
-              <div className="directory-rail directory-search-panel grid min-w-0 gap-3">
+              <div className="directory-rail directory-search-panel grid min-w-0 gap-0.5">
                   <h1 className="sr-only">{t('explorer.title')}</h1>
-                  <form onSubmit={submitSearch} className="grid min-h-[var(--workspace-top-row)] w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+                  <form onSubmit={submitSearch} className="mb-1 grid min-h-[var(--workspace-top-row)] w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
                     <Input aria-label={t('explorer.searchLabel')} placeholder={t('explorer.searchLabel')} value={inputValue} onChange={e => setInputValue(e.target.value)} />
                     <Button type="submit">{t('explorer.searchButton')}</Button>
                   </form>
-                <div className="grid w-full min-w-0 grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+                <div className="grid w-full min-w-0 grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-[repeat(4,minmax(0,1fr))_minmax(0,1.35fr)_minmax(0,1fr)]">
                   <DirectoryFilter label={t('explorer.filterPersona')} value={persona} onChange={value => setParam('persona', value)} options={[{ value: '', label: t('explorer.personaAny') }, { value: 'student', label: t('explorer.personaStudent') }, { value: 'alumnus', label: t('explorer.personaAlumnus') }]} />
                   <DirectoryFilter label={t('explorer.filterProgram')} value={program} onChange={value => setParam('program', value)} options={[{ value: '', label: t('explorer.allPrograms') }, ...(facets.programs || []).map(p => ({ value: p, label: p }))]} />
                   <DirectoryFilter label={t('explorer.filterCohort')} value={cohort} onChange={value => setParam('cohort', value)} options={[{ value: '', label: t('explorer.allCohorts') }, ...(facets.cohortYears || []).map(y => ({ value: String(y), label: t('explorer.classOf', { year: y }) }))]} />
                   <DirectoryFilter label={t('explorer.filterLocation')} value={location} onChange={value => setParam('location', value)} options={[{ value: '', label: t('explorer.allLocations') }, ...(facets.locations || []).map(l => ({ value: l, label: l }))]} />
-                  <DirectoryFilter label={t('explorer.filterLanguage')} value={language} onChange={value => setParam('language', value)} options={[{ value: '', label: t('explorer.allLanguages') }, ...languageOptions(facets.languages, lang).map(option => ({ value: option.code, label: option.label }))]} />
+                  <DirectoryFilter label={t('explorer.filterLanguage')} multiple value={language} onChange={setLanguages} options={languageChoices.map(option => ({ value: option.code, label: option.label }))} renderValue={selected => selected?.length ? selected.map(code => languageChoices.find(option => option.code === code)?.label || code).join(', ') : t('explorer.filterLanguage')} />
                   <DirectoryFilter label={t('explorer.sortLabel')} value={sort} onChange={value => setParam('sort', value)} options={[{ value: 'relevance', label: t('explorer.sortRelevance') }, { value: 'name', label: t('explorer.sortName') }]} />
                 </div>
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <Button type="button" size="sm" variant="ghost" className="filter-control" onClick={() => { setInputValue(''); setSearchParams({}); }}>{t('explorer.clearFilters')}</Button>
-                </div>
+                {hasActiveFilters && <div className="flex min-h-[var(--navigation-row-height)] flex-wrap items-center justify-between gap-3">
+                  <Button type="button" size="xs" variant="ghost" onClick={() => { setInputValue(''); setSearchParams({}); }}>{t('explorer.clearFilters')}</Button>
+                </div>}
                 {!dirError && total > 0 && (
-                  <div className="directory-pagination flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4 text-sm text-muted-foreground">
+                  <div className="directory-pagination mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4 text-sm text-muted-foreground">
                     {updatingResults ? <Skeleton className="h-4 w-28" /> : <span>{t('explorer.showing', { from, to, total })}</span>}
                     <div className="flex items-center gap-2">
                       <Button type="button" size="sm" variant="outline" disabled={updatingResults || page <= 1} onClick={() => setParam('page', String(page - 1))}>
