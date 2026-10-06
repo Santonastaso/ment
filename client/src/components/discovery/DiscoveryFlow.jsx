@@ -510,7 +510,7 @@ export default function DiscoveryFlow() {
                   {visibleConnections.length === 0 ? <p className="discovery-connection-empty">{t('conversations.filter.empty')}</p> : <div className="discovery-connection-cards">
                     {visibleConnections.map((session, index) => {
                       const peer = session.mentor_id === user?.id ? session.mentee : session.mentor;
-                      const href = session.route_token ? sessionPath(session) : `${sessionPath(session)}&filter=${connectionCategory}`;
+                      const href = session.route_token ? sessionPath(session) : `/conversations?filter=${connectionCategory}&session=${session.id}`;
                       return <Link key={session.id} className="discovery-connection-card" to={href} aria-label={`${copy.openChat}: ${peer?.name || ''}`}>
                         <span className="discovery-avatar" style={{ backgroundColor: avatarTints[index % avatarTints.length] }} aria-hidden="true">{initials(peer?.name)}</span>
                         <span><strong>{peer?.name}</strong><small>{requestText(session.title, t('conversations.requestTitle'))}</small></span>
