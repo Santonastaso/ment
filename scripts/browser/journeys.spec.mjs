@@ -460,6 +460,7 @@ test('chat rail previews the latest message after send and reload', async ({ pag
   await expect(direct.locator('small')).toHaveText('The newest direct reply');
   const group = page.locator('.conversation-list-item').filter({ hasText: 'Test Group' });
   await group.click();
+  await expect(page.locator('.conversation-header strong')).toHaveText('Test Group');
   await page.getByRole('textbox', { name: 'Message', exact: true }).fill('The newest group reply');
   await page.getByRole('button', { name: 'Send message', exact: true }).click();
   await expect(group.locator('small')).toHaveText('The newest group reply');
