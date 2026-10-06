@@ -272,7 +272,7 @@ export default function KnowledgeGraph() {
             disabled={!isPlatform}
             onChange={(e) => setCompany(e.target.value)}
             className={cn(
-              'h-9 min-w-[12rem] rounded-lg border border-border bg-background px-3 text-sm',
+              'filter-control min-w-[12rem] border px-3 text-sm',
               'focus-visible:border-ring focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
               !isPlatform && 'cursor-not-allowed opacity-70'
             )}
@@ -297,7 +297,7 @@ export default function KnowledgeGraph() {
             value={language}
             onChange={(e) => setLanguage(e.target.value)}
             className={cn(
-              'h-9 min-w-[12rem] rounded-lg border border-border bg-background px-3 text-sm',
+              'filter-control min-w-[12rem] border px-3 text-sm',
               'focus-visible:border-ring focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50'
             )}
           >
@@ -318,7 +318,7 @@ export default function KnowledgeGraph() {
             value={program}
             onChange={(e) => setProgram(e.target.value)}
             className={cn(
-              'h-9 min-w-[12rem] rounded-lg border border-border bg-background px-3 text-sm',
+              'filter-control min-w-[12rem] border px-3 text-sm',
               'focus-visible:border-ring focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50'
             )}
           >
@@ -336,15 +336,16 @@ export default function KnowledgeGraph() {
         ].map(([name, value, setter, options]) => (
           <label key={name} className="flex min-w-0 flex-col gap-1.5 text-xs font-medium text-muted-foreground" htmlFor={`kg-${name}`}>
             {t(`graph.filter.${name}`)}
-            <select id={`kg-${name}`} value={value} onChange={e => setter(e.target.value)} className="h-9 max-w-full rounded-lg border border-border bg-background px-3 text-sm">
+            <select id={`kg-${name}`} value={value} onChange={e => setter(e.target.value)} className="filter-control max-w-full border px-3 text-sm">
               <option value="">{t('graph.filter.all')}</option>
               {options.map(option => <option key={option.value ?? option} value={option.value ?? option}>{option.label ?? option}</option>)}
             </select>
           </label>
         ))}
-        <Button variant="outline" onClick={resetGraph}>{t('graph.reset')}</Button>
+        <Button variant="outline" className="filter-control" onClick={resetGraph}>{t('graph.reset')}</Button>
         <Button
           variant="outline"
+          className="filter-control"
           onClick={() => loadGraph(company, language)}
           data-testid="kg-refresh"
         >

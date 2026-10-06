@@ -48,6 +48,7 @@ export function SkillCloudFilters({ value, onChange }) {
         <button
           key={option.key}
           type="button"
+          className="filter-control"
           aria-pressed={value === option.key}
           onClick={() => onChange(option.key)}
         >

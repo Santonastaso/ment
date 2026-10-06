@@ -437,7 +437,7 @@ export default function Profile() {
       )}
 
       {validTabs.length > 1 && (
-        <nav className="profile-tabs flex items-center gap-1 overflow-x-auto overflow-y-hidden whitespace-nowrap" aria-label={t('profile.tabs.label')}>
+        <nav className="profile-tabs flex min-h-[var(--workspace-top-row)] items-center gap-1 overflow-x-auto overflow-y-hidden whitespace-nowrap" aria-label={t('profile.tabs.label')}>
           {validTabs.map(key => (
             <button
               key={key}

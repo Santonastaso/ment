@@ -4,7 +4,7 @@ export default function PageHeader({ title, description, action, compact, hideTi
   return (
     <div
       className={cn(
-        'flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between',
+        'flex min-h-[var(--workspace-top-row)] flex-col justify-center gap-3 sm:flex-row sm:items-center sm:justify-between',
         compact ? 'mb-0.5' : 'mb-1'
       )}
     >

@@ -26,8 +26,8 @@ export default function Sidebar({ collapsed = false, onNavigate, onToggle }) {
       ];
 
   return (
-    <div className="flex h-full w-full flex-col px-2.5 py-2.5">
-      <div className="relative mb-6 flex h-11 shrink-0 items-center">
+    <div className="flex h-full w-full flex-col px-2.5 pb-2.5 pt-4">
+      <div className="relative mb-1.5 flex h-[var(--workspace-top-row)] shrink-0 items-center">
         <button type="button" onClick={onToggle} className="grid size-11 shrink-0 place-items-center rounded-full outline-none hover:bg-[var(--sidebar-accent)] focus-visible:ring-3 focus-visible:ring-[var(--sidebar-ring)]" aria-label={collapsed ? 'Open sidebar' : 'Close sidebar'} title={collapsed ? 'Open sidebar' : 'Close sidebar'}>
           <span className="grid size-8 place-items-center rounded-full bg-primary text-xs font-bold text-white">M</span>
         </button>
@@ -55,7 +55,7 @@ export default function Sidebar({ collapsed = false, onNavigate, onToggle }) {
               onClick={onNavigate}
               data-testid={item.testid}
               className={cn(
-                'relative flex h-10 items-center rounded-full text-sm font-normal outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]',
+                'relative flex h-[var(--navigation-row-height)] items-center rounded-[var(--control-radius)] text-sm font-normal outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]',
                 'sidebar-nav-link gap-3 px-3',
                 active
                   ? 'bg-[var(--sidebar-accent)] text-foreground'

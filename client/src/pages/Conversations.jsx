@@ -5,7 +5,7 @@ import api from '../api/index.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useT } from '../i18n/index.jsx';
 import { Field } from '../components/ui/field.jsx';
-import { formatMessageTime } from '../lib/utils.js';
+import { formatChatClock, formatMessageTime } from '../lib/utils.js';
 import { Button } from '../components/ui/button.jsx';
 import { Avatar, AvatarFallback } from '../components/ui/avatar.jsx';
 import { Skeleton } from '../components/ui/skeleton.jsx';
@@ -57,6 +57,12 @@ function localDateTime(value) {
   if (!value) return '';
   const date = new Date(value);
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+}
+
+function chatDayKey(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
 function appendMessage(current, row) {
@@ -459,6 +465,11 @@ export default function Conversations() {
     </div>
   );
 
+  const timelineItems = selected
+    ? [{ id: `request-${selected.id}`, kind: 'request-card', created_at: selected.created_at }, ...messages.filter(message => message.kind !== 'request')]
+    : messages.filter(message => message.kind !== 'request');
+  const dayFormatter = new Intl.DateTimeFormat(lang, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+
   return (
     <section className={cn('conversations-shell', (selectedId || selectedGroupId) && 'has-selection', railCollapsed && 'is-list-collapsed')}>
       <aside ref={railRef} className="conversation-list" aria-label={t('conversations.title')}>
@@ -482,6 +493,7 @@ export default function Conversations() {
                   type="button"
                   variant="ghost"
                   size="sm"
+                  className="filter-control"
                   aria-pressed={filter === option.key}
                   onClick={() => { setParams({ filter: option.key }); if (railCollapsed) setRailMenu('chats'); }}
                 >
@@ -562,8 +574,15 @@ export default function Conversations() {
 
             <div className="conversation-messages" ref={messagesRef}>
               {hasOlder && <Button type="button" variant="ghost" size="sm" className="mx-auto mb-4 flex" disabled={loadingOlder} onClick={loadOlderMessages}>{t('conversations.loadOlder')}</Button>}
-              {selected && <article className={cn('conversation-request-card', selected.isMentee ? 'is-mine' : 'is-theirs')}>
-                <div className="conversation-request-top"><span><MessageSquareText aria-hidden="true" />{t('conversations.requestCard')}</span><time>{formatMessageTime(selected.created_at)}</time></div>
+              {timelineItems.map((message, index) => {
+                const day = chatDayKey(message.created_at);
+                const showDay = day && day !== chatDayKey(timelineItems[index - 1]?.created_at);
+                const event = message.kind === 'system' || message.kind === 'schedule' ? timelineEvent(message, t) : null;
+                const EventIcon = event?.icon;
+                return <React.Fragment key={message.id}>
+                  {showDay && <div className="conversation-day"><time dateTime={day}>{dayFormatter.format(new Date(message.created_at))}</time></div>}
+                  {message.kind === 'request-card' ? <article className={cn('conversation-request-card', selected.isMentee ? 'is-mine' : 'is-theirs')}>
+                <div className="conversation-request-top"><span><MessageSquareText aria-hidden="true" />{t('conversations.requestCard')}</span><time dateTime={selected.created_at}>{formatChatClock(selected.created_at)}</time></div>
                 <h2>{requestText(selected.title, t('conversations.requestTitle'))}</h2>
                 {selected.pre_session_question && selected.pre_session_question.trim() !== selected.title?.trim() && <p className="conversation-request-focus">{requestText(selected.pre_session_question)}</p>}
                 {selected.outbound_message && <p className="conversation-request-body">{requestText(selected.outbound_message)}</p>}
@@ -582,17 +601,11 @@ export default function Conversations() {
                     <Button type="button" variant="ghost" size="sm" onClick={() => { setOverviewOpen(true); setScheduleOpen(true); }}>{t(selected.scheduled_at ? 'conversations.reschedule' : 'conversations.schedule')}</Button>
                   </>}
                 </div>}
-              </article>}
-              {messages.map((message) => {
-                if (message.kind === 'request') return null;
-                if (message.kind === 'system' || message.kind === 'schedule') {
-                  const event = timelineEvent(message, t);
-                  const EventIcon = event.icon;
-                  return <div className="conversation-event" key={message.id}><EventIcon aria-hidden="true" /><strong>{event.title}</strong><time>{formatMessageTime(message.created_at)}</time></div>;
-                }
-                return <div className={cn('conversation-message', message.sender_id === user?.id ? 'is-mine' : 'is-theirs')} key={message.id}>
-                  {selectedGroup && message.sender_id !== user?.id && <strong>{message.sender_name}</strong>}<p>{message.body}</p><time>{formatMessageTime(message.created_at)}</time>
-                </div>;
+              </article> : event ? <div className="conversation-event"><EventIcon aria-hidden="true" /><strong>{event.title}</strong><time dateTime={message.created_at}>{formatChatClock(message.created_at)}</time></div>
+                    : <div className={cn('conversation-message', message.sender_id === user?.id ? 'is-mine' : 'is-theirs')}>
+                      {selectedGroup && message.sender_id !== user?.id && <strong>{message.sender_name}</strong>}<p>{message.body}</p><time dateTime={message.created_at}>{formatChatClock(message.created_at)}</time>
+                    </div>}
+                </React.Fragment>;
               })}
             </div>
 

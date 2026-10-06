@@ -5,7 +5,7 @@ import { buttonVariants } from './ui/button.jsx';
 
 export default function DirectoryFilter({ label, value, onChange, options }) {
   return <Select.Root value={value} onValueChange={onChange} items={options}>
-    <Select.Trigger className={buttonVariants({ variant: 'ghost', className: 'directory-filter w-full min-w-0 justify-between font-normal' })} aria-label={label}>
+    <Select.Trigger className={buttonVariants({ variant: 'ghost', className: 'filter-control directory-filter w-full min-w-0 justify-between font-normal' })} aria-label={label}>
       <Select.Value placeholder={options[0]?.label} />
       <Select.Icon><ChevronDown size={16} aria-hidden="true" /></Select.Icon>
     </Select.Trigger>
