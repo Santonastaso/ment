@@ -419,7 +419,15 @@ test('groups, unread badges and mobile back navigation', async ({ page }) => {
   await dialog.getByRole('textbox', { name: 'Group name' }).fill('New Group');
   await dialog.getByRole('textbox', { name: 'Description', exact: true }).fill('Fixture group');
   await dialog.getByRole('button', { name: 'Create', exact: true }).click();
-  await expect(dialog).toBeHidden();
+  const manager = page.getByRole('dialog', { name: /Manage members/ });
+  await expect(manager).toBeVisible();
+  await expect(manager.getByText('Viewer Student')).toBeVisible();
+  await manager.getByRole('textbox', { name: 'Find a person' }).fill('Peer');
+  await manager.getByRole('button', { name: 'Add', exact: true }).click();
+  await expect(manager.getByText('Peer Mentor')).toBeVisible();
+  await expect(manager.getByText('2 members')).toBeVisible();
+  await manager.press('Escape');
+  await expect(manager).toBeHidden();
   await page.locator('nav').getByRole('link', { name: /^Messages/ }).click();
   await page.getByRole('button', { name: 'Close', exact: true }).click();
   const group = page.getByRole('button', { name: /Test Group/ });

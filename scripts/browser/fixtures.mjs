@@ -62,7 +62,7 @@ function fixtureApi(state) {
         state.messages['/sessions/3/messages'] = [{ id: 1, sender_id: state.user.id, kind: 'request', body: body.message, created_at: new Date().toISOString() }];
         return payload(row);
       }
-      if (path === '/groups') { const row = { ...body, id: 2, joined: true, is_owner: true, member_count: 1 }; state.groups.push(row); return row; }
+      if (path === '/groups') { const row = { ...body, id: 2, joined: true, is_owner: true, member_count: 1 }; state.groups.push(row); state.groupMembers[row.id] = [{ user_id: state.user.id, role: 'owner' }]; return row; }
       if (/^\/(sessions|groups)\/\d+\/messages$/.test(path)) {
         const send = () => {
           const existing = body.client_id && (state.messages[path] || []).find(row => row.client_id === body.client_id);
@@ -153,7 +153,23 @@ export const test = base.extend({
           const own=[]; return {on(event,filter,callback){const l={filter,callback};own.push(l);listeners.push(l);return this},subscribe(){return this},own};
         }, removeChannel:channel=>channel.own.forEach(l=>listeners.splice(listeners.indexOf(l),1)),
         from:table=>({select:()=>({eq:async(_column,id)=>({data:table==='group_members'?(window.fixture.groupMembers[id]||[]):[],error:null})})}),
-        rpc:async(name,args)=>({data:name==='peer_profile'?window.fixture.groupProfiles[args.p_user_id]:{name:'Peer'},error:null})};
+        rpc:async(name,args)=>{
+          const state=window.fixture;
+          if(name==='group_member_directory') {
+            const members=state.groupMembers[args.p_group_id]||[];
+            const query=args.p_query?.toLowerCase();
+            return {data:{
+              members:members.map(m=>({id:m.user_id,name:m.user_id===state.user.id?state.user.name:state.groupProfiles[m.user_id]?.name||'Member',is_owner:m.role==='owner'})),
+              candidates:query?.length>=2?Object.values(state.groupProfiles).filter(p=>p.name.toLowerCase().includes(query)&&!members.some(m=>m.user_id===p.id)).map(p=>({id:p.id,name:p.name})):[],
+            },error:null};
+          }
+          if(name==='manage_group_member') {
+            const members=state.groupMembers[args.p_group_id];
+            state.groupMembers[args.p_group_id]=args.p_add?[...members,{user_id:args.p_user_id,role:'member'}]:members.filter(m=>m.user_id!==args.p_user_id);
+            return {data:null,error:null};
+          }
+          return {data:name==='peer_profile'?state.groupProfiles[args.p_user_id]:{name:'Peer'},error:null};
+        }};
       ` });
       if (url.pathname === '/src/api/index.js') return route.fulfill({ contentType: 'text/javascript', body: `
         export default (${fixtureApi.toString()})(window.fixture);

@@ -32,6 +32,13 @@ export default function Groups() {
   const [reviewTarget, setReviewTarget] = useState(null);
   const [requests, setRequests] = useState([]);
   const [reviewLoading, setReviewLoading] = useState(false);
+  const [manageTarget, setManageTarget] = useState(null);
+  const [memberSearch, setMemberSearch] = useState('');
+  const [roster, setRoster] = useState({ members: [], candidates: [] });
+  const [manageLoading, setManageLoading] = useState(false);
+  const [manageSaving, setManageSaving] = useState(false);
+  const [manageError, setManageError] = useState('');
+  const [rosterRevision, setRosterRevision] = useState(0);
 
   async function load() {
     setLoading(true);
@@ -57,12 +64,32 @@ export default function Groups() {
     return () => { window.removeEventListener('focus', refresh); supabase.removeChannel(channel); };
   }, []);
 
+  useEffect(() => {
+    if (!manageTarget) return;
+    let cancelled = false;
+    setManageLoading(true);
+    const timer = setTimeout(async () => {
+      const { data, error: rosterError } = await supabase.rpc('group_member_directory', {
+        p_group_id: manageTarget.id, p_query: memberSearch.trim() || null,
+      });
+      if (!cancelled) {
+        if (rosterError || !Array.isArray(data?.members) || !Array.isArray(data?.candidates)) {
+          setManageError(t('groups.membersError'));
+        } else { setRoster(data); setManageError(''); }
+        setManageLoading(false);
+      }
+    }, memberSearch ? 250 : 0);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [manageTarget?.id, memberSearch, rosterRevision]);
+
   async function createGroup() {
     if (name.trim().length < 2 || saving) return;
     setSaving(true);
     setError('');
     try {
-      await api.post('/groups', { name: name.trim(), description: description.trim() });
+      const { data: created } = await api.post('/groups', { name: name.trim(), description: description.trim() });
+      setManageTarget({ id: created.id, name: name.trim() });
+      setMemberSearch('');
       setName('');
       setDescription('');
       await load();
@@ -125,6 +152,21 @@ export default function Groups() {
     finally { setSaving(false); }
   }
 
+  async function changeMember(member, add) {
+    if (!manageTarget || manageSaving) return;
+    if (!add && !window.confirm(t('groups.confirmRemove', { name: member.name }))) return;
+    setManageSaving(true); setManageError('');
+    try {
+      const { error: changeError } = await supabase.rpc('manage_group_member', {
+        p_group_id: manageTarget.id, p_user_id: member.id, p_add: add,
+      });
+      if (changeError) throw changeError;
+      setRosterRevision(current => current + 1);
+      await load();
+    } catch { setManageError(t('groups.error.save')); }
+    finally { setManageSaving(false); }
+  }
+
   return (
     <PageShell>
       <h1 className="sr-only">{t('groups.pageTitle')}</h1>
@@ -164,6 +206,7 @@ export default function Groups() {
 
                   <span className="person-row-actions">
                     {group.is_owner && group.pending_count > 0 && <Button type="button" variant="ghost" size="sm" onClick={() => openReview(group)}>{t('groups.requests', { count: group.pending_count })}</Button>}
+                    {group.is_owner && <Button type="button" variant="ghost" size="sm" onClick={() => { setManageTarget(group); setMemberSearch(''); setManageError(''); }}>{t('groups.manageMembers')}</Button>}
                     {group.joined && (
                       <Button variant="ghost" size="sm"
                         type="button"
@@ -231,6 +274,24 @@ export default function Groups() {
             </article>
           ))}
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+        </DialogContent>
+      </Dialog>
+      <Dialog open={!!manageTarget} onOpenChange={open => { if (!open && !manageSaving) setManageTarget(null); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{t('groups.manageMembers')} · {manageTarget?.name}</DialogTitle><DialogDescription>{t('groups.manageDescription')}</DialogDescription></DialogHeader>
+          <label className="label" htmlFor="group-member-search">{t('groups.findMember')}</label>
+          <input id="group-member-search" className="input text-sm" value={memberSearch} maxLength={80} onChange={event => setMemberSearch(event.target.value)} placeholder={t('groups.findMemberPlaceholder')} />
+          {manageLoading ? <p role="status">{t('common.loading')}</p> : <>
+            {memberSearch.trim().length >= 2 && <section className="grid max-h-40 gap-2 overflow-y-auto" aria-label={t('groups.searchResults')}>
+              {roster.candidates.map(person => <div key={person.id} className="flex items-center justify-between gap-3"><span>{person.name}</span><Button type="button" size="sm" disabled={manageSaving} onClick={() => changeMember(person, true)}>{t('groups.addMember')}</Button></div>)}
+              {roster.candidates.length === 0 && <p className="text-sm text-muted-foreground">{t('groups.noCandidates')}</p>}
+            </section>}
+            <section className="grid max-h-64 gap-2 overflow-y-auto" aria-label={t('groups.members', { count: roster.members.length })}>
+              <p className="label-meta">{t('groups.members', { count: roster.members.length })}</p>
+              {roster.members.map(member => <div key={member.id} className="flex items-center justify-between gap-3 border-b py-2"><span>{member.name}{member.is_owner && <small className="ml-2 text-muted-foreground">{t('groups.owner')}</small>}</span>{!member.is_owner && <Button type="button" variant="ghost" size="sm" disabled={manageSaving} onClick={() => changeMember(member, false)}>{t('groups.removeMember')}</Button>}</div>)}
+            </section>
+          </>}
+          {manageError && <p role="alert" className="text-sm text-destructive">{manageError}</p>}
         </DialogContent>
       </Dialog>
     </PageShell>
