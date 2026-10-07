@@ -1,5 +1,59 @@
 import { test, expect } from './fixtures.mjs';
 
+test('password reset stays on Ment and accepts a recovery link', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => window.fixture.setUser(null));
+  await expect(page).toHaveURL(/\/login$/);
+  await page.getByRole('textbox', { name: 'Email' }).fill('student@example.test');
+  await page.getByRole('button', { name: 'Forgot password?' }).click();
+  await expect(page.getByText(/reset link/i)).toBeVisible();
+  expect(await page.evaluate(() => window.fixture.resetRequest.options.redirectTo)).toBe('http://127.0.0.1:3010/reset-password');
+
+  await page.goto('/reset-password#access_token=test&refresh_token=test&type=recovery');
+  await expect(page.getByText('Choose a new password', { exact: true })).toBeVisible();
+  await page.getByLabel('New password').fill('valid-password-2026');
+  await page.getByLabel('Confirm password').fill('valid-password-2026');
+  await page.getByRole('button', { name: 'Save new password' }).click();
+  await expect(page).toHaveURL(/\/login$/);
+});
+
+test('CV import populates onboarding and can be saved', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => window.fixture.setUser({ ...window.fixture.user, onboarding_complete: false }));
+  await expect(page).toHaveURL(/\/onboarding$/);
+  const file = page.locator('input[type="file"]');
+  await expect(file).toBeDisabled();
+  await page.getByRole('checkbox').check();
+  await file.setInputFiles({ name: 'resume.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 synthetic CV') });
+  await expect(page.getByRole('heading', { name: /Your background/i })).toBeVisible();
+  expect(await page.evaluate(() => {
+    const call = window.fixture.calls.find(item => item.path === '/profile/ingest');
+    return [call.body.get('kind'), call.body.get('file').name];
+  })).toEqual(['cv', 'resume.pdf']);
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Finish' }).click();
+  await expect(page).toHaveURL('http://127.0.0.1:3010/');
+  expect(await page.evaluate(() => window.fixture.calls.some(item => item.path === '/profile/ingest/1/accept'))).toBe(true);
+});
+
+test('Messages opens a clean link and switching chats does not replay transitions', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => {
+    window.fixture.sessions[0].route_token = 'first-chat';
+    window.fixture.sessions[1].route_token = 'second-chat';
+  });
+  await page.getByRole('link', { name: 'Messages' }).click();
+  await expect(page).toHaveURL(/\/c\/first-chat$/);
+  await expect(page.locator('.conversation-header strong')).toHaveText('Peer 1');
+  await page.locator('.page-transition').evaluate(element => { element.dataset.testIdentity = 'retained'; });
+  await page.locator('.conversation-list-item').filter({ hasText: 'Peer 2' }).click();
+  await expect(page).toHaveURL(/\/c\/second-chat$/);
+  await expect(page.locator('.conversation-header strong')).toHaveText('Peer 2');
+  await expect(page.locator('.page-transition')).toHaveAttribute('data-test-identity', 'retained');
+  expect(await page.locator('.conversation-thread').evaluate(element => getComputedStyle(element).animationName)).toBe('none');
+});
+
 test('Home greeting uses four borderless faces and turns each 15 seconds', async ({ page }) => {
   await page.clock.install();
   await page.goto('/');

@@ -237,12 +237,16 @@ export default function Onboarding({ returnTo }) {
                   <option value="performance_review">{t('onboarding.import.kindReview')}</option>
                 </select>
               </div>
-              <label className="block border-2 border-dashed border-[var(--input)] rounded-xl p-10 text-center cursor-pointer transition-colors duration-150 hover:border-foreground/30 hover:bg-muted">
+              <label className="flex items-start gap-2 text-xs text-muted-foreground">
+                <input type="checkbox" checked={aiConsent} onChange={e => setAiConsent(e.target.checked)} className="mt-0.5" />
+                <span>{t('onboarding.import.consent')}</span>
+              </label>
+              <label className={`block rounded-xl border-2 border-dashed border-[var(--input)] p-10 text-center transition-colors duration-150 ${aiConsent ? 'cursor-pointer hover:border-foreground/30 hover:bg-muted' : 'cursor-not-allowed opacity-60'}`}>
                 <input
                   type="file"
                   accept=".docx,.pdf,.txt"
                   className="hidden"
-                  disabled={uploading}
+                  disabled={uploading || !aiConsent}
                   onChange={e => { if (e.target.files[0]) handleUpload(e.target.files[0]); e.target.value = ''; }}
                 />
                 {uploading ? <p className="text-sm text-muted-foreground">{t('onboarding.import.reading')}</p> : (
@@ -251,10 +255,6 @@ export default function Onboarding({ returnTo }) {
                     <p className="text-xs text-muted-foreground mt-1">{t('onboarding.import.hint')}</p>
                   </>
                 )}
-              </label>
-              <label className="flex items-start gap-2 text-xs text-muted-foreground">
-                <input type="checkbox" checked={aiConsent} onChange={e => setAiConsent(e.target.checked)} className="mt-0.5" />
-                <span>{t('onboarding.import.consent')}</span>
               </label>
             </>
           )}

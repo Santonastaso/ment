@@ -4,8 +4,6 @@
 
 import mammoth from 'npm:mammoth@1.9.0';
 import { Buffer } from 'node:buffer';
-// pdfjs-dist is the Deno-friendly PDF parser. Using legacy build to avoid worker setup.
-import { getDocument } from 'npm:pdfjs-dist@4.7.76/legacy/build/pdf.mjs';
 import {
   corsHeaders,
   jsonError,
@@ -50,7 +48,8 @@ function validateDocxArchive(buf: Uint8Array) {
 async function extractText(buf: Uint8Array, filename: string): Promise<string> {
   const lower = filename.toLowerCase();
   if (lower.endsWith('.pdf')) {
-    // pdfjs accepts a typed array
+    // Loading PDF.js only for PDFs keeps a PDF runtime failure from blocking DOCX and TXT imports.
+    const { getDocument } = await import('npm:pdfjs-dist@4.7.76/legacy/build/pdf.mjs');
     const doc = await getDocument({ data: buf }).promise;
     if (doc.numPages > MAX_PDF_PAGES) throw new Error('document_too_many_pages');
     let out = '';
