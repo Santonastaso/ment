@@ -1,7 +1,7 @@
-export function messageFor(topic, payload, origin) {
+export function messageFor(topic, payload, origin, routeToken) {
   const sessionId = Number(payload.session_id);
-  const sessionLink = Number.isSafeInteger(sessionId) && sessionId > 0
-    ? `${origin}/conversations?session=${sessionId}` : `${origin}/conversations`;
+  const sessionLink = typeof routeToken === 'string' && /^[A-Za-z0-9_-]{16}$/.test(routeToken)
+    ? `${origin}/c/${routeToken}` : `${origin}/conversations`;
   if (topic === 'reflection_reminder') return {
     subject: 'Your MENT reflection is ready',
     text: `Take two minutes to reflect on what went well this week. Open MENT: ${origin}/profile`,

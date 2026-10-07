@@ -3,8 +3,8 @@ import { Select } from '@base-ui/react/select';
 import { Check, ChevronDown } from 'lucide-react';
 import { buttonVariants } from './ui/button.jsx';
 
-export default function DirectoryFilter({ label, value, onChange, options, renderValue, multiple = false }) {
-  return <Select.Root multiple={multiple} value={value} onValueChange={onChange} items={options}>
+export default function DirectoryFilter({ label, value, onChange, options, renderValue, multiple = false, disabled = false }) {
+  return <Select.Root multiple={multiple} value={value} onValueChange={onChange} items={options} disabled={disabled}>
     <Select.Trigger className={buttonVariants({ variant: 'ghost', className: 'filter-control directory-filter w-full min-w-0 justify-between px-3 font-normal' })} aria-label={label}>
       <Select.Value className="min-w-0 truncate" placeholder={options[0]?.label}>{renderValue}</Select.Value>
       <Select.Icon><ChevronDown size={16} aria-hidden="true" /></Select.Icon>

@@ -78,14 +78,14 @@ Deno.serve(async (req) => {
 
     const payload = row.payload && typeof row.payload === 'object' && !Array.isArray(row.payload)
       ? row.payload as Record<string, unknown> : {};
-    const content = messageFor(row.topic, payload, appOrigin);
     let session = null;
-    if (content && row.topic !== 'reflection_reminder') {
+    if (row.topic !== 'reflection_reminder') {
       const sessionId = Number(payload.session_id);
       const { data } = await sb.from('sessions')
-        .select('mentor_id, mentee_id, status, scheduled_at').eq('id', sessionId).maybeSingle();
+        .select('mentor_id, mentee_id, status, scheduled_at, route_token').eq('id', sessionId).maybeSingle();
       session = data;
     }
+    const content = messageFor(row.topic, payload, appOrigin, session?.route_token);
     if (!content || !isDeliverable({ ...row, payload }, session)) {
       await fail('not_deliverable');
       continue;

@@ -129,6 +129,10 @@ test('pilot feedback migrations: group lifecycle, tenant boundaries, capacity an
     await db.exec(`delete from group_members where group_id = ${created.id} and user_id = '${owner}';
       insert into group_join_requests(group_id, user_id, reason) values (${created.id}, '${owner}', 'Self request');`);
     await db.exec(await migration('20261005102000_0073_group_owner_and_request_restart.sql'));
+    await db.exec('alter table sessions add column route_token text default gen_random_uuid()::text');
+    const cleanLinks = await migration('20261007100000_0077_clean_conversation_links.sql');
+    await db.exec(cleanLinks.slice(cleanLinks.indexOf('create or replace function public.my_session_relationships'), cleanLinks.indexOf('create or replace function public.my_groups')));
+    await db.exec(await migration('20261007101000_0078_restore_active_session_relationships.sql'));
     await as(owner);
     assert.equal((await one('select count(*)::int value from group_members where group_id = $1 and user_id = $2', [created.id, owner])).value, 1);
     assert.equal((await one('select status from group_join_requests where group_id = $1 and user_id = $2', [created.id, owner])).status, 'withdrawn');
@@ -156,6 +160,7 @@ test('pilot feedback migrations: group lifecycle, tenant boundaries, capacity an
       p_pre_session_question => 'Finance help', p_idempotency_key => gen_random_uuid()) value`, [owner])).rows[0].value;
     assert.notEqual(restarted.id, sent.id);
     assert.equal((await one('select my_session_relationships() value')).value[0].session_id, restarted.id);
+    assert.equal((await one('select my_session_relationships() value')).value[0].session_token, restarted.route_token);
     assert.equal((await one('select count(*)::int value from session_messages where session_id = $1', [sent.id])).value, 1);
     await db.query("update sessions set created_at = now() - interval '8 days', request_expires_at = now() - interval '1 second' where id = $1", [restarted.id]);
     // Deliberately fail message storage to verify the real request RPC rolls back too.

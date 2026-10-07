@@ -480,11 +480,9 @@ async function get(url) {
     const [path, query] = url.split('?');
     const id = Number(path.split('/')[2]);
     const before = new URLSearchParams(query || '').get('before');
-    const { data, error } = await supabase.rpc('my_session_messages', { p_session_id: id });
+    const { data, error } = await supabase.rpc('my_session_messages', { p_session_id: id, p_before: before ? Number(before) : null });
     if (error) throw new ApiError(error.message, 404);
-    const history = (data || []).sort((a, b) => a.id - b.id);
-    const eligible = before ? history.filter((message) => message.id < Number(before)) : history;
-    return ok({ messages: eligible.slice(-50), hasMore: eligible.length > 50 });
+    return ok(data || { messages: [], hasMore: false });
   }
 
   if (url === '/sessions/pending-acceptances') {
