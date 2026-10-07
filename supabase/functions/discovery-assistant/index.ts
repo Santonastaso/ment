@@ -100,6 +100,20 @@ const EMPTY_POOL_MESSAGES: Record<string, string> = {
   French: 'Le réseau actuel ne contient aucun professionnel pertinent pour cette demande.',
 };
 
+// The application writes the greeting and the sign-off; the model is told
+// not to, and writes them anyway ("Ciao Francesco, ciao Francesco"). Strip
+// any it added, at the start and the end, in every language, as often as
+// they repeat.
+const GREETING = /^\s*(?:ciao|salve|buongiorno|buonasera|gentile|egregi[oa]|car[oa]|hi|hello|hey|dear|good (?:morning|afternoon|evening)|bonjour|bonsoir|salut|cher|ch[eè]re)\b[^\n.!?]{0,40}?[,!:]\s*/i;
+const SIGN_OFF = /\n\s*(?:a presto|grazie(?: mille)?|cordiali saluti|saluti|un saluto|buona giornata|thanks|thank you|best(?: regards| wishes)?|kind regards|regards|cheers|merci(?: beaucoup)?|cordialement|bien (?:à|a) vous|bonne journée|à bientôt)\b[^\n]{0,30}(?:\n[^\n]{0,40})?\s*$/i;
+function withoutGreeting(body: string) {
+  let text = body.trim();
+  for (let i = 0; i < 3 && GREETING.test(text); i += 1) text = text.replace(GREETING, '').trim();
+  for (let i = 0; i < 2 && SIGN_OFF.test(`\n${text}`); i += 1) text = `\n${text}`.replace(SIGN_OFF, '').trim();
+  // The first word may now start lower case after "Ciao Francesco, grazie...".
+  return text ? text[0].toUpperCase() + text.slice(1) : body.trim();
+}
+
 function formatRequestDraft(language: string, sender: string, recipient: string, body: string) {
   if (language === 'Italian') return `Ciao ${recipient},\n\n${body}\n\nA presto,\n${sender}`;
   if (language === 'French') return `Bonjour ${recipient},\n\n${body}\n\nMerci,\n${sender}`;
@@ -1208,7 +1222,7 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
         temperature: Number(body.variant) ? 0.35 : 0.15,
         maxTokens: 350,
       });
-      const draftBody = cleanText(result.value?.body, 1200);
+      const draftBody = withoutGreeting(cleanText(result.value?.body, 1200));
       if (!draftBody) return jsonError('ai_invalid_response', 502);
       const firstName = (name: unknown) => cleanText(name, 120).split(/\s+/)[0];
       const recipientName = redactInterOrg && !established.has(selected.id) ? 'there' : firstName(selected.name);

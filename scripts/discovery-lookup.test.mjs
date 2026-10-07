@@ -876,3 +876,22 @@ test('back-to-back pushback never opens or reads the same way twice', async () =
     assert.doesNotMatch(result.message, /someone different|some different people/);
   }
 });
+
+// The application writes the greeting and sign-off once; whatever the model
+// adds of its own is removed, in every language.
+for (const [lang, body, greeting, signOff] of [
+  ['it', 'Ciao Finance, ciao Finance,\n\nsto cercando consigli sulla modellazione finanziaria.\n\nA presto,\nViewer', 'Ciao Finance,', 'A presto,'],
+  ['en', 'Hi Finance!\nI am looking for advice on financial modelling.\n\nBest regards,\nViewer', 'Hi Finance,', 'Thanks,'],
+  ['fr', 'Bonjour Finance,\nJe cherche des conseils en modélisation financière.\nCordialement,\nViewer', 'Bonjour Finance,', 'Merci,'],
+]) {
+  test(`a draft greets and signs off once (${lang})`, async () => {
+    const fixture = discoveryFixture({ responses: [{ body }] });
+    const response = await run(fixture, { action: 'draft', query: 'Financial modelling', person_id: finance.id, lang });
+    const { draft } = await response.json();
+    const count = (text) => draft.split(text).length - 1;
+    assert.equal(count(greeting), 1, draft);
+    assert.equal(count(signOff), 1, draft);
+    assert.equal(draft.split('Viewer').length - 1, 1, draft);
+    assert.match(draft, /^\S+ Finance,\n\n[A-Z]/u, 'the body starts right after the one greeting');
+  });
+}
