@@ -720,20 +720,27 @@ export default function Conversations() {
             <DialogDescription>{selectedGroup.description || t('groups.chatSubtitle')}</DialogDescription>
           </DialogHeader>
           <div className="conversation-overview-body">
+            {selectedGroup.is_owner && <p className="text-sm text-muted-foreground">{t('groups.youManage')}</p>}
             <section aria-label={t('groups.members', { count: selectedGroup.member_count || groupMembers.length })}>
               <p className="label-meta">{t('groups.members', { count: selectedGroup.member_count || groupMembers.length })}</p>
               {groupMembersLoading ? <div role="status" className="space-y-2"><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /></div>
                 : groupMembersError ? <p className="text-sm text-muted-foreground">{t('groups.membersError')}</p>
                   : <div className="grid max-h-72 gap-2 overflow-y-auto">
-                    {groupMembers.map(member => <div key={member.user_id} className="flex items-center gap-3 rounded-[var(--panel-radius)] bg-[var(--control-surface)] p-3">
+                    {groupMembers.map(member => {
+                      const isOwner = member.role === 'owner' || (selectedGroup.is_owner && member.user_id === user?.id);
+                      return <div key={member.user_id} className="flex items-center gap-3 rounded-[var(--panel-radius)] bg-[var(--control-surface)] p-3">
                       <Avatar className="size-9"><AvatarFallback>{initials(member.name)}</AvatarFallback></Avatar>
                       <span className="min-w-0 flex-1 truncate font-medium">{member.name}</span>
-                      {member.role === 'owner' && <span className="text-xs text-muted-foreground">{t('groups.owner')}</span>}
-                    </div>)}
+                      {isOwner && <span className="rounded-full bg-background px-2 py-1 text-xs font-medium text-foreground">{t('groups.ownerLabel')}</span>}
+                    </div>;
+                    })}
                     {groupMembers.length === 0 && <p className="text-sm text-muted-foreground">{t('groups.noMembers')}</p>}
                   </div>}
             </section>
           </div>
+          {selectedGroup.is_owner && <DialogFooter className="conversation-overview-footer">
+            <Button type="button" size="sm" onClick={() => { setGroupOverviewOpen(false); navigate(`/groups?manage=${selectedGroup.id}`); }}>{t('groups.manageMembers')}</Button>
+          </DialogFooter>}
         </DialogContent>
       </Dialog>}
       <Dialog open={withdrawOpen} onOpenChange={value => { if (!withdrawing) setWithdrawOpen(value); }}>

@@ -37,6 +37,8 @@
   "groups.confirmRemove": "Retirer {name} de ce groupe ?",
   "groups.info": "Infos du groupe",
   "groups.owner": "Créateur",
+  "groups.ownerLabel": "Créateur du groupe",
+  "groups.youManage": "Vous gérez ce groupe. Ajoutez ou retirez des membres ci-dessous.",
   "groups.memberUnknown": "Membre",
   "groups.noMembers": "Aucun membre à afficher.",
   "groups.membersError": "Impossible de charger les membres. Réessayez.",

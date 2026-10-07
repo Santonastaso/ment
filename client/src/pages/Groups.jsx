@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../api/index.js';
 import { useT } from '../i18n/index.jsx';
 import { groupPath } from '../lib/conversationLinks.mjs';
@@ -19,6 +19,7 @@ function requestExpiryLabel(value, t) {
 
 export default function Groups() {
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
   const { t } = useT();
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -63,6 +64,19 @@ export default function Groups() {
       .subscribe();
     return () => { window.removeEventListener('focus', refresh); supabase.removeChannel(channel); };
   }, []);
+
+  useEffect(() => {
+    const group = groups.find(item => item.id === Number(params.get('manage')));
+    if (!group?.is_owner) return;
+    setManageTarget(group);
+    setMemberSearch('');
+    setManageError('');
+    setParams(current => {
+      const next = new URLSearchParams(current);
+      next.delete('manage');
+      return next;
+    }, { replace: true });
+  }, [groups, params, setParams]);
 
   useEffect(() => {
     if (!manageTarget) return;

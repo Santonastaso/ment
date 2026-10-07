@@ -37,6 +37,8 @@
   "groups.confirmRemove": "Rimuovere {name} da questo gruppo?",
   "groups.info": "Informazioni sul gruppo",
   "groups.owner": "Creatore",
+  "groups.ownerLabel": "Creatore del gruppo",
+  "groups.youManage": "Gestisci questo gruppo. Aggiungi o rimuovi membri qui sotto.",
   "groups.memberUnknown": "Membro",
   "groups.noMembers": "Nessun membro da mostrare.",
   "groups.membersError": "Impossibile caricare i membri. Riprova.",

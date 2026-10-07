@@ -110,7 +110,7 @@ export const test = base.extend({
       window.fixture = {
         user, peer, calls: [], pending: [], nextMessageId: 10, messages: JSON.parse(sessionStorage.getItem('ment.fixture.messages') || '{}'),
         unread: { sessions: 0, groups: 1, sessionMessages: {}, groupMessages: { 1: 2 } },
-        groups: [{ id: 1, name: 'Test Group', description: 'A group for testing', joined: true, member_count: 3 }],
+        groups: [{ id: 1, name: 'Test Group', description: 'A group for testing', joined: true, is_owner: true, member_count: 3 }],
         groupMembers: { 1: [
           { user_id: user.id, role: 'owner' },
           { user_id: peer.id, role: 'member' },

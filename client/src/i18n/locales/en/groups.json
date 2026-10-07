@@ -37,6 +37,8 @@
   "groups.confirmRemove": "Remove {name} from this group?",
   "groups.info": "Group info",
   "groups.owner": "Owner",
+  "groups.ownerLabel": "Group owner",
+  "groups.youManage": "You manage this group. Add or remove members below.",
   "groups.memberUnknown": "Member",
   "groups.noMembers": "No members to show.",
   "groups.membersError": "Could not load members. Try again.",
