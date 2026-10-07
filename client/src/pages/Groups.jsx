@@ -73,8 +73,9 @@ export default function Groups() {
         p_group_id: manageTarget.id, p_query: memberSearch.trim() || null,
       });
       if (!cancelled) {
-        if (rosterError) setManageError(t('groups.membersError'));
-        else { setRoster(data); setManageError(''); }
+        if (rosterError || !Array.isArray(data?.members) || !Array.isArray(data?.candidates)) {
+          setManageError(t('groups.membersError'));
+        } else { setRoster(data); setManageError(''); }
         setManageLoading(false);
       }
     }, memberSearch ? 250 : 0);
