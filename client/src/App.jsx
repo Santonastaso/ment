@@ -83,7 +83,8 @@ function page(node, animate = true) {
 
 function PageTransition({ children }) {
   const { pathname } = useLocation();
-  return <div key={pathname} className="page-transition">{children}</div>;
+  const key = pathname === '/conversations' || pathname.startsWith('/c/') || pathname.startsWith('/g/') ? 'conversations' : pathname;
+  return <div key={key} className="page-transition">{children}</div>;
 }
 
 function LoadingScreen() {

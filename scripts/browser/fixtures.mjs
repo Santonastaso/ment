@@ -49,6 +49,10 @@ function fixtureApi(state) {
         return {};
       }
       if (path.endsWith('/acknowledge')) { state.sessions.find(s => s.id === Number(path.split('/')[2])).mentee_acknowledged_at = new Date().toISOString(); return {}; }
+      if (path === '/profile/ingest') return { draft_id: 1, classifier_source: 'test', proposed: {
+        job_title: 'Analyst', bio: 'Built useful systems.', career_history: [], can_teach: [], wants_to_learn: [],
+      } };
+      if (path === '/profile/ingest/1/accept') return { ok: true };
       if (path === '/users/me/onboarding') return { ...state.user, ...body, onboarding_complete: true };
       if (path === '/discovery/matches') {
         if (state.calls.filter(c => c.path === path).length === 1) return { thread_id: 'thread', matches: [], clarification: 'Which finance skill would you like help with?',
@@ -139,8 +143,8 @@ export const test = base.extend({
           const [unreadCounts, setUnread] = React.useState(window.fixture.unread);
           const updateUser = next => {window.fixture.user = next; setUser(next)};
           window.fixture.setUser = updateUser;
-          const value = { user, session: {user: {email:user.email}}, loading:false, pendingAcceptanceCount:0, unreadCounts,
-            updateUser, logout:async()=>{}, refreshPendingAcceptances:async()=>{},
+          const value = { user, session: user ? {user: {email:user.email}} : null, loading:false, pendingAcceptanceCount:0, unreadCounts,
+            updateUser, logout:async()=>updateUser(null), signOut:async()=>updateUser(null), refreshPendingAcceptances:async()=>{},
             refreshUnreadCounts:async()=>setUnread(structuredClone(window.fixture.unread)) };
           return React.createElement(Context.Provider, {value}, children);
         }
@@ -149,7 +153,11 @@ export const test = base.extend({
       if (url.pathname === '/src/lib/supabase.js') return route.fulfill({ contentType: 'text/javascript', body: `
         const listeners = [];
         window.fixture.emit = (table, row) => listeners.filter(l => l.filter.table === table).forEach(l => l.callback({new:row}));
-        export const supabase = {channel:()=>{
+        export const supabase = {auth:{
+          resetPasswordForEmail:async(email,options)=>{window.fixture.resetRequest={email,options};return {error:null}},
+          setSession:async()=>{window.fixture.setUser({...window.fixture.user,id:'viewer',email:'student@example.test'});return {error:null}},
+          updateUser:async()=>({error:null}),
+        },channel:()=>{
           const own=[]; return {on(event,filter,callback){const l={filter,callback};own.push(l);listeners.push(l);return this},subscribe(){return this},own};
         }, removeChannel:channel=>channel.own.forEach(l=>listeners.splice(listeners.indexOf(l),1)),
         from:table=>({select:()=>({eq:async(_column,id)=>({data:table==='group_members'?(window.fixture.groupMembers[id]||[]):[],error:null})})}),

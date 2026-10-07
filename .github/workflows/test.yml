@@ -108,6 +108,8 @@ jobs:
           while IFS= read -r function; do
             deno check --node-modules-dir=auto --no-lock "$function"
           done < <(find supabase/functions -mindepth 2 -maxdepth 2 -name index.ts -print | sort)
+      - name: Parse a PDF in the Edge runtime
+        run: deno test --node-modules-dir=auto --no-lock scripts/profile-pdf-runtime.test.mts
 
   database:
     runs-on: ubuntu-latest
@@ -195,6 +197,15 @@ jobs:
           supabase link --project-ref "$project_ref"
           supabase db push --linked --dry-run
           supabase db push --linked --yes
+
+      - name: Sync auth redirect configuration
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          project_ref=$(sed -n 's/^project_id = "\([^"]*\)"/\1/p' supabase/config.toml)
+          supabase config diff --project-ref "$project_ref"
+          supabase config push --project-ref "$project_ref" --yes
 
       - name: Deploy all Edge Functions
         env:

@@ -291,11 +291,19 @@ export default function Conversations() {
     Promise.all([loadSessions(), loadGroups()])
       .then(([nextSessions, nextGroups]) => {
         if (cancelled) return;
-        if (selectedId && nextSessions.some((item) => item.id === selectedId)) return;
-        if (selectedGroupId && nextGroups.some((item) => item.id === selectedGroupId)) return;
+        const currentSession = nextSessions.find((item) => item.id === selectedId);
+        if (currentSession) {
+          if (querySessionId && currentSession.route_token && !params.has('filter')) navigate(sessionPath(currentSession), { replace: true });
+          return;
+        }
+        const currentGroup = nextGroups.find((item) => item.id === selectedGroupId);
+        if (currentGroup) {
+          if (queryGroupId && currentGroup.route_token && !params.has('filter')) navigate(groupPath(currentGroup), { replace: true });
+          return;
+        }
         if (params.has('filter') || sessionToken || groupToken) return;
-        if (nextSessions[0]) setParams({ session: String(nextSessions[0].id) }, { replace: true });
-        else if (nextGroups[0]) setParams({ group: String(nextGroups[0].id) }, { replace: true });
+        if (nextSessions[0]) navigate(sessionPath(nextSessions[0]), { replace: true });
+        else if (nextGroups[0]) navigate(groupPath(nextGroups[0]), { replace: true });
         else if (selectedId || selectedGroupId) setParams({}, { replace: true });
       })
       .catch((requestError) => { if (!cancelled) setError(requestError.response?.data?.error || t('conversations.error')); })
@@ -334,11 +342,14 @@ export default function Conversations() {
     };
   }, []);
 
+  useLayoutEffect(() => {
+    setMessages([]);
+    setHasOlder(false);
+  }, [selectedId, selectedGroupId]);
+
   useEffect(() => {
     if (selectedGroupId) {
       let cancelled = false;
-      setMessages([]);
-      setHasOlder(false);
       const refresh = (initial = false) => loadGroupMessages(selectedGroupId, null, initial)
         .then(() => {
           if (!cancelled) return api.post(`/groups/${selectedGroupId}/read`, {}).then(refreshUnreadCounts);
@@ -365,10 +376,8 @@ export default function Conversations() {
       document.addEventListener('visibilitychange', refreshWhenVisible);
       return () => { cancelled = true; window.clearInterval(poll); window.removeEventListener('focus', refreshOnFocus); document.removeEventListener('visibilitychange', refreshWhenVisible); supabase.removeChannel(channel); };
     }
-    if (!selectedId) { setMessages([]); setHasOlder(false); return undefined; }
+    if (!selectedId) return undefined;
     let cancelled = false;
-    setMessages([]);
-    setHasOlder(false);
     const refresh = async (initial = false) => {
       try {
         await loadMessages(selectedId, null, initial);

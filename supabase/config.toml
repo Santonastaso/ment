@@ -1,5 +1,9 @@
 project_id = "vqvjdtnpcamyrqkqsrfb"
 
+[auth]
+site_url = "https://ment-steel.vercel.app"
+additional_redirect_urls = ["https://ment-steel.vercel.app/reset-password"]
+
 [functions.admin-create-user]
 verify_jwt = true
 

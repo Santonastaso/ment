@@ -351,7 +351,8 @@ async function loadSessionRelationships() {
 async function uploadToStorage(bucket, prefix, file) {
   const filename = `${Date.now()}-${(file.name || 'upload').replace(/[^a-zA-Z0-9._-]/g, '_')}`;
   const path = prefix ? `${prefix}/${filename}` : filename;
-  const upload = () => supabase.storage.from(bucket).upload(path, file, { upsert: false, contentType: file.type || undefined });
+  const type = bucket === 'profile-uploads' ? ({ pdf: 'application/pdf', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', txt: 'text/plain' })[filename.split('.').at(-1).toLowerCase()] : file.type;
+  const upload = () => supabase.storage.from(bucket).upload(path, file, { upsert: false, contentType: type || undefined });
   let { error } = await upload();
   if (error && (String(error.statusCode) === '401' || /invalid token|invalid jwt|jwt expired/i.test(error.message || ''))) {
     const { error: refreshError } = await supabase.auth.refreshSession();
