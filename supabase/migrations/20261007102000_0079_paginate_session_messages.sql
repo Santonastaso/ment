@@ -1,6 +1,8 @@
 create index if not exists session_messages_page_idx on public.session_messages(session_id, id desc);
 
-create function public.my_session_messages_page(
+drop function public.my_session_messages(bigint);
+
+create function public.my_session_messages(
   p_session_id bigint, p_before bigint default null, p_limit integer default 50
 )
 returns jsonb language plpgsql stable security definer set search_path = public as $$
@@ -23,6 +25,6 @@ begin
 end;
 $$;
 
-revoke all on function public.my_session_messages_page(bigint, bigint, integer) from public, anon;
-grant execute on function public.my_session_messages_page(bigint, bigint, integer) to authenticated;
+revoke all on function public.my_session_messages(bigint, bigint, integer) from public, anon;
+grant execute on function public.my_session_messages(bigint, bigint, integer) to authenticated;
 notify pgrst, 'reload schema';

@@ -32,23 +32,21 @@ test('session history RPC reads messages hidden by direct table RLS', async () =
     await db.query("select set_config('request.jwt.claim.sub', $1, false)", [owner]);
     await db.exec('set role authenticated');
     assert.equal((await db.query('select count(*)::int value from session_messages')).rows[0].value, 0);
-    assert.equal((await db.query('select my_session_messages(1) value')).rows[0].value[0].body, 'Stored reply');
-    const history = (await db.query('select my_session_messages_page(1) value')).rows[0].value;
+    const history = (await db.query('select my_session_messages(1) value')).rows[0].value;
     assert.equal(history.messages[0].body, 'Stored reply');
     await db.exec('reset role');
     await db.exec(`insert into session_messages(id, session_id, sender_id, kind, body, created_at)
       select n, 1, '${owner}', 'message', 'Reply ' || n, now() from generate_series(2, 55) n`);
     await db.exec('set role authenticated');
-    assert.equal((await db.query('select my_session_messages(1) value')).rows[0].value.length, 55);
-    const newest = (await db.query('select my_session_messages_page(1) value')).rows[0].value;
+    const newest = (await db.query('select my_session_messages(1) value')).rows[0].value;
     assert.equal(newest.messages.length, 50);
     assert.equal(newest.messages[0].id, 6);
     assert.equal(newest.hasMore, true);
-    const older = (await db.query('select my_session_messages_page(1, $1) value', [6])).rows[0].value;
+    const older = (await db.query('select my_session_messages(1, $1) value', [6])).rows[0].value;
     assert.deepEqual(older.messages.map(message => message.id), [1, 2, 3, 4, 5]);
     assert.equal(older.hasMore, false);
     await db.query("select set_config('request.jwt.claim.sub', $1, false)", ['10000000-0000-0000-0000-000000000003']);
-    await assert.rejects(db.query('select my_session_messages_page(1) value'), /not_found/);
+    await assert.rejects(db.query('select my_session_messages(1) value'), /not_found/);
   } finally {
     await db.close();
   }
