@@ -449,6 +449,10 @@ test('groups, unread badges and mobile back navigation', async ({ page }) => {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
   await page.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(page.getByRole('button', { name: /New Group/ })).toBeVisible();
+  await page.getByRole('button', { name: /Test Group/ }).click();
+  await page.getByRole('button', { name: 'Group info' }).click();
+  await page.getByRole('button', { name: 'Manage members', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: /Manage members.*Test Group/ })).toBeVisible();
 });
 
 test('failed send preserves the draft and can be retried', async ({ page }) => {

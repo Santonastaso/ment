@@ -31,8 +31,12 @@ test('only the active group owner can manage same-organization members', async (
       insert into group_members values(1, '${owner}', 'owner');
       insert into group_join_requests values(1, '${member}', 'pending');
     `);
-    const sql = await readFile(new URL('../supabase/migrations/20261007105000_0082_group_member_management.sql', import.meta.url), 'utf8');
-    await db.exec(sql);
+    const managementSql = await readFile(new URL('../supabase/migrations/20261007105000_0082_group_member_management.sql', import.meta.url), 'utf8');
+    const ownerSql = await readFile(new URL('../supabase/migrations/20261007111500_0083_normalize_group_owners.sql', import.meta.url), 'utf8');
+    await db.exec(managementSql);
+    await db.exec("update group_members set role = 'member' where user_id = '10000000-0000-0000-0000-000000000001'");
+    await db.exec(ownerSql);
+    assert.equal((await db.query("select role from group_members where user_id = '10000000-0000-0000-0000-000000000001'")).rows[0].role, 'owner');
     await db.query("select set_config('request.jwt.claim.sub', $1, false)", [owner]);
     await db.exec('set role authenticated');
 
