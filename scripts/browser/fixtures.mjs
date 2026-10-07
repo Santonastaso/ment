@@ -14,6 +14,7 @@ function fixtureApi(state) {
     state.calls.push({ method, path, body });
     if (method === 'post' && state.failNext === path) { state.failNext = null; throw new Error('Fixture network failure'); }
     if (method === 'get') {
+      if (state.failGet === path) throw new Error('Fixture history load failed');
       if (path === '/users/me') return { ...state.user, skills: [], career: [] };
       if (path === '/users/me/skill-evidence') return [];
       if (path === '/users/me/capacity') return {};
@@ -64,11 +65,18 @@ function fixtureApi(state) {
       if (path === '/groups') { const row = { ...body, id: 2, joined: true, is_owner: true, member_count: 1 }; state.groups.push(row); return row; }
       if (/^\/(sessions|groups)\/\d+\/messages$/.test(path)) {
         const send = () => {
-          const row = { id: ++state.nextMessageId, sender_id: state.user.id, body: body.body, created_at: new Date().toISOString() };
+          const existing = body.client_id && (state.messages[path] || []).find(row => row.client_id === body.client_id);
+          if (existing) return existing;
+          const row = { id: ++state.nextMessageId, sender_id: state.user.id, body: body.body, client_id: body.client_id, created_at: new Date().toISOString() };
           state.messages[path] = [...(state.messages[path] || []), row];
           sessionStorage.setItem('ment.fixture.messages', JSON.stringify(state.messages));
           return row;
         };
+        if (state.failAfterCommit === path) {
+          state.failAfterCommit = null;
+          send();
+          throw new Error('Fixture response lost after commit');
+        }
         return state.delaySends ? new Promise(resolve => state.pending.push(() => resolve(send()))) : send();
       }
     }

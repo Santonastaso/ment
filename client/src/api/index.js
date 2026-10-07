@@ -190,6 +190,8 @@ async function loadProfile(userId, viewerId) {
     supabase.rpc('skill_progress_for', { p_user_id: userId }),
     supabase.rpc('expertise_signature_for', { p_user_id: userId }),
   ]);
+  const profileReadError = [skillsRes, careerRes, progressRes, expertiseRes].find(result => result.error)?.error;
+  if (profileReadError) throw new ApiError(profileReadError.message);
 
   const allSkills = (skillsRes.data || []).map((s) => ({ ...s }));
   const skills = isSelf ? allSkills : allSkills.filter((s) => s.type !== 'wants_to_learn');
@@ -785,7 +787,19 @@ async function post(url, body = {}, opts = {}) {
       p_linkedin_headline: body.linkedin_headline || null,
     });
     if (error) throw new ApiError(error.message);
-    return ok(await loadProfile(viewer.id, viewer.id));
+    return ok({
+      id: viewer.id,
+      name: body.name,
+      department: body.department,
+      job_title: body.current_role || body.job_title || '',
+      current_role: body.current_role || body.job_title || '',
+      location: body.location || '',
+      bio: body.bio || '',
+      program: body.program || '',
+      ...(body.cohort_year ? { cohort_year: Number(body.cohort_year) } : {}),
+      ...(body.persona ? { role: body.persona } : {}),
+      onboarding_complete: true,
+    });
   }
 
   if (url === '/sessions') {
@@ -809,6 +823,7 @@ async function post(url, body = {}, opts = {}) {
     const { data, error } = await supabase.rpc('send_session_message', {
       p_session_id: id,
       p_body: body.body,
+      p_client_id: body.client_id,
     });
     if (error) throw new ApiError(error.message);
     return ok(data, 201);
@@ -869,7 +884,7 @@ async function post(url, body = {}, opts = {}) {
 
   if (/^\/groups\/\d+\/messages$/.test(url)) {
     const id = Number(url.split('/')[2]);
-    const { data, error } = await supabase.rpc('send_group_message', { p_group_id: id, p_body: body.body });
+    const { data, error } = await supabase.rpc('send_group_message', { p_group_id: id, p_body: body.body, p_client_id: body.client_id });
     if (error) throw new ApiError(error.message, 403);
     return ok(data, 201);
   }
