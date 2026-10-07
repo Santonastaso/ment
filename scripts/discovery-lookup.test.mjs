@@ -876,3 +876,51 @@ test('back-to-back pushback never opens or reads the same way twice', async () =
     assert.doesNotMatch(result.message, /someone different|some different people/);
   }
 });
+
+// The application writes the greeting and sign-off once; whatever the model
+// adds of its own is removed, in every language.
+for (const [lang, body, greeting, signOff] of [
+  ['it', 'Ciao Finance, ciao Finance,\n\nsto cercando consigli sulla modellazione finanziaria.\n\nA presto,\nViewer', 'Ciao Finance,', 'A presto,'],
+  ['en', 'Hi Finance!\nI am looking for advice on financial modelling.\n\nBest regards,\nViewer', 'Hi Finance,', 'Thanks,'],
+  ['fr', 'Bonjour Finance,\nJe cherche des conseils en modélisation financière.\nCordialement,\nViewer', 'Bonjour Finance,', 'Merci,'],
+]) {
+  test(`a draft greets and signs off once (${lang})`, async () => {
+    const fixture = discoveryFixture({ responses: [{ body }] });
+    const response = await run(fixture, { action: 'draft', query: 'Financial modelling', person_id: finance.id, lang });
+    const { draft } = await response.json();
+    const count = (text) => draft.split(text).length - 1;
+    assert.equal(count(greeting), 1, draft);
+    assert.equal(count(signOff), 1, draft);
+    assert.equal(draft.split('Viewer').length - 1, 1, draft);
+    assert.match(draft, /^\S+ Finance,\n\n[A-Z]/u, 'the body starts right after the one greeting');
+  });
+}
+
+// The sender asks; the recipient has the expertise. The draft that started
+// this: Maria's own background "could help support you".
+const backwards = 'Caro Francesco, spero che stia bene! Il mio background in gestione finanziaria e procurement potrebbe essere utile per supportarti nell’analisi di strategie di acquisto a livello globale. Vorrei condividere alcune idee su come ottimizzare processi o previsioni finanziarie.';
+const draftFor = async (responses) => {
+  const fixture = discoveryFixture({ responses });
+  const response = await run(fixture, { action: 'draft', query: 'strategie di acquisto globali', person_id: finance.id, lang: 'it' });
+  return { fixture, draft: (await response.json()).draft };
+};
+
+test('a draft that claims the recipient\'s expertise is asked for again', async () => {
+  const good = 'Ho visto il tuo background in modellazione finanziaria e mi piacerebbe chiederti un consiglio sulle strategie di acquisto globali.';
+  const { fixture, draft } = await draftFor([{ body: backwards }, { body: good }]);
+  assert.equal(fixture.calls.length, 2);
+  assert.match(fixture.calls[1].messages[0].content, /previous draft spoke as if the sender had the expertise/);
+  assert.equal(draft, `Ciao Finance,\n\n${good}\n\nA presto,\nViewer`);
+});
+
+test('if the second draft is still backwards, a plain request about the recipient is used', async () => {
+  const { draft } = await draftFor([{ body: backwards }, { body: backwards }]);
+  assert.match(draft, /^Ciao Finance,\n\nHo visto il tuo background in financial modelling/);
+  assert.doesNotMatch(draft, /il mio background|supportarti|Caro/);
+});
+
+test('the request reaches the model as the sender\'s need, with the roles spelled out', async () => {
+  const { fixture } = await draftFor([{ body: 'Ho visto il tuo background e vorrei un consiglio.' }]);
+  assert.equal(JSON.parse(fixture.calls[0].messages[1].content).sender.need, 'strategie di acquisto globali');
+  assert.match(fixture.calls[0].messages[0].content, /the sender is asking, not offering/);
+});
