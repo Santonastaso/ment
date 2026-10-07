@@ -114,6 +114,26 @@ function withoutGreeting(body: string) {
   return text ? text[0].toUpperCase() + text.slice(1) : body.trim();
 }
 
+// The sender is the one asking. A draft that claims the recipient's
+// expertise for the sender, or offers the sender's help, has the roles the
+// wrong way round.
+const OFFERS_HELP = [
+  /\b(il mio|la mia|i miei|le mie) (background|esperienz\w*|competenz\w*|percorso|conoscenz\w*|expertise)\b[^.!?]*\b(utile|aiut\w*|support\w*|contribu\w*)/i,
+  /\b(posso|potrei) (aiutarti|supportarti|darti una mano|offrirti)\b|\bvorrei condividere (alcune|qualche) (idee|consigli)/i,
+  /\bmy (background|experience|expertise|skills)\b[^.!?]*\b(help|support|useful|assist|benefit)/i,
+  /\bI (can|could|would love to) (help|support|assist) you\b|\bI'?d like to share (some|my) (ideas|insights|advice)/i,
+  /\b(mon|ma|mes) (parcours|exp[ée]rience|expertise|comp[ée]tences)\b[^.!?]*\b(aider|utile|soutenir|accompagner)/i,
+  /\bje (peux|pourrais) vous (aider|accompagner|soutenir)\b/i,
+];
+const offersHelp = (text: string) => OFFERS_HELP.some((pattern) => pattern.test(text));
+function requestTemplate(language: string, expertise: string[]) {
+  const topics = (expertise || []).slice(0, 2).map((item) => String(item).toLowerCase());
+  const area = topics.join(language === 'Italian' ? ' e ' : language === 'French' ? ' et ' : ' and ');
+  if (language === 'Italian') return `Ho visto il tuo background${area ? ` in ${area}` : ''} e mi piacerebbe chiederti qualche consiglio su ciò su cui sto lavorando. Avresti tempo per una breve chiacchierata nelle prossime settimane?`;
+  if (language === 'French') return `J'ai vu votre parcours${area ? ` en ${area}` : ''} et j'aimerais beaucoup vous demander quelques conseils sur ce sur quoi je travaille. Auriez-vous un moment pour un court échange dans les prochaines semaines ?`;
+  return `I came across your background${area ? ` in ${area}` : ''} and would love to ask for your advice on what I'm working on. Would you have time for a short chat in the next few weeks?`;
+}
+
 function formatRequestDraft(language: string, sender: string, recipient: string, body: string) {
   if (language === 'Italian') return `Ciao ${recipient},\n\n${body}\n\nA presto,\n${sender}`;
   if (language === 'French') return `Bonjour ${recipient},\n\n${body}\n\nMerci,\n${sender}`;
@@ -1215,14 +1235,24 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
     if (!selected) return jsonError('candidate_unavailable', 409);
     const startedAt = Date.now();
     try {
-      const result = await mistralJson<{ body?: string }>({
+      const recipient = publicCandidate(selected, undefined, redactInterOrg && !established.has(selected.id));
+      const writeDraft = (correction: string) => mistralJson<{ body?: string }>({
         feature: 'discovery_draft',
-        system: `Write only the message body for a concise, warm invitation in ${language}. The sender is the requester; the recipient is the person being contacted. Write strictly in the sender's voice: "I" means the sender and "you" means the recipient. Do not speak as the recipient, introduce the recipient as yourself, greet anyone, use either person's name, or add a sign-off; the application adds those parts with the correct names. Mention why the recipient's background is relevant. Do not describe their experience as \"verified\". Use only the supplied facts and never invent credentials, employers, skills, or relationships. Return JSON with one string field named body. Keep it under 80 words.`,
-        user: JSON.stringify({ sender: { name: caller.name }, request: query, recipient: publicCandidate(selected, undefined, redactInterOrg && !established.has(selected.id)), variant: Number(body.variant) || 0 }),
+        system: `Write only the message body of a short, warm request for help, in ${language}. The SENDER is a student or alumnus asking for advice; the RECIPIENT is the experienced person being asked. Write in the sender's voice: "I" is the sender, who needs help; "you" is the recipient, who has the expertise. Talk about the RECIPIENT's background ("your experience in ...", "il tuo background in ...", "votre parcours en ..."), and say what the sender would like advice on. Never present the recipient's expertise as the sender's own, and never offer the sender's help or ideas: the sender is asking, not offering. Do not greet anyone, use either person's name, or add a sign-off; the application adds those. Do not describe their experience as \"verified\". Use only the supplied facts and never invent credentials, employers, skills, or relationships. Return JSON with one string field named body. Keep it under 80 words.${correction}`,
+        user: JSON.stringify({ sender: { name: caller.name, need: query }, recipient, variant: Number(body.variant) || 0 }),
         temperature: Number(body.variant) ? 0.35 : 0.15,
         maxTokens: 350,
       });
-      const draftBody = withoutGreeting(cleanText(result.value?.body, 1200));
+      let result = await writeDraft('');
+      let draftBody = withoutGreeting(cleanText(result.value?.body, 1200));
+      // The small model sometimes writes as if the sender were the expert
+      // ("il mio background ... per supportarti"). Ask once more, then fall
+      // back to a plain request built from the recipient's own expertise.
+      if (offersHelp(draftBody)) {
+        result = await writeDraft(' Your previous draft spoke as if the sender had the expertise and was offering help. Rewrite it so the sender asks the recipient for advice, referring to the recipient\'s background.');
+        draftBody = withoutGreeting(cleanText(result.value?.body, 1200));
+      }
+      if (offersHelp(draftBody)) draftBody = requestTemplate(language, recipient.expertise as string[]);
       if (!draftBody) return jsonError('ai_invalid_response', 502);
       const firstName = (name: unknown) => cleanText(name, 120).split(/\s+/)[0];
       const recipientName = redactInterOrg && !established.has(selected.id) ? 'there' : firstName(selected.name);
@@ -1239,7 +1269,7 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
         kind: 'draft',
         content: draft,
         search_request: query,
-        person: publicCandidate(selected, undefined, redactInterOrg && !established.has(selected.id)),
+        person: recipient,
       }, selected.id);
       return jsonOk({ draft, model: result.model, thread_id: threadId });
     } catch (error) {
