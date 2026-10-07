@@ -33,6 +33,7 @@
   "groups.membersError": "Could not load members. Try again.",
   "groups.join": "Join",
   "groups.leave": "Leave",
+  "groups.confirmLeave": "Leave {name}? You will need to request to join again.",
   "groups.error.load": "Could not load groups. Try again.",
   "groups.error.save": "Could not save that change. Try again.",
   "groups.chat": "Chat",

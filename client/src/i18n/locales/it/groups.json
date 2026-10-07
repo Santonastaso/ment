@@ -33,6 +33,7 @@
   "groups.membersError": "Impossibile caricare i membri. Riprova.",
   "groups.join": "Unisciti",
   "groups.leave": "Esci",
+  "groups.confirmLeave": "Vuoi uscire da {name}? Dovrai richiedere di nuovo l'accesso.",
   "groups.error.load": "Impossibile caricare i gruppi. Riprova.",
   "groups.error.save": "Impossibile salvare la modifica. Riprova.",
   "groups.chat": "Chat",

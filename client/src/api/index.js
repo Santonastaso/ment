@@ -190,6 +190,8 @@ async function loadProfile(userId, viewerId) {
     supabase.rpc('skill_progress_for', { p_user_id: userId }),
     supabase.rpc('expertise_signature_for', { p_user_id: userId }),
   ]);
+  const profileReadError = [skillsRes, careerRes, progressRes, expertiseRes].find(result => result.error)?.error;
+  if (profileReadError) throw new ApiError(profileReadError.message);
 
   const allSkills = (skillsRes.data || []).map((s) => ({ ...s }));
   const skills = isSelf ? allSkills : allSkills.filter((s) => s.type !== 'wants_to_learn');
@@ -773,31 +775,31 @@ async function post(url, body = {}, opts = {}) {
         end_year: c.end_year ?? null,
         end_month: c.end_month ?? null,
       })),
-      p_can_teach: (body.can_teach || []).map((s) => (typeof s === 'string' ? s : s.skill)),
+      p_can_teach: (body.can_teach || []).map((s) => typeof s === 'string' ? { skill: s } : {
+        skill: s.skill,
+        example_project: s.example_project || '',
+      }),
       p_wants_to_learn: body.wants_to_learn || [],
       p_program: body.program || '',
       p_cohort_year: body.cohort_year ? parseInt(body.cohort_year, 10) : null,
       p_persona: body.persona || null,
+      p_linkedin_url: body.linkedin_url || null,
+      p_linkedin_headline: body.linkedin_headline || null,
     });
     if (error) throw new ApiError(error.message);
-    if (body.linkedin_url || body.linkedin_headline) {
-      const { error: linkedinError } = await supabase.from('profiles').update({
-        linkedin_url: body.linkedin_url || null,
-        linkedin_headline: body.linkedin_headline || null,
-      }).eq('id', viewer.id);
-      if (linkedinError) throw new ApiError(linkedinError.message);
-    }
-    for (const item of body.can_teach || []) {
-      if (typeof item !== 'object' || !item.example_project?.trim()) continue;
-      const { error: skillError } = await supabase
-        .from('skills')
-        .update({ example_project: item.example_project.trim().slice(0, 80) })
-        .eq('user_id', viewer.id)
-        .eq('type', 'can_teach')
-        .eq('skill', item.skill);
-      if (skillError) throw new ApiError(skillError.message);
-    }
-    return ok(await loadProfile(viewer.id, viewer.id));
+    return ok({
+      id: viewer.id,
+      name: body.name,
+      department: body.department,
+      job_title: body.current_role || body.job_title || '',
+      current_role: body.current_role || body.job_title || '',
+      location: body.location || '',
+      bio: body.bio || '',
+      program: body.program || '',
+      ...(body.cohort_year ? { cohort_year: Number(body.cohort_year) } : {}),
+      ...(body.persona ? { role: body.persona } : {}),
+      onboarding_complete: true,
+    });
   }
 
   if (url === '/sessions') {
@@ -821,6 +823,7 @@ async function post(url, body = {}, opts = {}) {
     const { data, error } = await supabase.rpc('send_session_message', {
       p_session_id: id,
       p_body: body.body,
+      p_client_id: body.client_id,
     });
     if (error) throw new ApiError(error.message);
     return ok(data, 201);
@@ -881,7 +884,7 @@ async function post(url, body = {}, opts = {}) {
 
   if (/^\/groups\/\d+\/messages$/.test(url)) {
     const id = Number(url.split('/')[2]);
-    const { data, error } = await supabase.rpc('send_group_message', { p_group_id: id, p_body: body.body });
+    const { data, error } = await supabase.rpc('send_group_message', { p_group_id: id, p_body: body.body, p_client_id: body.client_id });
     if (error) throw new ApiError(error.message, 403);
     return ok(data, 201);
   }

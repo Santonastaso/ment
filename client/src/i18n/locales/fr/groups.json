@@ -33,6 +33,7 @@
   "groups.membersError": "Impossible de charger les membres. Réessayez.",
   "groups.join": "Rejoindre",
   "groups.leave": "Quitter",
+  "groups.confirmLeave": "Quitter {name} ? Vous devrez demander à rejoindre à nouveau.",
   "groups.error.load": "Impossible de charger les groupes. Reessayez.",
   "groups.error.save": "Impossible d'enregistrer la modification. Reessayez.",
   "groups.chat": "Discussion",

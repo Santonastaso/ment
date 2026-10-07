@@ -91,6 +91,25 @@ test('admin provisioning atomically attaches Auth-only users and keeps tenant sc
       p_can_teach => '[]'::jsonb, p_wants_to_learn => '[]'::jsonb
     )`), /profile_missing/);
     assert.equal((await one('select count(*)::int as count from skills where user_id = $1', [missingProfileId])).count, 0);
+
+    await db.exec(`create function public.is_active_user() returns boolean language sql stable as $$ select auth.uid() is not null $$`);
+    await db.exec(await read('migrations/20261007103000_0080_atomic_onboarding.sql'));
+    await db.query("select set_config('request.jwt.claim.sub', $1, false)", [existingAuthId]);
+    const onboarding = `select public.save_onboarding(
+      p_name => 'Finished', p_department => 'Engineering', p_seniority => null,
+      p_job_title => 'Lead', p_bio => '', p_shadow_role_response => null,
+      p_tenure_years => null, p_location => '', p_career => $1::jsonb,
+      p_can_teach => '[{"skill":"Coaching","example_project":"Mentored a team"}]'::jsonb,
+      p_wants_to_learn => '["Leadership"]'::jsonb,
+      p_linkedin_url => 'https://linkedin.com/in/test', p_linkedin_headline => 'Coach'
+    )`;
+    await assert.rejects(db.query(onboarding, [JSON.stringify([{ role_title: 'Developer', department: 'Engineering', start_year: 'invalid' }])]), /invalid input syntax/);
+    assert.equal((await one('select onboarding_complete from profiles where id = $1', [existingAuthId])).onboarding_complete, false);
+    await db.query(onboarding, ['[]']);
+    assert.deepEqual(await one('select name, linkedin_url, linkedin_headline, onboarding_complete from profiles where id = $1', [existingAuthId]), {
+      name: 'Finished', linkedin_url: 'https://linkedin.com/in/test', linkedin_headline: 'Coach', onboarding_complete: true,
+    });
+    assert.equal((await one("select example_project from skills where user_id = $1 and type = 'can_teach'", [existingAuthId])).example_project, 'Mentored a team');
   } finally {
     await db.close();
   }

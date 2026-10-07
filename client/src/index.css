@@ -643,9 +643,6 @@ a.person-row-name:hover { color: var(--primary); text-decoration: underline; }
 .conversation-composer svg { width: 15px; }
 .conversation-error { position: absolute; right: 18px; bottom: 82px; border-radius: var(--control-radius); background: #fce8e5; color: #9f2d20; padding: 8px 16px; font-size: 12px; }
 .conversation-loading { display: grid; height: 100vh; place-items: center; color: var(--muted-foreground); font-size: 13px; }
-.profile-tabs { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
-.profile-tabs::-webkit-scrollbar { height: 4px; }
-.profile-tabs::-webkit-scrollbar-thumb { border-radius: 4px; background: var(--border); }
 @keyframes discoveryTyping { 0%, 60%, 100% { opacity: .35; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
 @keyframes discoveryAppear { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes discoveryMatchReveal { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }

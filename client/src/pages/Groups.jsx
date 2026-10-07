@@ -77,6 +77,7 @@ export default function Groups() {
   async function toggleMembership(group) {
     if (saving) return;
     if (group.is_owner) return;
+    if (group.joined && !window.confirm(t('groups.confirmLeave', { name: group.name }))) return;
     if (!group.joined && group.join_status !== 'pending') {
       setError(''); setReason(''); setJoinTarget(group);
       return;

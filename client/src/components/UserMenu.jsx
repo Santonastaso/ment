@@ -120,7 +120,7 @@ export default function UserMenu({ compact = false, placement = 'topbar' }) {
             {t('common.signOut')}
           </button>
           <div className="mt-1 flex items-center justify-between border-t border-border px-2.5 pt-2">
-            <span className="text-xs text-muted-foreground">Language</span>
+            <span className="text-xs text-muted-foreground">{t('common.language')}</span>
             <LanguageSwitcher />
           </div>
         </div>

@@ -19,6 +19,7 @@ import { homeCopy } from '../components/demo/homeCopy.js';
 import SessionRequestModal from '../components/SessionRequestModal.jsx';
 import TimeSlotSelect from '../components/TimeSlotSelect.jsx';
 import { groupPath, sessionPath } from '../lib/conversationLinks.mjs';
+import { beginPendingMessage, finishPendingMessage, pendingDrafts, pendingMessage } from '../lib/pendingMessage.mjs';
 
 function initials(name = '') {
   return name.split(' ').map((part) => part[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || '?';
@@ -148,7 +149,7 @@ export default function Conversations() {
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [drafts, setDrafts] = useState({});
+  const [drafts, setDrafts] = useState(() => pendingDrafts(window.sessionStorage, user?.id));
   const [sendingThreads, setSendingThreads] = useState({});
   const pendingSends = useRef(new Set());
   const threadKey = selectedGroupId ? `group:${selectedGroupId}` : selectedId ? `session:${selectedId}` : '';
@@ -228,6 +229,11 @@ export default function Conversations() {
     const query = before ? `?before=${before}` : '';
     const { data } = await api.get(`/sessions/${id}/messages${query}`);
     if (activeThreadRef.current !== `session:${id}`) return;
+    const pending = pendingMessage(window.sessionStorage, user?.id, `session:${id}`);
+    if (pending && data.messages.some(item => item.client_id === pending.id)) {
+      finishPendingMessage(window.sessionStorage, user?.id, `session:${id}`, pending.id);
+      setDrafts(items => clearSentDraft(items, `session:${id}`, pending.body));
+    }
     if (before) {
       const box = messagesRef.current;
       if (box) preserveScrollRef.current = { mode: 'prepend', height: box.scrollHeight, top: box.scrollTop };
@@ -250,6 +256,11 @@ export default function Conversations() {
     const query = before ? `?before=${before}` : '';
     const { data } = await api.get(`/groups/${id}/messages${query}`);
     if (activeThreadRef.current !== `group:${id}`) return;
+    const pending = pendingMessage(window.sessionStorage, user?.id, `group:${id}`);
+    if (pending && data.messages.some(item => item.client_id === pending.id)) {
+      finishPendingMessage(window.sessionStorage, user?.id, `group:${id}`, pending.id);
+      setDrafts(items => clearSentDraft(items, `group:${id}`, pending.body));
+    }
     data.messages.forEach((item) => senderNamesRef.current.set(item.sender_id, item.sender_name));
     if (before) {
       const box = messagesRef.current;
@@ -358,9 +369,16 @@ export default function Conversations() {
     let cancelled = false;
     setMessages([]);
     setHasOlder(false);
-    const refresh = (initial = false) => Promise.all([loadMessages(selectedId, null, initial), api.post(`/sessions/${selectedId}/read`, {})]).then(refreshUnreadCounts).catch((requestError) => {
-      if (!cancelled) setError(requestError.response?.data?.error || t('conversations.error'));
-    });
+    const refresh = async (initial = false) => {
+      try {
+        await loadMessages(selectedId, null, initial);
+        if (cancelled) return;
+        await api.post(`/sessions/${selectedId}/read`, {});
+        await refreshUnreadCounts();
+      } catch (requestError) {
+        if (!cancelled) setError(requestError.response?.data?.error || t('conversations.error'));
+      }
+    };
     refresh(true);
     const channel = supabase.channel(`session-${selectedId}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'session_messages', filter: `session_id=eq.${selectedId}` }, ({ new: row }) => {
@@ -456,10 +474,12 @@ export default function Conversations() {
     const endpoint = selectedGroup ? `/groups/${selectedGroup.id}/messages` : selected ? `/sessions/${selected.id}/messages` : null;
     if (!body || !endpoint || pendingSends.current.has(key)) return;
     pendingSends.current.add(key);
+    const clientId = beginPendingMessage(window.sessionStorage, user?.id, key, body);
     setSendingThreads(items => ({ ...items, [key]: true }));
     setError('');
     try {
-      const response = await api.post(endpoint, { body });
+      const response = await api.post(endpoint, { body, client_id: clientId });
+      finishPendingMessage(window.sessionStorage, user?.id, key, clientId);
       if (activeThreadRef.current === key) {
         preserveScrollRef.current = null;
         setMessages(items => appendMessage(items, response.data));

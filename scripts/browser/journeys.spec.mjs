@@ -456,6 +456,51 @@ test('failed send preserves the draft and can be retried', async ({ page }) => {
   await expect(composer).toHaveValue('');
 });
 
+test('a lost send response does not duplicate a message on retry or reload', async ({ page }) => {
+  await page.goto('/conversations?session=1');
+  await page.evaluate(() => { window.fixture.failAfterCommit = '/sessions/1/messages'; });
+  const composer = page.getByRole('textbox', { name: 'Message', exact: true });
+  await composer.fill('Exactly once');
+  await page.getByRole('button', { name: 'Send message', exact: true }).click();
+  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(composer).toHaveValue('Exactly once');
+  await page.getByRole('button', { name: 'Send message', exact: true }).click();
+  await expect(composer).toHaveValue('');
+  expect(await page.evaluate(() => window.fixture.messages['/sessions/1/messages'].filter(row => row.body === 'Exactly once').length)).toBe(1);
+  await page.reload();
+  await expect(page.locator('.conversation-messages').getByText('Exactly once')).toHaveCount(1);
+  await expect(composer).toHaveValue('');
+});
+
+test('a lost send response is reconciled after reload', async ({ page }) => {
+  await page.goto('/conversations?session=1');
+  await page.evaluate(() => { window.fixture.failAfterCommit = '/sessions/1/messages'; });
+  const composer = page.getByRole('textbox', { name: 'Message', exact: true });
+  await composer.fill('Already delivered');
+  await page.getByRole('button', { name: 'Send message', exact: true }).click();
+  await expect(page.getByRole('alert')).toBeVisible();
+  await page.reload();
+  await expect(page.locator('.conversation-messages').getByText('Already delivered')).toHaveCount(1);
+  await expect(composer).toHaveValue('');
+});
+
+test('failed message history does not mark the chat read', async ({ page }) => {
+  await page.goto('/conversations?session=1');
+  await page.evaluate(() => { window.fixture.failGet = '/sessions/2/messages'; });
+  await page.locator('.conversation-list-item').filter({ hasText: 'Peer 2' }).click();
+  await expect(page.getByRole('alert')).toBeVisible();
+  expect(await page.evaluate(() => window.fixture.calls.some(call => call.path === '/sessions/2/read'))).toBe(false);
+});
+
+test('all profile sections remain visible on a narrow screen', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/profile');
+  const tabs = page.locator('.profile-tabs');
+  for (const section of ['overview', 'skills', 'availability', 'experience', 'reflections']) {
+    await expect(tabs.getByTestId(`profile-tab-${section}`)).toBeInViewport();
+  }
+});
+
 test('chat rail previews the latest message after send and reload', async ({ page }) => {
   await page.goto('/conversations?session=1');
   const direct = page.locator('.conversation-list-item').filter({ hasText: 'Peer 1' });

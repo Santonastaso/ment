@@ -131,6 +131,8 @@ export default function Profile() {
 
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -152,6 +154,7 @@ export default function Profile() {
   const [showAddCareer, setShowAddCareer] = useState(false);
   const [editingCareerId, setEditingCareerId] = useState(null);
   const [editCareerDraft, setEditCareerDraft] = useState(null);
+  const [careerBusy, setCareerBusy] = useState(false);
 
   const [availabilitySaving, setAvailabilitySaving] = useState(false);
   const [capacity, setCapacity] = useState(null);
@@ -171,6 +174,7 @@ export default function Profile() {
     if (!targetId) return;
     async function load() {
       setLoading(true);
+      setLoadError(false);
       try {
         const res = await api.get(isOwnProfile ? '/users/me' : `/users/${targetId}`);
         let loadedProfile = res.data;
@@ -202,13 +206,13 @@ export default function Profile() {
           }
         }
       } catch {
-        navigate('/');
+        setLoadError(true);
       } finally {
         setLoading(false);
       }
     }
     load();
-  }, [targetId, isOwnProfile, navigate]);
+  }, [targetId, isOwnProfile, loadAttempt]);
 
   function showToast(msg) {
     setToast(msg);
@@ -298,10 +302,13 @@ export default function Profile() {
 
   async function setAvailability({ paused }) {
     setAvailabilitySaving(true);
+    setCapacityError('');
     try {
       await api.put('/users/me', { mentorship_paused: paused });
       await refreshProfile();
       showToast(t('profile.toast.availabilityUpdated'));
+    } catch {
+      setCapacityError(t('components.sessionRequest.errorGeneric'));
     } finally {
       setAvailabilitySaving(false);
     }
@@ -327,7 +334,7 @@ export default function Profile() {
   }
 
   async function handleAddCareer() {
-    if (!newCareer.role.trim() || !newCareer.department.trim()) return;
+    if (!newCareer.role.trim() || !newCareer.department.trim() || careerBusy) return;
     const start = inputToYM(newCareer.start_date);
     const end = inputToYM(newCareer.end_date);
     const payload = {
@@ -340,19 +347,32 @@ export default function Profile() {
       end_year: end.year,
       end_month: end.month,
     };
-    const res = await api.post('/users/me/career', payload);
-    // Refetch so the chronological sort and company grouping picks up the
-    // new entry in the right position, instead of always pinning it on top.
-    await refreshProfile();
-    setNewCareer({ role: '', department: '', company: '', description: '', start_date: '', end_date: '' });
-    setShowAddCareer(false);
-    showToast(t('profile.toast.careerAdded'));
+    setCareerBusy(true);
+    try {
+      await api.post('/users/me/career', payload);
+      await refreshProfile();
+      setNewCareer({ role: '', department: '', company: '', description: '', start_date: '', end_date: '' });
+      setShowAddCareer(false);
+      showToast(t('profile.toast.careerAdded'));
+    } catch {
+      showToast(t('profile.toast.careerSaveError'));
+    } finally {
+      setCareerBusy(false);
+    }
   }
 
   async function handleDeleteCareer(id) {
-    await api.delete(`/users/me/career/${id}`);
-    setProfile(prev => ({ ...prev, career: prev.career.filter(c => c.id !== id) }));
-    showToast(t('profile.toast.entryRemoved'));
+    if (careerBusy || !window.confirm(t('profile.career.confirmRemove'))) return;
+    setCareerBusy(true);
+    try {
+      await api.delete(`/users/me/career/${id}`);
+      setProfile(prev => ({ ...prev, career: prev.career.filter(c => c.id !== id) }));
+      showToast(t('profile.toast.entryRemoved'));
+    } catch {
+      showToast(t('profile.toast.careerSaveError'));
+    } finally {
+      setCareerBusy(false);
+    }
   }
 
   function startEditCareer(entry) {
@@ -373,7 +393,7 @@ export default function Profile() {
   }
 
   async function handleSaveEditedCareer() {
-    if (!editingCareerId || !editCareerDraft) return;
+    if (!editingCareerId || !editCareerDraft || careerBusy) return;
     if (!editCareerDraft.role.trim() || !editCareerDraft.department.trim()) return;
     const start = inputToYM(editCareerDraft.start_date);
     const end = inputToYM(editCareerDraft.end_date);
@@ -387,12 +407,17 @@ export default function Profile() {
       end_year: end.year,
       end_month: end.month,
     };
-    await api.put(`/users/me/career/${editingCareerId}`, payload);
-    // Refetch so chronological sort + grouping picks up changes to dates or
-    // company name.
-    await refreshProfile();
-    cancelEditCareer();
-    showToast(t('profile.toast.entryUpdated'));
+    setCareerBusy(true);
+    try {
+      await api.put(`/users/me/career/${editingCareerId}`, payload);
+      await refreshProfile();
+      cancelEditCareer();
+      showToast(t('profile.toast.entryUpdated'));
+    } catch {
+      showToast(t('profile.toast.careerSaveError'));
+    } finally {
+      setCareerBusy(false);
+    }
   }
 
   const linkedinHref = safeLinkedInHref(profile?.linkedin_url);
@@ -407,7 +432,7 @@ export default function Profile() {
     );
   }
 
-  if (!profile) return null;
+  if (loadError || !profile) return <PageShell><p role="alert">{t('profile.error.load')}</p><Button onClick={() => setLoadAttempt(value => value + 1)}>{t('explorer.retry')}</Button></PageShell>;
 
   const skills = profile.skills || [];
   const teachSkills = skills.filter(s => s.type === 'can_teach');
@@ -438,7 +463,7 @@ export default function Profile() {
       )}
 
       {validTabs.length > 1 && (
-        <nav className="profile-tabs flex min-h-[var(--workspace-top-row)] items-center gap-1 overflow-x-auto overflow-y-hidden whitespace-nowrap" aria-label={t('profile.tabs.label')}>
+        <nav className="profile-tabs flex min-h-[var(--workspace-top-row)] flex-wrap items-center gap-1 sm:flex-nowrap" aria-label={t('profile.tabs.label')}>
           {validTabs.map(key => (
             <button
               key={key}
@@ -762,7 +787,7 @@ export default function Profile() {
         {isOwnProfile && showAddCareer && (
           <div className="career-entry-form mb-5">
             <CareerEntryFields value={newCareer} onChange={setNewCareer} />
-            <Button size="sm" onClick={handleAddCareer}>{t('profile.career.add')}</Button>
+              <Button size="sm" disabled={careerBusy} onClick={handleAddCareer}>{t('profile.career.add')}</Button>
           </div>
         )}
 
@@ -781,7 +806,7 @@ export default function Profile() {
                 <div key={entry.id} className="career-entry-form">
                   <CareerEntryFields value={editCareerDraft} onChange={setEditCareerDraft} />
                   <div className="flex gap-2">
-                    <Button size="sm" onClick={handleSaveEditedCareer}>{t('profile.btn.save')}</Button>
+                    <Button size="sm" disabled={careerBusy} onClick={handleSaveEditedCareer}>{t('profile.btn.save')}</Button>
                     <Button size="sm" variant="ghost" onClick={cancelEditCareer}>{t('profile.btn.cancel')}</Button>
                   </div>
                 </div>
@@ -802,8 +827,8 @@ export default function Profile() {
                   </div>
                   {isOwnProfile && (
                     <div className="flex shrink-0 items-center gap-2">
-                      <Button variant="ghost" size="sm" onClick={() => startEditCareer(entry)}>{t('profile.career.edit')}</Button>
-                      <Button variant="danger" size="sm"  onClick={() => handleDeleteCareer(entry.id)}>
+                      <Button variant="ghost" size="sm" disabled={careerBusy} onClick={() => startEditCareer(entry)}>{t('profile.career.edit')}</Button>
+                      <Button variant="danger" size="sm" disabled={careerBusy} onClick={() => handleDeleteCareer(entry.id)}>
                         {t('profile.career.remove')}
                       </Button>
                     </div>
