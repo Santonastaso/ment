@@ -480,7 +480,7 @@ async function get(url) {
     const [path, query] = url.split('?');
     const id = Number(path.split('/')[2]);
     const before = new URLSearchParams(query || '').get('before');
-    const { data, error } = await supabase.rpc('my_session_messages', { p_session_id: id, p_before: before ? Number(before) : null });
+    const { data, error } = await supabase.rpc('my_session_messages_page', { p_session_id: id, p_before: before ? Number(before) : null });
     if (error) throw new ApiError(error.message, 404);
     return ok(data || { messages: [], hasMore: false });
   }
