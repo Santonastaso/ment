@@ -773,30 +773,18 @@ async function post(url, body = {}, opts = {}) {
         end_year: c.end_year ?? null,
         end_month: c.end_month ?? null,
       })),
-      p_can_teach: (body.can_teach || []).map((s) => (typeof s === 'string' ? s : s.skill)),
+      p_can_teach: (body.can_teach || []).map((s) => typeof s === 'string' ? { skill: s } : {
+        skill: s.skill,
+        example_project: s.example_project || '',
+      }),
       p_wants_to_learn: body.wants_to_learn || [],
       p_program: body.program || '',
       p_cohort_year: body.cohort_year ? parseInt(body.cohort_year, 10) : null,
       p_persona: body.persona || null,
+      p_linkedin_url: body.linkedin_url || null,
+      p_linkedin_headline: body.linkedin_headline || null,
     });
     if (error) throw new ApiError(error.message);
-    if (body.linkedin_url || body.linkedin_headline) {
-      const { error: linkedinError } = await supabase.from('profiles').update({
-        linkedin_url: body.linkedin_url || null,
-        linkedin_headline: body.linkedin_headline || null,
-      }).eq('id', viewer.id);
-      if (linkedinError) throw new ApiError(linkedinError.message);
-    }
-    for (const item of body.can_teach || []) {
-      if (typeof item !== 'object' || !item.example_project?.trim()) continue;
-      const { error: skillError } = await supabase
-        .from('skills')
-        .update({ example_project: item.example_project.trim().slice(0, 80) })
-        .eq('user_id', viewer.id)
-        .eq('type', 'can_teach')
-        .eq('skill', item.skill);
-      if (skillError) throw new ApiError(skillError.message);
-    }
     return ok(await loadProfile(viewer.id, viewer.id));
   }
 
