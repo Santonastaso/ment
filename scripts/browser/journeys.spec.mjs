@@ -456,6 +456,15 @@ test('failed send preserves the draft and can be retried', async ({ page }) => {
   await expect(composer).toHaveValue('');
 });
 
+test('all profile sections remain visible on a narrow screen', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/profile');
+  const tabs = page.locator('.profile-tabs');
+  for (const section of ['overview', 'skills', 'availability', 'experience', 'reflections']) {
+    await expect(tabs.getByTestId(`profile-tab-${section}`)).toBeInViewport();
+  }
+});
+
 test('chat rail previews the latest message after send and reload', async ({ page }) => {
   await page.goto('/conversations?session=1');
   const direct = page.locator('.conversation-list-item').filter({ hasText: 'Peer 1' });

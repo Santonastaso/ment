@@ -20,6 +20,8 @@ export default function ProfileReflection({ history = false, draft, onDraftChang
   const open = controlled ? openProp : openInternal;
   const setOpen = controlled ? (onOpenChange || (() => {})) : setOpenInternal;
   const [entries, setEntries] = useState([]);
+  const [checkInDue, setCheckInDue] = useState(false);
+  const [lastEntryDays, setLastEntryDays] = useState(null);
   const [loading, setLoading] = useState(history);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -28,19 +30,22 @@ export default function ProfileReflection({ history = false, draft, onDraftChang
   const triggerRef = useRef(null);
 
   useEffect(() => {
-    if (!history) return;
     let cancelled = false;
     setLoading(true);
     setError('');
     api.get('/reflections').then(res => {
-      if (!cancelled) setEntries(res.data.entries || []);
+      if (!cancelled) {
+        setEntries(res.data.entries || []);
+        setCheckInDue(!!res.data.dueForCheckIn);
+        setLastEntryDays(res.data.lastEntryDays);
+      }
     }).catch(() => {
       if (!cancelled) setError(t('components.reflection.errorLoad'));
     }).finally(() => {
       if (!cancelled) setLoading(false);
     });
     return () => { cancelled = true; };
-  }, [history, reload, t]);
+  }, [reload, t]);
 
   async function submit(event) {
     event.preventDefault();
@@ -55,6 +60,7 @@ export default function ProfileReflection({ history = false, draft, onDraftChang
     try {
       const res = await api.post('/reflections', draft);
       setEntries(prev => [res.data, ...prev.filter(entry => entry.id !== res.data.id)]);
+      setCheckInDue(false);
       onDraftChange({ support_needed: '', managed_well: '' });
       setOpen(false);
     } catch {
@@ -77,6 +83,22 @@ export default function ProfileReflection({ history = false, draft, onDraftChang
       catch { setError(t('components.reflection.refreshError')); }
     } catch {
       setError(t('components.reflection.errorApply'));
+    } finally {
+      lock.current = false;
+      setBusy(false);
+    }
+  }
+
+  async function reclassify(entry) {
+    if (lock.current) return;
+    lock.current = true;
+    setBusy(true);
+    setError('');
+    try {
+      const { data } = await api.post(`/reflections/${entry.id}/reclassify`);
+      setEntries(prev => prev.map(item => item.id === entry.id ? { ...item, ...data } : item));
+    } catch {
+      setError(t('components.reflection.errorReclassifyFailed'));
     } finally {
       lock.current = false;
       setBusy(false);
@@ -113,10 +135,12 @@ export default function ProfileReflection({ history = false, draft, onDraftChang
       )}
       {error && (history || !open) && <p role="alert" className="text-sm text-destructive">{error}</p>}
       {history && error && <Button variant="outline" onClick={() => setReload(n => n + 1)}>{t('explorer.retry')}</Button>}
-      {loading && <p role="status" className="text-sm">{t('components.reflection.loading')}</p>}
+      {history && loading && <p role="status" className="text-sm">{t('components.reflection.loading')}</p>}
+      {!history && !loading && !error && checkInDue && <p className="px-3 text-sm text-muted-foreground">{t('components.reflection.dueTitle')}</p>}
+      {history && !loading && !error && checkInDue && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[var(--control-surface)] p-4"><div><p className="text-sm font-medium">{t('components.reflection.dueTitle')}</p><p className="text-xs text-muted-foreground">{t(lastEntryDays === null ? 'components.reflection.dueBodyFirst' : 'components.reflection.dueBodyDays', { days: lastEntryDays })}</p></div><Button size="sm" onClick={() => setOpen(true)}>{t('components.reflection.startCheckIn')}</Button></div>}
       {history && !loading && !error && entries.length === 0 && <p className="text-sm text-muted-foreground">{t('components.reflection.empty')}</p>}
-      {entries.map(entry => (
-        <ReflectionReview key={entry.id} entry={entry} busy={busy} onApply={apply} lang={lang} />
+      {history && entries.map(entry => (
+        <ReflectionReview key={entry.id} entry={entry} busy={busy} onApply={apply} onReclassify={reclassify} lang={lang} />
       ))}
       {!history && <ContinuationIntent />}
     </div>
@@ -175,7 +199,7 @@ function ContinuationIntent() {
   );
 }
 
-function ReflectionReview({ entry, busy, onApply, lang }) {
+function ReflectionReview({ entry, busy, onApply, onReclassify, lang }) {
   const { t } = useT();
   const [open, setOpen] = useState(false);
   const [review, setReview] = useState(false);
@@ -236,7 +260,7 @@ function ReflectionReview({ entry, busy, onApply, lang }) {
                 </div>
               ) : count > 0 ? (
                 <Button type="button" size="sm" variant="outline" onClick={() => setReview(true)}>{t('components.reflection.reviewSuggestions')}</Button>
-              ) : <p className="text-sm text-muted-foreground">{t('components.reflection.noSignals')}</p>}
+              ) : <div className="flex items-center justify-between gap-3"><p className="text-sm text-muted-foreground">{t('components.reflection.noSignals')}</p>{!entry.applied && (!entry.classifier_source || entry.classifier_source === 'unclassified') && <Button size="sm" variant="outline" disabled={busy} onClick={() => onReclassify(entry)}>{t(busy ? 'components.reflection.reclassifying' : 'components.reflection.reclassify')}</Button>}</div>}
             </div>
             <footer className="flex justify-end px-5 pb-5"><Button type="button" size="sm" onClick={() => setOpen(false)}>{t('components.popup.done')}</Button></footer>
           </article>
