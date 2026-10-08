@@ -134,6 +134,10 @@ export default function Profile() {
   const [loadError, setLoadError] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [editing, setEditing] = useState(false);
+  const [cvConsent, setCvConsent] = useState(false);
+  const [cvBusy, setCvBusy] = useState(false);
+  const [cvDraft, setCvDraft] = useState(null);
+  const [cvError, setCvError] = useState('');
   const [saving, setSaving] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [toast, setToast] = useState('');
@@ -358,6 +362,67 @@ export default function Profile() {
       showToast(t('profile.toast.careerSaveError'));
     } finally {
       setCareerBusy(false);
+    }
+  }
+
+  async function handleCvUpload(file) {
+    if (!file || cvBusy) return;
+    if (!cvConsent) { setCvError(t('onboarding.import.consentRequired')); return; }
+    if (file.size > 10 * 1024 * 1024 || !/\.(pdf|docx)$/i.test(file.name)) { setCvError(t('onboarding.import.error')); return; }
+    setCvBusy(true);
+    setCvError('');
+    const data = new FormData();
+    data.append('file', file);
+    try {
+      const response = await api.post('/profile/ingest', data, { headers: { 'Content-Type': 'multipart/form-data' } });
+      setCvDraft(response.data);
+    } catch {
+      setCvError(t('onboarding.import.unavailable'));
+    } finally {
+      setCvBusy(false);
+    }
+  }
+
+  async function applyCvDraft() {
+    if (!cvDraft || cvBusy) return;
+    const proposed = cvDraft.proposed || {};
+    const career = proposed.career_history?.length
+      ? proposed.career_history.map(entry => ({
+          role: entry.role || entry.role_title || proposed.job_title || profile.current_role || '',
+          department: entry.department || proposed.department || profile.department || '',
+          company: entry.company || '', description: entry.description || '',
+          start_year: entry.start_year ?? null, start_month: entry.start_month ?? null,
+          end_year: entry.end_year ?? null, end_month: entry.end_month ?? null,
+        }))
+      : profile.career?.length ? profile.career : [{ role: proposed.job_title || profile.current_role || '', department: proposed.department || profile.department || '' }];
+    const primary = career[0] || {};
+    const skills = profile.skills || [];
+    const payload = {
+      name: profile.name, department: primary.department || profile.department,
+      current_role: primary.role || primary.role_title || profile.current_role,
+      seniority: profile.seniority, shadow_role_response: profile.shadow_role_response,
+      location: proposed.location || profile.location || '', bio: proposed.bio || profile.bio || '',
+      career,
+      can_teach: proposed.can_teach?.length ? proposed.can_teach : skills.filter(skill => skill.type === 'can_teach'),
+      wants_to_learn: proposed.wants_to_learn?.length ? proposed.wants_to_learn : skills.filter(skill => skill.type === 'wants_to_learn').map(skill => skill.skill),
+      program: profile.program || '', cohort_year: profile.cohort_year || null,
+      persona: profile.role, linkedin_url: profile.linkedin_url || null,
+      linkedin_headline: profile.linkedin_headline || null,
+    };
+    setCvBusy(true);
+    setCvError('');
+    try {
+      await api.post(`/profile/ingest/${cvDraft.draft_id}/accept`, { accepted_json: { ...proposed, ...payload } });
+      const response = await api.post('/users/me/onboarding', payload);
+      updateUser(response.data);
+      await refreshProfile();
+      setCvDraft(null);
+      setEditing(false);
+      showToast(t('profile.toast.profileUpdated'));
+    } catch {
+      setCvError(t('onboarding.import.unavailable'));
+    } finally {
+      setCvBusy(false);
     }
   }
 
@@ -593,6 +658,16 @@ export default function Profile() {
                 onChange={e => setForm(f => ({ ...f, bio: e.target.value }))}
                 className="sm:col-span-2 lg:col-span-3"
               />
+              <div className="space-y-2 sm:col-span-2 lg:col-span-3">
+                <label className="flex items-start gap-2 text-sm text-muted-foreground">
+                  <input type="checkbox" checked={cvConsent} onChange={event => setCvConsent(event.target.checked)} />
+                  <span>{t('onboarding.import.consent')}</span>
+                </label>
+                <input aria-label={t('onboarding.import.browse')} type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" disabled={cvBusy} onChange={event => { handleCvUpload(event.target.files?.[0]); event.target.value = ''; }} />
+                {cvBusy && <p role="status">{t('onboarding.import.reading')}</p>}
+                {cvError && <p role="alert" className="text-sm text-destructive">{cvError}</p>}
+                {cvDraft && <div className="flex flex-wrap items-center gap-2"><p className="text-sm text-muted-foreground">{t('onboarding.import.reviewNotice')}</p><Button type="button" onClick={applyCvDraft} disabled={cvBusy}>{t('profile.btn.applyCv')}</Button></div>}
+              </div>
             </div>
           ) : <div className="space-y-1">{headlineSummary && <p className="text-sm text-muted-foreground">{headlineSummary}</p>}{profile.bio && <p className="text-sm text-muted-foreground">{profile.bio}</p>}</div>}
         </SurfaceBody>
@@ -605,14 +680,14 @@ export default function Profile() {
           action={isOwnProfile ? <SkillCloudFilters value={skillFilter} onChange={setSkillFilter} /> : null}
         />
         <SurfaceBody className="min-w-0 pt-3">
-          {isOwnProfile && !(profile.skillProgress || profile.skills || []).some(skill => skill.session_count > 0) ? (
+          {isOwnProfile && !(profile.skillProgress?.length ? profile.skillProgress : profile.skills || []).length ? (
             <div className="rounded-[var(--panel-radius)] bg-[var(--surface)] p-5">
               <p className="text-sm text-muted-foreground">{t('profile.skillLandscape.firstDay')}</p>
               <Button size="sm" variant="outline" className="mt-3" onClick={() => setTab('skills')}>{t('profile.skillLandscape.addSkills')}</Button>
             </div>
           ) : (
             <SkillCloud
-              skillProgress={profile.skillProgress || profile.skills || []}
+              skillProgress={profile.skillProgress?.length ? profile.skillProgress : profile.skills || []}
               isOwnProfile={isOwnProfile}
               filter={skillFilter}
               onDeleteSkill={isOwnProfile ? handleDeleteSkillFromBubble : undefined}

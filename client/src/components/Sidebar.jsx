@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { CircleUserRound, House, MessagesSquare, PanelLeft, Search, Server, Share2, Shield, UsersRound } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useT } from '../i18n/index.jsx';
@@ -10,6 +10,7 @@ export default function Sidebar({ collapsed = false, onNavigate, onToggle }) {
   const { user, pendingAcceptanceCount, unreadCounts } = useAuth();
   const { t } = useT();
   const location = useLocation();
+  const navigate = useNavigate();
 
   const links = user?.is_admin
     ? [
@@ -52,7 +53,13 @@ export default function Sidebar({ collapsed = false, onNavigate, onToggle }) {
             <Link
               key={item.to}
               to={item.to}
-              onClick={onNavigate}
+              onClick={event => {
+                onNavigate?.();
+                if (item.to === '/' && location.pathname === '/') {
+                  event.preventDefault();
+                  navigate('/', { state: { resetDiscovery: true } });
+                }
+              }}
               data-testid={item.testid}
               className={cn(
                 'relative flex h-[var(--navigation-row-height)] items-center rounded-[var(--control-radius)] text-sm font-normal outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]',

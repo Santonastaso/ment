@@ -15,7 +15,7 @@ function fixtureApi(state) {
     if (method === 'post' && state.failNext === path) { state.failNext = null; throw new Error('Fixture network failure'); }
     if (method === 'get') {
       if (state.failGet === path) throw new Error('Fixture history load failed');
-      if (path === '/users/me') return { ...state.user, skills: [], career: [] };
+      if (path === '/users/me') return state.profile || { ...state.user, skills: [], career: [] };
       if (path === '/users/me/skill-evidence') return [];
       if (path === '/users/me/capacity') return {};
       if (path === '/reflections') return { entries: state.reflections || [] };
@@ -56,7 +56,13 @@ function fixtureApi(state) {
         } };
       }
       if (path === '/profile/ingest/1/accept') return { ok: true };
-      if (path === '/users/me/onboarding') return { ...state.user, ...body, onboarding_complete: true };
+      if (path === '/users/me/onboarding') {
+        state.profile = { ...state.user, ...body, skills: [
+          ...(body.can_teach || []).map(skill => ({ ...skill, type: 'can_teach' })),
+          ...(body.wants_to_learn || []).map(skill => ({ skill, type: 'wants_to_learn' })),
+        ], career: body.career || [], onboarding_complete: true };
+        return { ...state.profile };
+      }
       if (path === '/discovery/matches') {
         if (state.calls.filter(c => c.path === path).length === 1) return { thread_id: 'thread', matches: [], clarification: 'Which finance skill would you like help with?',
           suggestions: [{ label: 'Financial modelling', message: 'Financial modelling' }] };
@@ -117,7 +123,7 @@ export const test = base.extend({
       window.fixture = {
         user: JSON.parse(sessionStorage.getItem('ment.fixture.auth') || 'null') || user,
         persistAuth: sessionStorage.getItem('ment.fixture.persistAuth') === '1',
-        peer, calls: [], pending: [], nextMessageId: 10, messages: JSON.parse(sessionStorage.getItem('ment.fixture.messages') || '{}'),
+        peer, calls: [], pending: [], nextMessageId: 10, profile: null, messages: JSON.parse(sessionStorage.getItem('ment.fixture.messages') || '{}'),
         unread: { sessions: 0, groups: 1, sessionMessages: {}, groupMessages: { 1: 2 } },
         groups: [{ id: 1, name: 'Test Group', description: 'A group for testing', joined: true, is_owner: true, member_count: 3 }],
         groupMembers: { 1: [

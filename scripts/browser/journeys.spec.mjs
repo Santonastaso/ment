@@ -173,19 +173,48 @@ test('Messages opens a clean link and switching chats does not replay transition
   expect(await page.locator('.conversation-thread').evaluate(element => getComputedStyle(element).animationName)).toBe('none');
 });
 
-test('Home greeting uses four borderless faces and turns each 15 seconds', async ({ page }) => {
+test('Home greeting stays static', async ({ page }) => {
   await page.clock.install();
   await page.goto('/');
-  const prism = page.locator('.discovery-greeting-prism');
-  await expect(prism.locator('.discovery-greeting-face')).toHaveCount(4);
-  expect(await prism.locator('.discovery-greeting-face').first().evaluate(element => getComputedStyle(element).borderTopWidth)).toBe('0px');
-  await expect(prism).toHaveAttribute('style', /rotateX\(0deg\)/);
+  const greeting = page.locator('.discovery-greeting-scene');
+  const original = await greeting.textContent();
   await page.clock.fastForward(15000);
-  await expect(prism).toHaveAttribute('style', /rotateX\(-90deg\)/);
-  await page.clock.fastForward(15000);
-  await page.clock.fastForward(15000);
-  await page.clock.fastForward(15000);
-  await expect(prism).toHaveAttribute('style', /rotateX\(-360deg\)/);
+  await expect(greeting).toHaveText(original);
+  await expect(greeting.locator('span')).toHaveCount(0);
+});
+
+test('Home navigation resets an active discovery conversation', async ({ page }) => {
+  await page.goto('/');
+  const composer = page.getByRole('textbox', { name: 'Describe who could help' });
+  await composer.fill('finance');
+  await composer.press('Enter');
+  await expect(page.getByText('Which finance skill would you like help with?')).toBeVisible();
+  await page.locator('.app-sidebar').getByRole('link', { name: 'Home' }).click();
+  await expect(page.getByRole('textbox', { name: 'Describe who could help' })).toHaveValue('');
+  await expect(page.getByText('Which finance skill would you like help with?')).toHaveCount(0);
+  await expect(page).toHaveURL('http://127.0.0.1:3010/');
+});
+
+test('profile overview shows saved skills before the first session and CV can update them', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => {
+    window.fixture.profile = {
+      ...window.fixture.user, department: 'Engineering', current_role: 'Engineer', career: [{ role: 'Engineer', department: 'Engineering' }],
+      skills: [{ id: 5, skill: 'Architecture', type: 'can_teach', example_project: 'Built a platform' }],
+      skillProgress: [],
+    };
+  });
+  await page.locator('.app-sidebar').getByRole('link', { name: 'My profile' }).click();
+  await expect(page.getByText('Architecture', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Edit profile' }).click();
+  await page.getByRole('checkbox').check();
+  await page.locator('input[type="file"]').setInputFiles({ name: 'updated.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 synthetic CV') });
+  await expect(page.getByRole('button', { name: 'Apply CV suggestions' })).toBeVisible();
+  await page.getByRole('button', { name: 'Apply CV suggestions' }).click();
+  await expect.poll(() => page.evaluate(() => window.fixture.calls.some(call => call.path === '/users/me/onboarding'))).toBe(true);
+  const saved = await page.evaluate(() => window.fixture.calls.find(call => call.path === '/users/me/onboarding').body);
+  expect(saved.can_teach[0].skill).toBe('Architecture');
+  expect(saved.career[0].role).toBe('Engineer');
 });
 
 test('Messages rail moves smoothly and compact menus remain usable', async ({ page }) => {

@@ -25,7 +25,7 @@
   "onboarding.fields.locationPlaceholder": "e.g. London, San Francisco, Remote",
   "onboarding.fields.bio": "Short bio",
   "onboarding.fields.optional": "(optional)",
-  "onboarding.fields.bioPlaceholder": "A sentence about you, your interests, or what drives you.",
+  "onboarding.fields.bioPlaceholder": "Write a short bio in the first person, e.g. “I lead…”",
   "onboarding.fields.linkedin": "LinkedIn profile",
   "onboarding.career.workExperience": "Work experience",
   "onboarding.career.projects": "Projects or topics you worked on (optional)",

@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ArrowUp, ArrowUpRight, Check, Clock3, Pencil, RefreshCw, Search, Send, ThumbsDown, ThumbsUp, Trash2, X } from 'lucide-react';
 import api from '../../api/index.js';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -14,7 +14,7 @@ import { homeCopy } from '../demo/homeCopy.js';
 const COPY = {
   en: {
     history: 'History',
-    greetings: ['Hey {name}, would you like to meet today?', 'Hey {name}, who is on your mind?', 'Hey {name}, shall we find someone interesting?', 'Hey {name}, what is worth exploring today?'], placeholder: 'Describe who could help', resume: 'Resume search',
+    greeting: 'Hey {name}, would you like to meet today?', placeholder: 'Describe who could help', resume: 'Resume search',
     finding: 'Having a look', chooseLead: 'Here are the people who fit.', chooseBold: 'Pick one and I will write the message.',
     why: 'Why this match', choose: 'Choose', selected: 'Selected', different: 'Ask for different people', browse: 'browse the full directory', notRight: 'Not quite right?', or: 'or',
     to: 'To', intro: "Here's a suggested intro. Edit anything, then send when it feels like you.", suggested: 'Suggested draft', send: 'Send request', regenerate: 'Regenerate',
@@ -22,7 +22,7 @@ const COPY = {
   },
   it: {
     history: 'Cronologia',
-    greetings: ['Ehi {name}, ti va di incontrare qualcuno oggi?', 'Ehi {name}, a chi stai pensando?', 'Ehi {name}, troviamo qualcuno di interessante?', 'Ehi {name}, cosa vorresti esplorare oggi?'], placeholder: 'Descrivi chi potrebbe aiutarti', resume: 'Riprendi la ricerca',
+    greeting: 'Ehi {name}, ti va di incontrare qualcuno oggi?', placeholder: 'Descrivi chi potrebbe aiutarti', resume: 'Riprendi la ricerca',
     finding: 'Do un’occhiata', chooseLead: 'Ecco le persone adatte.', chooseBold: 'Scegline una e scrivo io il messaggio.',
     why: 'Perché è adatto', choose: 'Scegli', selected: 'Scelto', different: 'Mostra altre persone', browse: 'sfoglia la directory', notRight: 'Non è quello che cercavi?', or: 'oppure',
     to: 'A', intro: 'Ecco un messaggio proposto. Modifica tutto quello che vuoi, poi invialo quando ti sembra giusto.', suggested: 'Messaggio proposto', send: 'Invia richiesta', regenerate: 'Rigenera',
@@ -30,7 +30,7 @@ const COPY = {
   },
   fr: {
     history: 'Historique',
-    greetings: ['Salut {name}, on fait une rencontre aujourd’hui ?', 'Salut {name}, quelqu’un en tête ?', 'Salut {name}, on trouve quelqu’un d’intéressant ?', 'Salut {name}, on explore quoi aujourd’hui ?'], placeholder: 'Décrivez qui pourrait vous aider', resume: 'Reprendre la recherche',
+    greeting: 'Salut {name}, on fait une rencontre aujourd’hui ?', placeholder: 'Décrivez qui pourrait vous aider', resume: 'Reprendre la recherche',
     finding: 'Je regarde', chooseLead: 'Voici les personnes qui conviennent.', chooseBold: 'Choisissez-en une et j’écris le message.',
     why: 'Pourquoi ce profil', choose: 'Choisir', selected: 'Sélectionné', different: 'Voir d’autres personnes', browse: 'parcourir l’annuaire', notRight: 'Pas tout à fait ?', or: 'ou',
     to: 'À', intro: 'Voici un message proposé. Modifiez ce que vous voulez, puis envoyez-le lorsqu’il vous convient.', suggested: 'Message proposé', send: 'Envoyer la demande', regenerate: 'Régénérer',
@@ -156,7 +156,6 @@ export default function DiscoveryFlow() {
   const copy = COPY[lang] || COPY.en;
   const intentCopy = homeCopy(lang);
   const [stage, setStage] = useState('ask');
-  const [greetingIndex, setGreetingIndex] = useState(0);
   const [query, setQuery] = useState('');
   const [submittedQuery, setSubmittedQuery] = useState('');
   const [turns, setTurns] = useState([]);
@@ -184,6 +183,7 @@ export default function DiscoveryFlow() {
   const idempotencyKey = useRef(null);
   const flowVersion = useRef(0);
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const resumedFromUrl = useRef(null);
   // Earlier result sets stay reachable: each can be reopened in place.
@@ -204,10 +204,10 @@ export default function DiscoveryFlow() {
   }
 
   useEffect(() => {
-    if (stage !== 'ask') return undefined;
-    const timer = window.setInterval(() => setGreetingIndex(index => index + 1), 15000);
-    return () => window.clearInterval(timer);
-  }, [stage, copy]);
+    if (!location.state?.resetDiscovery) return;
+    reset();
+    navigate('/', { replace: true, state: null });
+  }, [location.key, location.state, navigate]);
 
   useLayoutEffect(() => {
     const input = composerInputRef.current;
@@ -458,11 +458,7 @@ export default function DiscoveryFlow() {
   return <section className={`discovery-flow ${isConversation ? 'is-conversation' : ''}`} aria-label="Ment discovery"><div className="discovery-thread">
     {stage === 'ask' && (
       <div className="discovery-ask-block">
-        <h1 className="discovery-greeting-scene">
-          <span className="discovery-greeting-prism" style={{ transform: `rotateX(${-greetingIndex * 90}deg)` }}>
-            {copy.greetings.map((line, index) => <span key={line} className="discovery-greeting-face" aria-hidden={index !== greetingIndex % copy.greetings.length}>{line.replace('{name}', firstName)}</span>)}
-          </span>
-        </h1>
+        <h1 className="discovery-greeting-scene">{copy.greeting.replace('{name}', firstName)}</h1>
         {composer()}
         {(history.length > 0 || connections.length > 0) && (
           <div className="discovery-meta-row">
