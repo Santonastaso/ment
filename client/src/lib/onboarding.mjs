@@ -6,6 +6,7 @@ export function onboardingErrorKey(error, importing = false) {
   if (/document_too|unsupported_document|text_too_short|document_read/i.test(code)) return 'onboarding.import.error';
   if (/ai_not_configured|ai_provider_auth|ai_model_not_found/i.test(code)) return 'onboarding.import.unavailable';
   if (/rate_limit|ai_temporarily|ai_provider_unreachable/i.test(code)) return 'onboarding.error.busy';
+  if (importing && error?.response?.status >= 500) return 'onboarding.import.unavailable';
   return importing ? 'onboarding.import.error' : 'onboarding.error.generic';
 }
 

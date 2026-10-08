@@ -131,6 +131,7 @@ export default function Onboarding({ returnTo }) {
       applyProposed(res.data.proposed, res.data.classifier_source);
       setStep(1);
     } catch (e) {
+      console.error('Profile import failed:', e.response?.status, e.response?.data?.error || e.message);
       setError(t(onboardingErrorKey(e, true)));
     } finally {
       setUploading(false);
