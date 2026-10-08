@@ -66,6 +66,7 @@ export async function mistralJson<T>(options: {
   feature?: string;
   temperature?: number;
   maxTokens?: number;
+  schema?: Record<string, unknown>;
 }): Promise<{ value: T; model: string; latencyMs: number }> {
   const startedAt = performance.now();
   const { apiKey, model: preferredModel, fallbackModel } = configuration(options.feature);
@@ -74,7 +75,9 @@ export async function mistralJson<T>(options: {
     model: name,
     temperature: options.temperature ?? 0.1,
     max_tokens: options.maxTokens ?? 1200,
-    response_format: { type: 'json_object' },
+    response_format: options.schema
+      ? { type: 'json_schema', json_schema: { name: options.feature || 'result', schema: options.schema, strict: true } }
+      : { type: 'json_object' },
     messages: [
       { role: 'system', content: options.system },
       { role: 'user', content: options.user },
@@ -142,7 +145,10 @@ export async function mistralJson<T>(options: {
   // attempt recovers most of those; a second failure is reported as before.
   for (let tries = 0; ; tries += 1) {
     const payload = await response.json().catch(() => null);
-    const content = payload?.choices?.[0]?.message?.content;
+    const rawContent = payload?.choices?.[0]?.message?.content;
+    const content = Array.isArray(rawContent)
+      ? rawContent.filter((part) => part?.type === 'text').map((part) => part.text).join('')
+      : rawContent;
     try {
       if (typeof content !== 'string' || !content.trim()) throw new Error('empty');
       return {
@@ -151,6 +157,11 @@ export async function mistralJson<T>(options: {
         latencyMs: performance.now() - startedAt,
       };
     } catch {
+      console.error(JSON.stringify({
+        event: 'mistral_invalid_json', model,
+        finish_reason: payload?.choices?.[0]?.finish_reason || 'unknown',
+        content_type: Array.isArray(rawContent) ? 'chunks' : typeof rawContent,
+      }));
       if (tries >= 1) throw new AiProviderError('ai_invalid_response');
       response = await attempt(model);
       if (!response.ok) throw new AiProviderError('ai_invalid_response');

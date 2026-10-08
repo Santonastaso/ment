@@ -20,6 +20,37 @@ const PROMPT_VERSION = 'profile-ingest-v2';
 const MAX_EXTRACTED_CHARS = 30000;
 const MAX_PDF_PAGES = 100;
 const MAX_DOCX_UNCOMPRESSED = 4 * 1024 * 1024;
+const string = { type: 'string' };
+const PROFILE_SCHEMA = {
+  type: 'object',
+  properties: {
+    proposed: {
+      type: 'object',
+      properties: {
+        job_title: string, department: string, location: string, bio: string,
+        career_history: {
+          type: 'array', items: {
+            type: 'object',
+            properties: { company: string, role_title: string, start_year: string, end_year: string, description: string },
+            required: ['company', 'role_title', 'start_year', 'end_year', 'description'],
+            additionalProperties: false,
+          },
+        },
+        can_teach: {
+          type: 'array', items: {
+            type: 'object', properties: { skill: string, example_project: string },
+            required: ['skill', 'example_project'], additionalProperties: false,
+          },
+        },
+        wants_to_learn: { type: 'array', items: string },
+      },
+      required: ['job_title', 'department', 'location', 'bio', 'career_history', 'can_teach', 'wants_to_learn'],
+      additionalProperties: false,
+    },
+  },
+  required: ['proposed'],
+  additionalProperties: false,
+};
 
 function validateDocxArchive(buf: Uint8Array) {
   const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
@@ -120,9 +151,13 @@ Deno.serve(async (req) => {
       system: `Extract a professional profile from the supplied document. Write descriptive text and skill names in ${language}. Return JSON with a proposed object containing: job_title (string), department (string), location (string), bio (string, max 500 characters), career_history (array of objects with company, role_title, start_year, end_year, description), can_teach (array of objects with skill and example_project, where example_project is at most 80 characters), and wants_to_learn (array of strings). Use short, conventional skill names as they would appear in a professional skills list: two or three words, lower case, noun form. Use only explicit evidence from the document. Use empty strings or arrays when evidence is absent. Never infer sensitive personal data.`,
       user: JSON.stringify({ source_kind: kind, document_text: rawText.slice(0, 30000) }),
       temperature: 0,
-      maxTokens: 1800,
+      maxTokens: 3000,
+      schema: PROFILE_SCHEMA,
     });
-    if (!result.value?.proposed || typeof result.value.proposed !== 'object') return jsonError('ai_invalid_response', 502);
+    if (!result.value?.proposed || typeof result.value.proposed !== 'object') {
+      console.error(JSON.stringify({ event: 'profile_ingest_invalid_shape', model: result.model }));
+      return jsonError('ai_invalid_response', 502);
+    }
     proposed = result.value.proposed;
     classifier_source = `mistral:${result.model}`;
     const { data: owner } = await ctx.sb.from('profiles').select('organization_id').eq('id', ctx.user.id).maybeSingle();
