@@ -9,6 +9,7 @@
   "onboarding.import.unavailable": "L'import est temporairement indisponible. Vous pouvez saisir vos informations manuellement.",
   "onboarding.header.title": "Créez votre profil",
   "onboarding.header.subtitle": "Quelques étapes pour vous mettre en relation avec les bonnes personnes.",
+  "onboarding.import.unreadable": "Aucun texte lisible n'a été trouvé dans ce fichier. Les PDF numérisés ne sont pas encore pris en charge : essayez un PDF avec du texte ou un DOCX, ou saisissez vos informations manuellement.",
   "onboarding.steps.import": "Import",
   "onboarding.steps.background": "Background",
   "onboarding.steps.teach": "Teach",

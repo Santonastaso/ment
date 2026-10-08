@@ -325,7 +325,7 @@ export default function Onboarding({ returnTo }) {
                 </div>
                 <div className="space-y-3">
                   {career.map((c, i) => (
-                    <div key={i} className="bg-muted rounded-lg p-3 space-y-2">
+                    <div key={i} className="onboarding-career-entry rounded-lg p-3 space-y-2">
                       <CareerEntryFields value={c} required={i === 0} descriptionLabel={t('onboarding.career.projects')} onChange={next => setCareer(current => current.map((entry, index) => index === i ? next : entry))} />
                       {career.length > 1 && (
                         <button type="button" onClick={() => removeCareer(i)} className="text-xs text-red-400 hover:text-red-600">{t('onboarding.career.remove')}</button>

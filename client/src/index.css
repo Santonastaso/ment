@@ -213,7 +213,7 @@ select.filter-control { border-color: transparent; background-color: var(--contr
 
 /* Floating-label field: the label starts as placeholder text inside the
    control and rises to a caption once the field is filled or focused. */
-.floating-field { position: relative; display: block; min-width: 0; border: 1px solid transparent; border-radius: var(--panel-radius); background: var(--control-surface); transition: border-color var(--motion-control) var(--motion-ease), background var(--motion-control) var(--motion-ease); }
+.floating-field { position: relative; display: block; min-width: 0; border: 1px solid var(--border-subtle); border-radius: var(--panel-radius); background: var(--control-surface); transition: border-color var(--motion-control) var(--motion-ease), background var(--motion-control) var(--motion-ease); }
 .floating-field:focus-within { border-color: var(--primary); background: var(--card); }
 .floating-field > label { position: absolute; left: 12px; top: 50%; color: var(--muted-foreground); font-size: 13.5px; transform: translateY(-50%); transition: top var(--motion-control) var(--motion-ease), font-size var(--motion-control) var(--motion-ease), transform var(--motion-control) var(--motion-ease); pointer-events: none; }
 /* A textarea's label sits on the first line, not centred on the whole box. */
@@ -245,6 +245,7 @@ select.filter-control { border-color: transparent; background-color: var(--contr
 /* Add and edit share one shell, so an entry looks the same whichever way you
    opened it. */
 .career-entry-form { display: grid; gap: .75rem; border: 1px solid var(--border-subtle); border-radius: var(--panel-radius); background: var(--card); padding: 14px; }
+.onboarding-career-entry { border: 1px solid var(--border-subtle); background: var(--card); }
 .career-entry-form .floating-field textarea { min-height: 62px; }
 
 .profile-skill-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 155px), 1fr)); gap: 9px; }

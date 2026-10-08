@@ -1,6 +1,6 @@
 {
   "onboarding.header.title": "Set up your profile",
-  "onboarding.header.subtitle": "A few steps so we can match you with mentors.",
+  "onboarding.header.subtitle": "A few steps so we can match you with the right people.",
   "onboarding.steps.import": "Import",
   "onboarding.steps.background": "Background",
   "onboarding.steps.teach": "Teach",
@@ -13,6 +13,7 @@
   "onboarding.import.consent": "I agree to have this file processed to draft my profile. AI processing is optional and disclosed.",
   "onboarding.import.consentRequired": "Please confirm file processing first.",
   "onboarding.import.error": "Could not read that file. Try another format or skip to enter manually.",
+  "onboarding.import.unreadable": "We couldn't find readable text in this file. Scanned PDFs aren't supported yet; try a text-based PDF or DOCX, or enter your details manually.",
   "onboarding.import.reviewNotice": "AI suggestions are a draft. Review every field before saving.",
   "onboarding.import.suggested": "AI suggested",
   "onboarding.background.title": "Your background",

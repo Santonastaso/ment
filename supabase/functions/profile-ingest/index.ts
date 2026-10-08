@@ -16,7 +16,7 @@ import { normalizeLang } from '../_shared/esco.ts';
 import { enforceRateLimit } from '../_shared/rate-limit.ts';
 
 const LANGUAGE_NAMES: Record<string, string> = { en: 'English', it: 'Italian', fr: 'French' };
-const PROMPT_VERSION = 'profile-ingest-v2';
+const PROMPT_VERSION = 'profile-ingest-v3';
 const MAX_EXTRACTED_CHARS = 30000;
 const MAX_PDF_PAGES = 100;
 const MAX_DOCX_UNCOMPRESSED = 4 * 1024 * 1024;
@@ -137,7 +137,15 @@ Deno.serve(async (req) => {
   try {
     const buf = new Uint8Array(await file.arrayBuffer());
     rawText = await extractText(buf, filename);
-  } catch {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    const safeCode = /^[a-z0-9_]{1,64}$/i.test(message) ? message : 'parser_error';
+    console.error(JSON.stringify({
+      event: 'profile_ingest_document_read_failed',
+      file_type: filename.toLowerCase().endsWith('.pdf') ? 'pdf' : 'docx',
+      error_code: safeCode,
+      error_name: error instanceof Error ? error.name : 'unknown',
+    }));
     return jsonError('document_read_failed_or_too_complex', 400);
   }
   if (!rawText || rawText.trim().length < 20) return jsonError('text_too_short', 400);
@@ -148,7 +156,7 @@ Deno.serve(async (req) => {
   try {
     const result = await mistralJson<{ proposed?: unknown }>({
       feature: 'profile_ingest',
-      system: `Extract a professional profile from the supplied document. Write descriptive text and skill names in ${language}. Return JSON with a proposed object containing: job_title (string), department (string), location (string), bio (string, max 500 characters), career_history (array of objects with company, role_title, start_year, end_year, description), can_teach (array of objects with skill and example_project, where example_project is at most 80 characters), and wants_to_learn (array of strings). Use short, conventional skill names as they would appear in a professional skills list: two or three words, lower case, noun form. Use only explicit evidence from the document. Use empty strings or arrays when evidence is absent. Never infer sensitive personal data.`,
+      system: `Extract a professional profile from the supplied document. Write descriptive text and skill names in ${language}. The bio must be written in first person as the profile owner's own words, starting with “I” (or the equivalent in ${language}); never describe the owner by name or as he/she/they. Return JSON with a proposed object containing: job_title (string), department (string), location (string), bio (string, max 500 characters), career_history (array of objects with company, role_title, start_year, end_year, description), can_teach (array of objects with skill and example_project, where example_project is at most 80 characters), and wants_to_learn (array of strings). Use short, conventional skill names as they would appear in a professional skills list: two or three words, lower case, noun form. Use only explicit evidence from the document. Use empty strings or arrays when evidence is absent. Never infer sensitive personal data.`,
       user: JSON.stringify({ source_kind: kind, document_text: rawText.slice(0, 30000) }),
       temperature: 0,
       maxTokens: 3000,
