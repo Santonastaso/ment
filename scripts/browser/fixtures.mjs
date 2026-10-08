@@ -21,8 +21,8 @@ function fixtureApi(state) {
       if (state.failGet === path) throw new Error('Fixture history load failed');
       if (path === '/users/me') return state.profile || { ...state.user, skills: [], career: [] };
       if (path === '/users/me/skill-evidence') return [];
-      if (path === '/users/me/capacity') return {};
-      if (path === '/reflections') return { entries: state.reflections || [] };
+      if (path === '/users/me/capacity') return state.capacity || {};
+      if (path === '/reflections') return { entries: state.reflections || [], dueForCheckIn: !!state.reflectionDue, lastEntryDays: state.reflectionDue ? 4 : null };
       if (path === '/sessions') return state.sessions.map(payload);
       if (path === '/groups') return state.groups.map(group => ({ ...group, latest_message: state.messages[`/groups/${group.id}/messages`]?.at(-1)?.body || null }));
       if (path.startsWith('/directory?')) return { people: [state.peer], total: 1, facets: { languages: ['fr', 'it'] } };

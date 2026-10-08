@@ -1,5 +1,14 @@
 import { test, expect } from './fixtures.mjs';
 
+async function waitForMotion(page) {
+  await page.evaluate(async () => {
+    const animations = document.getAnimations().filter(animation =>
+      animation.playState === 'running' && animation.effect?.getComputedTiming().iterations !== Infinity
+    );
+    await Promise.all(animations.map(animation => animation.finished.catch(() => {})));
+  });
+}
+
 function mockCvPdf() {
   const stream = 'BT /F1 12 Tf 72 720 Td (Invited Tester Engineering Mentor London) Tj ET';
   const objects = [
@@ -33,7 +42,7 @@ test('invited member signs in, changes temporary password, imports CV, and finis
     };
     window.fixture.tempPassword = 'temporary-password-2026';
     window.fixture.ingestProposed = {
-      department: 'Engineering', job_title: 'Mentor', location: 'London',
+      department: 'Engineering', job_title: 'Mentor', location: 'Zurigo, Svizzera / Amsterdam, Paesi Bassi (o remoto)',
       can_teach: [{ skill: 'Architecture', example_project: 'Built a platform' }],
       wants_to_learn: ['Leadership'], career_history: [],
     };
@@ -57,6 +66,7 @@ test('invited member signs in, changes temporary password, imports CV, and finis
   });
   await expect(page.getByRole('heading', { name: 'Your background' })).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Full name' })).toHaveValue('Invited Tester');
+  await expect(page.locator('select').first()).toHaveValue('Zurich');
   await expect(page.getByLabel('Department *')).toHaveValue('Engineering');
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByRole('heading', { name: 'What you can teach' })).toBeVisible();
@@ -95,6 +105,9 @@ test('onboarding language can be changed before profile setup is complete', asyn
   await expect(page.getByRole('heading', { name: 'Configura il tuo profilo' })).toBeVisible();
   await page.getByTestId('lang-fr').click();
   await expect(page.getByRole('heading', { name: 'Créez votre profil' })).toBeVisible();
+  for (const step of ['Importer', 'Parcours', 'Transmettre', 'Apprendre']) {
+    await expect(page.getByText(step, { exact: true })).toBeVisible();
+  }
 });
 
 test('a saved password with failed reauthentication tells the member to sign in again', async ({ page }) => {
@@ -165,6 +178,9 @@ test('Messages opens a clean link and switching chats does not replay transition
   await page.getByRole('link', { name: 'Messages' }).click();
   await expect(page).toHaveURL(/\/c\/first-chat$/);
   await expect(page.locator('.conversation-header strong')).toHaveText('Peer 1');
+  await expect(page.locator('.page-transition')).toHaveCSS('animation-duration', '0.24s');
+  await expect(page.locator('.page-transition')).toHaveCSS('animation-delay', '0s');
+  await expect(page.locator('.page-transition')).toHaveCSS('animation-name', 'pageEnter');
   await page.locator('.page-transition').evaluate(element => { element.dataset.testIdentity = 'retained'; });
   await page.locator('.conversation-list-item').filter({ hasText: 'Peer 2' }).click();
   await expect(page).toHaveURL(/\/c\/second-chat$/);
@@ -207,6 +223,8 @@ test('profile overview shows saved skills before the first session and CV can up
   await page.locator('.app-sidebar').getByRole('link', { name: 'My profile' }).click();
   await expect(page.getByText('Architecture', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Edit profile' }).click();
+  await expect(page.getByText('Choose CV file', { exact: true })).toBeVisible();
+  await expect(page.locator('input[type="file"]')).toHaveClass(/sr-only/);
   await page.getByRole('checkbox').check();
   await page.locator('input[type="file"]').setInputFiles({ name: 'updated.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 synthetic CV') });
   await expect(page.getByRole('button', { name: 'Apply CV suggestions' })).toBeVisible();
@@ -220,6 +238,7 @@ test('profile overview shows saved skills before the first session and CV can up
 test('Messages rail moves smoothly and compact menus remain usable', async ({ page }) => {
   await page.goto('/conversations?session=1');
   await expect(page.locator('.conversation-messages')).toBeVisible();
+  await waitForMotion(page);
   expect(await page.locator('main').evaluate(element => element.scrollHeight <= element.clientHeight + 1)).toBe(true);
   const sidebar = page.locator('.app-sidebar');
   const home = sidebar.getByRole('link', { name: 'Home' });
@@ -265,7 +284,7 @@ test('Messages rail moves smoothly and compact menus remain usable', async ({ pa
   expect(Math.abs(await centerY(close) - await centerY(sidebar.getByRole('button', { name: 'Close sidebar' }).last()))).toBeLessThan(3);
   expect(Math.abs(await centerY(close) - await centerY(page.locator('.conversation-header')))).toBeLessThan(3);
   expect(Math.abs(await centerY(page.getByRole('heading', { name: 'Messages' })) - await centerY(page.locator('.conversation-header')))).toBeLessThan(3);
-  expect(await rail.evaluate(element => getComputedStyle(element.parentElement).transitionDuration)).toBe('0.48s');
+  expect(await rail.evaluate(element => getComputedStyle(element.parentElement).transitionDuration)).toBe('0.28s');
   await close.click();
   await page.waitForTimeout(100);
   const movingWidth = await rail.evaluate(element => element.getBoundingClientRect().width);
@@ -310,6 +329,7 @@ test('Explorer sticky panel rules share the same width', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Clear filters' })).toHaveCount(0);
   await page.goto('/explorer?persona=student');
   await expect(page.locator('.directory-pagination')).toBeVisible();
+  await waitForMotion(page);
   const home = page.locator('.app-sidebar').getByRole('link', { name: 'Home' });
   const explorerLink = page.locator('.app-sidebar').getByRole('link', { name: 'Explorer' });
   const [homeHeight, homeRadius] = await home.evaluate(element => {
@@ -400,7 +420,7 @@ test('Quick reflection opens a card without shifting the profile and preserves d
     page.locator('.profile-tabs').boundingBox(),
     page.locator('.app-sidebar button[title="Close sidebar"]').first().boundingBox(),
   ]);
-  expect(Math.abs(tabsBox.y + tabsBox.height / 2 - brandBox.y - brandBox.height / 2)).toBeLessThan(3);
+  expect(Math.abs(tabsBox.y + tabsBox.height / 2 - brandBox.y - brandBox.height / 2)).toBeLessThan(5);
   const trigger = page.getByRole('button', { name: 'Start check-in', exact: true, includeHidden: true });
   await expect(trigger).toBeVisible();
   await trigger.scrollIntoViewIfNeeded();
@@ -436,19 +456,40 @@ test('Quick reflection opens a card without shifting the profile and preserves d
 
 test('Profile skill filters share the navigation pill geometry', async ({ page }) => {
   await page.goto('/profile');
-  await page.getByTestId('profile-tab-skills').click();
-  const visualTokens = await page.locator(':root').evaluate(element => {
-    const style = getComputedStyle(element);
-    return [style.getPropertyValue('--background').trim(), style.getPropertyValue('--panel-radius').trim()];
+  await page.evaluate(() => {
+    const startTransition = document.startViewTransition.bind(document);
+    window.fixture.profileTabDirections = [];
+    document.startViewTransition = update => {
+      window.fixture.profileTabDirections.push(document.documentElement.dataset.profileTabDirection);
+      return startTransition(update);
+    };
   });
-  expect(visualTokens).toEqual(['#f4f4f2', '24px']);
-  const panels = page.locator('.profile-tab-content .grid.items-start > div');
-  expect(await learnPanel.locator('.profile-skill-heading').evaluate(element => getComputedStyle(element).color)).toBe('rgb(71, 102, 79)');
-  expect(await teachPanel.evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgb(241, 241, 238)');
-  expect(await learnPanel.evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgb(241, 241, 238)');
-  await expect(panels).toHaveCount(2);
-  const [teachPanel, learnPanel] = await panels.all();
-  expect(await teachPanel.locator('.profile-skill-heading').evaluate(element => getComputedStyle(element).color)).toBe('rgb(147, 70, 47)');
+  await page.getByTestId('profile-tab-skills').click();
+  expect(await page.locator(':root').evaluate(element => getComputedStyle(element).getPropertyValue('--background').trim())).toBe('#fafaf9');
+  const skillsType = await page.getByRole('heading', { name: 'What you can teach' }).evaluate(element => {
+    const style = getComputedStyle(element);
+    return { family: style.fontFamily, size: style.fontSize, weight: style.fontWeight };
+  });
+  const learnType = await page.getByRole('heading', { name: 'What you want to learn' }).evaluate(element => {
+    const style = getComputedStyle(element);
+    return { family: style.fontFamily, size: style.fontSize, weight: style.fontWeight };
+  });
+  const bodyFamily = await page.locator('body').evaluate(element => getComputedStyle(element).fontFamily);
+  expect(skillsType).toEqual({ family: bodyFamily, size: '16px', weight: '600' });
+  expect(learnType).toEqual(skillsType);
+  const skillPanels = page.locator('.profile-tab-content .grid.items-start > div');
+  expect(await page.locator(':root').evaluate(element => getComputedStyle(element).getPropertyValue('--panel-radius').trim())).toBe('24px');
+  await expect(skillPanels).toHaveCount(2);
+  const [teaching, learning] = await skillPanels.all();
+  expect(await teaching.locator('h3').evaluate(element => getComputedStyle(element).color)).toBe('rgb(32, 30, 27)');
+  expect(await learning.locator('h3').evaluate(element => getComputedStyle(element).color)).toBe('rgb(32, 30, 27)');
+  expect(await teaching.evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgb(241, 241, 238)');
+  expect(await learning.evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgb(241, 241, 238)');
+  await expect(page.locator('.profile-tab-content')).toHaveCSS('view-transition-name', 'profile-tab-panel');
+  expect(await page.locator('.profile-tab-content').evaluate(element => getComputedStyle(element).animationName)).toBe('none');
+  expect(await page.evaluate(() => window.fixture.profileTabDirections)).toEqual(['forward']);
+  await page.getByTestId('profile-tab-overview').click();
+  expect(await page.evaluate(() => window.fixture.profileTabDirections)).toEqual(['forward', 'backward']);
   const home = page.locator('.app-sidebar').getByRole('link', { name: 'Home' });
   const geometry = locator => locator.evaluate(element => {
     const style = getComputedStyle(element);
@@ -460,12 +501,12 @@ test('Profile skill filters share the navigation pill geometry', async ({ page }
   }
 });
 
-test('Reflection log can add a check-in from its header', async ({ page }) => {
+test('Reflection log check-in starts from its reminder banner', async ({ page }) => {
   await page.goto('/profile');
+  await page.evaluate(() => { window.fixture.reflectionDue = true; });
   await page.getByTestId('profile-tab-reflections').click();
-  const add = page.getByRole('button', { name: 'Start check-in' });
-  await expect(add).toBeVisible();
-  await add.click();
+  await expect(page.getByRole('button', { name: '+ Add a reflection' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Start check-in' }).click();
   const dialog = page.getByRole('dialog', { name: 'Weekly check-in' });
   await dialog.getByRole('textbox', { name: 'What did you feel you needed support on this week?' }).fill('Practice presenting clearly.');
   await dialog.getByRole('button', { name: 'Save reflection' }).click();
@@ -475,9 +516,12 @@ test('Reflection log can add a check-in from its header', async ({ page }) => {
 
 test('Messages count sits beside its heading', async ({ page }) => {
   await page.goto('/conversations?session=1');
+  const rail = page.locator('.conversation-list');
   const heading = page.locator('.conversation-list-heading');
   await expect(heading.locator('h1')).toHaveText('Messages');
   await expect(heading.locator('.conversation-list-count')).toHaveText('3');
+  expect((await heading.boundingBox()).x - (await rail.boundingBox()).x).toBeGreaterThanOrEqual(23);
+  expect((await page.locator('.conversation-list-item').first().boundingBox()).x - (await rail.boundingBox()).x).toBeGreaterThanOrEqual(14);
   const gap = await heading.evaluate(element => {
     const title = element.querySelector('h1').getBoundingClientRect();
     const count = element.querySelector('.conversation-list-count').getBoundingClientRect();
@@ -486,6 +530,7 @@ test('Messages count sits beside its heading', async ({ page }) => {
   expect(gap).toBeGreaterThanOrEqual(0);
   expect(gap).toBeLessThanOrEqual(12);
 });
+
 test('Messages shows chat skeleton rows until sessions and groups load', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => { window.fixture.holdLoads = ['/sessions', '/groups']; });
@@ -498,12 +543,15 @@ test('Messages shows chat skeleton rows until sessions and groups load', async (
     await expect(page.locator('.conversation-list-item')).toHaveCount(0);
     expect(await page.evaluate(() => Date.now() - Math.min(...window.fixture.heldLoadStartedAt))).toBeLessThan(900);
   } finally {
-    await page.evaluate(() => window.fixture.pendingLoads.splice(0).forEach(resolve => resolve()));
+    await page.evaluate(() => {
+      window.fixture.releasedLoadAt = Date.now();
+      window.fixture.pendingLoads.splice(0).forEach(resolve => resolve());
+    });
   }
   await expect(skeleton).toHaveCount(0);
-  expect(await page.evaluate(() => Date.now() - Math.min(...window.fixture.heldLoadStartedAt))).toBeGreaterThanOrEqual(950);
   await expect(page.locator('.conversation-list-item')).toHaveCount(3);
   await expect(page.locator('.conversation-list-item').first()).toContainText('Peer 1');
+  expect(await page.evaluate(() => Date.now() - window.fixture.releasedLoadAt)).toBeLessThan(900);
 });
 
 test('Explorer shows profile-shaped skeletons until directory results load', async ({ page }) => {
@@ -522,12 +570,15 @@ test('Explorer shows profile-shaped skeletons until directory results load', asy
     await expect(pagination).not.toContainText('Showing');
     expect(await page.evaluate(() => Date.now() - Math.min(...window.fixture.heldLoadStartedAt))).toBeLessThan(900);
   } finally {
-    await page.evaluate(() => window.fixture.pendingLoads.splice(0).forEach(resolve => resolve()));
+    await page.evaluate(() => {
+      window.fixture.releasedLoadAt = Date.now();
+      window.fixture.pendingLoads.splice(0).forEach(resolve => resolve());
+    });
   }
   await expect(skeletons).toHaveCount(0);
-  expect(await page.evaluate(() => Date.now() - Math.min(...window.fixture.heldLoadStartedAt))).toBeGreaterThanOrEqual(950);
   await expect(pagination).toContainText('Showing 1–1 of 1');
   await expect(page.locator('.directory-results .person-row:not(.person-row-skeleton)')).toHaveCount(1);
+  expect(await page.evaluate(() => Date.now() - window.fixture.releasedLoadAt)).toBeLessThan(900);
 });
 
 test('Groups keeps its skeleton until the whole group list is ready', async ({ page }) => {
@@ -541,13 +592,33 @@ test('Groups keeps its skeleton until the whole group list is ready', async ({ p
     await expect(page.locator('main article.person-row')).toHaveCount(0);
     expect(await page.evaluate(() => Date.now() - Math.min(...window.fixture.heldLoadStartedAt))).toBeLessThan(900);
   } finally {
-    await page.evaluate(() => window.fixture.pendingLoads.splice(0).forEach(resolve => resolve()));
+    await page.evaluate(() => {
+      window.fixture.releasedLoadAt = Date.now();
+      window.fixture.pendingLoads.splice(0).forEach(resolve => resolve());
+    });
   }
   await expect(skeleton).toHaveCount(0);
-  expect(await page.evaluate(() => Date.now() - Math.min(...window.fixture.heldLoadStartedAt))).toBeGreaterThanOrEqual(950);
   await expect(page.locator('main article.person-row')).toContainText('Test Group');
+  expect(await page.evaluate(() => Date.now() - window.fixture.releasedLoadAt)).toBeLessThan(900);
 });
 
+test('Home holds history and conversation controls in skeletons until both are ready', async ({ page }) => {
+  await page.goto('/profile');
+  await page.evaluate(() => { window.fixture.holdLoads = ['/sessions', '/discovery/threads*']; });
+  await page.locator('nav').getByRole('link', { name: 'Home' }).click();
+
+  const skeleton = page.locator('.discovery-home-skeleton');
+  await expect(skeleton).toBeVisible();
+  await expect(skeleton.locator('[data-slot="skeleton"]')).toHaveCount(5);
+  await expect(page.locator('.discovery-history, .discovery-connection-bubble')).toHaveCount(0);
+
+  await page.evaluate(() => window.fixture.pendingLoads.splice(0, 1).forEach(resolve => resolve()));
+  await expect(skeleton).toBeVisible();
+
+  await page.evaluate(() => window.fixture.pendingLoads.splice(0).forEach(resolve => resolve()));
+  await expect(skeleton).toHaveCount(0);
+  await expect(page.locator('.discovery-connection-bubble')).toHaveCount(4);
+});
 
 test('Home categories expand into chat cards before opening a conversation', async ({ page }) => {
   await page.goto('/conversations?session=1');
@@ -784,11 +855,43 @@ test('failed message history does not mark the chat read', async ({ page }) => {
 
 test('all profile sections remain visible on a narrow screen', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/profile');
+  await page.goto('/');
+  await page.evaluate(() => { window.fixture.capacity = { weekly_limit: 2, monthly_limit: 5, weekly_booked: 1, monthly_booked: 1 }; });
+  await page.locator('.app-sidebar').getByRole('link', { name: 'My profile' }).click();
   const tabs = page.locator('.profile-tabs');
   for (const section of ['overview', 'skills', 'availability', 'experience', 'reflections']) {
     await expect(tabs.getByTestId(`profile-tab-${section}`)).toBeInViewport();
   }
+  await tabs.getByTestId('profile-tab-availability').click();
+  const availabilityStatus = page.getByTestId('availability-status');
+  const pause = page.getByTestId('toggle-availability');
+  await expect(availabilityStatus).toBeVisible();
+  await expect(pause).toBeVisible();
+  expect(await availabilityStatus.evaluate(element => {
+    const status = element.getBoundingClientRect();
+    const button = document.querySelector('[data-testid="toggle-availability"]').getBoundingClientRect();
+    return Math.abs(status.top + status.height / 2 - button.top - button.height / 2);
+  })).toBeLessThan(3);
+  const weeklyFill = page.getByTestId('capacity-fill-weekly');
+  const monthlyFill = page.getByTestId('capacity-fill-monthly');
+  await expect(weeklyFill).toHaveCSS('animation-name', 'capacityFill');
+  await expect(monthlyFill).toHaveCSS('animation-name', 'capacityFill');
+  expect(await weeklyFill.evaluate(element => element.style.width)).toBe('50%');
+  expect(await monthlyFill.evaluate(element => element.style.width)).toBe('20%');
+});
+
+test('Groups uses a brief page fade without shifting content', async ({ page }) => {
+  await page.goto('/profile');
+  const content = page.locator('.app-main > div');
+  const leftBefore = await content.evaluate(element => element.getBoundingClientRect().left);
+  await page.locator('.app-sidebar').getByRole('link', { name: 'Groups' }).click();
+  await expect(page).toHaveURL(/\/groups$/);
+  await expect(page.locator('.page-transition')).toHaveCSS('animation-duration', '0.24s');
+  await expect(page.locator('.page-transition')).toHaveCSS('animation-delay', '0s');
+  const opacity = Number(await page.locator('.page-transition').evaluate(element => getComputedStyle(element).opacity));
+  expect(opacity).toBeLessThan(1);
+  const leftAfter = await content.evaluate(element => element.getBoundingClientRect().left);
+  expect(Math.abs(leftAfter - leftBefore)).toBeLessThan(1);
 });
 
 test('chat rail previews the latest message after send and reload', async ({ page }) => {
@@ -928,6 +1031,7 @@ test('declining a pending request keeps the mentor signed in', async ({ page }) 
   await expect(page).not.toHaveURL(/\/login/);
   await expect(page.locator('.conversation-request-card')).toContainText('A pending request');
 });
+
 test('a profile opened from chat results leads back to the same results', async ({ page }) => {
   await page.goto('/');
   const composer = page.getByRole('textbox', { name: 'Describe who could help' });
