@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../api/index.js';
 import { useT } from '../i18n/index.jsx';
@@ -23,6 +23,8 @@ export default function Groups() {
   const { t } = useT();
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
+  const initialLoadingUntil = useRef(null);
+  const loadingTimer = useRef(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [saving, setSaving] = useState(false);
@@ -42,6 +44,8 @@ export default function Groups() {
   const [rosterRevision, setRosterRevision] = useState(0);
 
   async function load() {
+    const startedAt = Date.now();
+    if (initialLoadingUntil.current === null) initialLoadingUntil.current = startedAt + 1000;
     setLoading(true);
     try {
       const res = await api.get('/groups');
@@ -50,7 +54,9 @@ export default function Groups() {
     } catch {
       setError(t('groups.error.load'));
     } finally {
-      setLoading(false);
+      const minimumTime = Math.max(0, initialLoadingUntil.current - startedAt);
+      window.clearTimeout(loadingTimer.current);
+      loadingTimer.current = window.setTimeout(() => setLoading(false), Math.max(0, minimumTime - (Date.now() - startedAt)));
     }
   }
 
@@ -62,7 +68,7 @@ export default function Groups() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'group_join_requests' }, refresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members' }, refresh)
       .subscribe();
-    return () => { window.removeEventListener('focus', refresh); supabase.removeChannel(channel); };
+    return () => { window.removeEventListener('focus', refresh); supabase.removeChannel(channel); window.clearTimeout(loadingTimer.current); };
   }, []);
 
   useEffect(() => {
@@ -190,7 +196,7 @@ export default function Groups() {
       </header>
       <div>
           {error && !createOpen && !joinTarget && !reviewTarget && <p className="text-sm text-destructive" role="alert">{error}</p>}
-          {loading && groups.length === 0 ? (
+          {loading ? (
             <div role="status" aria-label={t('common.loading')} className="space-y-2">
               {[0, 1, 2].map(index => (
                 <div key={index} className="flex items-center gap-3 px-3 py-4">

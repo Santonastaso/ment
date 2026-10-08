@@ -474,6 +474,68 @@ test('Messages count sits beside its heading', async ({ page }) => {
   expect(gap).toBeGreaterThanOrEqual(0);
   expect(gap).toBeLessThanOrEqual(12);
 });
+test('Messages shows chat skeleton rows until sessions and groups load', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => { window.fixture.holdLoads = ['/sessions', '/groups']; });
+  await page.locator('nav').getByRole('link', { name: /^Messages/ }).click();
+
+  const skeleton = page.locator('.conversation-list-skeleton');
+  try {
+    await expect(skeleton).toBeVisible();
+    await expect(skeleton.locator('.conversation-list-skeleton-row')).toHaveCount(7);
+    await expect(page.locator('.conversation-list-item')).toHaveCount(0);
+    expect(await page.evaluate(() => Date.now() - Math.min(...window.fixture.heldLoadStartedAt))).toBeLessThan(900);
+  } finally {
+    await page.evaluate(() => window.fixture.pendingLoads.splice(0).forEach(resolve => resolve()));
+  }
+  await expect(skeleton).toHaveCount(0);
+  expect(await page.evaluate(() => Date.now() - Math.min(...window.fixture.heldLoadStartedAt))).toBeGreaterThanOrEqual(950);
+  await expect(page.locator('.conversation-list-item')).toHaveCount(3);
+  await expect(page.locator('.conversation-list-item').first()).toContainText('Peer 1');
+});
+
+test('Explorer shows profile-shaped skeletons until directory results load', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => { window.fixture.holdLoads = ['/directory*']; });
+  await page.locator('nav').getByRole('link', { name: 'Explorer' }).click();
+
+  const skeletons = page.locator('.person-row-skeleton');
+  const pagination = page.locator('.directory-pagination');
+  try {
+    await expect(skeletons).toHaveCount(6);
+    await expect(skeletons.first()).toBeVisible();
+    await expect(page.locator('.directory-results .person-row:not(.person-row-skeleton)')).toHaveCount(0);
+    await expect(pagination).toBeVisible();
+    await expect(pagination.locator('[data-slot="skeleton"]')).toHaveCount(4);
+    await expect(pagination).not.toContainText('Showing');
+    expect(await page.evaluate(() => Date.now() - Math.min(...window.fixture.heldLoadStartedAt))).toBeLessThan(900);
+  } finally {
+    await page.evaluate(() => window.fixture.pendingLoads.splice(0).forEach(resolve => resolve()));
+  }
+  await expect(skeletons).toHaveCount(0);
+  expect(await page.evaluate(() => Date.now() - Math.min(...window.fixture.heldLoadStartedAt))).toBeGreaterThanOrEqual(950);
+  await expect(pagination).toContainText('Showing 1–1 of 1');
+  await expect(page.locator('.directory-results .person-row:not(.person-row-skeleton)')).toHaveCount(1);
+});
+
+test('Groups keeps its skeleton until the whole group list is ready', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => { window.fixture.holdLoads = ['/groups']; });
+  await page.locator('nav').getByRole('link', { name: 'Groups' }).click();
+
+  const skeleton = page.locator('main [role="status"]');
+  try {
+    await expect(skeleton).toBeVisible();
+    await expect(page.locator('main article.person-row')).toHaveCount(0);
+    expect(await page.evaluate(() => Date.now() - Math.min(...window.fixture.heldLoadStartedAt))).toBeLessThan(900);
+  } finally {
+    await page.evaluate(() => window.fixture.pendingLoads.splice(0).forEach(resolve => resolve()));
+  }
+  await expect(skeleton).toHaveCount(0);
+  expect(await page.evaluate(() => Date.now() - Math.min(...window.fixture.heldLoadStartedAt))).toBeGreaterThanOrEqual(950);
+  await expect(page.locator('main article.person-row')).toContainText('Test Group');
+});
+
 
 test('Home categories expand into chat cards before opening a conversation', async ({ page }) => {
   await page.goto('/conversations?session=1');

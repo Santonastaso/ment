@@ -12,6 +12,10 @@ function fixtureApi(state) {
   };
   const call = async (method, path, body) => {
     state.calls.push({ method, path, body });
+    if (method === 'get' && state.holdLoads?.some(held => held.endsWith('*') ? path.startsWith(held.slice(0, -1)) : path === held)) {
+      state.heldLoadStartedAt.push(Date.now());
+      await new Promise(resolve => state.pendingLoads.push(resolve));
+    }
     if (method === 'post' && state.failNext === path) { state.failNext = null; throw new Error('Fixture network failure'); }
     if (method === 'get') {
       if (state.failGet === path) throw new Error('Fixture history load failed');
@@ -123,7 +127,7 @@ export const test = base.extend({
       window.fixture = {
         user: JSON.parse(sessionStorage.getItem('ment.fixture.auth') || 'null') || user,
         persistAuth: sessionStorage.getItem('ment.fixture.persistAuth') === '1',
-        peer, calls: [], pending: [], nextMessageId: 10, profile: null, messages: JSON.parse(sessionStorage.getItem('ment.fixture.messages') || '{}'),
+        peer, calls: [], pending: [], pendingLoads: [], holdLoads: [], heldLoadStartedAt: [], nextMessageId: 10, profile: null, messages: JSON.parse(sessionStorage.getItem('ment.fixture.messages') || '{}'),
         unread: { sessions: 0, groups: 1, sessionMessages: {}, groupMessages: { 1: 2 } },
         groups: [{ id: 1, name: 'Test Group', description: 'A group for testing', joined: true, is_owner: true, member_count: 3 }],
         groupMembers: { 1: [
