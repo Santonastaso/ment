@@ -49,9 +49,12 @@ function fixtureApi(state) {
         return {};
       }
       if (path.endsWith('/acknowledge')) { state.sessions.find(s => s.id === Number(path.split('/')[2])).mentee_acknowledged_at = new Date().toISOString(); return {}; }
-      if (path === '/profile/ingest') return { draft_id: 1, classifier_source: 'test', proposed: {
+      if (path === '/profile/ingest') {
+        if (state.requireFreshAuth && !state.authReady) throw new Error('auth_required');
+        return { draft_id: 1, classifier_source: 'test', proposed: state.ingestProposed || {
         job_title: 'Analyst', bio: 'Built useful systems.', career_history: [], can_teach: [], wants_to_learn: [],
-      } };
+        } };
+      }
       if (path === '/profile/ingest/1/accept') return { ok: true };
       if (path === '/users/me/onboarding') return { ...state.user, ...body, onboarding_complete: true };
       if (path === '/discovery/matches') {
@@ -112,7 +115,9 @@ export const test = base.extend({
     await page.addInitScript(({ user, peer }) => {
       localStorage.setItem('ment.lang', 'en');
       window.fixture = {
-        user, peer, calls: [], pending: [], nextMessageId: 10, messages: JSON.parse(sessionStorage.getItem('ment.fixture.messages') || '{}'),
+        user: JSON.parse(sessionStorage.getItem('ment.fixture.auth') || 'null') || user,
+        persistAuth: sessionStorage.getItem('ment.fixture.persistAuth') === '1',
+        peer, calls: [], pending: [], nextMessageId: 10, messages: JSON.parse(sessionStorage.getItem('ment.fixture.messages') || '{}'),
         unread: { sessions: 0, groups: 1, sessionMessages: {}, groupMessages: { 1: 2 } },
         groups: [{ id: 1, name: 'Test Group', description: 'A group for testing', joined: true, is_owner: true, member_count: 3 }],
         groupMembers: { 1: [
@@ -141,10 +146,21 @@ export const test = base.extend({
         export function AuthProvider({children}) {
           const [user, setUser] = React.useState(window.fixture.user);
           const [unreadCounts, setUnread] = React.useState(window.fixture.unread);
-          const updateUser = next => {window.fixture.user = next; setUser(next)};
+          const updateUser = next => {
+            window.fixture.user = next;
+            if (window.fixture.persistAuth) sessionStorage.setItem('ment.fixture.auth', JSON.stringify(next));
+            setUser(next);
+          };
           window.fixture.setUser = updateUser;
           const value = { user, session: user ? {user: {email:user.email}} : null, loading:false, pendingAcceptanceCount:0, unreadCounts,
-            updateUser, logout:async()=>updateUser(null), signOut:async()=>updateUser(null), refreshPendingAcceptances:async()=>{},
+            updateUser, logout:async()=>updateUser(null), signOut:async()=>updateUser(null),
+            refreshProfile:async()=>{if(window.fixture.requireFreshAuth&&!window.fixture.authReady)throw new Error('stale_session')},
+            signIn:async(email,password)=>{
+              const invited = window.fixture.invitedUser;
+              if (!invited || email !== invited.email || password !== window.fixture.tempPassword) throw new Error('Invalid credentials');
+              window.fixture.authReady=true;
+              updateUser(invited);
+            },
             refreshUnreadCounts:async()=>setUnread(structuredClone(window.fixture.unread)) };
           return React.createElement(Context.Provider, {value}, children);
         }
@@ -153,7 +169,19 @@ export const test = base.extend({
       if (url.pathname === '/src/lib/supabase.js') return route.fulfill({ contentType: 'text/javascript', body: `
         const listeners = [];
         window.fixture.emit = (table, row) => listeners.filter(l => l.filter.table === table).forEach(l => l.callback({new:row}));
-        export const supabase = {auth:{
+        export const supabase = {functions:{invoke:async(name,{body})=>{
+          if(name!=='complete-password-change') throw new Error('Unexpected function: '+name);
+          window.fixture.changedPassword=body.password;
+          window.fixture.authReady=false;
+          return {data:{ok:true},error:null};
+        }},auth:{
+          signInWithPassword:async({email,password})=>{
+            if(window.fixture.failReauth||email!==window.fixture.invitedUser?.email||password!==window.fixture.changedPassword)return {error:new Error('Invalid credentials')};
+            window.fixture.authReady=true;
+            window.fixture.reauthenticated=true;
+            window.fixture.setUser({...window.fixture.user,must_change_password:false});
+            return {error:null};
+          },
           resetPasswordForEmail:async(email,options)=>{window.fixture.resetRequest={email,options};return {error:null}},
           setSession:async()=>{window.fixture.setUser({...window.fixture.user,id:'viewer',email:'student@example.test'});return {error:null}},
           updateUser:async()=>({error:null}),

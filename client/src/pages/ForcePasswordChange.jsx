@@ -56,6 +56,7 @@ export default function ForcePasswordChange({ recovery = false }) {
     if (next.length < 8) { setError(t('auth.forcePassword.error.tooShort')); return; }
     if (next !== confirm) { setError(t('auth.forcePassword.error.mismatch')); return; }
     setLoading(true);
+    let passwordSaved = false;
     try {
       if (recovery) {
         const { error: changeError } = await supabase.auth.updateUser({ password: next });
@@ -67,10 +68,16 @@ export default function ForcePasswordChange({ recovery = false }) {
           body: { password: next },
         });
         if (changeError) throw changeError;
+        passwordSaved = true;
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: session.user.email,
+          password: next,
+        });
+        if (signInError) throw signInError;
         await refreshProfile();
       }
     } catch {
-      setError(t(recovery ? 'auth.recovery.updateError' : 'auth.forcePassword.error.generic'));
+      setError(t(recovery ? 'auth.recovery.updateError' : passwordSaved ? 'auth.forcePassword.error.signInAgain' : 'auth.forcePassword.error.generic'));
     } finally {
       setLoading(false);
     }

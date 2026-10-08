@@ -106,7 +106,7 @@ export function AuthProvider({ children }) {
   async function refreshProfile() {
     setLoading(true);
     try {
-      const current = session || (await supabase.auth.getSession()).data.session;
+      const current = (await supabase.auth.getSession()).data.session;
       if (!current?.user?.id) {
         setProfileError(false);
         return;

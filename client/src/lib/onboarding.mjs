@@ -1,5 +1,6 @@
 export function onboardingErrorKey(error, importing = false) {
   const code = error?.response?.data?.error || error?.message || '';
+  if (error?.response?.status === 401) return 'onboarding.error.session';
   if (/invalid_token|auth_required|jwt|session.*expired/i.test(code)) return 'onboarding.error.session';
   if (/save_onboarding|schema cache|PGRST202/i.test(code)) return 'onboarding.error.unavailable';
   if (/document_too|unsupported_document|text_too_short|document_read/i.test(code)) return 'onboarding.import.error';

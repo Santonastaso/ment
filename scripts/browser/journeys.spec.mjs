@@ -1,5 +1,112 @@
 import { test, expect } from './fixtures.mjs';
 
+function mockCvPdf() {
+  const stream = 'BT /F1 12 Tf 72 720 Td (Invited Tester Engineering Mentor London) Tj ET';
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',
+    `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ];
+  let pdf = '%PDF-1.4\n';
+  const offsets = [0];
+  for (const [index, object] of objects.entries()) {
+    offsets.push(pdf.length);
+    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  }
+  const xref = pdf.length;
+  pdf += `xref\n0 ${offsets.length}\n0000000000 65535 f \n`;
+  pdf += offsets.slice(1).map(offset => `${String(offset).padStart(10, '0')} 00000 n \n`).join('');
+  return Buffer.from(`${pdf}trailer\n<< /Size ${offsets.length} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`);
+}
+
+test('invited member signs in, changes temporary password, imports CV, and finishes onboarding', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => {
+    window.fixture.persistAuth = true;
+    window.fixture.requireFreshAuth = true;
+    sessionStorage.setItem('ment.fixture.persistAuth', '1');
+    window.fixture.invitedUser = {
+      id: 'invited', email: 'invited@example.test', name: 'Invited Tester', role: 'student',
+      must_change_password: true, onboarding_complete: false,
+    };
+    window.fixture.tempPassword = 'temporary-password-2026';
+    window.fixture.ingestProposed = {
+      department: 'Engineering', job_title: 'Mentor', location: 'London',
+      can_teach: [{ skill: 'Architecture', example_project: 'Built a platform' }],
+      wants_to_learn: ['Leadership'], career_history: [],
+    };
+    window.fixture.setUser(null);
+  });
+  await expect(page).toHaveURL(/\/login$/);
+  await page.getByRole('textbox', { name: 'Email' }).fill('invited@example.test');
+  await page.getByLabel('Password', { exact: true }).fill('temporary-password-2026');
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await expect(page).toHaveURL(/\/change-password$/);
+  await page.getByLabel('New password').fill('new-private-password-2026');
+  await page.getByLabel('Confirm password').fill('new-private-password-2026');
+  await page.getByRole('button', { name: 'Update password' }).click();
+  await expect(page).toHaveURL(/\/onboarding$/);
+  await expect(page.locator('input[type="file"]')).toBeDisabled();
+  await page.getByRole('checkbox').check();
+  await page.locator('input[type="file"]').setInputFiles({
+    name: 'invited-cv.pdf', mimeType: 'application/pdf', buffer: mockCvPdf(),
+  });
+  await expect(page.getByRole('heading', { name: 'Your background' })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Full name' })).toHaveValue('Invited Tester');
+  await expect(page.locator('select.input').first()).toHaveValue('Engineering');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByRole('heading', { name: 'What you can teach' })).toBeVisible();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByRole('heading', { name: 'What you want to learn' })).toBeVisible();
+  await page.getByRole('button', { name: 'Finish & see my matches' }).click();
+  await expect(page).toHaveURL('http://127.0.0.1:3010/');
+  expect(await page.evaluate(async () => {
+    const calls = window.fixture.calls;
+    const upload = calls.find(call => call.path === '/profile/ingest');
+    const save = calls.find(call => call.path === '/users/me/onboarding');
+    return {
+      changedPassword: window.fixture.changedPassword,
+      reauthenticated: window.fixture.reauthenticated,
+      uploaded: [upload.body.get('kind'), upload.body.get('file').name, (await upload.body.get('file').arrayBuffer()).byteLength],
+      saved: [save.body.name, save.body.department, save.body.current_role, save.body.can_teach[0].skill, save.body.wants_to_learn[0]],
+      acceptedDraft: calls.some(call => call.path === '/profile/ingest/1/accept'),
+      ready: window.fixture.user.onboarding_complete,
+    };
+  })).toEqual({
+    changedPassword: 'new-private-password-2026', reauthenticated: true,
+    uploaded: ['cv', 'invited-cv.pdf', mockCvPdf().length],
+    saved: ['Invited Tester', 'Engineering', 'Mentor', 'Architecture', 'Leadership'],
+    acceptedDraft: true, ready: true,
+  });
+  await page.reload();
+  await expect(page).toHaveURL('http://127.0.0.1:3010/');
+  await expect(page.getByRole('link', { name: 'My profile' })).toBeVisible();
+});
+
+test('a saved password with failed reauthentication tells the member to sign in again', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => {
+    window.fixture.invitedUser = {
+      id: 'invited', email: 'invited@example.test', name: 'Invited Tester', role: 'student',
+      must_change_password: true, onboarding_complete: false,
+    };
+    window.fixture.tempPassword = 'temporary-password-2026';
+    window.fixture.failReauth = true;
+    window.fixture.setUser(null);
+  });
+  await page.getByRole('textbox', { name: 'Email' }).fill('invited@example.test');
+  await page.getByLabel('Password', { exact: true }).fill('temporary-password-2026');
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.getByLabel('New password').fill('new-private-password-2026');
+  await page.getByLabel('Confirm password').fill('new-private-password-2026');
+  await page.getByRole('button', { name: 'Update password' }).click();
+  await expect(page.getByRole('alert')).toContainText('Password saved, but automatic sign-in failed.');
+  await page.getByRole('button', { name: 'Sign out' }).click();
+  await expect(page).toHaveURL(/\/login$/);
+});
+
 test('password reset stays on Ment and accepts a recovery link', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => window.fixture.setUser(null));
