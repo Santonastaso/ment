@@ -144,6 +144,7 @@ export default function Conversations() {
   const showGroups = FILTERS.find(option => option.key === filter)?.groups === true;
 
   const [messages, setMessages] = useState([]);
+  const [loadedThreadKey, setLoadedThreadKey] = useState('');
   const sessionsFetchRef = useRef(0);
   const [hasOlder, setHasOlder] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
@@ -155,6 +156,7 @@ export default function Conversations() {
   const threadKey = selectedGroupId ? `group:${selectedGroupId}` : selectedId ? `session:${selectedId}` : '';
   const activeThreadRef = useRef(threadKey);
   activeThreadRef.current = threadKey;
+  const pageLoading = loading || (!!threadKey && loadedThreadKey !== threadKey);
   const draft = drafts[threadKey] || '';
   const sending = !!sendingThreads[threadKey];
   const [scheduleOpen, setScheduleOpen] = useState(false);
@@ -287,6 +289,8 @@ export default function Conversations() {
 
   useEffect(() => {
     let cancelled = false;
+    let loadingTimer;
+    const loadingStartedAt = Date.now();
     setLoading(true);
     Promise.all([loadSessions(), loadGroups()])
       .then(([nextSessions, nextGroups]) => {
@@ -307,8 +311,14 @@ export default function Conversations() {
         else if (selectedId || selectedGroupId) setParams({}, { replace: true });
       })
       .catch((requestError) => { if (!cancelled) setError(requestError.response?.data?.error || t('conversations.error')); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+      .finally(() => {
+        if (cancelled) return;
+        loadingTimer = window.setTimeout(
+          () => { if (!cancelled) setLoading(false); },
+          Math.max(0, 1000 - (Date.now() - loadingStartedAt)),
+        );
+      });
+    return () => { cancelled = true; window.clearTimeout(loadingTimer); };
   }, []);
 
   useEffect(() => {
@@ -345,6 +355,7 @@ export default function Conversations() {
   useLayoutEffect(() => {
     setMessages([]);
     setHasOlder(false);
+    setLoadedThreadKey('');
   }, [selectedId, selectedGroupId]);
 
   useEffect(() => {
@@ -352,9 +363,16 @@ export default function Conversations() {
       let cancelled = false;
       const refresh = (initial = false) => loadGroupMessages(selectedGroupId, null, initial)
         .then(() => {
-          if (!cancelled) return api.post(`/groups/${selectedGroupId}/read`, {}).then(refreshUnreadCounts);
+          if (cancelled) return;
+          if (initial) setLoadedThreadKey(`group:${selectedGroupId}`);
+          return api.post(`/groups/${selectedGroupId}/read`, {}).then(refreshUnreadCounts);
         })
-        .catch((requestError) => { if (!cancelled) setError(requestError.response?.data?.error || t('conversations.error')); });
+        .catch((requestError) => {
+          if (!cancelled) {
+            setError(requestError.response?.data?.error || t('conversations.error'));
+            if (initial) setLoadedThreadKey(`group:${selectedGroupId}`);
+          }
+        });
       refresh(true);
       const channel = supabase.channel(`group-${selectedGroupId}`)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_messages', filter: `group_id=eq.${selectedGroupId}` }, async ({ new: row }) => {
@@ -382,10 +400,14 @@ export default function Conversations() {
       try {
         await loadMessages(selectedId, null, initial);
         if (cancelled) return;
+        if (initial) setLoadedThreadKey(`session:${selectedId}`);
         await api.post(`/sessions/${selectedId}/read`, {});
         await refreshUnreadCounts();
       } catch (requestError) {
-        if (!cancelled) setError(requestError.response?.data?.error || t('conversations.error'));
+        if (!cancelled) {
+          setError(requestError.response?.data?.error || t('conversations.error'));
+          if (initial) setLoadedThreadKey(`session:${selectedId}`);
+        }
       }
     };
     refresh(true);
@@ -516,23 +538,6 @@ export default function Conversations() {
     } finally { setSavingSchedule(false); }
   }
 
-  if (loading) return (
-    <div className="conversations-shell" role="status" aria-label={t('common.loading')}>
-      <aside className="conversation-list space-y-3 p-4">
-        <Skeleton className="mb-6 h-6 w-28" />
-        {[0, 1, 2, 3].map(index => (
-          <div key={index} className="flex items-center gap-3 py-2">
-            <Skeleton className="size-9 shrink-0 rounded-full" />
-            <div className="flex-1 space-y-2"><Skeleton className="h-4 w-3/4" /><Skeleton className="h-3 w-1/2" /></div>
-          </div>
-        ))}
-      </aside>
-      <div className="conversation-loading">
-        <div className="space-y-3"><Skeleton className="h-5 w-44" /><Skeleton className="h-4 w-64" /></div>
-      </div>
-    </div>
-  );
-
   const timelineItems = selected
     ? [{ id: `request-${selected.id}`, kind: 'request-card', created_at: selected.created_at }, ...messages.filter(message => message.kind !== 'request')]
     : messages.filter(message => message.kind !== 'request');
@@ -541,13 +546,17 @@ export default function Conversations() {
   return (
     <section className={cn('conversations-shell', (selectedId || selectedGroupId) && 'has-selection', railCollapsed && 'is-list-collapsed')}>
       <aside ref={railRef} className="conversation-list" aria-label={t('conversations.title')}>
-        <header><div className="conversation-list-heading"><h1>{t('conversations.title')}</h1><span className="conversation-list-count">{sessions.length + groups.length}</span></div><button type="button" className="conversation-list-toggle" onClick={() => { setRailCollapsed(current => !current); setRailMenu(null); }} aria-label={railCollapsed ? t('conversations.openList') : t('conversations.closeList')} title={railCollapsed ? t('conversations.openList') : t('conversations.closeList')}>{railCollapsed ? <ChevronsRight aria-hidden="true" /> : <ChevronsLeft aria-hidden="true" />}</button></header>
+        <header><div className="conversation-list-heading"><h1>{t('conversations.title')}</h1>{pageLoading ? <Skeleton className="h-5 w-8 rounded-full" /> : <span className="conversation-list-count">{sessions.length + groups.length}</span>}</div><button type="button" className="conversation-list-toggle" onClick={() => { setRailCollapsed(current => !current); setRailMenu(null); }} aria-label={railCollapsed ? t('conversations.openList') : t('conversations.closeList')} title={railCollapsed ? t('conversations.openList') : t('conversations.closeList')}>{railCollapsed ? <ChevronsRight aria-hidden="true" /> : <ChevronsLeft aria-hidden="true" />}</button></header>
         {railCollapsed && <div className="conversation-rail-controls" role="group" aria-label={t('conversations.title')}>
           <button type="button" aria-label={t('conversations.filter.label')} title={t('conversations.filter.label')} aria-expanded={railMenu === 'filters'} aria-controls="conversation-list-filters" onClick={() => setRailMenu(current => current === 'filters' ? null : 'filters')}><ListFilter aria-hidden="true" /></button>
           <button type="button" aria-label={t('conversations.title')} title={t('conversations.title')} aria-expanded={railMenu === 'chats'} aria-controls="conversation-list-chats" onClick={() => setRailMenu(current => current === 'chats' ? null : 'chats')}><MessageSquareText aria-hidden="true" />{unreadCounts.sessions + unreadCounts.groups > 0 && <span className="conversation-rail-unread">{unreadCounts.sessions + unreadCounts.groups}</span>}</button>
         </div>}
         <div className={cn('conversation-list-content', railMenu && `menu-${railMenu}`)}>
-        {(sessions.length > 0 || groups.length > 0) && (
+        {pageLoading ? (
+          <div className="conversation-filters conversation-filters-skeleton" aria-hidden="true">
+            {FILTERS.map(option => <Skeleton key={option.key} className="h-9 rounded-full" />)}
+          </div>
+        ) : (sessions.length > 0 || groups.length > 0) && (
           <div id="conversation-list-filters" className="conversation-filters" role="group" aria-label={t('conversations.filter.label')}>
             {FILTERS.map(option => {
               const count = option.key === 'all'
@@ -571,8 +580,18 @@ export default function Conversations() {
             })}
           </div>
         )}
-        <div id="conversation-list-chats" className="conversation-list-scroll">
-        {sessions.length === 0 && groups.length === 0 ? (
+        <div id="conversation-list-chats" className="conversation-list-scroll" aria-busy={pageLoading}>
+        {pageLoading ? (
+          <div className="conversation-list-skeleton" role="status" aria-label={t('common.loading')}>
+            {Array.from({ length: 7 }, (_, index) => (
+              <div key={index} className="conversation-list-skeleton-row">
+                <Skeleton className="size-9 shrink-0 rounded-full" />
+                <span className="conversation-list-skeleton-copy"><Skeleton className="h-3.5 w-2/3" /><Skeleton className="h-3 w-5/6" /></span>
+                <Skeleton className="h-4 w-12 rounded-full" />
+              </div>
+            ))}
+          </div>
+        ) : sessions.length === 0 && groups.length === 0 ? (
           <div className="conversation-empty">
             <MessageCircle />
             <strong>{t('conversations.emptyTitle')}</strong>
@@ -619,8 +638,14 @@ export default function Conversations() {
         </div>
       </aside>
 
-      <div key={selectedGroup ? `group-${selectedGroup.id}` : selected ? `session-${selected.id}` : 'empty'} className="conversation-thread">
-        {!selected && !selectedGroup ? (
+      <div key={selectedGroup ? `group-${selectedGroup.id}` : selected ? `session-${selected.id}` : 'empty'} className="conversation-thread" aria-busy={pageLoading}>
+        {pageLoading ? (
+          <div className="conversation-thread-skeleton" role="status" aria-label={t('common.loading')}>
+            <Skeleton className="h-16 w-full rounded-2xl" />
+            <div className="conversation-thread-skeleton-message"><Skeleton className="h-24 w-2/3 rounded-2xl" /><Skeleton className="h-16 w-1/2 self-end rounded-2xl" /></div>
+            <Skeleton className="mt-auto h-12 w-full rounded-xl" />
+          </div>
+        ) : !selected && !selectedGroup ? (
           <div className="conversation-placeholder"><MessageCircle /><p>{t('conversations.select')}</p></div>
         ) : (
           <>

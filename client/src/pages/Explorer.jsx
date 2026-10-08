@@ -66,6 +66,9 @@ export default function Explorer() {
   // Directory-style: filters + pagination, server-side.
   useEffect(() => {
     let cancelled = false;
+    let loadingTimer;
+    const initialLoad = !dirData;
+    const loadingStartedAt = Date.now();
     setDirLoading(true);
     setDirError(false);
     const params = new URLSearchParams({
@@ -91,8 +94,15 @@ export default function Explorer() {
         }, { replace: true });
       })
       .catch(() => { if (!cancelled) setDirError(true); })
-      .finally(() => { if (!cancelled) setDirLoading(false); });
-    return () => { cancelled = true; };
+      .finally(() => {
+        if (cancelled) return;
+        const minimumLoadingTime = initialLoad ? 1000 : 0;
+        loadingTimer = window.setTimeout(
+          () => { if (!cancelled) setDirLoading(false); },
+          Math.max(0, minimumLoadingTime - (Date.now() - loadingStartedAt)),
+        );
+      });
+    return () => { cancelled = true; window.clearTimeout(loadingTimer); };
   }, [query, persona, program, cohort, location, languageKey, sort, page, retry]);
 
   function submitSearch(e) {
@@ -132,7 +142,16 @@ export default function Explorer() {
                 {hasActiveFilters && <div className="flex min-h-[var(--navigation-row-height)] flex-wrap items-center justify-between gap-3">
                   <Button type="button" size="xs" variant="ghost" onClick={() => { setInputValue(''); setSearchParams({}); }}>{t('explorer.clearFilters')}</Button>
                 </div>}
-                {!dirError && total > 0 && (
+                {updatingResults ? (
+                  <div className="directory-pagination mt-6 flex min-h-14 flex-wrap items-center justify-between gap-3 border-t border-border pt-4 text-sm" aria-hidden="true">
+                    <Skeleton className="h-4 w-32" />
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="h-9 w-24 rounded-full" />
+                      <Skeleton className="h-4 w-8" />
+                      <Skeleton className="h-9 w-16 rounded-full" />
+                    </div>
+                  </div>
+                ) : !dirError && total > 0 && (
                   <div className="directory-pagination mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4 text-sm text-muted-foreground">
                     {updatingResults ? <Skeleton className="h-4 w-28" /> : <span>{t('explorer.showing', { from, to, total })}</span>}
                     <div className="flex items-center gap-2">
@@ -149,15 +168,22 @@ export default function Explorer() {
               </div>
 
               <div key={dirError ? 'error' : dirData?.requestKey || 'initial'} className="directory-results" data-loading={updatingResults && !!dirData} aria-busy={updatingResults} inert={updatingResults && !!dirData ? '' : undefined}>
-              {dirError ? (
+              {updatingResults ? (
+                <div className="directory-rail grid gap-1" role="status" aria-label={t('common.loading')}>
+                  {[1, 2, 3, 4, 5, 6].map(i => (
+                    <article key={i} className="person-row person-row-skeleton" aria-hidden="true">
+                      <Skeleton className="person-row-avatar size-10 rounded-full" />
+                      <span className="person-row-identity"><Skeleton className="h-4 w-36 max-w-full" /><Skeleton className="h-3 w-56 max-w-full" /></span>
+                      <span className="person-row-actions"><Skeleton className="h-8 w-24 rounded-full" /><Skeleton className="h-8 w-32 rounded-full" /></span>
+                      <span className="person-row-meta"><Skeleton className="h-5 w-20 rounded-full" /><Skeleton className="h-5 w-24 rounded-full" /><Skeleton className="h-5 w-16 rounded-full" /></span>
+                    </article>
+                  ))}
+                </div>
+              ) : dirError ? (
                 <Surface><SurfaceBody className="space-y-3" role="alert">
                   <p role="alert">{t('explorer.directoryError')}</p>
                   <Button onClick={() => setRetry(n => n + 1)}>{t('explorer.retry')}</Button>
                 </SurfaceBody></Surface>
-              ) : dirLoading && !dirData ? (
-                <div className="grid gap-1">
-                  {[1, 2, 3, 4, 5, 6].map(i => <Skeleton key={i} className="my-3 h-20 rounded-lg" />)}
-                </div>
               ) : total === 0 ? (
                 <Surface>
                   <SurfaceBody className="py-12 text-center">
