@@ -378,7 +378,7 @@ test('Explorer sticky panel controls share dimensions and use the interactive ra
   const option = page.locator('.directory-filter-option:visible').first();
   await expect(option).toBeVisible();
   expect(await option.evaluate(element => element.getBoundingClientRect().height)).toBeCloseTo(homeHeight, 3);
-  expect(await option.evaluate(element => getComputedStyle(element).borderRadius)).toBe('24px');
+  expect(await option.evaluate(element => getComputedStyle(element).borderRadius)).toBe('999px');
   await page.keyboard.press('Escape');
   const [searchBox, brandBox] = await Promise.all([
     page.locator('.directory-search-panel form').boundingBox(),
