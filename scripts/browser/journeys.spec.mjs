@@ -437,6 +437,18 @@ test('Quick reflection opens a card without shifting the profile and preserves d
 test('Profile skill filters share the navigation pill geometry', async ({ page }) => {
   await page.goto('/profile');
   await page.getByTestId('profile-tab-skills').click();
+  const visualTokens = await page.locator(':root').evaluate(element => {
+    const style = getComputedStyle(element);
+    return [style.getPropertyValue('--background').trim(), style.getPropertyValue('--panel-radius').trim()];
+  });
+  expect(visualTokens).toEqual(['#f4f4f2', '24px']);
+  const panels = page.locator('.profile-tab-content .grid.items-start > div');
+  expect(await learnPanel.locator('.profile-skill-heading').evaluate(element => getComputedStyle(element).color)).toBe('rgb(71, 102, 79)');
+  expect(await teachPanel.evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgb(241, 241, 238)');
+  expect(await learnPanel.evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgb(241, 241, 238)');
+  await expect(panels).toHaveCount(2);
+  const [teachPanel, learnPanel] = await panels.all();
+  expect(await teachPanel.locator('.profile-skill-heading').evaluate(element => getComputedStyle(element).color)).toBe('rgb(147, 70, 47)');
   const home = page.locator('.app-sidebar').getByRole('link', { name: 'Home' });
   const geometry = locator => locator.evaluate(element => {
     const style = getComputedStyle(element);

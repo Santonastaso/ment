@@ -744,7 +744,7 @@ export default function Profile() {
       {isOwnProfile && tab === 'skills' && (
         <div className="grid items-start gap-5 lg:grid-cols-2">
           <div className="min-w-0 rounded-[var(--panel-radius)] border border-[var(--border-subtle)] bg-[var(--surface)] p-4 sm:p-5">
-            <h3 className="mb-3 text-base font-bold text-foreground">{t('profile.manageSkills.canTeach')}</h3>
+            <h3 className="profile-skill-heading is-teaching mb-3 text-base font-bold text-foreground">{t('profile.manageSkills.canTeach')}</h3>
             <TeachSkillsEditor
               tileLayout
               value={teachEditorValue}
@@ -755,7 +755,7 @@ export default function Profile() {
           </div>
 
           <div className="min-w-0 rounded-[var(--panel-radius)] border border-[var(--border-subtle)] bg-[var(--surface)] p-4 sm:p-5">
-            <h3 className="mb-3 text-base font-bold text-foreground">{t('profile.manageSkills.wantsToLearn')}</h3>
+            <h3 className="profile-skill-heading is-learning mb-3 text-base font-bold text-foreground">{t('profile.manageSkills.wantsToLearn')}</h3>
             <SkillTagInput
               tileLayout
               value={wantsToLearn}

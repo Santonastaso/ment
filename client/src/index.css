@@ -5,7 +5,7 @@
 @layer base {
   :root {
     --font-sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    --background: #fafaf9;
+    --background: #f4f4f2;
     --foreground: #201e1b;
     --card: #fbfaf7;
     --surface: #f1f1ee;
@@ -14,8 +14,8 @@
     --control-radius: 999px;
     --navigation-row-height: 40px;
     --workspace-top-row: 68px;
-    --panel-radius: 12px;
-    --dialog-radius: 18px;
+    --panel-radius: 24px;
+    --dialog-radius: 24px;
     --item-radius: 8px;
     --card-foreground: #201e1b;
     --popover: #fbfaf7;
@@ -35,6 +35,8 @@
     --border-subtle: #e3dfd7;
     --input: #cbc7be;
     --ring: rgba(184, 86, 55, 0.2);
+    --skill-teaching-foreground: #93462f;
+    --skill-learning-foreground: #47664f;
     --radius: var(--panel-radius);
     --shadow-card: none;
     --shadow-overlay: 0 14px 36px rgba(48, 40, 32, 0.16);
@@ -250,6 +252,8 @@ select.filter-control { border-color: transparent; background-color: var(--contr
   transition: background-color var(--motion-control) var(--motion-ease), border-color var(--motion-control) var(--motion-ease), transform var(--motion-control) var(--motion-ease);
 }
 .profile-skill-tile.is-learning { min-height: 52px; }
+.profile-skill-heading.is-teaching { color: var(--skill-teaching-foreground); }
+.profile-skill-heading.is-learning { color: var(--skill-learning-foreground); }
 .profile-skill-tile:hover { border-color: var(--border); background: var(--background); transform: translateY(-2px); }
 .profile-skill-tile:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .profile-skill-tile > span { min-width: 0; }
