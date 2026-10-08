@@ -66,9 +66,6 @@ export default function Explorer() {
   // Directory-style: filters + pagination, server-side.
   useEffect(() => {
     let cancelled = false;
-    let loadingTimer;
-    const initialLoad = !dirData;
-    const loadingStartedAt = Date.now();
     setDirLoading(true);
     setDirError(false);
     const params = new URLSearchParams({
@@ -95,14 +92,9 @@ export default function Explorer() {
       })
       .catch(() => { if (!cancelled) setDirError(true); })
       .finally(() => {
-        if (cancelled) return;
-        const minimumLoadingTime = initialLoad ? 1000 : 0;
-        loadingTimer = window.setTimeout(
-          () => { if (!cancelled) setDirLoading(false); },
-          Math.max(0, minimumLoadingTime - (Date.now() - loadingStartedAt)),
-        );
+        if (!cancelled) setDirLoading(false);
       });
-    return () => { cancelled = true; window.clearTimeout(loadingTimer); };
+    return () => { cancelled = true; };
   }, [query, persona, program, cohort, location, languageKey, sort, page, retry]);
 
   function submitSearch(e) {

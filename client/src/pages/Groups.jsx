@@ -23,8 +23,6 @@ export default function Groups() {
   const { t } = useT();
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
-  const initialLoadingUntil = useRef(null);
-  const loadingTimer = useRef(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [saving, setSaving] = useState(false);
@@ -44,8 +42,6 @@ export default function Groups() {
   const [rosterRevision, setRosterRevision] = useState(0);
 
   async function load() {
-    const startedAt = Date.now();
-    if (initialLoadingUntil.current === null) initialLoadingUntil.current = startedAt + 1000;
     setLoading(true);
     try {
       const res = await api.get('/groups');
@@ -54,9 +50,7 @@ export default function Groups() {
     } catch {
       setError(t('groups.error.load'));
     } finally {
-      const minimumTime = Math.max(0, initialLoadingUntil.current - startedAt);
-      window.clearTimeout(loadingTimer.current);
-      loadingTimer.current = window.setTimeout(() => setLoading(false), Math.max(0, minimumTime - (Date.now() - startedAt)));
+      setLoading(false);
     }
   }
 
@@ -68,7 +62,7 @@ export default function Groups() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'group_join_requests' }, refresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members' }, refresh)
       .subscribe();
-    return () => { window.removeEventListener('focus', refresh); supabase.removeChannel(channel); window.clearTimeout(loadingTimer.current); };
+    return () => { window.removeEventListener('focus', refresh); supabase.removeChannel(channel); };
   }, []);
 
   useEffect(() => {
@@ -191,7 +185,7 @@ export default function Groups() {
     <PageShell>
       <h1 className="sr-only">{t('groups.pageTitle')}</h1>
       <header className="flex min-h-[var(--workspace-top-row)] items-center justify-between">
-        <h2 className="text-[19px] font-semibold tracking-[-0.02em]">{t('groups.list.title')}</h2>
+        <h2 className="text-section-large font-semibold tracking-[-0.02em]">{t('groups.list.title')}</h2>
         <Button type="button" size="icon-lg" aria-label={t('groups.create.title')} title={t('groups.create.title')} onClick={() => { setError(''); setCreateOpen(true); }}><Plus aria-hidden="true" /></Button>
       </header>
       <div>

@@ -283,7 +283,7 @@ export default function KnowledgeGraph() {
             ))}
           </select>
           {!isPlatform && (
-            <span className="text-[11px] text-muted-foreground">{t('graph.filter.locked')}</span>
+            <span className="text-caption text-muted-foreground">{t('graph.filter.locked')}</span>
           )}
         </div>
 

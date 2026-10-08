@@ -7,7 +7,18 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
+        sans: ['var(--font-sans)'],
+        heading: ['var(--font-sans)'],
+      },
+      fontSize: {
+        micro: '0.625rem',
+        caption: '0.6875rem',
+        label: '0.8125rem',
+        body: '0.875rem',
+        'body-large': '0.9375rem',
+        section: '1rem',
+        'section-large': '1.125rem',
+        title: '1.25rem',
       },
       letterSpacing: {
         label: '0.06em',

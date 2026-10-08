@@ -243,14 +243,14 @@ export default function EscoSuggestInput({
                 className={`flex items-center justify-between gap-2 px-3 py-2 cursor-pointer ${active ? 'bg-muted text-foreground' : 'text-foreground hover:bg-muted'}`}
               >
                 <span className="truncate">{item.label}</span>
-                <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">
+                <span className="shrink-0 text-micro uppercase tracking-wide text-muted-foreground">
                   ESCO{item.language && item.language !== 'en' ? ` · ${item.language}` : ''}
                 </span>
               </li>
             );
           })}
           {loading && (
-            <li className="px-3 py-1.5 text-[11px] text-muted-foreground italic">{t('components.esco.searching')}</li>
+            <li className="px-3 py-1.5 text-caption text-muted-foreground italic">{t('components.esco.searching')}</li>
           )}
         </ul>
       )}

@@ -14,6 +14,7 @@ import { recordAiRun } from '../_shared/ai-telemetry.ts';
 import { aiErrorResponse, mistralJson } from '../_shared/mistral.ts';
 import { normalizeLang } from '../_shared/esco.ts';
 import { enforceRateLimit } from '../_shared/rate-limit.ts';
+import { CITY_OPTIONS, normalizeCity } from '../../../shared/cities.mjs';
 
 const LANGUAGE_NAMES: Record<string, string> = { en: 'English', it: 'Italian', fr: 'French' };
 const PROMPT_VERSION = 'profile-ingest-v3';
@@ -150,13 +151,13 @@ Deno.serve(async (req) => {
   }
   if (!rawText || rawText.trim().length < 20) return jsonError('text_too_short', 400);
 
-  let proposed;
+  let proposed: Record<string, unknown>;
   let classifier_source;
   const startedAt = Date.now();
   try {
     const result = await mistralJson<{ proposed?: unknown }>({
       feature: 'profile_ingest',
-      system: `Extract a professional profile from the supplied document. Write descriptive text and skill names in ${language}. The bio must be written in first person as the profile owner's own words, starting with “I” (or the equivalent in ${language}); never describe the owner by name or as he/she/they. Return JSON with a proposed object containing: job_title (string), department (string), location (string), bio (string, max 500 characters), career_history (array of objects with company, role_title, start_year, end_year, description), can_teach (array of objects with skill and example_project, where example_project is at most 80 characters), and wants_to_learn (array of strings). Use short, conventional skill names as they would appear in a professional skills list: two or three words, lower case, noun form. Use only explicit evidence from the document. Use empty strings or arrays when evidence is absent. Never infer sensitive personal data.`,
+      system: `Extract a professional profile from the supplied document. Write descriptive text and skill names in ${language}. The bio must be written in first person as the profile owner's own words, starting with “I” (or the equivalent in ${language}); never describe the owner by name or as he/she/they. For location, return exactly one current city from this list when possible: ${CITY_OPTIONS.join(', ')}. Otherwise return exactly one current city or “Remote”; never return multiple places, countries, alternatives, or explanations. Return JSON with a proposed object containing: job_title (string), department (string), location (string), bio (string, max 500 characters), career_history (array of objects with company, role_title, start_year, end_year, description), can_teach (array of objects with skill and example_project, where example_project is at most 80 characters), and wants_to_learn (array of strings). Use short, conventional skill names as they would appear in a professional skills list: two or three words, lower case, noun form. Use only explicit evidence from the document. Use empty strings or arrays when evidence is absent. Never infer sensitive personal data.`,
       user: JSON.stringify({ source_kind: kind, document_text: rawText.slice(0, 30000) }),
       temperature: 0,
       maxTokens: 3000,
@@ -166,7 +167,8 @@ Deno.serve(async (req) => {
       console.error(JSON.stringify({ event: 'profile_ingest_invalid_shape', model: result.model }));
       return jsonError('ai_invalid_response', 502);
     }
-    proposed = result.value.proposed;
+    proposed = result.value.proposed as Record<string, unknown>;
+    if (typeof proposed.location === 'string') proposed.location = normalizeCity(proposed.location);
     classifier_source = `mistral:${result.model}`;
     const { data: owner } = await ctx.sb.from('profiles').select('organization_id').eq('id', ctx.user.id).maybeSingle();
     await recordAiRun(ctx.sb, {

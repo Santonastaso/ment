@@ -66,7 +66,7 @@ export default function RatingPicker({ value = null, onChange, disabled = false,
         })}
       </div>
       {showHint && (
-        <p className="text-[11px] text-muted-foreground h-4">
+        <p className="text-caption text-muted-foreground h-4">
           {hintFor ? t(HINT_KEYS[hintFor]) : t('components.rating.tapToRate')}
         </p>
       )}

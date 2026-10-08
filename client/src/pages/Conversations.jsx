@@ -289,8 +289,6 @@ export default function Conversations() {
 
   useEffect(() => {
     let cancelled = false;
-    let loadingTimer;
-    const loadingStartedAt = Date.now();
     setLoading(true);
     Promise.all([loadSessions(), loadGroups()])
       .then(([nextSessions, nextGroups]) => {
@@ -312,13 +310,9 @@ export default function Conversations() {
       })
       .catch((requestError) => { if (!cancelled) setError(requestError.response?.data?.error || t('conversations.error')); })
       .finally(() => {
-        if (cancelled) return;
-        loadingTimer = window.setTimeout(
-          () => { if (!cancelled) setLoading(false); },
-          Math.max(0, 1000 - (Date.now() - loadingStartedAt)),
-        );
+        if (!cancelled) setLoading(false);
       });
-    return () => { cancelled = true; window.clearTimeout(loadingTimer); };
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
