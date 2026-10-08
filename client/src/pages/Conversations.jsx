@@ -145,6 +145,7 @@ export default function Conversations() {
 
   const [messages, setMessages] = useState([]);
   const [loadedThreadKey, setLoadedThreadKey] = useState('');
+  const messageCacheRef = useRef(new Map());
   const sessionsFetchRef = useRef(0);
   const [hasOlder, setHasOlder] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
@@ -156,7 +157,9 @@ export default function Conversations() {
   const threadKey = selectedGroupId ? `group:${selectedGroupId}` : selectedId ? `session:${selectedId}` : '';
   const activeThreadRef = useRef(threadKey);
   activeThreadRef.current = threadKey;
-  const pageLoading = loading || (!!threadKey && loadedThreadKey !== threadKey);
+  const pageLoading = loading;
+  const threadLoading = !!threadKey && loadedThreadKey !== threadKey;
+  const showThreadSkeleton = loading || (!!threadKey && !loadedThreadKey);
   const draft = drafts[threadKey] || '';
   const sending = !!sendingThreads[threadKey];
   const [scheduleOpen, setScheduleOpen] = useState(false);
@@ -227,7 +230,7 @@ export default function Conversations() {
     return next;
   }
 
-  async function loadMessages(id, before = null, updatePagination = true) {
+  async function loadMessages(id, before = null, updatePagination = true, replaceOnLoad = false) {
     const query = before ? `?before=${before}` : '';
     const { data } = await api.get(`/sessions/${id}/messages${query}`);
     if (activeThreadRef.current !== `session:${id}`) return;
@@ -240,6 +243,8 @@ export default function Conversations() {
       const box = messagesRef.current;
       if (box) preserveScrollRef.current = { mode: 'prepend', height: box.scrollHeight, top: box.scrollTop };
       setMessages((current) => [...data.messages.filter((item) => !current.some((old) => old.id === item.id)), ...current]);
+    } else if (replaceOnLoad) {
+      setMessages(data.messages);
     } else {
       preserveReadingPosition();
       setMessages((current) => mergeLatestMessages(current, data.messages));
@@ -254,7 +259,7 @@ export default function Conversations() {
     }
   }
 
-  async function loadGroupMessages(id, before = null, updatePagination = true) {
+  async function loadGroupMessages(id, before = null, updatePagination = true, replaceOnLoad = false) {
     const query = before ? `?before=${before}` : '';
     const { data } = await api.get(`/groups/${id}/messages${query}`);
     if (activeThreadRef.current !== `group:${id}`) return;
@@ -268,6 +273,8 @@ export default function Conversations() {
       const box = messagesRef.current;
       if (box) preserveScrollRef.current = { mode: 'prepend', height: box.scrollHeight, top: box.scrollTop };
       setMessages((current) => [...data.messages.filter((item) => !current.some((old) => old.id === item.id)), ...current]);
+    } else if (replaceOnLoad) {
+      setMessages(data.messages);
     } else {
       preserveReadingPosition();
       setMessages((current) => mergeLatestMessages(current, data.messages));
@@ -347,15 +354,26 @@ export default function Conversations() {
   }, []);
 
   useLayoutEffect(() => {
-    setMessages([]);
     setHasOlder(false);
-    setLoadedThreadKey('');
+    const nextThreadKey = selectedGroupId ? `group:${selectedGroupId}` : selectedId ? `session:${selectedId}` : '';
+    const cachedThread = messageCacheRef.current.get(nextThreadKey);
+    if (cachedThread) {
+      setMessages(cachedThread.messages);
+      setHasOlder(cachedThread.hasOlder);
+      setLoadedThreadKey(nextThreadKey);
+    }
   }, [selectedId, selectedGroupId]);
+
+  useEffect(() => {
+    if (loadedThreadKey && loadedThreadKey === threadKey) {
+      messageCacheRef.current.set(loadedThreadKey, { messages, hasOlder });
+    }
+  }, [loadedThreadKey, messages, hasOlder, threadKey]);
 
   useEffect(() => {
     if (selectedGroupId) {
       let cancelled = false;
-      const refresh = (initial = false) => loadGroupMessages(selectedGroupId, null, initial)
+      const refresh = (initial = false) => loadGroupMessages(selectedGroupId, null, initial, initial)
         .then(() => {
           if (cancelled) return;
           if (initial) setLoadedThreadKey(`group:${selectedGroupId}`);
@@ -392,7 +410,7 @@ export default function Conversations() {
     let cancelled = false;
     const refresh = async (initial = false) => {
       try {
-        await loadMessages(selectedId, null, initial);
+        await loadMessages(selectedId, null, initial, initial);
         if (cancelled) return;
         if (initial) setLoadedThreadKey(`session:${selectedId}`);
         await api.post(`/sessions/${selectedId}/read`, {});
@@ -632,8 +650,8 @@ export default function Conversations() {
         </div>
       </aside>
 
-      <div key={selectedGroup ? `group-${selectedGroup.id}` : selected ? `session-${selected.id}` : 'empty'} className="conversation-thread" aria-busy={pageLoading}>
-        {pageLoading ? (
+      <div className="conversation-thread" aria-busy={loading || threadLoading}>
+        {showThreadSkeleton && !selected && !selectedGroup ? (
           <div className="conversation-thread-skeleton" role="status" aria-label={t('common.loading')}>
             <Skeleton className="h-16 w-full rounded-2xl" />
             <div className="conversation-thread-skeleton-message"><Skeleton className="h-24 w-2/3 rounded-2xl" /><Skeleton className="h-16 w-1/2 self-end rounded-2xl" /></div>
@@ -659,6 +677,11 @@ export default function Conversations() {
             </header>}
 
             <div className="conversation-messages" ref={messagesRef}>
+              {showThreadSkeleton ? <div className="conversation-messages-skeleton" role="status" aria-label={t('common.loading')}>
+                <Skeleton className="h-28 w-2/3 rounded-2xl" />
+                <Skeleton className="h-20 w-1/2 self-end rounded-2xl" />
+                <Skeleton className="h-24 w-3/5 rounded-2xl" />
+              </div> : <>
               {hasOlder && <Button type="button" variant="ghost" size="sm" className="mx-auto mb-4 flex" disabled={loadingOlder} onClick={loadOlderMessages}>{t('conversations.loadOlder')}</Button>}
               {timelineItems.map((message, index) => {
                 const day = chatDayKey(message.created_at);
@@ -694,6 +717,7 @@ export default function Conversations() {
                     </div>}
                 </React.Fragment>;
               })}
+              </>}
             </div>
 
             <form className="conversation-composer" onSubmit={sendMessage}>

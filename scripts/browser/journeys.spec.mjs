@@ -169,7 +169,7 @@ test('CV import populates onboarding and can be saved', async ({ page }) => {
   expect(await page.evaluate(() => window.fixture.calls.some(item => item.path === '/profile/ingest/1/accept'))).toBe(true);
 });
 
-test('Messages opens a clean link and switching chats does not replay transitions', async ({ page }) => {
+test('Messages keeps the list and chat layout steady while switching conversations', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => {
     window.fixture.sessions[0].route_token = 'first-chat';
@@ -178,15 +178,26 @@ test('Messages opens a clean link and switching chats does not replay transition
   await page.getByRole('link', { name: 'Messages' }).click();
   await expect(page).toHaveURL(/\/c\/first-chat$/);
   await expect(page.locator('.conversation-header strong')).toHaveText('Peer 1');
-  await expect(page.locator('.page-transition')).toHaveCSS('animation-duration', '0.24s');
-  await expect(page.locator('.page-transition')).toHaveCSS('animation-delay', '0s');
-  await expect(page.locator('.page-transition')).toHaveCSS('animation-name', 'pageEnter');
+  await expect(page.locator('.page-transition')).toHaveCSS('animation-name', 'none');
   await page.locator('.page-transition').evaluate(element => { element.dataset.testIdentity = 'retained'; });
+  await page.evaluate(() => { window.fixture.holdLoads = ['/sessions/2/messages']; });
   await page.locator('.conversation-list-item').filter({ hasText: 'Peer 2' }).click();
   await expect(page).toHaveURL(/\/c\/second-chat$/);
   await expect(page.locator('.conversation-header strong')).toHaveText('Peer 2');
+  await expect(page.locator('.conversation-filters')).toBeVisible();
+  await expect(page.locator('.conversation-list-item')).toHaveCount(3);
+  await expect(page.locator('.conversation-messages [role="status"]')).toHaveCount(0);
+  await expect(page.locator('.conversation-list-skeleton')).toHaveCount(0);
+  await expect(page.locator('.conversation-thread-skeleton')).toHaveCount(0);
+  await expect(page.locator('.conversation-composer')).toBeVisible();
   await expect(page.locator('.page-transition')).toHaveAttribute('data-test-identity', 'retained');
   expect(await page.locator('.conversation-thread').evaluate(element => getComputedStyle(element).animationName)).toBe('none');
+  await page.evaluate(() => window.fixture.pendingLoads.splice(0).forEach(resolve => resolve()));
+  await page.evaluate(() => { window.fixture.holdLoads = ['/sessions/1/messages']; });
+  await page.locator('.conversation-list-item').filter({ hasText: 'Peer 1' }).click();
+  await expect(page.locator('.conversation-header strong')).toHaveText('Peer 1');
+  await expect(page.locator('.conversation-messages [role="status"]')).toHaveCount(0);
+  await page.evaluate(() => window.fixture.pendingLoads.splice(0).forEach(resolve => resolve()));
 });
 
 test('Home greeting stays static', async ({ page }) => {
@@ -246,7 +257,7 @@ test('Messages rail moves smoothly and compact menus remain usable', async ({ pa
   const [homeBox, allBox] = await Promise.all([home.boundingBox(), all.boundingBox()]);
   expect(allBox.y).toBeCloseTo(homeBox.y, 0);
   expect(allBox.height).toBe(homeBox.height);
-  expect(await all.evaluate(element => getComputedStyle(element).borderRadius)).toBe(await home.evaluate(element => getComputedStyle(element).borderRadius));
+  expect(await all.evaluate(element => getComputedStyle(element).borderRadius)).toBe('24px');
   const centerY = async locator => {
     const box = await locator.boundingBox();
     return box.y + box.height / 2;
@@ -400,12 +411,25 @@ test('a proposed time is checked again before sending a request', async ({ page 
   await page.goto('/explorer');
   await page.getByRole('button', { name: 'Request a session' }).first().click();
   const dialog = page.getByRole('dialog', { name: 'Request a session' });
+  await expect(dialog.getByText('1 / 4')).toBeVisible();
+  await expect(dialog.getByText('Availability and request limits are checked again when you send.')).toHaveCount(0);
+  await expect(dialog.getByText(/Pick one or more topics from .*strengths/)).toHaveCount(0);
   await dialog.getByRole('button', { name: 'Skip' }).click();
+  await expect(dialog.getByText('2 / 4')).toBeVisible();
+  await expect(dialog.getByText('What is the one specific question you want to leave this session with an answer to?')).toBeVisible();
+  expect(await dialog.getByRole('textbox').evaluate(element => getComputedStyle(element).borderRadius)).toBe('24px');
+  expect(await dialog.getByRole('button', { name: 'One-off conversation' }).evaluate(element => getComputedStyle(element).textAlign)).toBe('center');
   await dialog.getByRole('textbox').fill('How can I improve my project planning?');
   await dialog.getByRole('button', { name: 'Next' }).click();
   await dialog.getByRole('button', { name: 'Suggest a time', exact: true }).click();
+  const dateField = dialog.getByRole('textbox', { name: 'Date' });
+  const timeField = dialog.getByRole('combobox', { name: 'Time' });
+  expect(await dateField.evaluate(element => getComputedStyle(element).textAlign)).toBe('center');
+  expect(await timeField.evaluate(element => getComputedStyle(element).borderRadius)).toBe('24px');
+  expect((await timeField.boundingBox()).width).toBeLessThan(200);
   await dialog.getByRole('button', { name: 'Review request' }).click();
   await expect(dialog.getByText('Review your request')).toBeVisible();
+  await expect(dialog.getByText('with Bob Taylor · Engineering')).toHaveCount(0);
   const now = await page.evaluate(() => Date.now());
   await page.clock.setFixedTime(new Date(now + 40 * 60 * 1000));
   await dialog.getByRole('button', { name: 'Confirm and send' }).click();
@@ -456,14 +480,6 @@ test('Quick reflection opens a card without shifting the profile and preserves d
 
 test('Profile skill filters share the navigation pill geometry', async ({ page }) => {
   await page.goto('/profile');
-  await page.evaluate(() => {
-    const startTransition = document.startViewTransition.bind(document);
-    window.fixture.profileTabDirections = [];
-    document.startViewTransition = update => {
-      window.fixture.profileTabDirections.push(document.documentElement.dataset.profileTabDirection);
-      return startTransition(update);
-    };
-  });
   await page.getByTestId('profile-tab-skills').click();
   expect(await page.locator(':root').evaluate(element => getComputedStyle(element).getPropertyValue('--background').trim())).toBe('#fafaf9');
   const skillsType = await page.getByRole('heading', { name: 'What you can teach' }).evaluate(element => {
@@ -485,11 +501,13 @@ test('Profile skill filters share the navigation pill geometry', async ({ page }
   expect(await learning.locator('h3').evaluate(element => getComputedStyle(element).color)).toBe('rgb(32, 30, 27)');
   expect(await teaching.evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgb(241, 241, 238)');
   expect(await learning.evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgb(241, 241, 238)');
-  await expect(page.locator('.profile-tab-content')).toHaveCSS('view-transition-name', 'profile-tab-panel');
+  await expect(page.locator('.profile-tab-content')).toHaveCSS('view-transition-name', 'none');
   expect(await page.locator('.profile-tab-content').evaluate(element => getComputedStyle(element).animationName)).toBe('none');
-  expect(await page.evaluate(() => window.fixture.profileTabDirections)).toEqual(['forward']);
-  await page.getByTestId('profile-tab-overview').click();
-  expect(await page.evaluate(() => window.fixture.profileTabDirections)).toEqual(['forward', 'backward']);
+  for (const tab of ['overview', 'availability', 'experience', 'reflections', 'skills']) {
+    await page.getByTestId(`profile-tab-${tab}`).click();
+    await expect(page.locator('.profile-tab-content')).toHaveCSS('animation-name', 'none');
+    await expect(page.locator('.profile-tab-content')).toHaveCSS('view-transition-name', 'none');
+  }
   const home = page.locator('.app-sidebar').getByRole('link', { name: 'Home' });
   const geometry = locator => locator.evaluate(element => {
     const style = getComputedStyle(element);
@@ -579,6 +597,40 @@ test('Explorer shows profile-shaped skeletons until directory results load', asy
   await expect(pagination).toContainText('Showing 1–1 of 1');
   await expect(page.locator('.directory-results .person-row:not(.person-row-skeleton)')).toHaveCount(1);
   expect(await page.evaluate(() => Date.now() - window.fixture.releasedLoadAt)).toBeLessThan(900);
+});
+
+test('Explorer keeps existing rows steady while another page loads', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => { window.fixture.directoryTotal = 25; });
+  await page.locator('nav').getByRole('link', { name: 'Explorer' }).click();
+  const rows = page.locator('.directory-results .person-row:not(.person-row-skeleton)');
+  await expect(rows).toHaveCount(1);
+  await expect(page.locator('.directory-pagination')).toContainText('1/3');
+
+  await page.evaluate(() => { window.fixture.holdLoads = ['/directory*']; });
+  await page.getByRole('button', { name: 'Next' }).click();
+  await expect(page).toHaveURL(/page=2/);
+  await expect(rows).toHaveCount(1);
+  await expect(page.locator('.person-row-skeleton')).toHaveCount(0);
+  await expect(page.locator('.directory-results')).toHaveAttribute('aria-busy', 'true');
+  await page.evaluate(() => window.fixture.pendingLoads.splice(0).forEach(resolve => resolve()));
+  await expect(page.locator('.directory-results')).toHaveAttribute('aria-busy', 'false');
+  await expect(page.locator('.directory-pagination')).toContainText('2/3');
+});
+
+test('Explorer profile links stay anchored when the neighboring action shrinks', async ({ page }) => {
+  await page.goto('/explorer');
+  const actions = page.locator('.directory-results .person-row:not(.person-row-skeleton) .person-row-actions').first();
+  const profileLink = actions.locator('.person-row-link');
+  const rightAction = actions.locator(':scope > :last-child');
+  await expect(profileLink).toBeVisible();
+  const profileBefore = await profileLink.boundingBox();
+  const actionBefore = await rightAction.boundingBox();
+  await rightAction.evaluate(element => { element.style.width = '64px'; });
+  const profileAfter = await profileLink.boundingBox();
+  const actionAfter = await rightAction.boundingBox();
+  expect(actionAfter.width).toBeLessThan(actionBefore.width);
+  expect(profileAfter.x).toBeCloseTo(profileBefore.x, 0);
 });
 
 test('Groups keeps its skeleton until the whole group list is ready', async ({ page }) => {
@@ -880,16 +932,15 @@ test('all profile sections remain visible on a narrow screen', async ({ page }) 
   expect(await monthlyFill.evaluate(element => element.style.width)).toBe('20%');
 });
 
-test('Groups uses a brief page fade without shifting content', async ({ page }) => {
+test('Route changes do not fade or shift page content', async ({ page }) => {
   await page.goto('/profile');
   const content = page.locator('.app-main > div');
   const leftBefore = await content.evaluate(element => element.getBoundingClientRect().left);
   await page.locator('.app-sidebar').getByRole('link', { name: 'Groups' }).click();
   await expect(page).toHaveURL(/\/groups$/);
-  await expect(page.locator('.page-transition')).toHaveCSS('animation-duration', '0.24s');
-  await expect(page.locator('.page-transition')).toHaveCSS('animation-delay', '0s');
+  await expect(page.locator('.page-transition')).toHaveCSS('animation-name', 'none');
   const opacity = Number(await page.locator('.page-transition').evaluate(element => getComputedStyle(element).opacity));
-  expect(opacity).toBeLessThan(1);
+  expect(opacity).toBe(1);
   const leftAfter = await content.evaluate(element => element.getBoundingClientRect().left);
   expect(Math.abs(leftAfter - leftBefore)).toBeLessThan(1);
 });

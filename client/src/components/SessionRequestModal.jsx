@@ -95,6 +95,13 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
     return out;
   }, [mentor]);
 
+  const stepTitle = [
+    t('components.sessionRequest.step1Label'),
+    t('components.sessionRequest.step2Label'),
+    t('components.sessionRequest.step3Label'),
+    t('components.sessionRequest.reviewTitle'),
+  ][step - 1];
+
   function toggleTopic(skill) {
     setSelectedTopics(prev =>
       prev.includes(skill) ? prev.filter(s => s !== skill) : [...prev, skill]
@@ -141,28 +148,21 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
     <Portal>
     <div className="app-modal-overlay session-request-backdrop bg-black/20">
       <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="session-request-title" className="app-modal-panel session-request-modal flex w-full max-w-[560px] flex-col overflow-hidden rounded-[var(--dialog-radius)] border border-[var(--border)] bg-card [box-shadow:var(--shadow-overlay)]">
-        <div className="flex-shrink-0 border-b border-[var(--border-subtle)] px-6 py-5">
-          <div className="flex items-center justify-between">
+        <div className="flex-shrink-0 px-6 py-5">
+          <div className="flex items-start justify-between gap-4">
             <h2 id="session-request-title" className="text-xl font-semibold tracking-[-0.02em] text-foreground">{t('components.sessionRequest.title')}</h2>
-            <Button type="button" variant="ghost" size="icon-sm" disabled={submitting} aria-label={copy.close} title={copy.close} onClick={onClose}><X aria-hidden="true" /></Button>
+            <div className="flex shrink-0 items-center gap-3">
+              <span className="text-sm font-medium tabular-nums text-muted-foreground">{step} / {TOTAL_STEPS}</span>
+              <Button type="button" variant="ghost" size="icon-sm" disabled={submitting} aria-label={copy.close} title={copy.close} onClick={onClose}><X aria-hidden="true" /></Button>
+            </div>
           </div>
-          <p className="text-sm text-muted-foreground mt-1">{t('components.sessionRequest.subtitle', { name: mentor.name, department: mentor.department })}</p>
+          <p className="mt-1 text-base text-muted-foreground">{stepTitle}</p>
         </div>
 
         <div key={step} ref={bodyRef} className="session-modal-scroll session-step-content min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-5">
-          {/* Step indicator */}
-          <p className="text-xs font-medium tabular-nums text-muted-foreground">{step} / {TOTAL_STEPS}</p>
-
           {/* STEP 1 — Topics */}
           {step === 1 && (
             <div>
-              <p className="mb-3 text-xs text-muted-foreground">{t('components.sessionRequest.availabilityNotice')}</p>
-              <label className="label mb-1">
-                {t('components.sessionRequest.step1Label')}
-              </label>
-              <p className="text-xs text-muted-foreground mb-3">
-                {t('components.sessionRequest.step1Help', { name: mentor.name.split(' ')[0] })}
-              </p>
               {teachSkills.length === 0 ? (
                 <p className="text-sm text-muted-foreground italic">
                   {t('components.sessionRequest.step1NoSkills', { name: mentor.name.split(' ')[0] })}
@@ -202,9 +202,6 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
           {/* STEP 2 — Focus question */}
           {step === 2 && (
             <div>
-              <label className="label">
-                {t('components.sessionRequest.step2Label')}
-              </label>
               <textarea
                 className="input resize-none"
                 rows={5}
@@ -230,7 +227,7 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
                         type="button"
                         variant={active ? 'default' : 'outline'}
                         aria-pressed={active}
-                        className="h-auto min-h-11 justify-start whitespace-normal rounded-xl px-4 py-3 text-left"
+                        className="h-auto min-h-11 justify-center whitespace-normal px-4 py-3 text-center"
                         onClick={() => setIntent(option.value)}
                       >
                         {option.label}
@@ -244,20 +241,19 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
 
           {/* STEP 3 — Date/time */}
           {step === 3 && (
-            <div className="space-y-4">
-              <p className="label">{t('components.sessionRequest.step3Label')}</p>
+            <div className="space-y-5">
               <div className="grid grid-cols-2 gap-2" role="group" aria-label={t('components.sessionRequest.step3Label')}>
                 <Button type="button" variant={!scheduledAt ? 'default' : 'outline'} className="h-auto min-h-11 whitespace-normal px-3" aria-pressed={!scheduledAt} onClick={() => setScheduledAt('')}>{t('components.sessionRequest.reviewNoTime')}</Button>
                 <Button type="button" variant={scheduledAt ? 'default' : 'outline'} className="h-auto min-h-11 whitespace-normal px-3" aria-pressed={!!scheduledAt} onClick={() => setScheduledAt(suggestedDateTime)}>{t('components.sessionRequest.pickTime')}</Button>
               </div>
-              {scheduledAt && <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2 flex flex-wrap gap-2">
+              {scheduledAt && <div className="flex flex-wrap items-end gap-3">
+                <div className="flex w-full flex-wrap gap-2 pb-1">
                   {[1, 3, 7].map(days => <Button key={days} type="button" size="sm" variant="outline" onClick={() => pickDay(days)}>{t(`components.sessionRequest.day${days}`)}</Button>)}
                 </div>
-                <label className="label">{t('components.sessionRequest.date')}
-                  <input type="date" className="input mt-1" min={minDateTime.slice(0, 10)} value={scheduledAt.slice(0, 10)} onChange={e => setScheduledAt(`${e.target.value}T${scheduledAt.slice(11, 16)}`)} />
+                <label className="label block w-40">{t('components.sessionRequest.date')}
+                  <input type="date" className="input mt-1 text-center" min={minDateTime.slice(0, 10)} value={scheduledAt.slice(0, 10)} onChange={e => setScheduledAt(`${e.target.value}T${scheduledAt.slice(11, 16)}`)} />
                 </label>
-                <TimeSlotSelect label={t('components.sessionRequest.time')} value={scheduledAt} min={minDateTime} onChange={setScheduledAt} />
+                <TimeSlotSelect label={t('components.sessionRequest.time')} className="w-36 text-center" value={scheduledAt} min={minDateTime} onChange={setScheduledAt} />
               </div>}
               <p className="text-xs text-muted-foreground">{t('components.sessionRequest.step3Optional')}</p>
             </div>
@@ -265,9 +261,8 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
 
           {step === 4 && (
             <div className="space-y-5 text-sm">
-              <p className="font-semibold text-foreground">{t('components.sessionRequest.reviewTitle')}</p>
-              <label className="block">{t('components.sessionRequest.requestTitle')}<input className="input mt-1" value={requestTitle} maxLength={120} disabled={submitting || !!submittedPayload.current} onChange={e => setRequestTitle(e.target.value)} /></label>
-              <label className="block">{copy.message}<textarea className="input mt-1 min-h-40 resize-none" value={draft} maxLength={6000} disabled={submitting || !!submittedPayload.current} onChange={e => { setDraft(e.target.value); setDraftEdited(true); }} /></label>
+              <label className="block font-semibold">{t('components.sessionRequest.requestTitle')}<input className="input mt-1 font-normal" value={requestTitle} maxLength={120} disabled={submitting || !!submittedPayload.current} onChange={e => setRequestTitle(e.target.value)} /></label>
+              <label className="block font-semibold">{copy.message}<textarea className="input mt-1 min-h-40 resize-none font-normal" value={draft} maxLength={6000} disabled={submitting || !!submittedPayload.current} onChange={e => { setDraft(e.target.value); setDraftEdited(true); }} /></label>
               <section className="space-y-2" aria-label={t('components.sessionRequest.reviewTopics')}>
                 <Button
                   type="button"
@@ -285,14 +280,17 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
                   {teachSkills.length === 0 && <p className="text-muted-foreground">{t('components.sessionRequest.step1NoSkills', { name: mentor.name.split(' ')[0] })}</p>}
                 </div>}
               </section>
-              <section className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3" aria-label={t('components.sessionRequest.reviewWhen')}>
-                <div><p className="text-xs font-medium text-muted-foreground">{t('components.sessionRequest.reviewWhen')}</p><p>{scheduledAt ? new Date(scheduledAt).toLocaleString(lang) : t('components.sessionRequest.reviewNoTime')}</p></div>
-                <Button type="button" variant="outline" size="sm" onClick={() => setStep(3)}>{t(scheduledAt ? 'conversations.reschedule' : 'components.sessionRequest.pickTime')}</Button>
+              <section className="space-y-1" aria-label={t('components.sessionRequest.reviewWhen')}>
+                <p className="block text-sm font-semibold">{t('components.sessionRequest.reviewWhen')}</p>
+                <div className="flex items-center gap-2">
+                  <p className="input flex min-h-10 flex-1 items-center rounded-full">{scheduledAt ? new Date(scheduledAt).toLocaleString(lang) : t('components.sessionRequest.reviewNoTime')}</p>
+                  <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => setStep(3)}>{t(scheduledAt ? 'conversations.reschedule' : 'components.sessionRequest.pickTime')}</Button>
+                </div>
               </section>
-              <section className="space-y-2" aria-label={copy.intent}>
+              <section className="space-y-3 pt-3" aria-label={copy.intent}>
                 <p className="font-medium">{copy.intent}</p>
                 <div className="grid grid-cols-2 gap-2">
-                  {[{ value: 'one_off', label: copy.oneOff }, { value: 'ongoing', label: copy.ongoing }].map(option => <Button key={option.value} type="button" variant={intent === option.value ? 'default' : 'outline'} aria-pressed={intent === option.value} disabled={submitting || !!submittedPayload.current} className="h-auto min-h-11 whitespace-normal" onClick={() => setIntent(option.value)}>{option.label}</Button>)}
+                  {[{ value: 'one_off', label: copy.oneOff }, { value: 'ongoing', label: copy.ongoing }].map(option => <Button key={option.value} type="button" variant={intent === option.value ? 'default' : 'outline'} aria-pressed={intent === option.value} disabled={submitting || !!submittedPayload.current} className="h-auto min-h-11 justify-center whitespace-normal text-center" onClick={() => setIntent(option.value)}>{option.label}</Button>)}
                 </div>
               </section>
               <p className="text-xs text-muted-foreground">{t('components.sessionRequest.reviewNotice')}</p>
@@ -302,7 +300,7 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
           {error && <p role="alert" className="text-red-600 text-sm">{error}</p>}
         </div>
 
-        <div className="flex flex-shrink-0 justify-end gap-2 border-t border-[var(--border-subtle)] px-6 py-4">
+        <div className="flex flex-shrink-0 justify-end gap-2 px-6 py-4">
           {step === 1 && (
             <>
               <Button onClick={onClose} variant="outline">{t('components.sessionRequest.cancel')}</Button>
