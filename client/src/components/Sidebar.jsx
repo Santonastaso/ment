@@ -32,7 +32,7 @@ export default function Sidebar({ collapsed = false, onNavigate, onToggle }) {
         <button type="button" onClick={onToggle} className="grid size-11 shrink-0 place-items-center rounded-full outline-none hover:bg-[var(--sidebar-accent)] focus-visible:ring-3 focus-visible:ring-[var(--sidebar-ring)]" aria-label={collapsed ? 'Open sidebar' : 'Close sidebar'} title={collapsed ? 'Open sidebar' : 'Close sidebar'}>
           <span className="grid size-8 place-items-center rounded-full bg-primary text-xs font-bold text-white">M</span>
         </button>
-        <Link to={user?.is_admin ? '/admin' : '/'} onClick={onNavigate} tabIndex={collapsed ? -1 : undefined} aria-hidden={collapsed} className={cn('sidebar-brand-label pl-1 text-[17px] font-semibold tracking-[-0.025em] text-foreground', collapsed && 'is-hidden')}>
+        <Link to={user?.is_admin ? '/admin' : '/'} onClick={onNavigate} tabIndex={collapsed ? -1 : undefined} aria-hidden={collapsed} className={cn('sidebar-brand-label pl-1 text-section-large font-semibold tracking-[-0.025em] text-foreground', collapsed && 'is-hidden')}>
           MENT
         </Link>
         {onToggle && <button type="button" onClick={onToggle} tabIndex={collapsed ? -1 : undefined} aria-hidden={collapsed} className={cn('sidebar-end-toggle absolute right-1 grid size-10 place-items-center rounded-full text-muted-foreground outline-none hover:bg-[var(--sidebar-accent)] hover:text-foreground focus-visible:ring-3 focus-visible:ring-[var(--sidebar-ring)]', collapsed && 'is-hidden')} aria-label="Close sidebar" title="Close sidebar">
@@ -76,7 +76,7 @@ export default function Sidebar({ collapsed = false, onNavigate, onToggle }) {
               {badgeCount > 0 && (
                 <span
                   data-testid="nav-messages-unread-badge"
-                  className={cn('inline-flex items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground', collapsed ? 'absolute right-1 top-1 size-4' : 'ml-auto h-5 min-w-[1.25rem] px-1.5')}
+                  className={cn('inline-flex items-center justify-center rounded-full bg-primary text-micro font-semibold text-primary-foreground', collapsed ? 'absolute right-1 top-1 size-4' : 'ml-auto h-5 min-w-[1.25rem] px-1.5')}
                   aria-label={t('nav.unreadConversations', { count: badgeCount })}
                 >
                   {badgeCount > 99 ? '99+' : badgeCount}

@@ -7,7 +7,7 @@ function Brand() {
   return (
     <Link to="/welcome" className="flex items-center gap-2.5" aria-label="Ment home">
       <span className="grid size-8 place-items-center rounded-full bg-primary text-xs font-bold text-primary-foreground">M</span>
-      <span className="text-[15px] font-semibold tracking-[-0.01em]">MENT</span>
+      <span className="text-body-large font-semibold tracking-[-0.01em]">MENT</span>
     </Link>
   );
 }
@@ -79,7 +79,7 @@ function ProductConversation({ t }) {
     <div className="landing-preview overflow-hidden border border-border bg-card">
       <div className="flex items-center justify-between border-b border-border px-4 py-3 sm:px-5">
         <div className="flex items-center gap-2.5">
-          <span className="grid size-7 place-items-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">M</span>
+          <span className="grid size-7 place-items-center rounded-full bg-primary text-micro font-bold text-primary-foreground">M</span>
           <span className="text-sm font-semibold">Ment</span>
         </div>
         <span className="text-xs text-muted-foreground">{t('landing.preview.network')}</span>
@@ -89,7 +89,7 @@ function ProductConversation({ t }) {
           {t('landing.preview.query')}
         </p>
         <div className="mt-5 flex max-w-2xl items-start gap-3">
-          <span className="grid size-7 shrink-0 place-items-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">M</span>
+          <span className="grid size-7 shrink-0 place-items-center rounded-full bg-primary text-micro font-bold text-primary-foreground">M</span>
           <div>
             <p className="text-sm font-medium">{t('landing.preview.intro')}</p>
             <p className="mt-1 text-sm text-muted-foreground">{t('landing.preview.reason')}</p>

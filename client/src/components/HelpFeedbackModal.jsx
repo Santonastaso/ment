@@ -133,7 +133,7 @@ export default function HelpFeedbackModal({ onClose }) {
               data-testid="help-message-input"
               className="input"
             />
-            <p className="mt-1 text-[11px] text-muted-foreground">{message.length}/2000</p>
+            <p className="mt-1 text-caption text-muted-foreground">{message.length}/2000</p>
           </div>
 
           {error && <p className="text-sm text-rose-600">{error}</p>}

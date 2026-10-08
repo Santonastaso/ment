@@ -9,9 +9,7 @@ import { useModalA11y } from '../lib/useModalA11y.js';
 import Portal from './ui/portal.jsx';
 
 // Draft ownership stays in Profile so changing tabs does not discard an answer.
-// `open`/`onOpenChange` let Profile drive the check-in from its header row, so
-// "Start check-in" can sit beside "View history" instead of below it. Left
-// uncontrolled, the component still renders its own start button.
+// `open`/`onOpenChange` let Profile keep the dialog state across profile tabs.
 export default function ProfileReflection({ history = false, draft, onDraftChange, onSkillsApplied, open: openProp, onOpenChange, returnFocus }) {
   const { t, lang } = useT();
   const fieldId = useId();
@@ -137,7 +135,7 @@ export default function ProfileReflection({ history = false, draft, onDraftChang
       {history && error && <Button variant="outline" onClick={() => setReload(n => n + 1)}>{t('explorer.retry')}</Button>}
       {history && loading && <p role="status" className="text-sm">{t('components.reflection.loading')}</p>}
       {!history && !loading && !error && checkInDue && <p className="px-3 text-sm text-muted-foreground">{t('components.reflection.dueTitle')}</p>}
-      {history && !loading && !error && checkInDue && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[var(--control-surface)] p-4"><div><p className="text-sm font-medium">{t('components.reflection.dueTitle')}</p><p className="text-xs text-muted-foreground">{t(lastEntryDays === null ? 'components.reflection.dueBodyFirst' : 'components.reflection.dueBodyDays', { days: lastEntryDays })}</p></div><Button size="sm" onClick={() => setOpen(true)}>{t('components.reflection.startCheckIn')}</Button></div>}
+      {history && !loading && !error && checkInDue && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[var(--control-surface)] p-4"><div><p className="text-sm font-medium">{t('components.reflection.dueTitle')}</p><p className="text-xs text-muted-foreground">{t(lastEntryDays === null ? 'components.reflection.dueBodyFirst' : 'components.reflection.dueBodyDays', { days: lastEntryDays })}</p></div><Button ref={returnFocus} size="sm" onClick={() => setOpen(true)}>{t('components.reflection.startCheckIn')}</Button></div>}
       {history && !loading && !error && entries.length === 0 && <p className="text-sm text-muted-foreground">{t('components.reflection.empty')}</p>}
       {history && entries.map(entry => (
         <ReflectionReview key={entry.id} entry={entry} busy={busy} onApply={apply} onReclassify={reclassify} lang={lang} />

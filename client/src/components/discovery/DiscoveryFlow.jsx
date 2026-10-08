@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { useT } from '../../i18n/index.jsx';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog.jsx';
 import { Button } from '../ui/button.jsx';
+import { Skeleton } from '../ui/skeleton.jsx';
 import DirectoryFilter from '../DirectoryFilter.jsx';
 import { CONVERSATION_FILTERS, conversationState, requestText, resumableSearch } from '../../lib/conversations.mjs';
 import { sessionPath } from '../../lib/conversationLinks.mjs';
@@ -167,6 +168,8 @@ export default function DiscoveryFlow() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [connections, setConnections] = useState([]);
+  const [historyReady, setHistoryReady] = useState(false);
+  const [connectionsReady, setConnectionsReady] = useState(false);
   const [connectionCategory, setConnectionCategory] = useState(null);
   const [sessionId, setSessionId] = useState(null);
   const [threadId, setThreadId] = useState(null);
@@ -230,7 +233,8 @@ export default function DiscoveryFlow() {
       if (cancelled) return;
       setHistory(data || []);
       setResumeThread((data || []).find(resumableSearch) || null);
-    }).catch(() => {});
+      setHistoryReady(true);
+    }).catch(() => { if (!cancelled) setHistoryReady(true); });
     return () => { cancelled = true; };
   }, [user?.id]);
   useEffect(() => {
@@ -239,7 +243,15 @@ export default function DiscoveryFlow() {
     resumedFromUrl.current = requested;
     resumeSearch(requested);
   }, [user?.id, searchParams]);
-  useEffect(() => { if (!user?.id || stage !== 'ask') return; api.get('/sessions').then(({ data }) => setConnections(data || [])).catch(() => {}); }, [stage, user?.id]);
+  useEffect(() => {
+    if (!user?.id || stage !== 'ask') return;
+    let cancelled = false;
+    api.get('/sessions')
+      .then(({ data }) => { if (!cancelled) setConnections(data || []); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setConnectionsReady(true); });
+    return () => { cancelled = true; };
+  }, [stage, user?.id]);
 
   async function findMatches(nextQuery, activeThreadId = threadId) {
     const version = flowVersion.current;
@@ -460,7 +472,14 @@ export default function DiscoveryFlow() {
       <div className="discovery-ask-block">
         <h1 className="discovery-greeting-scene">{copy.greeting.replace('{name}', firstName)}</h1>
         {composer()}
-        {(history.length > 0 || connections.length > 0) && (
+        {(!historyReady || !connectionsReady) ? (
+          <div className="discovery-meta-row discovery-home-skeleton" role="status" aria-label={t('common.loading')}>
+            <div className="discovery-recent-row"><Skeleton className="size-[var(--connection-control-size)] rounded-full" /></div>
+            <div className="discovery-connections"><div className="discovery-connection-bubbles">
+              {connectionFilters.map(option => <Skeleton key={option.key} className="size-[var(--connection-control-size)] rounded-full" />)}
+            </div></div>
+          </div>
+        ) : (history.length > 0 || connections.length > 0) && (
           <div className="discovery-meta-row">
             {history.length > 0 && (
               <div className="discovery-recent-row">

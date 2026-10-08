@@ -115,23 +115,23 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
               </>
             )}
             {relative && (
-              <span className="text-[10px] uppercase tracking-wide bg-muted text-muted-foreground border border-[var(--border)] rounded-full px-2 py-0.5">
+              <span className="text-micro uppercase tracking-wide bg-muted text-muted-foreground border border-[var(--border)] rounded-full px-2 py-0.5">
                 {relative}
               </span>
             )}
             {statusBadge && (
-              <span className={`text-[10px] uppercase tracking-wide rounded-full px-2 py-0.5 ${statusBadge.className}`}>
+              <span className={`text-micro uppercase tracking-wide rounded-full px-2 py-0.5 ${statusBadge.className}`}>
                 {statusBadge.label}
               </span>
             )}
             {awaitingMark && (
-              <span className="text-[10px] uppercase tracking-wide bg-amber-100 text-amber-800 rounded-full px-2 py-0.5">
+              <span className="text-micro uppercase tracking-wide bg-amber-100 text-amber-800 rounded-full px-2 py-0.5">
                 {t('components.meeting.awaitingMark')}
               </span>
             )}
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <span className={`text-[10px] uppercase tracking-wide rounded-full px-2 py-0.5 font-medium ${roleBadge.className}`}>
+            <span className={`text-micro uppercase tracking-wide rounded-full px-2 py-0.5 font-medium ${roleBadge.className}`}>
               {roleBadge.label}
             </span>
             <span className="text-xs text-secondary-foreground">
@@ -145,12 +145,12 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
           {visibleTopics.length > 0 && (
             <div className="flex flex-wrap gap-1.5 pt-0.5">
               {visibleTopics.map((t, i) => (
-                <span key={i} className="bg-muted text-foreground border border-[var(--border)] rounded-full px-2 py-0.5 text-[11px] font-medium">
+                <span key={i} className="bg-muted text-foreground border border-[var(--border)] rounded-full px-2 py-0.5 text-caption font-medium">
                   {t}
                 </span>
               ))}
               {extraTopics > 0 && (
-                <span className="text-[11px] text-muted-foreground italic">{t('components.meeting.moreOne', { count: extraTopics })}</span>
+                <span className="text-caption text-muted-foreground italic">{t('components.meeting.moreOne', { count: extraTopics })}</span>
               )}
             </div>
           )}
@@ -162,7 +162,7 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
         <div className="px-4 pb-4 pt-1 text-sm space-y-3 border-t border-[var(--border-subtle)] bg-muted/50">
           {topics.length > visibleTopics.length && (
             <div>
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium mb-1.5">
+              <p className="text-caption uppercase tracking-wide text-muted-foreground font-medium mb-1.5">
                 {mode === 'upcoming' ? t('components.meeting.topicsToCover') : t('components.meeting.topicsCovered')}
               </p>
               <div className="flex flex-wrap gap-1.5">
@@ -176,7 +176,7 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
           )}
           {session.pre_session_question && (
             <div>
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium mb-0.5">{t('components.meeting.focusQuestion')}</p>
+              <p className="text-caption uppercase tracking-wide text-muted-foreground font-medium mb-0.5">{t('components.meeting.focusQuestion')}</p>
               <p className="text-foreground italic">“{session.pre_session_question}”</p>
             </div>
           )}
@@ -209,7 +209,7 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
               return (
                 <div className="space-y-3">
                   <div>
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium mb-0.5">{t('components.meeting.yourReflectionPrivate')}</p>
+                    <p className="text-caption uppercase tracking-wide text-muted-foreground font-medium mb-0.5">{t('components.meeting.yourReflectionPrivate')}</p>
                     <p className="text-xs text-secondary-foreground mb-1">{reflectionPrompt}</p>
                     <textarea
                       className="input resize-none text-sm"
@@ -221,7 +221,7 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
                     />
                   </div>
                   <div>
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium mb-0.5">{t('components.meeting.yourRatingPrivate')}</p>
+                    <p className="text-caption uppercase tracking-wide text-muted-foreground font-medium mb-0.5">{t('components.meeting.yourRatingPrivate')}</p>
                     <RatingPicker value={ratingDraft} onChange={setRatingDraft} />
                   </div>
                   <div className="flex gap-2">
@@ -248,7 +248,7 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
               return (
                 <div className="space-y-2">
                   <div className="flex items-baseline justify-between gap-2 mb-0.5">
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium">{t('components.meeting.yourReflectionPrivate')}</p>
+                    <p className="text-caption uppercase tracking-wide text-muted-foreground font-medium">{t('components.meeting.yourReflectionPrivate')}</p>
                     <button
                       onClick={() => { setReflectionDraft(myReflection || ''); setRatingDraft(myRating ?? null); setEditingReflection(true); }}
                       className="text-xs text-primary hover:text-foreground font-medium"
@@ -284,7 +284,7 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
 
           {mode === 'past' && (
             <div className="border-t border-[var(--border-subtle)] pt-3">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{t('components.meeting.outcomesTitle')}</p>
+              <p className="text-caption font-medium uppercase tracking-wide text-muted-foreground">{t('components.meeting.outcomesTitle')}</p>
               <p className="mt-0.5 text-xs text-secondary-foreground">{t('components.meeting.outcomesHelp')}</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {[

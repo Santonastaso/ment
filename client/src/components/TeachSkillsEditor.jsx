@@ -155,7 +155,7 @@ export default function TeachSkillsEditor({ value = [], onChange, placeholder, l
                 placeholder={t('components.teachSkills.examplePlaceholder')}
                 className="input"
               />
-              <p className="text-right text-[11px] text-muted-foreground tabular-nums">
+              <p className="text-right text-caption text-muted-foreground tabular-nums">
                 {draft.length}/{EXAMPLE_LIMIT}
               </p>
             </div>

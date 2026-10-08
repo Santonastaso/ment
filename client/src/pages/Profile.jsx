@@ -1,5 +1,6 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { flushSync } from 'react-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import SkillTagInput from '../components/SkillTagInput.jsx';
 import TeachSkillsEditor from '../components/TeachSkillsEditor.jsx';
@@ -120,13 +121,37 @@ export default function Profile() {
     ? ['overview', 'skills', 'availability', 'experience', 'reflections']
     : ['overview', 'experience'];
   const tab = validTabs.includes(rawTab) ? rawTab : 'overview';
+  const previousTab = React.useRef(tab);
+  const tabDirection = validTabs.indexOf(tab) >= validTabs.indexOf(previousTab.current) ? 'forward' : 'backward';
+  const tabTransitionId = React.useRef(0);
+  const supportsViewTransitions = typeof document !== 'undefined' && typeof document.startViewTransition === 'function';
+  useEffect(() => { previousTab.current = tab; }, [tab]);
   // Arrived from a chat result: offer the way back to that conversation.
   const fromChat = !isOwnProfile && searchParams.get('from') === 'chat';
   const chatThread = searchParams.get('thread');
   function setTab(next) {
+    if (!validTabs.includes(next) || next === tab) return;
     const params = new URLSearchParams(searchParams);
     if (next === 'overview') params.delete('tab'); else params.set('tab', next);
-    setSearchParams(params);
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!supportsViewTransitions || reducedMotion) {
+      setSearchParams(params);
+      return;
+    }
+
+    const direction = validTabs.indexOf(next) >= validTabs.indexOf(tab) ? 'forward' : 'backward';
+    const transitionId = ++tabTransitionId.current;
+    document.documentElement.dataset.profileTabDirection = direction;
+    const clearDirection = () => {
+      if (tabTransitionId.current === transitionId) delete document.documentElement.dataset.profileTabDirection;
+    };
+    try {
+      document.startViewTransition(() => flushSync(() => setSearchParams(params)))
+        .finished.then(clearDirection, clearDirection);
+    } catch {
+      clearDirection();
+      setSearchParams(params);
+    }
   }
 
   const [profile, setProfile] = useState(null);
@@ -528,7 +553,7 @@ export default function Profile() {
       )}
 
       {validTabs.length > 1 && (
-        <nav className="profile-tabs flex min-h-[var(--workspace-top-row)] flex-wrap items-center gap-1 sm:flex-nowrap" aria-label={t('profile.tabs.label')}>
+        <nav className="profile-tabs flex min-h-0 flex-wrap items-center gap-1 sm:flex-nowrap" aria-label={t('profile.tabs.label')}>
           {validTabs.map(key => (
             <button
               key={key}
@@ -547,7 +572,7 @@ export default function Profile() {
         </nav>
       )}
 
-      <div key={tab} className="profile-tab-content">
+      <div key={tab} className={`profile-tab-content${supportsViewTransitions ? ' profile-tab-view-transition' : ` profile-tab-enter-${tabDirection}`}`}>
       {tab === 'overview' && (
       <>
       <Surface className="profile-overview-header">
@@ -560,7 +585,7 @@ export default function Profile() {
                 </AvatarFallback>
               </Avatar>
               <div className="min-w-0 flex-1">
-                <h1 className="text-[22px] font-medium tracking-[-0.02em]">{profile.name}</h1>
+                <h1 className="text-title font-medium tracking-[-0.02em]">{profile.name}</h1>
                 <div className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
                   {editing ? null : (
                     <>
@@ -660,11 +685,14 @@ export default function Profile() {
               />
               <div className="space-y-2 sm:col-span-2 lg:col-span-3">
                 <label className="flex items-start gap-2 text-sm text-muted-foreground">
-                  <input type="checkbox" checked={cvConsent} onChange={event => setCvConsent(event.target.checked)} />
+                  <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-[#a95035]" checked={cvConsent} onChange={event => setCvConsent(event.target.checked)} />
                   <span>{t('onboarding.import.consent')}</span>
                 </label>
-                <input aria-label={t('onboarding.import.browse')} type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" disabled={cvBusy} onChange={event => { handleCvUpload(event.target.files?.[0]); event.target.value = ''; }} />
-                {cvBusy && <p role="status">{t('onboarding.import.reading')}</p>}
+                <input id="profile-cv-upload" className="peer sr-only" aria-label={t('onboarding.import.browse')} type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" disabled={cvBusy || !cvConsent} onChange={event => { handleCvUpload(event.target.files?.[0]); event.target.value = ''; }} />
+                <label htmlFor="profile-cv-upload" className={`flex min-h-28 flex-col items-center justify-center gap-2 rounded-xl border border-[var(--input)] bg-muted/40 px-4 py-3 text-center peer-focus-visible:ring-2 peer-focus-visible:ring-ring ${cvBusy || !cvConsent ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:bg-muted'}`}>
+                  <span className="rounded-[var(--control-radius)] bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">{cvBusy ? t('onboarding.import.reading') : t('onboarding.import.browse')}</span>
+                  {!cvBusy && <span className="text-xs text-muted-foreground">{t('onboarding.import.hint')}</span>}
+                </label>
                 {cvError && <p role="alert" className="text-sm text-destructive">{cvError}</p>}
                 {cvDraft && <div className="flex flex-wrap items-center gap-2"><p className="text-sm text-muted-foreground">{t('onboarding.import.reviewNotice')}</p><Button type="button" onClick={applyCvDraft} disabled={cvBusy}>{t('profile.btn.applyCv')}</Button></div>}
               </div>
@@ -697,10 +725,10 @@ export default function Profile() {
         {/* Expertise signature */}
         {profile.expertiseSignature?.length > 0 && (
           <div className="pt-1">
-            <h3 className="mb-2 text-sm font-semibold">{isOwnProfile ? t('profile.expertise.titleOwn') : t('profile.expertise.titleOther', { name: firstName })}</h3>
+            <h3 className="mb-2 text-section font-semibold">{isOwnProfile ? t('profile.expertise.titleOwn') : t('profile.expertise.titleOther', { name: firstName })}</h3>
             <div className="flex flex-wrap gap-2">
               {profile.expertiseSignature.map(skill => (
-                <Badge key={skill} variant="secondary" className="h-auto rounded-full bg-[var(--control-surface)] px-3 py-1 text-[13px] text-foreground">{skill}</Badge>
+                <Badge key={skill} variant="secondary" className="h-auto rounded-full bg-[var(--control-surface)] px-3 py-1 text-label text-foreground">{skill}</Badge>
               ))}
             </div>
           </div>
@@ -744,7 +772,7 @@ export default function Profile() {
       {isOwnProfile && tab === 'skills' && (
         <div className="grid items-start gap-5 lg:grid-cols-2">
           <div className="min-w-0 rounded-[var(--panel-radius)] border border-[var(--border-subtle)] bg-[var(--surface)] p-4 sm:p-5">
-            <h3 className="profile-skill-heading is-teaching mb-3 text-base font-bold text-foreground">{t('profile.manageSkills.canTeach')}</h3>
+            <h3 className="mb-3 text-section font-semibold">{t('profile.manageSkills.canTeach')}</h3>
             <TeachSkillsEditor
               tileLayout
               value={teachEditorValue}
@@ -755,7 +783,7 @@ export default function Profile() {
           </div>
 
           <div className="min-w-0 rounded-[var(--panel-radius)] border border-[var(--border-subtle)] bg-[var(--surface)] p-4 sm:p-5">
-            <h3 className="profile-skill-heading is-learning mb-3 text-base font-bold text-foreground">{t('profile.manageSkills.wantsToLearn')}</h3>
+            <h3 className="mb-3 text-section font-semibold">{t('profile.manageSkills.wantsToLearn')}</h3>
             <SkillTagInput
               tileLayout
               value={wantsToLearn}
@@ -769,9 +797,13 @@ export default function Profile() {
 
       {isOwnProfile && tab === 'availability' && (
         <Surface className="overflow-visible bg-transparent">
-          <SurfaceHeader
-            className="px-0 pb-0 pt-0 sm:px-0"
-            action={
+          <SurfaceBody className="px-0 pt-0 sm:px-0">
+            <div className="mb-5 flex items-center justify-between gap-3">
+              <p className="text-sm font-medium" data-testid="availability-status">
+                {profile.mentorship_paused
+                  ? t('profile.availability.paused')
+                  : t('profile.availability.available')}
+              </p>
               <Button
                 type="button"
                 size="sm"
@@ -782,15 +814,13 @@ export default function Profile() {
               >
                 {profile.mentorship_paused ? t('profile.availability.resume') : t('profile.availability.pause')}
               </Button>
-            }
-          />
-          <SurfaceBody className="px-0 pt-5 sm:px-0">
+            </div>
             {capacityError && <p role="alert" className="mb-4 text-sm text-destructive">{capacityError}</p>}
 
             {/* Where notifications go. Blank means the address you sign in
                 with, which is what most people want. */}
             <section className="mb-6 rounded-[var(--panel-radius)] bg-[var(--surface)] p-4">
-              <h3 className="text-sm font-semibold">{t('profile.notifyEmail.title')}</h3>
+              <h3 className="text-section font-semibold">{t('profile.notifyEmail.title')}</h3>
               <p className="mt-0.5 text-xs text-muted-foreground">{t('profile.notifyEmail.help')}</p>
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <Field
@@ -812,11 +842,6 @@ export default function Profile() {
                 <p className="mt-2 text-xs text-muted-foreground">{t('profile.notifyEmail.usingLogin', { email: profile.email })}</p>
               )}
             </section>
-            <p className="text-sm font-medium" data-testid="availability-status">
-              {profile.mentorship_paused
-                ? t('profile.availability.paused')
-                : t('profile.availability.available')}
-            </p>
             {capacity && <div className="mt-5 grid gap-3 sm:grid-cols-2">
               {[
                 { period: 'weekly', limit: capacityDraft.weekly_limit, booked: capacity.weekly_booked, max: 50 },
@@ -824,10 +849,10 @@ export default function Profile() {
               ].map(item => (
                 <section key={item.period} className="rounded-[var(--panel-radius)] bg-[var(--surface)] p-4">
                   <div className="flex items-start justify-between gap-3">
-                    <div><h3 className="text-sm font-semibold">{t(`profile.availability.${item.period}`)}</h3><p className="mt-0.5 text-xs text-muted-foreground">{t('profile.availability.booked', { booked: item.booked, limit: item.limit })}</p></div>
+                    <div><h3 className="text-section font-semibold">{t(`profile.availability.${item.period}`)}</h3><p className="mt-0.5 text-xs text-muted-foreground">{t('profile.availability.booked', { booked: item.booked, limit: item.limit })}</p></div>
                     <input type="number" min="1" max={item.max} className="input h-9 min-h-0 w-20 text-center" aria-label={t(`profile.availability.${item.period}Limit`)} value={item.limit} disabled={availabilitySaving} onChange={event => setCapacityDraft(previous => ({ ...previous, [`${item.period}_limit`]: event.target.value }))} />
                   </div>
-                  <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-background"><div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, (item.booked / Math.max(1, Number(item.limit))) * 100)}%` }} /></div>
+                  <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-background"><div data-testid={`capacity-fill-${item.period}`} className="capacity-fill h-full rounded-full bg-primary" style={{ width: `${Math.min(100, (item.booked / Math.max(1, Number(item.limit))) * 100)}%` }} /></div>
                 </section>
               ))}
             </div>}
@@ -933,7 +958,6 @@ export default function Profile() {
                 {t('profile.reflection.descSuffix')}
               </>
             }
-            action={<Button ref={reflectionTriggerRef} type="button" variant="outline" size="icon-sm" aria-label={t('components.reflection.startCheckIn')} aria-haspopup="dialog" onClick={() => setReflectionOpen(true)}><Plus className="size-4" aria-hidden="true" /></Button>}
           />
           <SurfaceBody className="pt-5">
             <ProfileReflection history draft={reflectionDraft} onDraftChange={setReflectionDraft} onSkillsApplied={refreshProfile} open={reflectionOpen} onOpenChange={setReflectionOpen} returnFocus={reflectionTriggerRef} />
