@@ -11,6 +11,7 @@ import api from '../api/index.js';
 import { useT } from '../i18n/index.jsx';
 import LanguageSwitcher from '../i18n/LanguageSwitcher.jsx';
 import { Button } from '../components/ui/button.jsx';
+import { CITY_OPTIONS, normalizeCity } from '../../../shared/cities.mjs';
 
 function SuggestedPill() {
   const { t } = useT();
@@ -43,6 +44,7 @@ export default function Onboarding({ returnTo }) {
   const [program, setProgram] = useState(user?.program || '');
   const [cohortYear, setCohortYear] = useState(user?.cohort_year || '');
   const [location, setLocation] = useState(user?.location || '');
+  const [locationChoice, setLocationChoice] = useState(() => CITY_OPTIONS.includes(user?.location) ? user.location : user?.location ? '__other' : '');
   const [bio, setBio] = useState(user?.bio || '');
   const [linkedinUrl, setLinkedinUrl] = useState(user?.linkedin_url || '');
   // start_date / end_date are "YYYY-MM" strings (native <input type="month"> format)
@@ -75,7 +77,12 @@ export default function Onboarding({ returnTo }) {
 
   function applyProposed(proposed, source) {
     const next = new Set();
-    if (proposed.location) { setLocation(proposed.location); next.add('location'); }
+    if (proposed.location) {
+      const city = normalizeCity(proposed.location);
+      setLocation(city);
+      setLocationChoice(CITY_OPTIONS.includes(city) ? city : '__other');
+      next.add('location');
+    }
     if (proposed.bio) { setBio(proposed.bio); next.add('bio'); }
     const importedCareer = Array.isArray(proposed.career_history) && proposed.career_history.length
       ? proposed.career_history
@@ -304,10 +311,18 @@ export default function Onboarding({ returnTo }) {
                 </div>
                 <div className="sm:col-span-2">
                   <label className="label">{t('onboarding.fields.location')}{suggested.has('location') && <SuggestedPill source={classifierSource} />} <span className="font-normal text-muted-foreground">{t('onboarding.fields.locationHint')}</span></label>
-                  <input className="input" value={location} onChange={e => setLocation(e.target.value)} placeholder={t('onboarding.fields.locationPlaceholder')} list="ment-location-suggestions" />
-                  <datalist id="ment-location-suggestions">
-                    {['New York','San Francisco','Toronto','Mexico City','London','Berlin','Paris','Madrid','Amsterdam','Stockholm','Dublin','Milan','Tokyo','Singapore','Sydney','Mumbai','Bangalore','Seoul','São Paulo','Dubai','Remote'].map(l => <option key={l} value={l} />)}
-                  </datalist>
+                  <select className="input" aria-label={t('onboarding.fields.location')} value={locationChoice} onChange={event => {
+                    const choice = event.target.value;
+                    setLocationChoice(choice);
+                    if (choice === '__other') {
+                      if (CITY_OPTIONS.includes(location)) setLocation('');
+                    } else setLocation(choice);
+                  }}>
+                    <option value="">{t('onboarding.fields.locationPlaceholder')}</option>
+                    {CITY_OPTIONS.map(city => <option key={city} value={city}>{city}</option>)}
+                    <option value="__other">{t('onboarding.fields.locationOther')}</option>
+                  </select>
+                  {locationChoice === '__other' && <input className="input mt-2" aria-label={t('onboarding.fields.locationOther')} value={location} onChange={event => setLocation(event.target.value)} onBlur={event => setLocation(normalizeCity(event.target.value))} placeholder={t('onboarding.fields.locationOtherPlaceholder')} />}
                 </div>
                 <div className="sm:col-span-2">
                   <label className="label">{t('onboarding.fields.bio')}{suggested.has('bio') && <SuggestedPill source={classifierSource} />} <span className="font-normal text-muted-foreground">{t('onboarding.fields.optional')}</span></label>
