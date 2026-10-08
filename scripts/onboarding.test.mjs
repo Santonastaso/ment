@@ -14,4 +14,5 @@ test('onboarding translates authentication and schema errors without exposing ba
   assert.equal(onboardingErrorKey({ message: 'Could not find public.save_onboarding in the schema cache' }), 'onboarding.error.unavailable');
   assert.equal(onboardingErrorKey({ message: 'unknown_internal_failure' }, true), 'onboarding.import.error');
   assert.equal(onboardingErrorKey({ response: { status: 502, data: { error: 'ai_invalid_response' } } }, true), 'onboarding.import.unavailable');
+  assert.equal(onboardingErrorKey({ response: { status: 400, data: { error: 'text_too_short' } } }, true), 'onboarding.import.unreadable');
 });

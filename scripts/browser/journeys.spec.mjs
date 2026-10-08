@@ -48,6 +48,8 @@ test('invited member signs in, changes temporary password, imports CV, and finis
   await page.getByLabel('Confirm password').fill('new-private-password-2026');
   await page.getByRole('button', { name: 'Update password' }).click();
   await expect(page).toHaveURL(/\/onboarding$/);
+  await expect(page.locator('#onboarding-import-kind')).toHaveCount(0);
+  await expect(page.getByText('Drop a file or click to browse')).toHaveCount(0);
   await expect(page.locator('input[type="file"]')).toBeDisabled();
   await page.getByRole('checkbox').check();
   await page.locator('input[type="file"]').setInputFiles({
@@ -55,7 +57,7 @@ test('invited member signs in, changes temporary password, imports CV, and finis
   });
   await expect(page.getByRole('heading', { name: 'Your background' })).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Full name' })).toHaveValue('Invited Tester');
-  await expect(page.locator('select.input').first()).toHaveValue('Engineering');
+  await expect(page.getByLabel('Department *')).toHaveValue('Engineering');
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByRole('heading', { name: 'What you can teach' })).toBeVisible();
   await page.getByRole('button', { name: 'Continue' }).click();
@@ -83,6 +85,16 @@ test('invited member signs in, changes temporary password, imports CV, and finis
   await page.reload();
   await expect(page).toHaveURL('http://127.0.0.1:3010/');
   await expect(page.getByRole('link', { name: 'My profile' })).toBeVisible();
+});
+
+test('onboarding language can be changed before profile setup is complete', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => window.fixture.setUser({ ...window.fixture.user, onboarding_complete: false }));
+  await expect(page).toHaveURL(/\/onboarding$/);
+  await page.getByTestId('lang-it').click();
+  await expect(page.getByRole('heading', { name: 'Configura il tuo profilo' })).toBeVisible();
+  await page.getByTestId('lang-fr').click();
+  await expect(page.getByRole('heading', { name: 'Créez votre profil' })).toBeVisible();
 });
 
 test('a saved password with failed reauthentication tells the member to sign in again', async ({ page }) => {
@@ -161,19 +173,48 @@ test('Messages opens a clean link and switching chats does not replay transition
   expect(await page.locator('.conversation-thread').evaluate(element => getComputedStyle(element).animationName)).toBe('none');
 });
 
-test('Home greeting uses four borderless faces and turns each 15 seconds', async ({ page }) => {
+test('Home greeting stays static', async ({ page }) => {
   await page.clock.install();
   await page.goto('/');
-  const prism = page.locator('.discovery-greeting-prism');
-  await expect(prism.locator('.discovery-greeting-face')).toHaveCount(4);
-  expect(await prism.locator('.discovery-greeting-face').first().evaluate(element => getComputedStyle(element).borderTopWidth)).toBe('0px');
-  await expect(prism).toHaveAttribute('style', /rotateX\(0deg\)/);
+  const greeting = page.locator('.discovery-greeting-scene');
+  const original = await greeting.textContent();
   await page.clock.fastForward(15000);
-  await expect(prism).toHaveAttribute('style', /rotateX\(-90deg\)/);
-  await page.clock.fastForward(15000);
-  await page.clock.fastForward(15000);
-  await page.clock.fastForward(15000);
-  await expect(prism).toHaveAttribute('style', /rotateX\(-360deg\)/);
+  await expect(greeting).toHaveText(original);
+  await expect(greeting.locator('span')).toHaveCount(0);
+});
+
+test('Home navigation resets an active discovery conversation', async ({ page }) => {
+  await page.goto('/');
+  const composer = page.getByRole('textbox', { name: 'Describe who could help' });
+  await composer.fill('finance');
+  await composer.press('Enter');
+  await expect(page.getByText('Which finance skill would you like help with?')).toBeVisible();
+  await page.locator('.app-sidebar').getByRole('link', { name: 'Home' }).click();
+  await expect(page.getByRole('textbox', { name: 'Describe who could help' })).toHaveValue('');
+  await expect(page.getByText('Which finance skill would you like help with?')).toHaveCount(0);
+  await expect(page).toHaveURL('http://127.0.0.1:3010/');
+});
+
+test('profile overview shows saved skills before the first session and CV can update them', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => {
+    window.fixture.profile = {
+      ...window.fixture.user, department: 'Engineering', current_role: 'Engineer', career: [{ role: 'Engineer', department: 'Engineering' }],
+      skills: [{ id: 5, skill: 'Architecture', type: 'can_teach', example_project: 'Built a platform' }],
+      skillProgress: [],
+    };
+  });
+  await page.locator('.app-sidebar').getByRole('link', { name: 'My profile' }).click();
+  await expect(page.getByText('Architecture', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Edit profile' }).click();
+  await page.getByRole('checkbox').check();
+  await page.locator('input[type="file"]').setInputFiles({ name: 'updated.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 synthetic CV') });
+  await expect(page.getByRole('button', { name: 'Apply CV suggestions' })).toBeVisible();
+  await page.getByRole('button', { name: 'Apply CV suggestions' }).click();
+  await expect.poll(() => page.evaluate(() => window.fixture.calls.some(call => call.path === '/users/me/onboarding'))).toBe(true);
+  const saved = await page.evaluate(() => window.fixture.calls.find(call => call.path === '/users/me/onboarding').body);
+  expect(saved.can_teach[0].skill).toBe('Architecture');
+  expect(saved.career[0].role).toBe('Engineer');
 });
 
 test('Messages rail moves smoothly and compact menus remain usable', async ({ page }) => {
@@ -478,6 +519,8 @@ test('onboarding to discovery, request, acceptance, chat and meeting', async ({ 
   await expect(page).toHaveURL(/\/onboarding$/);
   await page.getByRole('button', { name: /^Skip/ }).click();
   await page.getByRole('textbox', { name: 'Full name' }).fill('Viewer Student');
+  await page.getByRole('textbox', { name: 'Role title *' }).fill('Student');
+  await page.getByLabel('Department *').selectOption('Finance');
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.getByRole('button', { name: 'Finish & see my matches' }).click();
