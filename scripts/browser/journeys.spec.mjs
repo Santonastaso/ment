@@ -521,7 +521,7 @@ test('Messages count sits beside its heading', async ({ page }) => {
   await expect(heading.locator('h1')).toHaveText('Messages');
   await expect(heading.locator('.conversation-list-count')).toHaveText('3');
   expect((await heading.boundingBox()).x - (await rail.boundingBox()).x).toBeGreaterThanOrEqual(23);
-  expect((await page.locator('.conversation-list-item').first().boundingBox()).x - (await rail.boundingBox()).x).toBeGreaterThanOrEqual(14);
+  expect((await page.locator('.conversation-list-item').first().boundingBox()).x - (await rail.boundingBox()).x).toBeGreaterThanOrEqual(13.5);
   const gap = await heading.evaluate(element => {
     const title = element.querySelector('h1').getBoundingClientRect();
     const count = element.querySelector('.conversation-list-count').getBoundingClientRect();

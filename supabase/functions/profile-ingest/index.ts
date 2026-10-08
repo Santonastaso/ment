@@ -151,7 +151,7 @@ Deno.serve(async (req) => {
   }
   if (!rawText || rawText.trim().length < 20) return jsonError('text_too_short', 400);
 
-  let proposed;
+  let proposed: Record<string, unknown>;
   let classifier_source;
   const startedAt = Date.now();
   try {
@@ -167,7 +167,7 @@ Deno.serve(async (req) => {
       console.error(JSON.stringify({ event: 'profile_ingest_invalid_shape', model: result.model }));
       return jsonError('ai_invalid_response', 502);
     }
-    proposed = result.value.proposed;
+    proposed = result.value.proposed as Record<string, unknown>;
     if (typeof proposed.location === 'string') proposed.location = normalizeCity(proposed.location);
     classifier_source = `mistral:${result.model}`;
     const { data: owner } = await ctx.sb.from('profiles').select('organization_id').eq('id', ctx.user.id).maybeSingle();
