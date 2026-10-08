@@ -88,7 +88,6 @@ type ClarificationResult = {
   matching_terms?: string[];
   nearest_terms?: string[];
   subject_label?: string;
-  place_is_real?: boolean;
   parts?: unknown;
 };
 
@@ -500,6 +499,34 @@ function namedPerson(text: string) {
   return '';
 }
 
+// Famous fictional places, recognised in any case without asking the model.
+const FICTIONAL_PLACES = ['Gotham City', 'Gotham', 'Wakanda', 'Atlantis', 'Narnia', 'Hogwarts', 'Hogsmeade', 'Diagon Alley', 'Westeros',
+  "King's Landing", 'Winterfell', 'Mordor', 'Middle-earth', 'Middle Earth', 'Rivendell', 'Gondor', 'Neverland', 'Asgard', 'Krypton',
+  'Bikini Bottom', 'Tatooine', 'Coruscant', 'Wonderland', 'Emerald City', 'Land of Oz', 'El Dorado', 'Shangri-La', 'Agrabah',
+  'Arendelle', 'Zootopia', 'Duckburg', 'Hyrule', 'Azeroth', 'Vice City', 'Liberty City', 'Bedrock', 'Genovia', 'Latveria',
+  'Sokovia', 'Themyscira', 'Panem', 'Hill Valley', 'Hogwarts School'];
+function fictionalPlaceIn(text: string) {
+  return FICTIONAL_PLACES.find((place) => new RegExp(`(^|[^\\p{L}])${escapeRegex(place)}([^\\p{L}]|$)`, 'iu').test(text)) || '';
+}
+// One direct question about a place nothing else can vouch for.
+async function classifyPlace(place: string): Promise<'real' | 'fictional' | 'not_a_place'> {
+  try {
+    const result = await mistralJson<{ kind?: string }>({
+      feature: 'discovery_clarify',
+      system: 'Classify the name you are given. "real": a city, town, region or country that exists on Earth. "fictional": a place from films, comics, books, games, TV or myth. "not_a_place": not a place name at all. Return JSON only: {"kind":"real"|"fictional"|"not_a_place"}.',
+      user: JSON.stringify({ name: place.slice(0, 80) }),
+      temperature: 0,
+      maxTokens: 20,
+    });
+    const kind = result.value?.kind;
+    return kind === 'fictional' || kind === 'not_a_place' ? kind : 'real';
+  } catch {
+    // When in doubt, a place is treated as real: "nobody here is based there"
+    // is true either way, while calling a real town made-up is not.
+    return 'real';
+  }
+}
+
 // "Anywhere" lets go of a place given earlier in the conversation.
 const ANYWHERE = /\b(anywhere|any (city|location|place)|ovunque|qualsiasi citt[aà]|n'importe o[uù]|partout)\b/i;
 
@@ -802,10 +829,9 @@ Do not broaden explicit professions or domains into adjacent ones. For example, 
   "exclude": things the latest message says to drop or stop searching for, as written, else [].
   "conflict": two short phrases from the latest message that cannot both be true of one person, such as a very senior job and still being at school, else [].
 The language the user writes in is never a place: French words do not mean France.
-"place_is_real": false when named_location is a fictional or made-up place, such as one from a film, comic or novel; true for a real city, region or country.
 Every term you return is checked against the coverage and anything not found there is discarded, so copy exactly and never invent one. The examples in these instructions illustrate shape only: never reuse their wording or their subject in anything you return.
 
-Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one concise question or empty string","search_request":"concise grounded request or empty string","no_match_reason":"one plain sentence, or empty string","named_subject":"as written, or empty string","matching_terms":["exact coverage term"],"nearest_terms":["exact coverage term"],"named_location":"as written, or empty string","subject_label":"short phrase, or empty string","place_is_real":true,"parts":{"role":"","seniority":"","field":"","department":"","company":"","skills":[],"exclude":[],"conflict":[]}}.`,
+Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one concise question or empty string","search_request":"concise grounded request or empty string","no_match_reason":"one plain sentence, or empty string","named_subject":"as written, or empty string","matching_terms":["exact coverage term"],"nearest_terms":["exact coverage term"],"named_location":"as written, or empty string","subject_label":"short phrase, or empty string","parts":{"role":"","seniority":"","field":"","department":"","company":"","skills":[],"exclude":[],"conflict":[]}}.`,
         user: JSON.stringify({ conversation, coverage, answered: hasClarified, lexical_hits: hits }),
         temperature: 0.1,
         maxTokens: 800,
@@ -871,8 +897,17 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
       // "give me more options" look like a new request.
       const latestWords = new Set(wordsOf(latestOriginal));
       const placeHere = (value: string) => (answeringOurQuestion ? grounded(value) : wordsOf(value).some((word) => latestWords.has(word)));
-      const namedLocation = ANYWHERE.test(latestOriginal) ? ''
-        : (placeHere(extractedLocation) && !isVocabulary && plausiblePlace(extractedLocation) ? extractedLocation : '') || regionIn(latestOriginal);
+      // A well-known fictional place is recognised in any case ("wakanda").
+      const fictionalNamed = fictionalPlaceIn(latestOriginal);
+      const extractedPlace = ANYWHERE.test(latestOriginal) ? ''
+        : fictionalNamed || (placeHere(extractedLocation) && !isVocabulary && plausiblePlace(extractedLocation) ? extractedLocation : '') || regionIn(latestOriginal);
+      // Any other place we cannot vouch for gets one direct question. Asked as
+      // a field among many, the model let "Gotham city" through as real; asked
+      // on its own, it answers reliably.
+      const vouched = (place: string) => WORLD_CITIES.has(place.toLowerCase()) || Boolean(regionIn(place))
+        || knownLocations.some((known) => known.toLowerCase().includes(place.toLowerCase()) || place.toLowerCase().includes(known.toLowerCase()));
+      const placeKind = fictionalNamed ? 'fictional' : extractedPlace && !vouched(extractedPlace) ? await classifyPlace(extractedPlace) : 'real';
+      const namedLocation = placeKind === 'not_a_place' ? '' : extractedPlace;
       const regionCities = placeCities(namedLocation, knownLocations);
       const locationMissing = Boolean(namedLocation) && !regionCities.length && !knownLocations.some((known) => {
         const a = known.toLowerCase();
@@ -885,7 +920,7 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
         exactGapReason = (LOCATION_GAP[language] || LOCATION_GAP.English)(namedLocation);
         // A place the model calls made-up, and that is no city or region we know
         // of, is said to be unreal rather than offered as if nobody were there.
-        const fictional = result.value?.place_is_real === false && !WORLD_CITIES.has(namedLocation.toLowerCase()) && !regionIn(namedLocation);
+        const fictional = placeKind === 'fictional';
         gapState = { kind: fictional ? 'unreal' : 'place', value: namedLocation, role: false };
       } else if (namedLocation) {
         namedLocationFilter = knownLocations.find((known) => known.toLowerCase() === namedLocation.toLowerCase()) || namedLocation;

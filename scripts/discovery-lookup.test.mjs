@@ -924,3 +924,50 @@ test('the request reaches the model as the sender\'s need, with the roles spelle
   assert.equal(JSON.parse(fixture.calls[0].messages[1].content).sender.need, 'strategie di acquisto globali');
   assert.match(fixture.calls[0].messages[0].content, /the sender is asking, not offering/);
 });
+
+// Fictional places, without relying on the main model to flag them.
+const financePeople = [finance, { ...finance, id: 'finance-milan', location: 'Milan' }];
+test('a famous fictional place is recognised even in lower case', async () => {
+  const fixture = withLocations(discoveryFixture({ candidates: financePeople, responses: [clarify({ named_subject: 'finance' })] }), ['Paris', 'Milan']);
+  const result = await chat(fixture, 'I am looking for someone working in finance in wakanda');
+  assert.match(result.clarification, /^Good one! I'm fairly sure Wakanda isn't a real place/);
+  assert.equal(fixture.calls.length, 1, 'no extra question to the model');
+});
+
+test('a fictional place given as an answer is still called fictional', async () => {
+  const turns = [
+    { role: 'user', content: 'I am looking for someone working in finance' },
+    { role: 'assistant', kind: 'clarification', stage: 'department', department: 'Finance', content: 'What in finance would help most?' },
+  ];
+  const fixture = withLocations(discoveryFixture({ candidates: financePeople, turns, responses: [
+    clarify({ named_subject: 'finance', named_location: 'Gotham city' }), { outcome: 'no_match', matches: [] },
+  ] }), ['Paris', 'Milan']);
+  const result = await say(fixture, 'let’s look for someone based in Gotham city', 'thread');
+  assert.match(result.message || result.clarification, /Gotham City isn't a real place/);
+  assert.doesNotMatch(result.message || result.clarification, /couldn't find anyone based in/);
+});
+
+const askedAbout = (kind) => (fixture) => {
+  const served = fixture.fetch.bind(fixture);
+  fixture.fetch = async (url, options) => {
+    const request = JSON.parse(options.body);
+    if (/Classify the name you are given/.test(request.messages[0].content)) {
+      fixture.calls.push(request);
+      return Response.json({ model: 'fixture-model', choices: [{ message: { content: JSON.stringify({ kind }) } }] });
+    }
+    return served(url, options);
+  };
+  return fixture;
+};
+
+test('an unknown place the model calls fictional is called fictional', async () => {
+  const fixture = askedAbout('fictional')(withLocations(discoveryFixture({ candidates: financePeople, responses: [clarify({ named_subject: 'finance', named_location: 'Zubrowka' })] }), ['Paris', 'Milan']));
+  const result = await chat(fixture, 'someone in finance in Zubrowka');
+  assert.match(result.clarification, /Zubrowka isn't a real place/);
+});
+
+test('an unknown real town is never called fictional', async () => {
+  const fixture = askedAbout('real')(withLocations(discoveryFixture({ candidates: financePeople, responses: [clarify({ named_subject: 'finance', named_location: 'Bordeaux' })] }), ['Paris', 'Milan']));
+  const result = await chat(fixture, 'someone in finance in Bordeaux');
+  assert.match(result.clarification, /^I couldn't find anyone based in Bordeaux\./);
+});
