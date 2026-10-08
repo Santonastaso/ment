@@ -1,6 +1,5 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { flushSync } from 'react-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import SkillTagInput from '../components/SkillTagInput.jsx';
 import TeachSkillsEditor from '../components/TeachSkillsEditor.jsx';
@@ -121,11 +120,6 @@ export default function Profile() {
     ? ['overview', 'skills', 'availability', 'experience', 'reflections']
     : ['overview', 'experience'];
   const tab = validTabs.includes(rawTab) ? rawTab : 'overview';
-  const previousTab = React.useRef(tab);
-  const tabDirection = validTabs.indexOf(tab) >= validTabs.indexOf(previousTab.current) ? 'forward' : 'backward';
-  const tabTransitionId = React.useRef(0);
-  const supportsViewTransitions = typeof document !== 'undefined' && typeof document.startViewTransition === 'function';
-  useEffect(() => { previousTab.current = tab; }, [tab]);
   // Arrived from a chat result: offer the way back to that conversation.
   const fromChat = !isOwnProfile && searchParams.get('from') === 'chat';
   const chatThread = searchParams.get('thread');
@@ -133,25 +127,7 @@ export default function Profile() {
     if (!validTabs.includes(next) || next === tab) return;
     const params = new URLSearchParams(searchParams);
     if (next === 'overview') params.delete('tab'); else params.set('tab', next);
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (!supportsViewTransitions || reducedMotion) {
-      setSearchParams(params);
-      return;
-    }
-
-    const direction = validTabs.indexOf(next) >= validTabs.indexOf(tab) ? 'forward' : 'backward';
-    const transitionId = ++tabTransitionId.current;
-    document.documentElement.dataset.profileTabDirection = direction;
-    const clearDirection = () => {
-      if (tabTransitionId.current === transitionId) delete document.documentElement.dataset.profileTabDirection;
-    };
-    try {
-      document.startViewTransition(() => flushSync(() => setSearchParams(params)))
-        .finished.then(clearDirection, clearDirection);
-    } catch {
-      clearDirection();
-      setSearchParams(params);
-    }
+    setSearchParams(params);
   }
 
   const [profile, setProfile] = useState(null);
@@ -572,7 +548,7 @@ export default function Profile() {
         </nav>
       )}
 
-      <div key={tab} className={`profile-tab-content${supportsViewTransitions ? ' profile-tab-view-transition' : ` profile-tab-enter-${tabDirection}`}`}>
+      <div key={tab} className="profile-tab-content">
       {tab === 'overview' && (
       <>
       <Surface className="profile-overview-header">

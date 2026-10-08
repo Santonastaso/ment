@@ -25,7 +25,7 @@ function fixtureApi(state) {
       if (path === '/reflections') return { entries: state.reflections || [], dueForCheckIn: !!state.reflectionDue, lastEntryDays: state.reflectionDue ? 4 : null };
       if (path === '/sessions') return state.sessions.map(payload);
       if (path === '/groups') return state.groups.map(group => ({ ...group, latest_message: state.messages[`/groups/${group.id}/messages`]?.at(-1)?.body || null }));
-      if (path.startsWith('/directory?')) return { people: [state.peer], total: 1, facets: { languages: ['fr', 'it'] } };
+      if (path.startsWith('/directory?')) return { people: [state.peer], total: state.directoryTotal ?? 1, facets: { languages: ['fr', 'it'] } };
       // A saved conversation and a peer profile, for the view-profile round trip.
       if (path === '/discovery/threads/thread') return { id: 'thread', turns: [
         { role: 'user', content: 'Financial modelling' },

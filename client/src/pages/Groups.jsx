@@ -281,10 +281,13 @@ export default function Groups() {
         <DialogContent>
           <DialogHeader><DialogTitle>{reviewTarget?.name}</DialogTitle><DialogDescription>{t('groups.reviewDescription')}</DialogDescription></DialogHeader>
           {reviewLoading ? <p role="status">{t('common.loading')}</p> : requests.length === 0 ? <p>{t('groups.noRequests')}</p> : requests.map(request => (
-            <article key={request.user_id} className="grid gap-2 border-b py-3">
+            <article key={request.user_id} className="grid gap-2 py-3">
               <strong>{request.name}</strong><p className="whitespace-pre-wrap text-sm">{request.reason}</p>
-              <p className="text-xs text-muted-foreground">{requestExpiryLabel(request.expires_at, t)}</p>
-              <div className="flex gap-2"><Button disabled={saving} onClick={() => reviewRequest(request, true)}>{t('groups.approve')}</Button><Button variant="outline" disabled={saving} onClick={() => reviewRequest(request, false)}>{t('groups.decline')}</Button></div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button disabled={saving} onClick={() => reviewRequest(request, true)}>{t('groups.approve')}</Button>
+                <Button variant="outline" disabled={saving} onClick={() => reviewRequest(request, false)}>{t('groups.decline')}</Button>
+                <span className="ml-auto text-xs text-muted-foreground">{requestExpiryLabel(request.expires_at, t)}</span>
+              </div>
             </article>
           ))}
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}

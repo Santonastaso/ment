@@ -134,7 +134,7 @@ export default function Explorer() {
                 {hasActiveFilters && <div className="flex min-h-[var(--navigation-row-height)] flex-wrap items-center justify-between gap-3">
                   <Button type="button" size="xs" variant="ghost" onClick={() => { setInputValue(''); setSearchParams({}); }}>{t('explorer.clearFilters')}</Button>
                 </div>}
-                {updatingResults ? (
+                {updatingResults && !dirData ? (
                   <div className="directory-pagination mt-6 flex min-h-14 flex-wrap items-center justify-between gap-3 border-t border-border pt-4 text-sm" aria-hidden="true">
                     <Skeleton className="h-4 w-32" />
                     <div className="flex items-center gap-2">
@@ -159,8 +159,8 @@ export default function Explorer() {
                 )}
               </div>
 
-              <div key={dirError ? 'error' : dirData?.requestKey || 'initial'} className="directory-results" data-loading={updatingResults && !!dirData} aria-busy={updatingResults} inert={updatingResults && !!dirData ? '' : undefined}>
-              {updatingResults ? (
+              <div className="directory-results" data-loading={updatingResults && !!dirData} aria-busy={updatingResults} inert={updatingResults && !!dirData ? '' : undefined}>
+              {updatingResults && !dirData ? (
                 <div className="directory-rail grid gap-1" role="status" aria-label={t('common.loading')}>
                   {[1, 2, 3, 4, 5, 6].map(i => (
                     <article key={i} className="person-row person-row-skeleton" aria-hidden="true">
