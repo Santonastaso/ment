@@ -55,7 +55,7 @@ test('invited member signs in, changes temporary password, imports CV, and finis
   });
   await expect(page.getByRole('heading', { name: 'Your background' })).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Full name' })).toHaveValue('Invited Tester');
-  await expect(page.locator('select.input').first()).toHaveValue('Engineering');
+  await expect(page.getByLabel('Department *')).toHaveValue('Engineering');
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByRole('heading', { name: 'What you can teach' })).toBeVisible();
   await page.getByRole('button', { name: 'Continue' }).click();
@@ -83,6 +83,16 @@ test('invited member signs in, changes temporary password, imports CV, and finis
   await page.reload();
   await expect(page).toHaveURL('http://127.0.0.1:3010/');
   await expect(page.getByRole('link', { name: 'My profile' })).toBeVisible();
+});
+
+test('onboarding language can be changed before profile setup is complete', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => window.fixture.setUser({ ...window.fixture.user, onboarding_complete: false }));
+  await expect(page).toHaveURL(/\/onboarding$/);
+  await page.getByTestId('lang-it').click();
+  await expect(page.getByRole('heading', { name: 'Configura il tuo profilo' })).toBeVisible();
+  await page.getByTestId('lang-fr').click();
+  await expect(page.getByRole('heading', { name: 'Créez votre profil' })).toBeVisible();
 });
 
 test('a saved password with failed reauthentication tells the member to sign in again', async ({ page }) => {

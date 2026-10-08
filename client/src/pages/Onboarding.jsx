@@ -3,12 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import SkillTagInput from '../components/SkillTagInput.jsx';
 import TeachSkillsEditor from '../components/TeachSkillsEditor.jsx';
-import CareerEntryFields, { DEPARTMENTS } from '../components/CareerEntryFields.jsx';
+import CareerEntryFields from '../components/CareerEntryFields.jsx';
 import { Field } from '../components/ui/field.jsx';
 import { hasPlaceholderName, onboardingErrorKey } from '../lib/onboarding.mjs';
 import { Check } from 'lucide-react';
 import api from '../api/index.js';
 import { useT } from '../i18n/index.jsx';
+import LanguageSwitcher from '../i18n/LanguageSwitcher.jsx';
 import { Button } from '../components/ui/button.jsx';
 
 function SuggestedPill() {
@@ -42,12 +43,9 @@ export default function Onboarding({ returnTo }) {
   const [persona, setPersona] = useState(user?.role === 'alumnus' ? 'alumnus' : 'student');
   const [program, setProgram] = useState(user?.program || '');
   const [cohortYear, setCohortYear] = useState(user?.cohort_year || '');
-  const [department, setDepartment] = useState(user?.department || '');
-  const [currentRole, setCurrentRole] = useState(user?.current_role || '');
   const [location, setLocation] = useState(user?.location || '');
   const [bio, setBio] = useState(user?.bio || '');
   const [linkedinUrl, setLinkedinUrl] = useState(user?.linkedin_url || '');
-  const [linkedinHeadline, setLinkedinHeadline] = useState(user?.linkedin_headline || '');
   // start_date / end_date are "YYYY-MM" strings (native <input type="month"> format)
   const [career, setCareer] = useState([{ role: '', department: '', company: '', start_date: '', end_date: '' }]);
 
@@ -78,17 +76,15 @@ export default function Onboarding({ returnTo }) {
 
   function applyProposed(proposed, source) {
     const next = new Set();
-    if (proposed.department) { setDepartment(proposed.department); next.add('department'); }
-    if (proposed.job_title || proposed.current_role) {
-      setCurrentRole(proposed.job_title || proposed.current_role);
-      next.add('current_role');
-    }
     if (proposed.location) { setLocation(proposed.location); next.add('location'); }
     if (proposed.bio) { setBio(proposed.bio); next.add('bio'); }
-    if (Array.isArray(proposed.career_history) && proposed.career_history.length) {
-      setCareer(proposed.career_history.map(ch => ({
-        role: ch.role || ch.role_title || '',
-        department: ch.department || '',
+    const importedCareer = Array.isArray(proposed.career_history) && proposed.career_history.length
+      ? proposed.career_history
+      : [{ role_title: proposed.job_title || proposed.current_role || '', department: proposed.department || '' }];
+    if (importedCareer[0].role_title || importedCareer[0].role || importedCareer[0].department) {
+      setCareer(importedCareer.map(ch => ({
+        role: ch.role || ch.role_title || proposed.job_title || proposed.current_role || '',
+        department: ch.department || proposed.department || '',
         company: ch.company || '',
         description: ch.description || '',
         start_date: monthYearToPicker(ch.start_year, ch.start_month),
@@ -141,11 +137,16 @@ export default function Onboarding({ returnTo }) {
   async function handleFinish() {
     if (saving) return;
     if (!name.trim()) { setError(t('onboarding.error.nameRequired')); setStep(1); return; }
+    if (!career[0]?.role.trim() || !career[0]?.department.trim()) {
+      setError(t('onboarding.error.workExperienceRequired'));
+      setStep(1);
+      return;
+    }
     setSaving(true);
     setError('');
     try {
       const validCareer = career
-        .filter(c => c.role.trim() && c.department.trim())
+        .filter((c, index) => index === 0 || c.role.trim() || c.department.trim() || c.company.trim() || c.description?.trim() || c.start_date || c.end_date)
         .map(c => {
           const s = splitDate(c.start_date);
           const e = splitDate(c.end_date);
@@ -160,8 +161,9 @@ export default function Onboarding({ returnTo }) {
             end_month: e.month,
           };
         });
+      const primaryCareer = validCareer[0];
       const accepted = {
-        name, department, current_role: currentRole, location, bio,
+        name, department: primaryCareer.department, current_role: primaryCareer.role, location, bio,
         career_history: validCareer,
         can_teach: canTeach,
         wants_to_learn: wantsToLearn,
@@ -172,7 +174,7 @@ export default function Onboarding({ returnTo }) {
       const res = await api.post('/users/me/onboarding', {
         name, seniority: user?.seniority ?? null,
         shadow_role_response: user?.shadow_role_response ?? null,
-        department, current_role: currentRole, location, bio,
+        department: primaryCareer.department, current_role: primaryCareer.role, location, bio,
         career: validCareer,
         can_teach: canTeach,
         wants_to_learn: wantsToLearn,
@@ -180,7 +182,7 @@ export default function Onboarding({ returnTo }) {
         cohort_year: cohortYear,
         persona,
         linkedin_url: linkedinUrl,
-        linkedin_headline: linkedinHeadline,
+        linkedin_headline: null,
       });
       updateUser(res.data);
       navigate(returnTo || '/');
@@ -191,14 +193,26 @@ export default function Onboarding({ returnTo }) {
     }
   }
 
+  function handleContinue() {
+    if (step === 1 && (!career[0]?.role.trim() || !career[0]?.department.trim())) {
+      setError(t('onboarding.error.workExperienceRequired'));
+      return;
+    }
+    setError('');
+    setStep(current => current + 1);
+  }
+
   return (
     <div className="space-y-8">
-      <div className="flex items-center gap-2">
-        <span className="flex size-9 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">M</span>
-        <div>
-          <h1 className="text-xl font-medium tracking-[-0.01em] text-foreground">{t('onboarding.header.title')}</h1>
-          <p className="text-sm text-muted-foreground">{t('onboarding.header.subtitle')}</p>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <span className="flex size-9 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">M</span>
+          <div>
+            <h1 className="text-xl font-medium tracking-[-0.01em] text-foreground">{t('onboarding.header.title')}</h1>
+            <p className="text-sm text-muted-foreground">{t('onboarding.header.subtitle')}</p>
+          </div>
         </div>
+        <LanguageSwitcher />
       </div>
 
       <div>
@@ -297,18 +311,6 @@ export default function Onboarding({ returnTo }) {
                   <input className="input" type="number" min="1900" max="2100" value={cohortYear} onChange={e => setCohortYear(e.target.value)} placeholder="2024" />
                 </div>
                 <div className="sm:col-span-2">
-                  <h3 className="text-base font-medium mt-5 mb-4">{t('onboarding.background.work')}</h3>
-                  <label className="label">{t('onboarding.fields.department')}{suggested.has('department') && <SuggestedPill source={classifierSource} />}</label>
-                  <select className="input" value={department} onChange={e => setDepartment(e.target.value)}>
-                    <option value="">{t('onboarding.fields.selectDepartment')}</option>
-                    {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
-                  </select>
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="label">{t('onboarding.fields.currentRole')}{suggested.has('current_role') && <SuggestedPill source={classifierSource} />}</label>
-                  <input className="input" value={currentRole} onChange={e => setCurrentRole(e.target.value)} placeholder={t('onboarding.fields.currentRolePlaceholder')} />
-                </div>
-                <div className="sm:col-span-2">
                   <label className="label">{t('onboarding.fields.location')}{suggested.has('location') && <SuggestedPill source={classifierSource} />} <span className="font-normal text-muted-foreground">{t('onboarding.fields.locationHint')}</span></label>
                   <input className="input" value={location} onChange={e => setLocation(e.target.value)} placeholder={t('onboarding.fields.locationPlaceholder')} list="ment-location-suggestions" />
                   <datalist id="ment-location-suggestions">
@@ -319,21 +321,20 @@ export default function Onboarding({ returnTo }) {
                   <label className="label">{t('onboarding.fields.bio')}{suggested.has('bio') && <SuggestedPill source={classifierSource} />} <span className="font-normal text-muted-foreground">{t('onboarding.fields.optional')}</span></label>
                   <textarea className="input resize-none" rows={2} value={bio} onChange={e => setBio(e.target.value)} placeholder={t('onboarding.fields.bioPlaceholder')} />
                 </div>
-                <div className="sm:col-span-2 grid gap-3 sm:grid-cols-2">
-                  <div><label className="label">{t('onboarding.fields.linkedin')}</label><input className="input" type="url" value={linkedinUrl} onChange={e => setLinkedinUrl(e.target.value)} placeholder="https://linkedin.com/in/..." /></div>
-                  <div><label className="label">{t('onboarding.fields.linkedinHeadline')}</label><input className="input" value={linkedinHeadline} onChange={e => setLinkedinHeadline(e.target.value)} placeholder={t('onboarding.fields.linkedinHeadlinePlaceholder')} /></div>
+                <div className="sm:col-span-2">
+                  <label className="label">{t('onboarding.fields.linkedin')}</label><input className="input" type="url" value={linkedinUrl} onChange={e => setLinkedinUrl(e.target.value)} placeholder="https://linkedin.com/in/..." />
                 </div>
               </div>
 
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <label className="label mb-0">{t('onboarding.career.previousRoles')}{suggested.has('career') && <SuggestedPill source={classifierSource} />} <span className="font-normal text-muted-foreground">{t('onboarding.fields.optional')}</span></label>
+                  <label className="label mb-0">{t('onboarding.career.workExperience')}{suggested.has('career') && <SuggestedPill source={classifierSource} />}</label>
                   <button type="button" onClick={addCareerRow} className="text-sm text-primary hover:text-foreground font-medium">{t('onboarding.career.addRole')}</button>
                 </div>
                 <div className="space-y-3">
                   {career.map((c, i) => (
                     <div key={i} className="bg-muted rounded-lg p-3 space-y-2">
-                      <CareerEntryFields value={c} onChange={next => setCareer(current => current.map((entry, index) => index === i ? next : entry))} />
+                      <CareerEntryFields value={c} required={i === 0} descriptionLabel={t('onboarding.career.projects')} onChange={next => setCareer(current => current.map((entry, index) => index === i ? next : entry))} />
                       {career.length > 1 && (
                         <button type="button" onClick={() => removeCareer(i)} className="text-xs text-red-400 hover:text-red-600">{t('onboarding.career.remove')}</button>
                       )}
@@ -389,7 +390,7 @@ export default function Onboarding({ returnTo }) {
             {step === 0 ? (
               <Button onClick={() => { setError(''); setStep(1); }} disabled={uploading}>{t('onboarding.nav.skip')}</Button>
             ) : step < 3 ? (
-              <Button onClick={() => { setError(''); setStep(s => s + 1); }}>
+              <Button onClick={handleContinue}>
                 {t('onboarding.nav.continue')}
               </Button>
             ) : (

@@ -52,7 +52,7 @@ function fixtureApi(state) {
       if (path === '/profile/ingest') {
         if (state.requireFreshAuth && !state.authReady) throw new Error('auth_required');
         return { draft_id: 1, classifier_source: 'test', proposed: state.ingestProposed || {
-        job_title: 'Analyst', bio: 'Built useful systems.', career_history: [], can_teach: [], wants_to_learn: [],
+        job_title: 'Analyst', department: 'Engineering', bio: 'Built useful systems.', career_history: [], can_teach: [], wants_to_learn: [],
         } };
       }
       if (path === '/profile/ingest/1/accept') return { ok: true };
