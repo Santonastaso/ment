@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 17901)
-Total output lines: 1151
-
 import { test, expect } from './fixtures.mjs';
 
 async function waitForMotion(page) {
@@ -392,7 +389,378 @@ test('Explorer sticky panel controls share dimensions and use the interactive ra
     const pagination = panel.querySelector('.directory-pagination');
     const panelRect = panel.getBoundingClientRect();
     const paginationRect = pagination.getBoundingClientRect();
-    return [panelRect.left, panelRect.right, paginationRect.left, paginat…5901 tokens truncated…400000).toISOString().slice(0, 10);
+    return [panelRect.left, panelRect.right, paginationRect.left, paginationRect.right];
+  });
+  expect(edges[0]).toBeCloseTo(edges[2], 0);
+  expect(edges[1]).toBeCloseTo(edges[3], 0);
+  await page.setViewportSize({ width: 390, height: 700 });
+  expect(await page.locator('.directory-search-panel').evaluate(panel => getComputedStyle(panel).position)).toBe('static');
+});
+
+test('Explorer keeps its clear action for active search and sort', async ({ page }) => {
+  await page.goto('/explorer?q=finance');
+  await expect(page.getByRole('button', { name: 'Clear filters' })).toBeVisible();
+  await page.getByRole('button', { name: 'Clear filters' }).click();
+  await expect(page.getByRole('button', { name: 'Clear filters' })).toHaveCount(0);
+});
+
+test('a proposed time is checked again before sending a request', async ({ page }) => {
+  await page.goto('/explorer');
+  await page.getByRole('button', { name: 'Request a session' }).first().click();
+  const dialog = page.getByRole('dialog', { name: 'Request a session' });
+  await expect(dialog.getByText('1 / 4')).toBeVisible();
+  await expect(dialog.getByText('Availability and request limits are checked again when you send.')).toHaveCount(0);
+  await expect(dialog.getByText(/Pick one or more topics from .*strengths/)).toHaveCount(0);
+  await dialog.getByRole('button', { name: 'Skip' }).click();
+  await expect(dialog.getByText('2 / 4')).toBeVisible();
+  await expect(dialog.getByText('What is the one specific question you want to leave this session with an answer to?')).toBeVisible();
+  expect(await dialog.getByRole('textbox').evaluate(element => getComputedStyle(element).borderRadius)).toBe('24px');
+  expect(await dialog.getByRole('button', { name: 'One-off conversation' }).evaluate(element => getComputedStyle(element).textAlign)).toBe('center');
+  await dialog.getByRole('textbox').fill('How can I improve my project planning?');
+  await dialog.getByRole('button', { name: 'Next' }).click();
+  await dialog.getByRole('button', { name: 'Suggest a time', exact: true }).click();
+  const dateField = dialog.getByRole('textbox', { name: 'Date' });
+  const timeField = dialog.getByRole('combobox', { name: 'Time' });
+  expect(await dateField.evaluate(element => getComputedStyle(element).textAlign)).toBe('center');
+  expect(await timeField.evaluate(element => getComputedStyle(element).borderRadius)).toBe('24px');
+  expect((await timeField.boundingBox()).width).toBeLessThan(200);
+  await dialog.getByRole('button', { name: 'Review request' }).click();
+  await expect(dialog.getByText('Review your request')).toBeVisible();
+  await expect(dialog.getByText('with Bob Taylor · Engineering')).toHaveCount(0);
+  const now = await page.evaluate(() => Date.now());
+  await page.clock.setFixedTime(new Date(now + 40 * 60 * 1000));
+  await dialog.getByRole('button', { name: 'Confirm and send' }).click();
+  await expect(dialog.getByRole('alert')).toHaveText('Choose a date and time at least one hour from now.');
+  await expect(dialog.getByText('3 / 4')).toBeVisible();
+  expect(await page.evaluate(() => window.fixture.calls.some(call => call.method === 'post' && call.path === '/sessions'))).toBe(false);
+});
+
+test('Quick reflection opens a card without shifting the profile and preserves drafts', async ({ page }) => {
+  await page.goto('/profile');
+  const [tabsBox, brandBox] = await Promise.all([
+    page.locator('.profile-tabs').boundingBox(),
+    page.locator('.app-sidebar button[title="Close sidebar"]').first().boundingBox(),
+  ]);
+  expect(Math.abs(tabsBox.y + tabsBox.height / 2 - brandBox.y - brandBox.height / 2)).toBeLessThan(5);
+  const trigger = page.getByRole('button', { name: 'Start check-in', exact: true, includeHidden: true });
+  await expect(trigger).toBeVisible();
+  await trigger.scrollIntoViewIfNeeded();
+  const before = await trigger.boundingBox();
+  await trigger.click();
+  const dialog = page.getByRole('dialog', { name: 'Weekly check-in' });
+  await expect(dialog).toBeVisible();
+  const after = await trigger.boundingBox();
+  expect(after.y).toBeCloseTo(before.y, 0);
+  const support = dialog.getByRole('textbox', { name: 'What did you feel you needed support on this week?' });
+  await support.fill('I would like help planning my next role.');
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await expect(trigger).toBeFocused();
+  await trigger.click();
+  await expect(support).toHaveValue('I would like help planning my next role.');
+  await page.evaluate(() => { window.fixture.failNext = '/reflections'; });
+  await dialog.getByRole('button', { name: 'Save reflection', exact: true }).click();
+  await expect(dialog.getByRole('alert')).toBeVisible();
+  await expect(support).toHaveValue('I would like help planning my next role.');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(dialog).toBeVisible();
+  const bounds = await dialog.boundingBox();
+  expect(bounds.width).toBeLessThanOrEqual(390);
+  await dialog.getByRole('button', { name: 'Save reflection', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await trigger.click();
+  await expect(support).toHaveValue('');
+  await page.screenshot({ path: test.info().outputPath('quick-reflection-card.png'), animations: 'disabled' });
+  await dialog.press('Escape');
+  await expect(dialog).toBeHidden();
+});
+
+test('Profile skill filters share the navigation pill geometry', async ({ page }) => {
+  await page.goto('/profile');
+  await page.getByTestId('profile-tab-skills').click();
+  expect(await page.locator(':root').evaluate(element => getComputedStyle(element).getPropertyValue('--background').trim())).toBe('#fafaf9');
+  const skillsType = await page.getByRole('heading', { name: 'What you can teach' }).evaluate(element => {
+    const style = getComputedStyle(element);
+    return { family: style.fontFamily, size: style.fontSize, weight: style.fontWeight };
+  });
+  const learnType = await page.getByRole('heading', { name: 'What you want to learn' }).evaluate(element => {
+    const style = getComputedStyle(element);
+    return { family: style.fontFamily, size: style.fontSize, weight: style.fontWeight };
+  });
+  const bodyFamily = await page.locator('body').evaluate(element => getComputedStyle(element).fontFamily);
+  expect(skillsType).toEqual({ family: bodyFamily, size: '16px', weight: '600' });
+  expect(learnType).toEqual(skillsType);
+  const skillPanels = page.locator('.profile-tab-content .grid.items-start > div');
+  expect(await page.locator(':root').evaluate(element => getComputedStyle(element).getPropertyValue('--panel-radius').trim())).toBe('24px');
+  await expect(skillPanels).toHaveCount(2);
+  const [teaching, learning] = await skillPanels.all();
+  expect(await teaching.locator('h3').evaluate(element => getComputedStyle(element).color)).toBe('rgb(32, 30, 27)');
+  expect(await learning.locator('h3').evaluate(element => getComputedStyle(element).color)).toBe('rgb(32, 30, 27)');
+  expect(await teaching.evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgb(241, 241, 238)');
+  expect(await learning.evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgb(241, 241, 238)');
+  await expect(page.locator('.profile-tab-content')).toHaveCSS('view-transition-name', 'none');
+  expect(await page.locator('.profile-tab-content').evaluate(element => getComputedStyle(element).animationName)).toBe('none');
+  for (const tab of ['overview', 'availability', 'experience', 'reflections', 'skills']) {
+    await page.getByTestId(`profile-tab-${tab}`).click();
+    await expect(page.locator('.profile-tab-content')).toHaveCSS('animation-name', 'none');
+    await expect(page.locator('.profile-tab-content')).toHaveCSS('view-transition-name', 'none');
+  }
+  const home = page.locator('.app-sidebar').getByRole('link', { name: 'Home' });
+  const geometry = locator => locator.evaluate(element => {
+    const style = getComputedStyle(element);
+    return [element.getBoundingClientRect().height, style.borderRadius];
+  });
+  const expected = await geometry(home);
+  for (const filter of await page.locator('.skill-cloud-filters button').all()) {
+    expect(await geometry(filter)).toEqual(expected);
+  }
+});
+
+test('Reflection log check-in starts from its reminder banner', async ({ page }) => {
+  await page.goto('/profile');
+  await page.evaluate(() => { window.fixture.reflectionDue = true; });
+  await page.getByTestId('profile-tab-reflections').click();
+  await expect(page.getByRole('button', { name: '+ Add a reflection' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Start check-in' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Weekly check-in' });
+  await dialog.getByRole('textbox', { name: 'What did you feel you needed support on this week?' }).fill('Practice presenting clearly.');
+  await dialog.getByRole('button', { name: 'Save reflection' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole('button', { name: /Practice presenting clearly/ })).toBeVisible();
+});
+
+test('Messages count sits beside its heading', async ({ page }) => {
+  await page.goto('/conversations?session=1');
+  const rail = page.locator('.conversation-list');
+  const heading = page.locator('.conversation-list-heading');
+  await expect(heading.locator('h1')).toHaveText('Messages');
+  await expect(heading.locator('.conversation-list-count')).toHaveText('3');
+  expect((await heading.boundingBox()).x - (await rail.boundingBox()).x).toBeGreaterThanOrEqual(23);
+  expect((await page.locator('.conversation-list-item').first().boundingBox()).x - (await rail.boundingBox()).x).toBeGreaterThanOrEqual(13.5);
+  const gap = await heading.evaluate(element => {
+    const title = element.querySelector('h1').getBoundingClientRect();
+    const count = element.querySelector('.conversation-list-count').getBoundingClientRect();
+    return count.left - title.right;
+  });
+  expect(gap).toBeGreaterThanOrEqual(0);
+  expect(gap).toBeLessThanOrEqual(12);
+});
+
+test('Messages shows chat skeleton rows until sessions and groups load', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => { window.fixture.holdLoads = ['/sessions', '/groups']; });
+  await page.locator('nav').getByRole('link', { name: /^Messages/ }).click();
+
+  const skeleton = page.locator('.conversation-list-skeleton');
+  try {
+    await expect(skeleton).toBeVisible();
+    await expect(skeleton.locator('.conversation-list-skeleton-row')).toHaveCount(7);
+    await expect(page.locator('.conversation-list-item')).toHaveCount(0);
+    expect(await page.evaluate(() => Date.now() - Math.min(...window.fixture.heldLoadStartedAt))).toBeLessThan(900);
+  } finally {
+    await page.evaluate(() => {
+      window.fixture.releasedLoadAt = Date.now();
+      window.fixture.pendingLoads.splice(0).forEach(resolve => resolve());
+    });
+  }
+  await expect(skeleton).toHaveCount(0);
+  await expect(page.locator('.conversation-list-item')).toHaveCount(3);
+  await expect(page.locator('.conversation-list-item').first()).toContainText('Peer 1');
+  expect(await page.evaluate(() => Date.now() - window.fixture.releasedLoadAt)).toBeLessThan(900);
+});
+
+test('Explorer shows profile-shaped skeletons until directory results load', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => { window.fixture.holdLoads = ['/directory*']; });
+  await page.locator('nav').getByRole('link', { name: 'Explorer' }).click();
+
+  const skeletons = page.locator('.person-row-skeleton');
+  const pagination = page.locator('.directory-pagination');
+  try {
+    await expect(skeletons).toHaveCount(6);
+    await expect(skeletons.first()).toBeVisible();
+    await expect(page.locator('.directory-results .person-row:not(.person-row-skeleton)')).toHaveCount(0);
+    await expect(pagination).toBeVisible();
+    await expect(pagination.locator('[data-slot="skeleton"]')).toHaveCount(4);
+    await expect(pagination).not.toContainText('Showing');
+    expect(await page.evaluate(() => Date.now() - Math.min(...window.fixture.heldLoadStartedAt))).toBeLessThan(900);
+  } finally {
+    await page.evaluate(() => {
+      window.fixture.releasedLoadAt = Date.now();
+      window.fixture.pendingLoads.splice(0).forEach(resolve => resolve());
+    });
+  }
+  await expect(skeletons).toHaveCount(0);
+  await expect(pagination).toContainText('Showing 1–1 of 1');
+  await expect(page.locator('.directory-results .person-row:not(.person-row-skeleton)')).toHaveCount(1);
+  expect(await page.evaluate(() => Date.now() - window.fixture.releasedLoadAt)).toBeLessThan(900);
+});
+
+test('Explorer keeps existing rows steady while another page loads', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => { window.fixture.directoryTotal = 25; });
+  await page.locator('nav').getByRole('link', { name: 'Explorer' }).click();
+  const rows = page.locator('.directory-results .person-row:not(.person-row-skeleton)');
+  await expect(rows).toHaveCount(1);
+  await expect(page.locator('.directory-pagination')).toContainText('1/3');
+
+  await page.evaluate(() => { window.fixture.holdLoads = ['/directory*']; });
+  await page.getByRole('button', { name: 'Next' }).click();
+  await expect(page).toHaveURL(/page=2/);
+  await expect(rows).toHaveCount(1);
+  await expect(page.locator('.person-row-skeleton')).toHaveCount(0);
+  await expect(page.locator('.directory-results')).toHaveAttribute('aria-busy', 'true');
+  await page.evaluate(() => window.fixture.pendingLoads.splice(0).forEach(resolve => resolve()));
+  await expect(page.locator('.directory-results')).toHaveAttribute('aria-busy', 'false');
+  await expect(page.locator('.directory-pagination')).toContainText('2/3');
+});
+
+test('Explorer profile links stay anchored when the neighboring action shrinks', async ({ page }) => {
+  await page.goto('/explorer');
+  const actions = page.locator('.directory-results .person-row:not(.person-row-skeleton) .person-row-actions').first();
+  const profileLink = actions.locator('.person-row-link');
+  const rightAction = actions.locator(':scope > :last-child');
+  await expect(profileLink).toBeVisible();
+  const profileBefore = await profileLink.boundingBox();
+  const actionBefore = await rightAction.boundingBox();
+  await rightAction.evaluate(element => { element.style.width = '64px'; });
+  const profileAfter = await profileLink.boundingBox();
+  const actionAfter = await rightAction.boundingBox();
+  expect(actionAfter.width).toBeLessThan(actionBefore.width);
+  expect(profileAfter.x).toBeCloseTo(profileBefore.x, 0);
+});
+
+test('Groups keeps its skeleton until the whole group list is ready', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => { window.fixture.holdLoads = ['/groups']; });
+  await page.locator('nav').getByRole('link', { name: 'Groups' }).click();
+
+  const skeleton = page.locator('main [role="status"]');
+  try {
+    await expect(skeleton).toBeVisible();
+    await expect(page.locator('main article.person-row')).toHaveCount(0);
+    expect(await page.evaluate(() => Date.now() - Math.min(...window.fixture.heldLoadStartedAt))).toBeLessThan(900);
+  } finally {
+    await page.evaluate(() => {
+      window.fixture.releasedLoadAt = Date.now();
+      window.fixture.pendingLoads.splice(0).forEach(resolve => resolve());
+    });
+  }
+  await expect(skeleton).toHaveCount(0);
+  await expect(page.locator('main article.person-row')).toContainText('Test Group');
+  expect(await page.evaluate(() => Date.now() - window.fixture.releasedLoadAt)).toBeLessThan(900);
+});
+
+test('Home holds history and conversation controls in skeletons until both are ready', async ({ page }) => {
+  await page.goto('/profile');
+  await page.evaluate(() => { window.fixture.holdLoads = ['/sessions', '/discovery/threads*']; });
+  await page.locator('nav').getByRole('link', { name: 'Home' }).click();
+
+  const skeleton = page.locator('.discovery-home-skeleton');
+  await expect(skeleton).toBeVisible();
+  await expect(skeleton.locator('[data-slot="skeleton"]')).toHaveCount(5);
+  await expect(page.locator('.discovery-history, .discovery-connection-bubble')).toHaveCount(0);
+
+  await page.evaluate(() => window.fixture.pendingLoads.splice(0, 1).forEach(resolve => resolve()));
+  await expect(skeleton).toBeVisible();
+
+  await page.evaluate(() => window.fixture.pendingLoads.splice(0).forEach(resolve => resolve()));
+  await expect(skeleton).toHaveCount(0);
+  await expect(page.locator('.discovery-connection-bubble')).toHaveCount(4);
+});
+
+test('Home categories expand into chat cards before opening a conversation', async ({ page }) => {
+  await page.goto('/conversations?session=1');
+  await page.evaluate(() => {
+    const base = window.fixture.sessions[0];
+    window.fixture.sessions = [
+      { ...base, id: 1, status: 'scheduled', scheduled_at: new Date(Date.now() - 86400000).toISOString() },
+      { ...base, id: 2, status: 'pending', scheduled_at: null },
+      { ...base, id: 3, status: 'scheduled', scheduled_at: new Date(Date.now() + 86400000).toISOString() },
+      { ...base, id: 4, status: 'cancelled', scheduled_at: null },
+    ].map(session => ({ ...session, mentor_id: `peer-${session.id}`, mentor: { id: `peer-${session.id}`, name: `Peer ${session.id}` }, title: `Request ${session.id}` }));
+  });
+  await page.getByRole('link', { name: 'Home', exact: true }).click();
+  const categories = page.getByRole('group', { name: 'Your connections' });
+  await expect(categories.getByRole('button')).toHaveCount(4);
+  for (const [label, peer] of [['Needs you', 'Peer 1'], ['Waiting', 'Peer 2'], ['Scheduled', 'Peer 3'], ['Past', 'Peer 4']]) {
+    const bubble = categories.getByRole('button', { name: new RegExp(`^${label}.*1$`) });
+    await bubble.click();
+    await expect(bubble).toHaveAttribute('aria-expanded', 'true');
+    const panel = page.getByRole('region', { name: new RegExp(`^${label}`) });
+    await expect(panel.getByRole('link')).toHaveCount(1);
+    await expect(panel.getByRole('link', { name: `Open chat: ${peer}` })).toBeVisible();
+    await expect(page).toHaveURL('http://127.0.0.1:3010/');
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  const mainLeft = await page.locator('main').evaluate(element => element.getBoundingClientRect().left);
+  await page.getByRole('button', { name: 'Close sidebar', exact: true }).last().click();
+  expect(await page.locator('main').evaluate(element => element.getBoundingClientRect().left)).toBeCloseTo(mainLeft, 0);
+  await expect(page.getByRole('region', { name: /^Past/ })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  await categories.getByRole('button', { name: /^Past/ }).click();
+  await expect(page.getByRole('region', { name: /^Past/ })).toHaveCount(0);
+  await categories.getByRole('button', { name: /^Needs you/ }).click();
+  await page.screenshot({ path: test.info().outputPath('conversation-bubbles.png'), animations: 'disabled' });
+  await page.getByRole('link', { name: 'Open chat: Peer 1' }).click();
+  await expect(page).toHaveURL(/\/conversations\?filter=needs&session=1$/);
+  await expect(page.locator('.conversation-header strong')).toHaveText('Peer 1');
+});
+
+test('onboarding to discovery, request, acceptance, chat and meeting', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => window.fixture.setUser({ ...window.fixture.user, onboarding_complete: false }));
+  await expect(page).toHaveURL(/\/onboarding$/);
+  await page.getByRole('button', { name: /^Skip/ }).click();
+  await page.getByRole('textbox', { name: 'Full name' }).fill('Viewer Student');
+  await page.getByRole('textbox', { name: 'Role title *' }).fill('Student');
+  await page.getByLabel('Department *').selectOption('Finance');
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.getByRole('button', { name: 'Finish & see my matches' }).click();
+  await expect(page).toHaveURL('http://127.0.0.1:3010/');
+  const composer = page.getByRole('textbox', { name: 'Describe who could help' });
+  await composer.fill('finance');
+  await composer.press('Enter');
+  await expect(page.getByText('Which finance skill would you like help with?')).toBeVisible();
+  await composer.fill('Financial modelling');
+  await composer.press('Enter');
+  await page.getByRole('button', { name: 'Choose Peer Mentor' }).click();
+  await page.getByRole('textbox', { name: 'Suggested draft' }).fill('Please help me with financial modelling.');
+  const draftBox = await page.locator('.discovery-draft').boundingBox();
+  const sendBox = await page.getByRole('button', { name: 'Send request', exact: true }).boundingBox();
+  const backBox = await page.getByRole('button', { name: 'Back to matches' }).boundingBox();
+  expect(Math.abs(draftBox.x + draftBox.width - sendBox.x - sendBox.width)).toBeLessThan(2);
+  expect(backBox.x).toBeLessThan(sendBox.x);
+  await page.getByRole('combobox', { name: 'What kind of support?' }).click();
+  await page.getByRole('option', { name: 'Ongoing support' }).click();
+  await expect(page.getByRole('combobox', { name: 'What kind of support?' })).toContainText('Ongoing support');
+  await page.getByRole('button', { name: 'Send request', exact: true }).click();
+  expect(await page.evaluate(() => window.fixture.calls.find(call => call.method === 'post' && call.path === '/sessions')?.body.follow_up_intent)).toBe('ongoing');
+  await page.getByRole('link', { name: 'Open chat', exact: true }).click();
+  await expect(page.getByText('Please help me with financial modelling.', { exact: true })).toBeVisible();
+  await expect(page.locator('.conversation-header')).not.toContainText('Financial modelling');
+  await page.getByRole('button', { name: 'Request overview' }).click();
+  await expect(page.getByRole('dialog')).toContainText('Financial modelling');
+  await page.screenshot({ path: test.info().outputPath('request-overview.png'), animations: 'disabled' });
+  await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
+  await page.locator('.conversation-request-card').getByRole('button', { name: 'Withdraw request' }).click();
+  const withdrawDialog = page.getByRole('dialog');
+  await expect(withdrawDialog.getByText('This will cancel the pending session request. You can start a new request later.')).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.fixture.calls.some(call => call.method === 'put' && call.path === '/sessions/3' && call.body.status === 'cancelled'))).toBe(false);
+  await withdrawDialog.getByRole('button', { name: 'Keep request' }).click();
+  await expect(withdrawDialog).toBeHidden();
+  const student = await page.evaluate(() => window.fixture.user);
+  await page.evaluate(() => window.fixture.setUser({ ...window.fixture.peer, role: 'alumnus', onboarding_complete: true }));
+  await page.getByRole('link', { name: 'Groups', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Groups', exact: true })).toBeVisible();
+  await page.locator('nav').getByRole('link', { name: /^Messages/ }).click();
+  await page.getByRole('button', { name: /Viewer Student/ }).click();
+  const requestCard = page.locator('.conversation-request-card');
+  await requestCard.getByRole('button', { name: 'Accept', exact: true }).click();
+  await expect(requestCard.getByRole('button', { name: 'Schedule', exact: true })).toBeVisible();
+  await requestCard.getByRole('button', { name: 'Schedule', exact: true }).click();
+  const future = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10);
   const scheduledAt = await page.evaluate(value => new Date(`${value}T14:00`).toISOString(), future);
   await page.getByLabel('New time', { exact: true }).fill(future);
   await page.getByLabel('Time', { exact: true }).selectOption('14:00');
