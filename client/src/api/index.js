@@ -1202,7 +1202,10 @@ async function put(url, body = {}) {
       session = data;
     }
     let calendarSyncWarning = false;
-    if (body.scheduled_at !== undefined || ['scheduled', 'cancelled', 'declined'].includes(body.status)) {
+    const syncCalendar = body.scheduled_at !== undefined
+      || body.status === 'scheduled'
+      || (body.status === 'cancelled' && Boolean(session.scheduled_at));
+    if (syncCalendar) {
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
           const { data, error } = await invokeUserFunction('calendar-provider', { action: 'sync_session_events', session_id: id });

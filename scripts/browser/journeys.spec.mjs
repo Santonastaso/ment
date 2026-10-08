@@ -906,6 +906,28 @@ test('request history survives a missed reply and cancellation without reloading
   await expect(timeline.getByText('I have a few ideas.')).toBeVisible();
 });
 
+test('declining a pending request keeps the mentor signed in', async ({ page }) => {
+  await page.addInitScript(() => {
+    const { user, peer } = window.fixture;
+    const createdAt = new Date().toISOString();
+    window.fixture.sessions.push({
+      id: 3, status: 'pending', title: 'A pending request', created_at: createdAt,
+      mentor_id: user.id, mentee_id: peer.id, mentor: user, mentee: peer,
+      outbound_message: 'Could you help me with this?',
+      request_expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),
+    });
+    window.fixture.messages['/sessions/3/messages'] = [
+      { id: 1, sender_id: peer.id, kind: 'request', body: 'Could you help me with this?', created_at: createdAt },
+    ];
+  });
+
+  await page.goto('/conversations?session=3');
+  await page.locator('.conversation-request-card').getByRole('button', { name: 'Decline', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.fixture.sessions.find(session => session.id === 3)?.status)).toBe('declined');
+  await expect.poll(() => page.evaluate(() => window.fixture.user?.id)).toBe('viewer');
+  await expect(page).not.toHaveURL(/\/login/);
+  await expect(page.locator('.conversation-request-card')).toContainText('A pending request');
+});
 test('a profile opened from chat results leads back to the same results', async ({ page }) => {
   await page.goto('/');
   const composer = page.getByRole('textbox', { name: 'Describe who could help' });
