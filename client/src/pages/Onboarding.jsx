@@ -34,7 +34,6 @@ export default function Onboarding({ returnTo }) {
   const [draftId, setDraftId] = useState(null);
   const [classifierSource, setClassifierSource] = useState('');
   const [aiConsent, setAiConsent] = useState(false);
-  const [importKind, setImportKind] = useState('cv');
   const [suggested, setSuggested] = useState(() => new Set());
 
   // Step 1 — Background
@@ -106,7 +105,7 @@ export default function Onboarding({ returnTo }) {
 
   async function handleUpload(file) {
     if (!file || uploading) return;
-    if (file.size > 10 * 1024 * 1024 || !/\.(pdf|docx|txt)$/i.test(file.name)) {
+    if (file.size > 10 * 1024 * 1024 || !/\.(pdf|docx)$/i.test(file.name)) {
       setError(t('onboarding.import.error'));
       return;
     }
@@ -118,7 +117,7 @@ export default function Onboarding({ returnTo }) {
     setError('');
     const form = new FormData();
     form.append('file', file);
-    form.append('kind', importKind);
+    form.append('kind', 'cv');
     try {
       const res = await api.post('/profile/ingest', form, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -245,28 +244,21 @@ export default function Onboarding({ returnTo }) {
                   {t('onboarding.import.desc')}
                 </p>
               </div>
-              <div>
-                <label className="label" htmlFor="onboarding-import-kind">{t('onboarding.import.kind')}</label>
-                <select id="onboarding-import-kind" className="input" value={importKind} onChange={event => setImportKind(event.target.value)} disabled={uploading}>
-                  <option value="cv">{t('onboarding.import.kindCv')}</option>
-                  <option value="performance_review">{t('onboarding.import.kindReview')}</option>
-                </select>
-              </div>
               <label className="flex items-start gap-2 text-xs text-muted-foreground">
                 <input type="checkbox" checked={aiConsent} onChange={e => setAiConsent(e.target.checked)} className="mt-0.5" />
                 <span>{t('onboarding.import.consent')}</span>
               </label>
-              <label className={`block rounded-xl border-2 border-dashed border-[var(--input)] p-10 text-center transition-colors duration-150 ${aiConsent ? 'cursor-pointer hover:border-foreground/30 hover:bg-muted' : 'cursor-not-allowed opacity-60'}`}>
+              <label className={`flex min-h-32 flex-col items-center justify-center rounded-xl border border-[var(--input)] bg-muted/40 p-6 text-center ${aiConsent ? 'cursor-pointer hover:bg-muted' : 'cursor-not-allowed opacity-60'}`}>
                 <input
                   type="file"
-                  accept=".docx,.pdf,.txt"
+                  accept=".docx,.pdf"
                   className="hidden"
                   disabled={uploading || !aiConsent}
                   onChange={e => { if (e.target.files[0]) handleUpload(e.target.files[0]); e.target.value = ''; }}
                 />
                 {uploading ? <p className="text-sm text-muted-foreground">{t('onboarding.import.reading')}</p> : (
                   <>
-                    <p className="text-sm font-medium text-secondary-foreground">{t('onboarding.import.drop')}</p>
+                    <span className="rounded-[var(--control-radius)] bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">{t('onboarding.import.browse')}</span>
                     <p className="text-xs text-muted-foreground mt-1">{t('onboarding.import.hint')}</p>
                   </>
                 )}

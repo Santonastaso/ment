@@ -1,5 +1,5 @@
 // Profile ingest (Deno port of server/routes/profile-ingest.js + profileExtractor.js).
-// Body: { storage_path: string, kind?: 'performance_review' | 'cv' | 'manual_text' }
+// Body: { storage_path: string }
 // Returns: { draft_id, proposed, classifier_source }
 
 import mammoth from 'npm:mammoth@1.9.0';
@@ -117,7 +117,7 @@ Deno.serve(async (req) => {
 
   const body = await req.json().catch(() => ({}));
   const storagePath = (body.storage_path || '').toString();
-  const kind = ['performance_review', 'cv', 'manual_text'].includes(body.kind) ? body.kind : 'performance_review';
+  const kind = 'cv';
   const lang = normalizeLang(body.lang);
   const language = LANGUAGE_NAMES[lang] || 'English';
   if (!storagePath) return jsonError('storage_path_required');
@@ -130,7 +130,7 @@ Deno.serve(async (req) => {
     .download(storagePath);
   if (dlErr || !file) return jsonError(`download_failed: ${dlErr?.message ?? 'unknown'}`, 400);
   const filename = storagePath.split('/').slice(-1)[0];
-  if (!/\.(pdf|docx|txt)$/i.test(filename)) return jsonError('unsupported_document_type', 400);
+  if (!/\.(pdf|docx)$/i.test(filename)) return jsonError('unsupported_document_type', 400);
   if (file.size > 10 * 1024 * 1024) return jsonError('document_too_large', 413);
 
   let rawText: string;

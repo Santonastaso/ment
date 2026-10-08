@@ -48,6 +48,8 @@ test('invited member signs in, changes temporary password, imports CV, and finis
   await page.getByLabel('Confirm password').fill('new-private-password-2026');
   await page.getByRole('button', { name: 'Update password' }).click();
   await expect(page).toHaveURL(/\/onboarding$/);
+  await expect(page.locator('#onboarding-import-kind')).toHaveCount(0);
+  await expect(page.getByText('Drop a file or click to browse')).toHaveCount(0);
   await expect(page.locator('input[type="file"]')).toBeDisabled();
   await page.getByRole('checkbox').check();
   await page.locator('input[type="file"]').setInputFiles({

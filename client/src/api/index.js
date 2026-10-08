@@ -956,7 +956,7 @@ async function post(url, body = {}, opts = {}) {
   if (url === '/profile/ingest') {
     if (!(body instanceof FormData)) throw new ApiError('expected_form_data', 400);
     const file = body.get('file');
-    const kind = body.get('kind') || 'performance_review';
+    const kind = 'cv';
     if (!file) throw new ApiError('no_file', 400);
     const path = await uploadToStorage('profile-uploads', viewer.id, file);
     const { data, error } = await invokeUserFunction('profile-ingest', { storage_path: path, kind, lang: browserLanguage() });
