@@ -488,6 +488,8 @@ test('onboarding to discovery, request, acceptance, chat and meeting', async ({ 
   await expect(page).toHaveURL(/\/onboarding$/);
   await page.getByRole('button', { name: /^Skip/ }).click();
   await page.getByRole('textbox', { name: 'Full name' }).fill('Viewer Student');
+  await page.getByRole('textbox', { name: 'Role title *' }).fill('Student');
+  await page.getByLabel('Department *').selectOption('Finance');
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.getByRole('button', { name: 'Finish & see my matches' }).click();
