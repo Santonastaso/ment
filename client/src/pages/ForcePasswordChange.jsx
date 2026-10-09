@@ -87,7 +87,7 @@ export default function ForcePasswordChange({ recovery = false }) {
     <div className="auth-shell flex min-h-screen flex-col items-center justify-center bg-background p-6">
       <Card className="w-full max-w-[400px]">
         <CardHeader>
-      <CardTitle className="text-lg font-medium">{t(recovery ? 'auth.recovery.title' : 'auth.forcePassword.title')}</CardTitle>
+      <CardTitle className="text-xl font-medium">{t(recovery ? 'auth.recovery.title' : 'auth.forcePassword.title')}</CardTitle>
           <CardDescription>
             {recovery ? t('auth.recovery.description') : <>{session?.user?.email && <>{t('auth.forcePassword.account', { email: session.user.email })}</>}{t('auth.forcePassword.description')}</>}
           </CardDescription>

@@ -22,7 +22,7 @@ export function PageSection({ title, description, action, children, className })
       {(title || description || action) && (
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="min-w-0">
-            {title && <h2 className="text-lg font-semibold tracking-[-0.015em] text-foreground">{title}</h2>}
+            {title && <h2 className="text-section font-semibold tracking-[-0.015em] text-foreground">{title}</h2>}
             {description && (
               <div className="mt-1 text-sm text-muted-foreground">{description}</div>
             )}

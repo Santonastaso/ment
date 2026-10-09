@@ -28,7 +28,7 @@ function StatCard({ label, value, sub }) {
     <Surface>
       <SurfaceBody className="py-4">
         <p className="text-sm text-muted-foreground">{label}</p>
-        <p className="mt-1 text-3xl font-medium tabular-nums tracking-[-0.01em]">{value}</p>
+        <p className="mt-1 text-display font-medium tabular-nums tracking-[-0.01em]">{value}</p>
         {sub && <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p>}
       </SurfaceBody>
     </Surface>
@@ -1068,7 +1068,7 @@ function SessionBox({ count, label, tone }) {
   const dot = { yellow: 'bg-amber-500', blue: 'bg-blue-500', green: 'bg-emerald-500' }[tone] || 'bg-zinc-400';
   return (
     <div className="rounded-lg border border-[var(--border)] p-3 text-center">
-      <p className="text-2xl font-medium tabular-nums tracking-[-0.01em]">{count}</p>
+      <p className="text-xl font-medium tabular-nums tracking-[-0.01em]">{count}</p>
       <p className="mt-1 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
         <span className={`size-1.5 rounded-full ${dot}`} aria-hidden="true" />
         {label}
