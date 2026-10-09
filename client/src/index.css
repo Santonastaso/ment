@@ -562,7 +562,9 @@ a.person-row-name:hover { color: var(--primary); text-decoration: underline; }
 .conversation-list-toggle:focus-visible, .conversation-rail-controls button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .conversation-list-toggle svg, .conversation-rail-controls svg { width: 20px; height: 20px; }
 .conversation-list-content { display: flex; min-height: 0; flex: 1; flex-direction: column; animation: railContentIn var(--motion-panel) var(--motion-round) both; }
-@keyframes railContentIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: none; } }
+/* Keep rail geometry stable while content appears. Translating the entire list
+   made row alignment depend on the exact frame in which it was measured. */
+@keyframes railContentIn { from { opacity: .72; } to { opacity: 1; } }
 .conversations-shell.is-list-collapsed { grid-template-columns: 64px minmax(0, 1fr); }
 .is-list-collapsed .conversation-list { padding-inline: 8px; }
 .is-list-collapsed .conversation-list > header { justify-content: center; padding: 0; }
