@@ -561,7 +561,7 @@ export default function Profile() {
                 </AvatarFallback>
               </Avatar>
               <div className="min-w-0 flex-1">
-                <h1 className="text-title font-medium tracking-[-0.02em]">{profile.name}</h1>
+                <h1 className="text-title font-semibold tracking-[-0.02em]">{profile.name}</h1>
                 <div className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
                   {editing ? null : (
                     <>
@@ -809,7 +809,7 @@ export default function Profile() {
                   placeholder={profile.email || ''}
                   className="min-w-0 max-w-md flex-1 basis-72 bg-background"
                 />
-                <Button size="sm" onClick={handleSaveNotifyEmail} disabled={notifySaving || notifyEmail === (profile.notification_email || '')}>
+                <Button onClick={handleSaveNotifyEmail} disabled={notifySaving || notifyEmail === (profile.notification_email || '')}>
                   {notifySaving ? t('profile.btn.saving') : t('profile.btn.save')}
                 </Button>
               </div>
@@ -846,14 +846,13 @@ export default function Profile() {
               <Button
                 type="button"
                 variant={showAddCareer ? 'outline' : 'default'}
-                size="icon"
-                className="size-12 rounded-xl"
+                size="icon-lg"
                 aria-label={showAddCareer ? t('profile.btn.cancel') : t('profile.career.addEntry')}
                 title={showAddCareer ? t('profile.btn.cancel') : t('profile.career.addEntry')}
                 aria-expanded={showAddCareer}
                 onClick={() => setShowAddCareer(!showAddCareer)}
               >
-                {showAddCareer ? <X className="size-6" /> : <Plus className="size-6" />}
+                {showAddCareer ? <X className="size-5" /> : <Plus className="size-5" />}
               </Button>
             ) : null
           }

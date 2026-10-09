@@ -9,7 +9,7 @@ export default function PageHeader({ title, description, action, compact, hideTi
       )}
     >
       <div>
-        <h1 className={cn(hideTitle ? 'sr-only' : 'font-semibold tracking-[-0.025em] text-foreground', !hideTitle && (compact ? 'text-xl' : 'text-2xl'))}>
+        <h1 className={cn(hideTitle ? 'sr-only' : 'text-title font-semibold tracking-[-0.02em] text-foreground')}>
           {title}
         </h1>
         {description && <p className="mt-1.5 max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p>}

@@ -128,7 +128,7 @@ export default function AcceptanceModal({ sessions, onAcknowledged, onClose }) {
       >
         <div className="p-6 border-b border-[var(--border-subtle)] flex-shrink-0">
           <div className="flex items-center justify-between gap-3">
-            <h2 id="acceptance-modal-title" className="text-lg font-semibold text-foreground">
+            <h2 id="acceptance-modal-title" className="text-xl font-semibold text-foreground">
               {localSessions.length === 1 ? t('components.acceptance.titleOne') : t('components.acceptance.titleMany')}
             </h2>
             <button

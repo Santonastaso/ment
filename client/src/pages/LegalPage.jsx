@@ -15,7 +15,7 @@ export default function LegalPage({ type }) {
       <main className="mx-auto max-w-3xl px-6 py-14">
         <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{t('legal.effectiveDate')}</p>
         <h1 className="marketing-display mt-3 text-5xl">{t(`legal.${type}.title`)}</h1>
-        <p className="mt-6 max-w-2xl text-lg leading-7 text-muted-foreground">{t(`legal.${type}.intro`)}</p>
+        <p className="mt-6 max-w-2xl text-base leading-7 text-muted-foreground">{t(`legal.${type}.intro`)}</p>
         <div className="mt-12 border-t border-[var(--border)]">
           {Array.from({ length: sectionCount }, (_, index) => index + 1).map(index => (
             <section key={index} className="grid gap-3 border-b border-[var(--border)] py-6 sm:grid-cols-[180px_1fr]">
