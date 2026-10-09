@@ -13,7 +13,7 @@ export function SurfaceHeader({ title, description, action, className }) {
   return (
     <CardHeader
       className={cn(
-        'flex flex-row items-start justify-between space-y-0 bg-transparent px-4 pb-2 pt-4 sm:px-5',
+        'surface-header flex flex-row items-start justify-between space-y-0 bg-transparent px-4 pb-2 pt-4 sm:px-5',
         className
       )}
     >
