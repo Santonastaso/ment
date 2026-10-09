@@ -185,7 +185,7 @@ export default function Groups() {
     <PageShell>
       <h1 className="sr-only">{t('groups.pageTitle')}</h1>
       <header className="flex min-h-[var(--workspace-top-row)] items-center justify-between">
-        <h2 className="text-section-large font-semibold tracking-[-0.02em]">{t('groups.list.title')}</h2>
+        <h2 className="text-title font-semibold tracking-[-0.02em]">{t('groups.list.title')}</h2>
         <Button type="button" size="icon-lg" aria-label={t('groups.create.title')} title={t('groups.create.title')} onClick={() => { setError(''); setCreateOpen(true); }}><Plus className="size-5" aria-hidden="true" /></Button>
       </header>
       <div>

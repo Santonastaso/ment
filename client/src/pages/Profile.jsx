@@ -561,7 +561,7 @@ export default function Profile() {
                 </AvatarFallback>
               </Avatar>
               <div className="min-w-0 flex-1">
-                <h1 className="text-title font-medium tracking-[-0.02em]">{profile.name}</h1>
+                <h1 className="text-title font-semibold tracking-[-0.02em]">{profile.name}</h1>
                 <div className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
                   {editing ? null : (
                     <>
