@@ -6,6 +6,7 @@
   "onboarding.error.busy": "Veuillez réessayer dans un instant.",
   "onboarding.error.nameRequired": "Saisissez votre nom complet avant de terminer.",
   "onboarding.error.workExperienceRequired": "Ajoutez un poste et un département pour votre première expérience professionnelle.",
+  "onboarding.error.availabilitySave": "Votre profil est enregistré, mais votre disponibilité n'a pas pu l'être. Réessayez.",
   "onboarding.import.unavailable": "L'import est temporairement indisponible. Vous pouvez saisir vos informations manuellement.",
   "onboarding.header.title": "Créez votre profil",
   "onboarding.header.subtitle": "Quelques étapes pour vous mettre en relation avec les bonnes personnes.",

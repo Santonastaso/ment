@@ -12,21 +12,13 @@ import { useT } from '../i18n/index.jsx';
 import LanguageSwitcher from '../i18n/LanguageSwitcher.jsx';
 import { Button } from '../components/ui/button.jsx';
 import { CITY_OPTIONS, normalizeCity } from '../../../shared/cities.mjs';
+import { monthYearValue, parseMonthYear } from '../lib/monthYear.mjs';
 
 function SuggestedPill() {
   const { t } = useT();
   return <span className="ml-2 text-xs font-medium text-[var(--status-waiting-fg)]">{t('onboarding.import.suggested')}</span>;
 }
 
-// The import returns text ("2021", "9"); anything that is not a plausible
-// year is dropped rather than turned into a wrong date.
-function monthYearToPicker(year, month) {
-  const y = String(year ?? '').match(/\b(19|20)\d{2}\b/)?.[0];
-  if (!y) return '';
-  const parsed = Number.parseInt(month, 10);
-  const m = parsed >= 1 && parsed <= 12 ? parsed : 1;
-  return `${y}-${String(m).padStart(2, '0')}`;
-}
 
 export default function Onboarding({ returnTo }) {
   const { user, updateUser } = useAuth();
@@ -58,6 +50,8 @@ export default function Onboarding({ returnTo }) {
   const [weeklyLimit, setWeeklyLimit] = useState(2);
   const [monthlyLimit, setMonthlyLimit] = useState(5);
   const [acceptsRequests, setAcceptsRequests] = useState(true);
+  // The saved profile, kept while the availability save is retried.
+  const [savedProfile, setSavedProfile] = useState(null);
 
   // Step 2 — Can teach: array of { skill, example_project }
   const [canTeach, setCanTeach] = useState([]);
@@ -69,16 +63,6 @@ export default function Onboarding({ returnTo }) {
     setCareer([...career, { role: '', department: '', company: '', start_date: '', end_date: '' }]);
   }
 
-  function splitDate(s) {
-    if (!s) return { year: null, month: null };
-    const [y, m] = s.split('-');
-    const year = parseInt(y);
-    const month = parseInt(m);
-    return {
-      year: Number.isFinite(year) ? year : null,
-      month: Number.isFinite(month) && month >= 1 && month <= 12 ? month : null,
-    };
-  }
 
   function removeCareer(idx) {
     setCareer(career.filter((_, i) => i !== idx));
@@ -102,8 +86,8 @@ export default function Onboarding({ returnTo }) {
         department: ch.department || proposed.department || '',
         company: ch.company || '',
         description: ch.description || '',
-        start_date: monthYearToPicker(ch.start_year, ch.start_month),
-        end_date: monthYearToPicker(ch.end_year, ch.end_month),
+        start_date: monthYearValue(ch.start_year, ch.start_month),
+        end_date: monthYearValue(ch.end_year, ch.end_month),
       })));
       next.add('career');
     }
@@ -163,8 +147,8 @@ export default function Onboarding({ returnTo }) {
       const validCareer = career
         .filter((c, index) => index === 0 || c.role.trim() || c.department.trim() || c.company.trim() || c.description?.trim() || c.start_date || c.end_date)
         .map(c => {
-          const s = splitDate(c.start_date);
-          const e = splitDate(c.end_date);
+          const s = parseMonthYear(c.start_date);
+          const e = parseMonthYear(c.end_date);
           return {
             role: c.role,
             department: c.department,
@@ -183,6 +167,9 @@ export default function Onboarding({ returnTo }) {
         can_teach: canTeach,
         wants_to_learn: wantsToLearn,
       };
+      // A retry after a failed availability save must not submit the profile twice.
+      let profile = savedProfile;
+      if (!profile) {
       if (draftId) {
         await api.post(`/profile/ingest/${draftId}/accept`, { accepted_json: accepted });
       }
@@ -199,11 +186,21 @@ export default function Onboarding({ returnTo }) {
         linkedin_url: linkedinUrl,
         linkedin_headline: null,
       });
-      // The profile is saved; a failure here only leaves the default limits.
+      profile = res.data;
+      setSavedProfile(profile);
+      }
       const weekly = Math.max(1, Math.min(50, Number(weeklyLimit) || 1));
       const monthly = Math.max(weekly, Math.min(200, Number(monthlyLimit) || weekly));
-      await api.put('/users/me', { weekly_meeting_limit: weekly, monthly_meeting_limit: monthly, mentorship_paused: !acceptsRequests }).catch(() => {});
-      updateUser({ ...res.data, mentorship_paused: !acceptsRequests });
+      // Nothing is shown as saved, and nobody leaves this step, until the
+      // server has accepted the choice.
+      try {
+        await api.put('/users/me', { weekly_meeting_limit: weekly, monthly_meeting_limit: monthly, mentorship_paused: !acceptsRequests });
+      } catch {
+        setError(t('onboarding.error.availabilitySave'));
+        setStep(4);
+        return;
+      }
+      updateUser({ ...profile, weekly_meeting_limit: weekly, monthly_meeting_limit: monthly, mentorship_paused: !acceptsRequests });
       navigate(returnTo || '/');
     } catch (e) {
       setError(t(onboardingErrorKey(e)));
@@ -426,7 +423,7 @@ export default function Onboarding({ returnTo }) {
 
           <div className="flex justify-between pt-2">
             {step > 0 ? (
-              <Button onClick={() => { setError(''); setStep(s => s - 1); }} variant="outline" disabled={saving || uploading}>{t('onboarding.nav.back')}</Button>
+              <Button onClick={() => { setError(''); setStep(s => s - 1); }} variant="outline" disabled={saving || uploading || !!savedProfile}>{t('onboarding.nav.back')}</Button>
             ) : <div />}
 
             {step === 0 ? (

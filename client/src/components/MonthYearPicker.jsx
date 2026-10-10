@@ -5,8 +5,8 @@ import { useT } from '../i18n/index.jsx';
 // because that native control renders very differently across browsers and
 // doesn't make the expected format obvious.
 //
-// Value shape: a "YYYY-MM" string (matching the format the server expects),
-// or empty string when nothing's selected. Both selects can be cleared.
+// Value shape: a "YYYY-MM" string, "YYYY-" when only the year is known, or an
+// empty string when nothing's selected. Both selects can be cleared.
 
 const MONTH_VALUES = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
 
@@ -26,8 +26,8 @@ export default function MonthYearPicker({ value = '', onChange, allowEmpty = tru
       onChange('');
       return;
     }
-    // Pad month to 2 digits; year stays as-is
-    onChange(`${nextYear || ''}-${(nextMonth || '').padStart(2, '0').slice(0, 2)}`);
+    // The month stays empty when it is not known; it is never filled in.
+    onChange(`${nextYear || ''}-${nextMonth ? nextMonth.padStart(2, '0').slice(0, 2) : ''}`);
   }
 
   return (

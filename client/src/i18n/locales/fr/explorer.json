@@ -30,6 +30,8 @@
   "explorer.allCohorts": "Toutes les promotions",
   "explorer.allLocations": "Tous les lieux",
   "explorer.showing": "Résultats {from}–{to} sur {total}",
+  "explorer.perPage": "Résultats par page",
+  "explorer.perPageOption": "{count} par page",
   "explorer.prev": "Précédent",
   "explorer.next": "Suivant",
   "explorer.emptyChatTitle": "Aucun profil ne correspond",

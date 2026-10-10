@@ -142,6 +142,8 @@
   "components.reflection.errorLoad": "Could not load your reflections.",
   "components.reflection.refreshError": "Saved, but your profile could not refresh.",
   "components.reflection.reviewSuggestions": "Review suggestions",
+  "components.reflection.showMore": "Show {count} more",
+  "components.reflection.legacyNote": "Earlier check-ins suggested more skills than new ones do. The first ones are selected; tick any others you want.",
   "components.reflection.demoLabel": "Suggestions based on your reflection.",
   "components.reflection.demo.errorDelete": "Could not delete this reflection.",
   "components.reflection.demo.errorLoad": "Could not load your reflections.",
@@ -264,6 +266,7 @@
 
   "components.skillTag.placeholder": "Type a skill and press Enter",
   "components.skillTag.remove": "Remove {skill}",
+  "components.skillTag.removeShort": "Remove",
   "components.skillTag.ariaAdd": "Add skill",
   "components.skillTag.add": "Add",
 

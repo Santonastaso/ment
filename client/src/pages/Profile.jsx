@@ -10,6 +10,7 @@ import SessionRequestModal from '../components/SessionRequestModal.jsx';
 import CareerEntryFields, { DEPARTMENTS } from '../components/CareerEntryFields.jsx';
 import ProfileReflection from '../components/ProfileReflection.jsx';
 import { PageShell } from '../components/PageShell.jsx';
+import { importedMonth, importedYear, monthYearValue, parseMonthYear } from '../lib/monthYear.mjs';
 import PageHeader from '../components/PageHeader.jsx';
 import PageTabs from '../components/PageTabs.jsx';
 import { Surface, SurfaceBody, SurfaceHeader } from '../components/Surface.jsx';
@@ -44,25 +45,6 @@ function conciseHeadline(profile) {
       const normalized = part.replace(/^essec\s+/i, '').toLowerCase();
       return normalized && normalized !== 'demo profile' && !repeated.some(value => normalized === value || normalized.includes(value));
     }).join(' · ');
-}
-
-// Convert (year, month) to "YYYY-MM" string that <input type="month"> expects.
-function ymToInput(year, month) {
-  if (!year) return '';
-  const m = month && month >= 1 && month <= 12 ? String(month).padStart(2, '0') : '01';
-  return `${year}-${m}`;
-}
-
-// Parse "YYYY-MM" back into { year, month } pair (null-safe).
-function inputToYM(value) {
-  if (!value) return { year: null, month: null };
-  const [y, m] = value.split('-');
-  const year = parseInt(y);
-  const month = parseInt(m);
-  return {
-    year: Number.isFinite(year) ? year : null,
-    month: Number.isFinite(month) && month >= 1 && month <= 12 ? month : null,
-  };
 }
 
 // Group an already-sorted (reverse-chronological) career list into runs
@@ -104,10 +86,6 @@ function attachSkillEvidence(profile, evidence) {
   const skillProgress = (profile.skillProgress || skills).map((skill) => ({ ...skill, evidence: bySkill.get(skill.id) || [], session_count: (bySkill.get(skill.id) || []).length }));
   return { ...profile, skills, skillProgress };
 }
-
-// A CV import returns dates as text; only a real year or month is kept.
-const cvYear = value => { const year = String(value ?? '').match(/\b(19|20)\d{2}\b/)?.[0]; return year ? Number(year) : null; };
-const cvMonth = value => { const month = Number.parseInt(value, 10); return month >= 1 && month <= 12 ? month : null; };
 
 export default function Profile() {
   const { id } = useParams();
@@ -354,8 +332,8 @@ export default function Profile() {
 
   async function handleAddCareer() {
     if (!newCareer.role.trim() || !newCareer.department.trim() || careerBusy) return;
-    const start = inputToYM(newCareer.start_date);
-    const end = inputToYM(newCareer.end_date);
+    const start = parseMonthYear(newCareer.start_date);
+    const end = parseMonthYear(newCareer.end_date);
     const payload = {
       role: newCareer.role,
       department: newCareer.department,
@@ -406,8 +384,8 @@ export default function Profile() {
           role: entry.role || entry.role_title || proposed.job_title || profile.current_role || '',
           department: entry.department || proposed.department || profile.department || '',
           company: entry.company || '', description: entry.description || '',
-          start_year: cvYear(entry.start_year), start_month: cvMonth(entry.start_month),
-          end_year: cvYear(entry.end_year), end_month: cvMonth(entry.end_month),
+          start_year: importedYear(entry.start_year), start_month: importedMonth(entry.start_month),
+          end_year: importedYear(entry.end_year), end_month: importedMonth(entry.end_month),
         }))
       : profile.career?.length ? profile.career : [{ role: proposed.job_title || profile.current_role || '', department: proposed.department || profile.department || '' }];
     const primary = career[0] || {};
@@ -462,8 +440,8 @@ export default function Profile() {
       department: entry.department || '',
       company: entry.company || '',
       description: entry.description || '',
-      start_date: ymToInput(entry.start_year, entry.start_month),
-      end_date: ymToInput(entry.end_year, entry.end_month),
+      start_date: monthYearValue(entry.start_year, entry.start_month),
+      end_date: monthYearValue(entry.end_year, entry.end_month),
     });
   }
 
@@ -475,8 +453,8 @@ export default function Profile() {
   async function handleSaveEditedCareer() {
     if (!editingCareerId || !editCareerDraft || careerBusy) return;
     if (!editCareerDraft.role.trim() || !editCareerDraft.department.trim()) return;
-    const start = inputToYM(editCareerDraft.start_date);
-    const end = inputToYM(editCareerDraft.end_date);
+    const start = parseMonthYear(editCareerDraft.start_date);
+    const end = parseMonthYear(editCareerDraft.end_date);
     const payload = {
       role: editCareerDraft.role,
       department: editCareerDraft.department,

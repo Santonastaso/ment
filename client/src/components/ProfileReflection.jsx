@@ -1,4 +1,5 @@
 import { formatDay } from '../lib/utils.js';
+import { focusSuggestions } from '../lib/reflection.mjs';
 import React, { useEffect, useId, useRef, useState } from 'react';
 import api from '../api/index.js';
 import { useT } from '../i18n/index.jsx';
@@ -202,12 +203,17 @@ function ReflectionReview({ entry, busy, onApply, onReclassify, lang }) {
   const { t } = useT();
   const [open, setOpen] = useState(false);
   const [review, setReview] = useState(false);
-  const [dismissed, setDismissed] = useState([]);
+  // Older check-ins stored up to five skills a side. They are kept as they
+  // are; only the first ones are shown and selected, the rest wait behind
+  // "show more" and are added only if the user ticks them.
+  const focusedGaps = focusSuggestions(entry.extracted_gaps);
+  const focusedStrengths = focusSuggestions(entry.extracted_strengths);
+  const [expanded, setExpanded] = useState(false);
+  const [dismissed, setDismissed] = useState(() => [...focusedGaps.more.map(skill => 'gap:' + skill), ...focusedStrengths.more.map(skill => 'strength:' + skill)]);
   const dialogRef = useModalA11y(open);
-  // Earlier entries stored machine-style names ("strategic_planning").
-  const readable = list => [...new Set((list || []).map(skill => String(skill || '').replace(/_/g, ' ').replace(/\s+/g, ' ').trim()).filter(Boolean))];
-  const suggestedGaps = readable(entry.extracted_gaps);
-  const suggestedStrengths = readable(entry.extracted_strengths);
+  const heldBack = focusedGaps.more.length + focusedStrengths.more.length;
+  const suggestedGaps = expanded ? [...focusedGaps.shown, ...focusedGaps.more] : focusedGaps.shown;
+  const suggestedStrengths = expanded ? [...focusedStrengths.shown, ...focusedStrengths.more] : focusedStrengths.shown;
   const gaps = suggestedGaps.filter(skill => !dismissed.includes('gap:' + skill));
   const strengths = suggestedStrengths.filter(skill => !dismissed.includes('strength:' + skill));
   const date = new Date(entry.created_at);
@@ -256,6 +262,10 @@ function ReflectionReview({ entry, busy, onApply, onReclassify, lang }) {
                       {skills.map(skill => <label key={skill} className="mt-1 flex items-center gap-2 text-sm"><input type="checkbox" disabled={busy} checked={!dismissed.includes(kind + ':' + skill)} onChange={event => setDismissed(previous => event.target.checked ? previous.filter(item => item !== kind + ':' + skill) : [...previous, kind + ':' + skill])} />{skill}</label>)}
                     </div>
                   ))}
+                  {heldBack > 0 && !expanded && <div>
+                    <p className="text-xs text-muted-foreground">{t('components.reflection.legacyNote')}</p>
+                    <button type="button" className="quiet-link -ml-2 mt-1" data-testid="reflection-show-more" onClick={() => setExpanded(true)}>{t('components.reflection.showMore', { count: heldBack })}</button>
+                  </div>}
                   <div className="flex justify-end gap-2">
                     <Button variant="ghost" size="sm" disabled={busy} onClick={() => setReview(false)}>{t('components.reflection.cancel')}</Button>
                     <Button size="sm" disabled={busy || !count} onClick={() => onApply(entry, gaps, strengths)}>{t('components.reflection.applyToLandscape', { count })}</Button>

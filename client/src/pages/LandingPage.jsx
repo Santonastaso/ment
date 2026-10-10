@@ -99,7 +99,6 @@ function ProductConversation({ t }) {
       <div>{MATCHES.map(match => <MatchRow key={match.name} match={match} t={t} />)}</div>
       <div className="flex items-center justify-between gap-4 border-t border-border bg-muted/55 px-4 py-3 sm:px-5">
         <p className="text-xs text-muted-foreground">{t('landing.preview.privacy')}</p>
-        <span className="landing-preview-folio">MENT / 02</span>
       </div>
     </div>
   );
@@ -113,7 +112,6 @@ function Hero({ t }) {
         <h1>
           {t('landing.hero.title')}
         </h1>
-        <span className="landing-hero-index">MENT / 01</span>
       </div>
       <ProductConversation t={t} />
     </section>

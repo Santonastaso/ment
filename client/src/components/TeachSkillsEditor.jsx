@@ -165,11 +165,13 @@ export default function TeachSkillsEditor({ value = [], onChange, placeholder, l
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="text-destructive hover:text-destructive"
+                className="shrink-0 text-destructive hover:text-destructive"
+                aria-label={t('components.teachSkills.remove', { skill: editing.skill })}
+                title={t('components.teachSkills.remove', { skill: editing.skill })}
                 disabled={busy}
                 onClick={() => removeSkill(editingIdx)}
               >
-                {t('components.teachSkills.remove', { skill: editing.skill })}
+                {t('components.skillTag.removeShort')}
               </Button>
               <Button type="button" size="sm" className="ml-auto" disabled={busy} onClick={() => setEditingIdx(null)}>
                 {t('profile.btn.cancel')}

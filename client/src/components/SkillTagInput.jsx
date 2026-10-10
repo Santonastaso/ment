@@ -135,10 +135,12 @@ export default function SkillTagInput({ value = [], onChange, placeholder, lang,
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="text-destructive hover:text-destructive"
+                className="shrink-0 text-destructive hover:text-destructive"
+                aria-label={t('components.skillTag.remove', { skill: value[openIdx] })}
+                title={t('components.skillTag.remove', { skill: value[openIdx] })}
                 onClick={() => removeSkill(openIdx)}
               >
-                {t('components.skillTag.remove', { skill: value[openIdx] })}
+                {t('components.skillTag.removeShort')}
               </Button>
               <Button type="button" size="sm" className="ml-auto" onClick={() => setOpenIdx(null)}>
                 {t('components.popup.done')}

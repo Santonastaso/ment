@@ -17,6 +17,7 @@ function fixtureApi(state) {
       await new Promise(resolve => state.pendingLoads.push(resolve));
     }
     if (method === 'post' && state.failNext === path) { state.failNext = null; throw new Error('Fixture network failure'); }
+    if (method === 'put' && state.failPut === path) { state.failPut = null; throw new Error('Fixture network failure'); }
     if (method === 'get') {
       if (state.failGet === path) throw new Error('Fixture history load failed');
       if (path === '/users/me') return state.profile || { ...state.user, skills: [], career: [] };
@@ -25,7 +26,15 @@ function fixtureApi(state) {
       if (path === '/reflections') return { entries: state.reflections || [], dueForCheckIn: !!state.reflectionDue, lastEntryDays: state.reflectionDue ? 4 : null };
       if (path === '/sessions') return state.sessions.map(payload);
       if (path === '/groups') return state.groups.map(group => ({ ...group, latest_message: state.messages[`/groups/${group.id}/messages`]?.at(-1)?.body || null }));
-      if (path.startsWith('/directory?')) return { people: [state.peer], total: state.directoryTotal ?? 1, facets: { languages: ['fr', 'it'] } };
+      if (path.startsWith('/directory?')) {
+        // With a crowd configured, the fixture pages like the real directory.
+        if (!state.directoryCrowd) return { people: [state.peer], total: state.directoryTotal ?? 1, facets: { languages: ['fr', 'it'] } };
+        const query = new URLSearchParams(path.split('?')[1]);
+        const limit = Math.min(Number(query.get('limit')), state.directoryCap ?? 100);
+        const offset = Number(query.get('offset'));
+        const people = Array.from({ length: state.directoryCrowd }, (_, index) => ({ ...state.peer, id: `crowd-${index + 1}`, name: `Person ${String(index + 1).padStart(3, '0')}` }));
+        return { people: people.slice(offset, offset + limit), total: people.length, ...(state.directoryCap ? {} : { limit }), facets: { languages: ['fr', 'it'] } };
+      }
       // A saved conversation and a peer profile, for the view-profile round trip.
       if (path === '/discovery/threads/thread') return { id: 'thread', turns: [
         { role: 'user', content: 'Financial modelling' },
@@ -98,6 +107,11 @@ function fixtureApi(state) {
       }
     }
     if (method === 'put') {
+      if (path === '/users/me') {
+        state.user = { ...state.user, ...body };
+        if (state.profile) state.profile = { ...state.profile, ...body };
+        return { ...state.user };
+      }
       if (path.startsWith('/discovery/threads')) return {};
       if (/^\/sessions\/\d+$/.test(path)) {
         const session = state.sessions.find(s => s.id === Number(path.split('/')[2]));

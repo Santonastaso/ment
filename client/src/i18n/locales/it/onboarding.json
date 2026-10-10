@@ -6,6 +6,7 @@
   "onboarding.error.busy": "Riprova tra un momento.",
   "onboarding.error.nameRequired": "Inserisci il tuo nome completo prima di terminare.",
   "onboarding.error.workExperienceRequired": "Aggiungi un ruolo e un reparto per la tua prima esperienza professionale.",
+  "onboarding.error.availabilitySave": "Il tuo profilo è stato salvato, ma non la tua disponibilità. Riprova.",
   "onboarding.import.unavailable": "L'importazione è temporaneamente indisponibile. Puoi inserire i dati manualmente.",
   "onboarding.header.title": "Configura il tuo profilo",
   "onboarding.header.subtitle": "Bastano pochi passaggi per trovare le persone giuste.",

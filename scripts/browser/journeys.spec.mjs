@@ -811,7 +811,7 @@ test('Explorer shows profile-shaped skeletons until directory results load', asy
 
 test('Explorer keeps existing rows steady while another page loads', async ({ page }) => {
   await page.goto('/');
-  await page.evaluate(() => { window.fixture.directoryTotal = 25; });
+  await page.evaluate(() => { window.fixture.directoryTotal = 75; });
   await page.locator('nav').getByRole('link', { name: 'Explorer' }).click();
   const rows = page.locator('.directory-results .person-row:not(.person-row-skeleton)');
   await expect(rows).toHaveCount(1);
@@ -1378,4 +1378,166 @@ test('a person shown again after a follow-up is marked as shown before', async (
   await composer.fill('someone with more experience');
   await composer.press('Enter');
   await expect(page.locator('.discovery-reveal .discovery-seen-badge')).toHaveText('Shown before');
+});
+
+test('a failed availability save keeps the user on onboarding until it succeeds', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => window.fixture.setUser({ ...window.fixture.user, onboarding_complete: false }));
+  await expect(page).toHaveURL(/\/onboarding$/);
+  await page.getByRole('button', { name: /^Skip/ }).click();
+  await page.getByRole('textbox', { name: 'Full name' }).fill('Viewer Student');
+  await page.getByRole('textbox', { name: 'Role title *' }).fill('Student');
+  await page.getByLabel('Department *').selectOption('Finance');
+  for (let step = 0; step < 3; step++) await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  const availability = page.getByRole('heading', { name: 'When can people reach you?' });
+  await expect(availability).toBeVisible();
+  await page.getByTestId('onboarding-accepts-requests').uncheck();
+  await page.evaluate(() => { window.fixture.failPut = '/users/me'; });
+  await page.getByRole('button', { name: 'Finish & see my matches' }).click();
+  // The failure is said aloud, nothing is shown as saved and nobody leaves the step.
+  await expect(page.getByText('Your profile is saved, but your availability could not be saved. Try again.')).toBeVisible();
+  await expect(page).toHaveURL(/\/onboarding$/);
+  await expect(availability).toBeVisible();
+  await expect(page.getByTestId('onboarding-accepts-requests')).not.toBeChecked();
+  // Trying again saves the choice without submitting the profile a second time.
+  await page.getByRole('button', { name: 'Finish & see my matches' }).click();
+  await expect(page).toHaveURL('http://127.0.0.1:3010/');
+  const calls = await page.evaluate(() => window.fixture.calls.filter(call => call.path === '/users/me/onboarding' || (call.method === 'put' && call.path === '/users/me')));
+  expect(calls.filter(call => call.path === '/users/me/onboarding')).toHaveLength(1);
+  const saves = calls.filter(call => call.method === 'put');
+  expect(saves).toHaveLength(2);
+  expect(saves.at(-1).body.mentorship_paused).toBe(true);
+});
+
+test('Explorer page size drives the request, the page count and the boundaries', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => { window.fixture.directoryCrowd = 230; });
+  await page.locator('.app-sidebar').getByRole('link', { name: 'Explorer' }).click();
+  const rows = page.locator('.directory-results .person-row:not(.person-row-skeleton)');
+  const pagination = page.locator('.directory-pagination');
+  const next = pagination.getByRole('button', { name: 'Next', exact: true });
+  const previous = pagination.getByRole('button', { name: 'Previous', exact: true });
+  const choose = async size => {
+    await page.getByRole('combobox', { name: 'Results per page' }).click();
+    await page.locator('.directory-filter-option:visible').filter({ hasText: `${size} per page` }).click();
+  };
+  const lastRequest = () => page.evaluate(() => window.fixture.calls.filter(call => call.path.startsWith('/directory?')).at(-1).path);
+
+  await expect(rows).toHaveCount(25);
+  await expect(pagination).toContainText('Showing 1–25 of 230');
+  await expect(pagination).toContainText('1/10');
+  await expect(previous).toBeDisabled();
+  await next.click();
+  await expect(pagination).toContainText('Showing 26–50 of 230');
+  await expect(page).toHaveURL(/page=2/);
+
+  // Changing the size goes back to the first page and recounts the pages.
+  await choose(100);
+  await expect(rows).toHaveCount(100);
+  await expect(page).toHaveURL(/size=100/);
+  await expect(page).not.toHaveURL(/page=/);
+  await expect(pagination).toContainText('Showing 1–100 of 230');
+  await expect(pagination).toContainText('1/3');
+  await next.click();
+  await expect(pagination).toContainText('Showing 101–200 of 230');
+  await next.click();
+  await expect(rows).toHaveCount(30);
+  await expect(pagination).toContainText('Showing 201–230 of 230');
+  expect(await lastRequest()).toContain('limit=100&offset=200');
+  await expect(next).toBeDisabled();
+  await expect(previous).toBeEnabled();
+  // The size survives moving between pages.
+  await previous.click();
+  await expect(page).toHaveURL(/size=100/);
+  await expect(pagination).toContainText('Showing 101–200 of 230');
+
+  await choose(50);
+  await expect(rows).toHaveCount(50);
+  await expect(pagination).toContainText('1/5');
+  await choose(25);
+  await expect(rows).toHaveCount(25);
+  await expect(page).not.toHaveURL(/size=/);
+
+  // A database that still caps pages at 50 is paged by 50, so nobody is skipped.
+  const callsBeforeCap = await page.evaluate(() => { window.fixture.directoryCap = 50; return window.fixture.calls.length; });
+  await choose(100);
+  await expect(rows).toHaveCount(50);
+  await expect(pagination).toContainText('Showing 1–50 of 230');
+  await expect(pagination).toContainText('1/5');
+  await next.click();
+  await expect(pagination).toContainText('Showing 51–100 of 230');
+  expect(await lastRequest()).toContain('limit=50&offset=50');
+  // Once the cap is known, no later page is first asked for at the wrong offset.
+  const cappedRequests = await page.evaluate(from => window.fixture.calls.slice(from).map(call => call.path).filter(path => path.startsWith('/directory?')), callsBeforeCap);
+  expect(cappedRequests.filter(path => path.includes('limit=100'))).toHaveLength(1);
+  expect(cappedRequests.some(path => path.includes('offset=100'))).toBe(false);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByRole('combobox', { name: 'Results per page' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+});
+
+test('older check-ins lead with two suggestions a side and keep the rest one tap away', async ({ page }) => {
+  await page.goto('/profile');
+  await page.evaluate(() => {
+    window.fixture.reflections = [
+      { id: 1, created_at: '2026-01-05T10:00:00Z', support_needed: 'Legacy leadership entry', managed_well: 'connect with new people', applied: false, classifier_source: 'mistral:fixture',
+        extracted_gaps: ['leadership', 'strategic_planning', 'team_cohesion', 'conflict_resolution', 'vision_articulation'],
+        extracted_strengths: ['social_skills', 'networking', 'adaptability', 'collaboration', 'empathy'] },
+      { id: 2, created_at: '2026-01-12T10:00:00Z', support_needed: 'Focused new entry', managed_well: '', applied: false, classifier_source: 'mistral:fixture',
+        extracted_gaps: ['public speaking'], extracted_strengths: [] },
+    ];
+  });
+  await page.getByTestId('profile-tab-reflections').click();
+  await page.getByRole('button', { name: /Legacy leadership entry/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Weekly check-in' });
+  await dialog.getByRole('button', { name: 'Review suggestions' }).click();
+  await expect(dialog.getByRole('checkbox')).toHaveCount(4);
+  await expect(dialog.getByRole('checkbox', { name: 'strategic planning' })).toBeChecked();
+  await expect(dialog.getByRole('button', { name: 'Add 4 to my skills' })).toBeVisible();
+  // Nothing was deleted: the other six are there, unticked, for whoever wants them.
+  await dialog.getByTestId('reflection-show-more').click();
+  await expect(dialog.getByRole('checkbox')).toHaveCount(10);
+  await expect(dialog.getByRole('checkbox', { checked: true })).toHaveCount(4);
+  await expect(dialog.getByRole('checkbox', { name: 'vision articulation' })).not.toBeChecked();
+  await dialog.getByRole('checkbox', { name: 'empathy' }).check();
+  await expect(dialog.getByRole('button', { name: 'Add 5 to my skills' })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Close' }).click();
+
+  await page.getByRole('button', { name: /Focused new entry/ }).click();
+  await dialog.getByRole('button', { name: 'Review suggestions' }).click();
+  await expect(dialog.getByRole('checkbox')).toHaveCount(1);
+  await expect(dialog.getByTestId('reflection-show-more')).toHaveCount(0);
+});
+
+test('removing a long skill keeps the popup footer usable on a phone', async ({ page }) => {
+  const skill = 'Cross-functional stakeholder management and executive communication';
+  await page.setViewportSize({ width: 360, height: 780 });
+  await page.goto('/');
+  await page.evaluate(name => {
+    window.fixture.profile = { ...window.fixture.user, career: [], skills: [{ id: 1, skill: name, type: 'wants_to_learn' }] };
+  }, skill);
+  await page.locator('.app-sidebar').getByRole('link', { name: 'My profile' }).click();
+  await page.getByTestId('profile-tab-skills').click();
+  await page.getByRole('button', { name: skill, exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toContainText(skill);
+  // The button says only "Remove"; the skill it removes is in its accessible name.
+  const remove = dialog.getByRole('button', { name: `Remove ${skill}` });
+  await expect(remove).toHaveText('Remove');
+  const done = dialog.getByRole('button', { name: 'Done', exact: true });
+  const [removeBox, doneBox, dialogBox] = await Promise.all([remove.boundingBox(), done.boundingBox(), dialog.boundingBox()]);
+  expect(removeBox.x + removeBox.width).toBeLessThanOrEqual(doneBox.x);
+  expect(doneBox.x + doneBox.width).toBeLessThanOrEqual(dialogBox.x + dialogBox.width);
+  expect(Math.abs(removeBox.y - doneBox.y)).toBeLessThan(2);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+});
+
+test('the landing page carries no unexplained folio labels', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => window.fixture.setUser(null));
+  await page.goto('/welcome');
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await expect(page.getByText(/MENT \/ 0\d/)).toHaveCount(0);
+  await expect(page.locator('.landing-hero-index, .landing-preview-folio')).toHaveCount(0);
 });

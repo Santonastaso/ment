@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import SessionRequestModal from '../components/SessionRequestModal.jsx';
 import DirectoryFilter from '../components/DirectoryFilter.jsx';
 import { PageShell } from '../components/PageShell.jsx';
+import { DEFAULT_PAGE_SIZE, PAGE_SIZES, pageSizeFrom, serverPageCap } from '../lib/directory.mjs';
 import PageHeader from '../components/PageHeader.jsx';
 import { Surface, SurfaceBody } from '../components/Surface.jsx';
 import { Button } from '@/components/ui/button';
@@ -14,7 +15,6 @@ import { useT } from '../i18n/index.jsx';
 import { sessionPath } from '../lib/conversationLinks.mjs';
 import { languageOptions } from '../lib/languages.js';
 
-const PAGE_SIZE = 12;
 
 export default function Explorer() {
   const { t, lang } = useT();
@@ -30,13 +30,20 @@ export default function Explorer() {
   const languageKey = language.join(',');
   const sort = searchParams.get('sort') === 'name' ? 'name' : 'relevance';
   const page = Number.isSafeInteger(Number(searchParams.get('page'))) && Number(searchParams.get('page')) > 0 ? Number(searchParams.get('page')) : 1;
-  const requestKey = JSON.stringify([query, persona, program, cohort, location, language, sort, page]);
+  const pageSize = pageSizeFrom(searchParams.get('size'));
+  const requestKey = JSON.stringify([query, persona, program, cohort, location, language, sort, page, pageSize]);
 
   const [inputValue, setInputValue] = useState(query);
   const [dirError, setDirError] = useState(false);
   const [retry, setRetry] = useState(0);
   const [dirData, setDirData] = useState(null);
   const [dirLoading, setDirLoading] = useState(true);
+  // Offsets and page counts follow the size the server really pages by. That
+  // is the chosen size unless the server showed it serves less; the cap is
+  // kept apart from any one response, so a small page never limits a larger
+  // size chosen afterwards.
+  const [serverCap, setServerCap] = useState(null);
+  const size = serverCap ? Math.min(pageSize, serverCap) : pageSize;
   const [requestingMentor, setRequestingMentor] = useState(null);
 
   function updateParams(mutate) {
@@ -70,8 +77,8 @@ export default function Explorer() {
     setDirLoading(true);
     setDirError(false);
     const params = new URLSearchParams({
-      limit: String(PAGE_SIZE),
-      offset: String((page - 1) * PAGE_SIZE),
+      limit: String(size),
+      offset: String((page - 1) * size),
     });
     if (query) params.set('q', query);
     if (persona) params.set('persona', persona);
@@ -83,8 +90,12 @@ export default function Explorer() {
     api.get(`/directory?${params.toString()}`)
       .then(res => {
         if (cancelled) return;
+        // Served less than asked: these rows belong to a different paging, so
+        // remember the cap and let the request run again at that size.
+        const cap = serverPageCap(size, res.data);
+        if (cap) { setServerCap(cap); return; }
         setDirData({ ...res.data, requestKey });
-        const lastPage = Math.max(1, Math.ceil(res.data.total / PAGE_SIZE));
+        const lastPage = Math.max(1, Math.ceil(res.data.total / size));
         if (page > lastPage) setSearchParams(previous => {
           const next = new URLSearchParams(previous);
           if (lastPage === 1) next.delete('page'); else next.set('page', String(lastPage));
@@ -96,7 +107,7 @@ export default function Explorer() {
         if (!cancelled) setDirLoading(false);
       });
     return () => { cancelled = true; };
-  }, [query, persona, program, cohort, location, languageKey, sort, page, retry]);
+  }, [query, persona, program, cohort, location, languageKey, sort, page, size, retry]);
 
   function submitSearch(e) {
     e?.preventDefault();
@@ -108,9 +119,9 @@ export default function Explorer() {
 
   const facets = dirData?.facets || {};
   const total = dirData?.total ?? 0;
-  const from = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
-  const to = Math.min(page * PAGE_SIZE, total);
-  const pageCount = Math.max(Math.ceil(total / PAGE_SIZE), 1);
+  const from = total === 0 ? 0 : (page - 1) * size + 1;
+  const to = Math.min(page * size, total);
+  const pageCount = Math.max(Math.ceil(total / size), 1);
   const updatingResults = dirLoading || Boolean(dirData && dirData.requestKey !== requestKey);
   const languageChoices = languageOptions(facets.languages, lang);
   const hasActiveFilters = Boolean(query || persona || program || cohort || location || language.length || sort !== 'relevance');
@@ -147,7 +158,12 @@ export default function Explorer() {
                 ) : !dirError && total > 0 && (
                   <div className="directory-pagination mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4 text-sm text-muted-foreground">
                     {updatingResults ? <Skeleton className="h-4 w-28" /> : <span>{t('explorer.showing', { from, to, total })}</span>}
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="directory-page-size">
+                        <DirectoryFilter label={t('explorer.perPage')} value={String(pageSize)} disabled={updatingResults}
+                          onChange={value => setParam('size', Number(value) === DEFAULT_PAGE_SIZE ? '' : value)}
+                          options={PAGE_SIZES.map(count => ({ value: String(count), label: t('explorer.perPageOption', { count }) }))} />
+                      </div>
                       <Button type="button" size="sm" variant="outline" disabled={updatingResults || page <= 1} onClick={() => setParam('page', String(page - 1))}>
                         {t('explorer.prev')}
                       </Button>

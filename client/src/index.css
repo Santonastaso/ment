@@ -601,6 +601,7 @@ a.person-row-name:hover { color: var(--primary); text-decoration: underline; }
 .discovery-empty p { margin: 0 0 .7rem; }
 .directory-search-panel { position: sticky; top: var(--workspace-top-row); z-index: 10; margin: -8px 0 0; padding: 6px 0 1rem; background: var(--background); }
 .directory-pagination { min-width: 0; }
+.directory-page-size { width: 9.5rem; }
 .directory-filter > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .directory-filter-positioner { z-index: 50; width: var(--anchor-width); }
 .directory-filter-popup { max-height: min(360px, var(--available-height)); overflow-y: auto; border: 1px solid var(--border); border-radius: var(--panel-radius); background: var(--background); padding: 5px; box-shadow: 0 12px 32px rgb(0 0 0 / .1); transform-origin: var(--transform-origin); transition: opacity var(--motion-panel) var(--motion-ease), transform var(--motion-panel) var(--motion-ease); }
@@ -617,9 +618,7 @@ a.person-row-name:hover { color: var(--primary); text-decoration: underline; }
 .landing-hero-eyebrow { display: flex; align-items: center; gap: 13px; margin-bottom: 1.8rem; color: var(--primary); font-size: var(--type-small); line-height: 16px; font-weight: var(--font-weight-semibold); letter-spacing: .13em; text-transform: uppercase; }
 .landing-hero-eyebrow::before { content: ''; width: 28px; height: 1px; background: currentColor; }
 .landing-hero h1 { max-width: 12ch; font-size: clamp(3.3rem, 5.4vw, 6.25rem); font-weight: var(--font-weight-regular); line-height: .99; letter-spacing: -.055em; text-wrap: balance; }
-.landing-hero-index { display: block; margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border); color: var(--muted-foreground); font-size: var(--type-caption); line-height: 16px; font-weight: var(--font-weight-semibold); letter-spacing: .15em; }
 .landing-preview { width: 100%; margin: 0; border-radius: var(--dialog-radius); box-shadow: 0 18px 50px rgba(73, 57, 43, .06); }
-.landing-preview-folio { flex: 0 0 auto; color: var(--muted-foreground); font-size: var(--type-micro); line-height: 16px; font-weight: var(--font-weight-semibold); letter-spacing: .13em; }
 .landing-how { border-top: 1px solid var(--border); background: #eeeae2; padding: clamp(3rem, 5vw, 5rem) 2rem; }
 .landing-how-inner { display: grid; grid-template-columns: minmax(200px, .42fr) 1fr; gap: clamp(2rem, 6vw, 6rem); max-width: 1440px; margin: 0 auto; }
 .landing-how h2 { max-width: 12ch; font-size: clamp(2rem, 3vw, 3.3rem); font-weight: var(--font-weight-regular); line-height: 1.08; letter-spacing: -.04em; }
