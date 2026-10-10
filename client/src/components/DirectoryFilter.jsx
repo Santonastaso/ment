@@ -6,7 +6,15 @@ import { buttonVariants } from './ui/button.jsx';
 export default function DirectoryFilter({ label, value, onChange, options, renderValue, multiple = false, disabled = false }) {
   return <Select.Root multiple={multiple} value={value} onValueChange={onChange} items={options} disabled={disabled}>
     <Select.Trigger className={buttonVariants({ variant: 'ghost', className: 'filter-control directory-filter w-full min-w-0 justify-between px-3 font-normal' })} aria-label={label}>
-      <Select.Value className="min-w-0 truncate" placeholder={options[0]?.label}>{renderValue}</Select.Value>
+      <Select.Value className="min-w-0 truncate" placeholder={label}>
+        {selected => {
+          // With nothing chosen the chip names what it filters ("Programme"),
+          // not the catch-all option ("Tous les…"), which truncated to nothing.
+          if (multiple ? !selected?.length : !selected) return label;
+          if (renderValue) return typeof renderValue === 'function' ? renderValue(selected) : renderValue;
+          return options.find(option => option.value === selected)?.label ?? label;
+        }}
+      </Select.Value>
       <Select.Icon><ChevronDown size={16} aria-hidden="true" /></Select.Icon>
     </Select.Trigger>
     <Select.Portal>

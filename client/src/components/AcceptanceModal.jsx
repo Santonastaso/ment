@@ -1,4 +1,5 @@
 ﻿import React, { useEffect, useState } from 'react';
+import { formatDayTime } from '../lib/utils.js';
 import IcsDownloadButton from './IcsDownloadButton.jsx';
 import api from '../api/index.js';
 import { useModalA11y } from '../lib/useModalA11y.js';
@@ -16,16 +17,7 @@ import Portal from './ui/portal.jsx';
 // modal does not reappear on subsequent logins.
 function formatScheduled(iso, lang) {
   if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleString(lang, {
-    weekday: 'short',
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
+  return formatDayTime(iso, lang) || null;
 }
 
 function minDateTimeLocal() {
@@ -128,7 +120,7 @@ export default function AcceptanceModal({ sessions, onAcknowledged, onClose }) {
       >
         <div className="p-6 border-b border-[var(--border-subtle)] flex-shrink-0">
           <div className="flex items-center justify-between gap-3">
-            <h2 id="acceptance-modal-title" className="text-lg font-semibold text-foreground">
+            <h2 id="acceptance-modal-title" className="text-xl font-semibold text-foreground">
               {localSessions.length === 1 ? t('components.acceptance.titleOne') : t('components.acceptance.titleMany')}
             </h2>
             <button
@@ -228,7 +220,7 @@ export default function AcceptanceModal({ sessions, onAcknowledged, onClose }) {
         </div>
 
         <div className="p-5 border-t border-[var(--border-subtle)] flex-shrink-0 space-y-2">
-          {error && <p className="text-sm text-rose-600">{error}</p>}
+          {error && <p className="text-sm text-destructive">{error}</p>}
           <div className="flex justify-end gap-2">
             <Button
               type="button"

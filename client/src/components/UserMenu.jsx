@@ -65,7 +65,7 @@ export default function UserMenu({ compact = false, placement = 'topbar' }) {
         )}
       >
         <Avatar className="size-8">
-          <AvatarFallback className="bg-primary/15 text-xs font-semibold text-primary">
+          <AvatarFallback className="text-xs">
             {initials}
           </AvatarFallback>
         </Avatar>
@@ -84,7 +84,7 @@ export default function UserMenu({ compact = false, placement = 'topbar' }) {
         >
           <div className="flex items-center gap-2.5 border-b border-border px-2 py-2.5">
             <Avatar className="size-8">
-              <AvatarFallback className="bg-primary text-xs font-semibold text-white">{initials}</AvatarFallback>
+              <AvatarFallback className="text-xs">{initials}</AvatarFallback>
             </Avatar>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">{user?.name}</p>

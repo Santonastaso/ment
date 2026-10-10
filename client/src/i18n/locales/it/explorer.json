@@ -30,6 +30,8 @@
   "explorer.allCohorts": "Tutti gli anni",
   "explorer.allLocations": "Tutte le sedi",
   "explorer.showing": "Visualizzati {from}–{to} di {total}",
+  "explorer.perPage": "Risultati per pagina",
+  "explorer.perPageOption": "{count} per pagina",
   "explorer.prev": "Precedente",
   "explorer.next": "Successivo",
   "explorer.emptyChatTitle": "Nessun risultato per questa ricerca",

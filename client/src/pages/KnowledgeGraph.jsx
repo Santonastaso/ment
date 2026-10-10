@@ -263,7 +263,7 @@ export default function KnowledgeGraph() {
       <div className="flex flex-wrap items-end gap-4 rounded-xl border border-border bg-card p-4">
         <div className="flex flex-col gap-1.5">
           <label htmlFor="kg-company" className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-            <Building2 className="size-3.5" /> {t('graph.filter.company')}
+            <Building2 className="size-4" /> {t('graph.filter.company')}
           </label>
           <select
             id="kg-company"
@@ -289,7 +289,7 @@ export default function KnowledgeGraph() {
 
         <div className="flex flex-col gap-1.5">
           <label htmlFor="kg-language" className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-            <Languages className="size-3.5" /> {t('graph.filter.language')}
+            <Languages className="size-4" /> {t('graph.filter.language')}
           </label>
           <select
             id="kg-language"
@@ -310,7 +310,7 @@ export default function KnowledgeGraph() {
 
         <div className="flex flex-col gap-1.5">
           <label htmlFor="kg-program" className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-            <GraduationCap className="size-3.5" /> {t('graph.filter.program')}
+            <GraduationCap className="size-4" /> {t('graph.filter.program')}
           </label>
           <select
             id="kg-program"
@@ -547,7 +547,7 @@ export default function KnowledgeGraph() {
             </ul>
           </details>
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Info className="size-3.5" /> {t('graph.hoverHint')}
+            <Info className="size-4" /> {t('graph.hoverHint')}
           </p>
         </div>
       )}

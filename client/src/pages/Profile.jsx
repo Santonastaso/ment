@@ -10,6 +10,9 @@ import SessionRequestModal from '../components/SessionRequestModal.jsx';
 import CareerEntryFields, { DEPARTMENTS } from '../components/CareerEntryFields.jsx';
 import ProfileReflection from '../components/ProfileReflection.jsx';
 import { PageShell } from '../components/PageShell.jsx';
+import { importedMonth, importedYear, monthYearValue, parseMonthYear } from '../lib/monthYear.mjs';
+import PageHeader from '../components/PageHeader.jsx';
+import PageTabs from '../components/PageTabs.jsx';
 import { Surface, SurfaceBody, SurfaceHeader } from '../components/Surface.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -42,25 +45,6 @@ function conciseHeadline(profile) {
       const normalized = part.replace(/^essec\s+/i, '').toLowerCase();
       return normalized && normalized !== 'demo profile' && !repeated.some(value => normalized === value || normalized.includes(value));
     }).join(' · ');
-}
-
-// Convert (year, month) to "YYYY-MM" string that <input type="month"> expects.
-function ymToInput(year, month) {
-  if (!year) return '';
-  const m = month && month >= 1 && month <= 12 ? String(month).padStart(2, '0') : '01';
-  return `${year}-${m}`;
-}
-
-// Parse "YYYY-MM" back into { year, month } pair (null-safe).
-function inputToYM(value) {
-  if (!value) return { year: null, month: null };
-  const [y, m] = value.split('-');
-  const year = parseInt(y);
-  const month = parseInt(m);
-  return {
-    year: Number.isFinite(year) ? year : null,
-    month: Number.isFinite(month) && month >= 1 && month <= 12 ? month : null,
-  };
 }
 
 // Group an already-sorted (reverse-chronological) career list into runs
@@ -144,6 +128,14 @@ export default function Profile() {
   const [toast, setToast] = useState('');
   const [reflectionDraft, setReflectionDraft] = useState({ support_needed: '', managed_well: '' });
   const [reflectionOpen, setReflectionOpen] = useState(false);
+  // Arriving from a finished meeting opens the check-in straight away.
+  useEffect(() => {
+    if (!isOwnProfile || searchParams.get('checkin') !== '1') return;
+    setReflectionOpen(true);
+    const params = new URLSearchParams(searchParams);
+    params.delete('checkin');
+    setSearchParams(params, { replace: true });
+  }, [isOwnProfile, searchParams]);
   const reflectionTriggerRef = React.useRef(null);
   const [skillFilter, setSkillFilter] = useState('all');
   const [notifyEmail, setNotifyEmail] = useState('');
@@ -340,8 +332,8 @@ export default function Profile() {
 
   async function handleAddCareer() {
     if (!newCareer.role.trim() || !newCareer.department.trim() || careerBusy) return;
-    const start = inputToYM(newCareer.start_date);
-    const end = inputToYM(newCareer.end_date);
+    const start = parseMonthYear(newCareer.start_date);
+    const end = parseMonthYear(newCareer.end_date);
     const payload = {
       role: newCareer.role,
       department: newCareer.department,
@@ -392,8 +384,8 @@ export default function Profile() {
           role: entry.role || entry.role_title || proposed.job_title || profile.current_role || '',
           department: entry.department || proposed.department || profile.department || '',
           company: entry.company || '', description: entry.description || '',
-          start_year: entry.start_year ?? null, start_month: entry.start_month ?? null,
-          end_year: entry.end_year ?? null, end_month: entry.end_month ?? null,
+          start_year: importedYear(entry.start_year), start_month: importedMonth(entry.start_month),
+          end_year: importedYear(entry.end_year), end_month: importedMonth(entry.end_month),
         }))
       : profile.career?.length ? profile.career : [{ role: proposed.job_title || profile.current_role || '', department: proposed.department || profile.department || '' }];
     const primary = career[0] || {};
@@ -448,8 +440,8 @@ export default function Profile() {
       department: entry.department || '',
       company: entry.company || '',
       description: entry.description || '',
-      start_date: ymToInput(entry.start_year, entry.start_month),
-      end_date: ymToInput(entry.end_year, entry.end_month),
+      start_date: monthYearValue(entry.start_year, entry.start_month),
+      end_date: monthYearValue(entry.end_year, entry.end_month),
     });
   }
 
@@ -461,8 +453,8 @@ export default function Profile() {
   async function handleSaveEditedCareer() {
     if (!editingCareerId || !editCareerDraft || careerBusy) return;
     if (!editCareerDraft.role.trim() || !editCareerDraft.department.trim()) return;
-    const start = inputToYM(editCareerDraft.start_date);
-    const end = inputToYM(editCareerDraft.end_date);
+    const start = parseMonthYear(editCareerDraft.start_date);
+    const end = parseMonthYear(editCareerDraft.end_date);
     const payload = {
       role: editCareerDraft.role,
       department: editCareerDraft.department,
@@ -489,10 +481,13 @@ export default function Profile() {
   const linkedinHref = safeLinkedInHref(profile?.linkedin_url);
   const headlineSummary = conciseHeadline(profile || {});
 
+  const pageTitle = isOwnProfile ? t('nav.myProfile') : t('profile.pageTitle');
+
   if (loading) {
     return (
-      <PageShell>
-        <Skeleton className="h-36 w-full rounded-xl" />
+      <PageShell className="gap-0">
+        <PageHeader title={pageTitle} />
+        <Skeleton className="mb-5 h-36 w-full rounded-xl" />
         <Skeleton className="h-64 w-full rounded-xl" />
       </PageShell>
     );
@@ -511,16 +506,17 @@ export default function Profile() {
     : t('profile.skillLandscape.titleOther', { name: firstName });
 
   return (
-    <PageShell className="profile-page gap-8">
-      {fromChat && (
-        <div className="-mb-4">
-          <Button type="button" variant="ghost" size="sm" className="-ml-2"
+    <PageShell className="profile-page gap-0">
+      <PageHeader
+        title={pageTitle}
+        action={fromChat ? (
+          <Button type="button" variant="ghost" size="sm"
             onClick={() => navigate(chatThread ? `/?thread=${encodeURIComponent(chatThread)}` : '/')}>
             <ArrowLeft aria-hidden="true" />
             {t('profile.backToChat')}
           </Button>
-        </div>
-      )}
+        ) : null}
+      />
       {/* Toast */}
       {toast && (
         <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-lg border border-primary bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground">
@@ -528,40 +524,30 @@ export default function Profile() {
         </div>
       )}
 
-      {validTabs.length > 1 && (
-        <nav className="profile-tabs flex min-h-0 flex-wrap items-center gap-1 sm:flex-nowrap" aria-label={t('profile.tabs.label')}>
-          {validTabs.map(key => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setTab(key)}
-              data-testid={`profile-tab-${key}`}
-              className={`rounded-full px-3.5 py-1.5 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/40 ${
-                tab === key
-                  ? 'bg-[var(--control-surface)] font-medium text-foreground'
-                  : 'text-muted-foreground hover:bg-[var(--control-surface)] hover:text-foreground'
-              }`}
-            >
-              {t(`profile.tab.${key}`)}
-            </button>
-          ))}
-        </nav>
-      )}
+      <div className="profile-workspace">
+      <PageTabs
+        className="profile-tabs"
+        idPrefix="profile"
+        label={t('profile.tabs.label')}
+        tabs={validTabs.map(key => ({ key, label: t(`profile.tab.${key}`) }))}
+        value={tab}
+        onChange={setTab}
+      />
 
-      <div key={tab} className="profile-tab-content">
+      <div key={tab} id={`profile-panel-${tab}`} role="tabpanel" aria-labelledby={`profile-tab-${tab}`} tabIndex={0} className="profile-tab-content page-frame page-frame-body">
       {tab === 'overview' && (
       <>
-      <Surface className="profile-overview-header">
+      <Surface className="profile-section profile-overview-header">
         <SurfaceBody className="profile-overview-header-body space-y-3 px-4 pb-4 pt-4 sm:px-5 sm:pb-5 sm:pt-5">
           <div className="profile-identity-row flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
               <Avatar className="size-12">
-                <AvatarFallback className="bg-primary text-sm font-semibold text-primary-foreground">
+                <AvatarFallback className="text-base">
                   {profile.name?.charAt(0)}
                 </AvatarFallback>
               </Avatar>
               <div className="min-w-0 flex-1">
-                <h1 className="text-title font-medium tracking-[-0.02em]">{profile.name}</h1>
+                <h2 className="text-title font-semibold tracking-[-0.02em]">{profile.name}</h2>
                 <div className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
                   {editing ? null : (
                     <>
@@ -592,11 +578,11 @@ export default function Profile() {
                   <Button variant="outline" onClick={() => setEditing(true)}>{t('profile.btn.editProfile')}</Button>
                 )
               ) : profile.session_id ? (
-                <Link to={sessionPath({ id: profile.session_id, route_token: profile.session_token })} className="inline-flex h-11 items-center rounded-full bg-[var(--control-surface)] px-5 text-sm font-semibold text-foreground hover:bg-[var(--control-surface-hover)]">
+                <Link to={sessionPath({ id: profile.session_id, route_token: profile.session_token })} className="inline-flex h-10 items-center rounded-full border border-[var(--border)] bg-[var(--control-surface)] px-4 text-sm font-semibold text-foreground hover:bg-[var(--control-surface-hover)]">
                   {t('profile.btn.openChat')}
                 </Link>
               ) : profile.mentorship_available === false ? (
-                <Button variant="outline" className="h-11 px-6 text-base" disabled>
+                <Button variant="outline" disabled>
                   {t('profile.btn.currentlyUnavailable')}
                 </Button>
               ) : (
@@ -605,7 +591,7 @@ export default function Profile() {
             </div>
           </div>
           {!isOwnProfile && profile.mentorship_available === false && (
-            <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-800 border border-amber-200">
+            <p className="mt-2 inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium border-[var(--border)] bg-[var(--status-waiting-bg)] text-[var(--status-waiting-fg)]">
               {profile.mentorship_unavailable_until && new Date(profile.mentorship_unavailable_until) > new Date()
                 ? t('profile.mentoring.pausedUntil', { date: profile.mentorship_unavailable_until })
                 : t('profile.mentoring.notAccepting')}
@@ -661,7 +647,7 @@ export default function Profile() {
               />
               <div className="space-y-2 sm:col-span-2 lg:col-span-3">
                 <label className="flex items-start gap-2 text-sm text-muted-foreground">
-                  <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-[#a95035]" checked={cvConsent} onChange={event => setCvConsent(event.target.checked)} />
+                  <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-[var(--primary)]" checked={cvConsent} onChange={event => setCvConsent(event.target.checked)} />
                   <span>{t('onboarding.import.consent')}</span>
                 </label>
                 <input id="profile-cv-upload" className="peer sr-only" aria-label={t('onboarding.import.browse')} type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" disabled={cvBusy || !cvConsent} onChange={event => { handleCvUpload(event.target.files?.[0]); event.target.value = ''; }} />
@@ -677,15 +663,15 @@ export default function Profile() {
         </SurfaceBody>
       </Surface>
 
-      <div className="flex flex-col gap-12">
-      <Surface className="overflow-visible">
+      <div className="profile-overview-sections">
+      <Surface className="profile-section overflow-visible">
         <SurfaceHeader
           title={skillTitle}
           action={isOwnProfile ? <SkillCloudFilters value={skillFilter} onChange={setSkillFilter} /> : null}
         />
         <SurfaceBody className="min-w-0 pt-3">
           {isOwnProfile && !(profile.skillProgress?.length ? profile.skillProgress : profile.skills || []).length ? (
-            <div className="rounded-[var(--panel-radius)] bg-[var(--surface)] p-5">
+            <div>
               <p className="text-sm text-muted-foreground">{t('profile.skillLandscape.firstDay')}</p>
               <Button size="sm" variant="outline" className="mt-3" onClick={() => setTab('skills')}>{t('profile.skillLandscape.addSkills')}</Button>
             </div>
@@ -713,7 +699,7 @@ export default function Profile() {
       </Surface>
 
       {isOwnProfile && (
-        <Surface className="bg-[var(--surface)] px-1">
+        <Surface className="profile-section">
           <SurfaceHeader
             className="sm:px-4"
             title={t('profile.reflection.quickTitle')}
@@ -746,8 +732,8 @@ export default function Profile() {
       )}
 
       {isOwnProfile && tab === 'skills' && (
-        <div className="grid items-start gap-5 lg:grid-cols-2">
-          <div className="min-w-0 rounded-[var(--panel-radius)] border border-[var(--border-subtle)] bg-[var(--surface)] p-4 sm:p-5">
+        <div className="profile-skills-sections grid items-start lg:grid-cols-2">
+          <div className="profile-skills-section min-w-0">
             <h3 className="mb-3 text-section font-semibold">{t('profile.manageSkills.canTeach')}</h3>
             <TeachSkillsEditor
               tileLayout
@@ -758,7 +744,7 @@ export default function Profile() {
             />
           </div>
 
-          <div className="min-w-0 rounded-[var(--panel-radius)] border border-[var(--border-subtle)] bg-[var(--surface)] p-4 sm:p-5">
+          <div className="profile-skills-section min-w-0">
             <h3 className="mb-3 text-section font-semibold">{t('profile.manageSkills.wantsToLearn')}</h3>
             <SkillTagInput
               tileLayout
@@ -772,7 +758,7 @@ export default function Profile() {
       )}
 
       {isOwnProfile && tab === 'availability' && (
-        <Surface className="overflow-visible bg-transparent">
+        <Surface className="profile-section overflow-visible">
           <SurfaceBody className="px-0 pt-0 sm:px-0">
             <div className="mb-5 flex items-center justify-between gap-3">
               <p className="text-sm font-medium" data-testid="availability-status">
@@ -795,7 +781,7 @@ export default function Profile() {
 
             {/* Where notifications go. Blank means the address you sign in
                 with, which is what most people want. */}
-            <section className="mb-6 rounded-[var(--panel-radius)] bg-[var(--surface)] p-4">
+            <section className="border-t border-[var(--border-subtle)] pt-6">
               <h3 className="text-section font-semibold">{t('profile.notifyEmail.title')}</h3>
               <p className="mt-0.5 text-xs text-muted-foreground">{t('profile.notifyEmail.help')}</p>
               <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -809,7 +795,7 @@ export default function Profile() {
                   placeholder={profile.email || ''}
                   className="min-w-0 max-w-md flex-1 basis-72 bg-background"
                 />
-                <Button size="sm" onClick={handleSaveNotifyEmail} disabled={notifySaving || notifyEmail === (profile.notification_email || '')}>
+                <Button onClick={handleSaveNotifyEmail} disabled={notifySaving || notifyEmail === (profile.notification_email || '')}>
                   {notifySaving ? t('profile.btn.saving') : t('profile.btn.save')}
                 </Button>
               </div>
@@ -818,17 +804,17 @@ export default function Profile() {
                 <p className="mt-2 text-xs text-muted-foreground">{t('profile.notifyEmail.usingLogin', { email: profile.email })}</p>
               )}
             </section>
-            {capacity && <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            {capacity && <div className="mt-6 grid gap-x-8 gap-y-6 border-t border-[var(--border-subtle)] pt-6 sm:grid-cols-2">
               {[
                 { period: 'weekly', limit: capacityDraft.weekly_limit, booked: capacity.weekly_booked, max: 50 },
                 { period: 'monthly', limit: capacityDraft.monthly_limit, booked: capacity.monthly_booked, max: 200 },
               ].map(item => (
-                <section key={item.period} className="rounded-[var(--panel-radius)] bg-[var(--surface)] p-4">
+                <section key={item.period}>
                   <div className="flex items-start justify-between gap-3">
                     <div><h3 className="text-section font-semibold">{t(`profile.availability.${item.period}`)}</h3><p className="mt-0.5 text-xs text-muted-foreground">{t('profile.availability.booked', { booked: item.booked, limit: item.limit })}</p></div>
-                    <input type="number" min="1" max={item.max} className="input h-9 min-h-0 w-20 text-center" aria-label={t(`profile.availability.${item.period}Limit`)} value={item.limit} disabled={availabilitySaving} onChange={event => setCapacityDraft(previous => ({ ...previous, [`${item.period}_limit`]: event.target.value }))} />
+                    <input type="number" min="1" max={item.max} className="input w-20 text-center" aria-label={t(`profile.availability.${item.period}Limit`)} value={item.limit} disabled={availabilitySaving} onChange={event => setCapacityDraft(previous => ({ ...previous, [`${item.period}_limit`]: event.target.value }))} />
                   </div>
-                  <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-background"><div data-testid={`capacity-fill-${item.period}`} className="capacity-fill h-full rounded-full bg-primary" style={{ width: `${Math.min(100, (item.booked / Math.max(1, Number(item.limit))) * 100)}%` }} /></div>
+                  <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-[var(--control-surface)]"><div data-testid={`capacity-fill-${item.period}`} className="capacity-fill h-full rounded-full bg-primary" style={{ width: `${Math.min(100, (item.booked / Math.max(1, Number(item.limit))) * 100)}%` }} /></div>
                 </section>
               ))}
             </div>}
@@ -838,7 +824,7 @@ export default function Profile() {
       )}
 
       {tab === 'experience' && (
-      <Surface>
+      <Surface className="profile-section">
         <SurfaceHeader
           title={t('profile.career.title')}
           action={
@@ -847,13 +833,12 @@ export default function Profile() {
                 type="button"
                 variant={showAddCareer ? 'outline' : 'default'}
                 size="icon"
-                className="size-12 rounded-xl"
                 aria-label={showAddCareer ? t('profile.btn.cancel') : t('profile.career.addEntry')}
                 title={showAddCareer ? t('profile.btn.cancel') : t('profile.career.addEntry')}
                 aria-expanded={showAddCareer}
                 onClick={() => setShowAddCareer(!showAddCareer)}
               >
-                {showAddCareer ? <X className="size-6" /> : <Plus className="size-6" />}
+                {showAddCareer ? <X className="size-5" /> : <Plus className="size-5" />}
               </Button>
             ) : null
           }
@@ -924,7 +909,7 @@ export default function Profile() {
       )}
 
       {isOwnProfile && tab === 'reflections' && (
-        <Surface className="scroll-mt-8" id="reflection-log">
+        <Surface className="profile-section scroll-mt-8" id="reflection-log">
           <SurfaceHeader
             title={t('profile.reflection.title')}
             description={
@@ -940,6 +925,7 @@ export default function Profile() {
           </SurfaceBody>
         </Surface>
       )}
+      </div>
       </div>
 
       {showModal && (

@@ -71,7 +71,7 @@ export default function RequestAccess() {
 
       <Card className="w-full max-w-[520px]">
         <CardHeader>
-          <CardTitle className="text-lg font-medium">{t('auth.requestAccess.title')}</CardTitle>
+          <CardTitle className="text-xl font-medium">{t('auth.requestAccess.title')}</CardTitle>
           <CardDescription>{t('auth.requestAccess.description')}</CardDescription>
         </CardHeader>
         <CardContent>

@@ -13,7 +13,7 @@ function Input({
       type={type}
       data-slot="input"
       className={cn(
-        "input h-11 min-w-0 disabled:pointer-events-none aria-invalid:border-destructive aria-invalid:ring-[3px] aria-invalid:ring-destructive/20",
+        "input h-10 min-w-0 disabled:pointer-events-none aria-invalid:border-destructive aria-invalid:ring-[3px] aria-invalid:ring-destructive/20",
         className
       )}
       {...props} />

@@ -1,3 +1,4 @@
+import { formatDay } from '../lib/utils.js';
 import React, { useMemo, useState } from 'react';
 import { useT } from '../i18n/index.jsx';
 
@@ -173,7 +174,7 @@ export default function SkillCloud({ skillProgress = [], isOwnProfile, onDeleteS
                   <span key={`${item.session_id}-${item.person_id}`} className="person-row-chip">
                     {item.person_name}
                     <time className="ml-1.5 tabular-nums opacity-60">
-                      {new Date(item.occurred_at).toLocaleDateString(lang)}
+                      {formatDay(item.occurred_at, lang)}
                     </time>
                   </span>
                 ))}

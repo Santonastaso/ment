@@ -8,11 +8,19 @@ export function formatChatClock(value) {
   return Number.isNaN(date.getTime()) ? '' : `${padTime(date.getHours())}:${padTime(date.getMinutes())}`;
 }
 
-// Full dates remain useful outside the chat timeline, such as meeting details.
-export function formatMessageTime(value) {
-  const date = new Date(value);
+// The one date style outside the chat timeline: "9 Oct", with the year only
+// when it is not the current one, and a 24-hour clock when the time matters.
+export function formatDay(value, lang) {
+  const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return '';
-  return `${padTime(date.getDate())}/${padTime(date.getMonth() + 1)}/${String(date.getFullYear()).slice(-2)} ${formatChatClock(date)}`;
+  const options = { day: 'numeric', month: 'short' };
+  if (date.getFullYear() !== new Date().getFullYear()) options.year = 'numeric';
+  return date.toLocaleDateString(lang, options);
+}
+
+export function formatDayTime(value, lang) {
+  const day = formatDay(value, lang);
+  return day ? `${day}, ${formatChatClock(value)}` : '';
 }
 
 export function cn(...inputs) {

@@ -1,3 +1,4 @@
+import { atPlace } from './places.ts';
 import { repeats, sameOpening } from './voice.ts';
 // Everything Ment says around the results. These are templates rather than
 // model prose: the sentences set the tone and say what happens next, and the
@@ -60,9 +61,9 @@ const COPY: Record<string, Copy> = {
       if (gap.kind === 'phrase') return `I couldn't find ${gap.value} here`;
       if (gap.kind === 'company') return `I couldn't find anyone who has worked at ${gap.value}`;
       if (gap.kind === 'unreal') return `Good one! I'm fairly sure ${gap.value} isn't a real place, so nobody here is based there`;
-      if (gap.kind === 'elsewhere') return `I couldn't find anyone in ${gap.scope} in ${gap.value} right now`;
-      if (gap.kind === 'place') return `I couldn't find anyone based in ${gap.value}`;
-      if (gap.kind === 'busy') return `Nobody in ${gap.value} is free to talk right now`;
+      if (gap.kind === 'elsewhere') return `I couldn't find anyone in ${gap.scope} ${atPlace('English', gap.value)} right now`;
+      if (gap.kind === 'place') return `I couldn't find anyone based ${atPlace('English', gap.value)}`;
+      if (gap.kind === 'busy') return `Nobody ${atPlace('English', gap.value)} is free to talk right now`;
       return "I couldn't find an exact match";
     },
     closeMany: (terms) => terms
@@ -80,8 +81,8 @@ const COPY: Record<string, Copy> = {
       "If they look like a good fit, I'll draft a message.",
     ],
     retry: (strengths) => [
-      `${strengths ? ` — most people in the network work in ${strengths}` : ''}. Could you tell me a bit more, like the industry, a job title or a skill you're after? I'll take another look.`,
-      `${strengths ? ` — most people here are in ${strengths}` : ''}. Tell me a bit more, like an industry, a role or a skill, and I'll have another look.`,
+      `${strengths ? ` — I can introduce you to people in ${strengths}, though` : ''}. Could you tell me a bit more, like the industry, a job title or a skill you're after? I'll take another look.`,
+      `${strengths ? ` — there are people here in ${strengths}, though` : ''}. Tell me a bit more, like an industry, a role or a skill, and I'll have another look.`,
     ],
     join: 'and',
     greeting: (examples) => `Hi! I'm Ment — I help you find people in the ESSEC network who can help with your studies or career, and I'll draft the intro message for you. What are you looking for?${examples ? ` For example a field like ${examples}, a skill, or a type of role.` : ''}`,
@@ -110,9 +111,9 @@ const COPY: Record<string, Copy> = {
       if (gap.kind === 'phrase') return `Non ho trovato ${gap.value} qui`;
       if (gap.kind === 'company') return `Non ho trovato nessuno che abbia lavorato in ${gap.value}`;
       if (gap.kind === 'unreal') return `Bella questa! Sono abbastanza sicuro che ${gap.value} non sia un posto reale, quindi qui non c'è nessuno`;
-      if (gap.kind === 'elsewhere') return `Al momento non ho trovato nessuno in ambito ${gap.scope} a ${gap.value}`;
-      if (gap.kind === 'place') return `Non ho trovato nessuno a ${gap.value}`;
-      if (gap.kind === 'busy') return `Al momento nessuno a ${gap.value} è disponibile`;
+      if (gap.kind === 'elsewhere') return `Al momento non ho trovato nessuno in ambito ${gap.scope} ${atPlace('Italian', gap.value)}`;
+      if (gap.kind === 'place') return `Non ho trovato nessuno ${atPlace('Italian', gap.value)}`;
+      if (gap.kind === 'busy') return `Al momento nessuno ${atPlace('Italian', gap.value)} è disponibile`;
       return 'Non ho trovato una corrispondenza esatta';
     },
     closeMany: (terms) => terms
@@ -130,8 +131,8 @@ const COPY: Record<string, Copy> = {
       'Se ti convince, preparo io il messaggio.',
     ],
     retry: (strengths) => [
-      `${strengths ? `: qui la maggior parte delle persone lavora in ${strengths}` : ''}. Puoi dirmi qualcosa in più, come il settore, un ruolo o una competenza che ti interessa? Riprovo subito.`,
-      `${strengths ? `: qui la maggior parte delle persone è in ${strengths}` : ''}. Dimmi qualcosa in più, come un settore, un ruolo o una competenza, e ci riprovo.`,
+      `${strengths ? `, ma posso presentarti persone in ${strengths}` : ''}. Puoi dirmi qualcosa in più, come il settore, un ruolo o una competenza che ti interessa? Riprovo subito.`,
+      `${strengths ? `, ma qui trovi persone in ${strengths}` : ''}. Dimmi qualcosa in più, come un settore, un ruolo o una competenza, e ci riprovo.`,
     ],
     join: 'e',
     greeting: (examples) => `Ciao! Sono Ment: ti aiuto a trovare persone nella rete ESSEC che possono aiutarti negli studi o nella carriera, e preparo io il messaggio di presentazione. Cosa stai cercando?${examples ? ` Per esempio un settore come ${examples}, una competenza o un tipo di ruolo.` : ''}`,
@@ -160,9 +161,9 @@ const COPY: Record<string, Copy> = {
       if (gap.kind === 'phrase') return `Je n'ai pas trouvé ${gap.value} ici`;
       if (gap.kind === 'company') return `Je n'ai trouvé personne ayant travaillé chez ${gap.value}`;
       if (gap.kind === 'unreal') return `Bien essayé ! Je suis presque sûr que ${gap.value} n'est pas un vrai lieu, donc personne ici n'y est basé`;
-      if (gap.kind === 'elsewhere') return `Je n'ai trouvé personne en ${gap.scope} à ${gap.value} pour le moment`;
-      if (gap.kind === 'place') return `Je n'ai trouvé personne basé à ${gap.value}`;
-      if (gap.kind === 'busy') return `Personne à ${gap.value} n'est disponible pour le moment`;
+      if (gap.kind === 'elsewhere') return `Je n'ai trouvé personne en ${gap.scope} ${atPlace('French', gap.value)} pour le moment`;
+      if (gap.kind === 'place') return `Je n'ai trouvé personne ${atPlace('French', gap.value)}`;
+      if (gap.kind === 'busy') return `Personne ${atPlace('French', gap.value)} n'est disponible pour le moment`;
       return "Je n'ai pas trouvé de correspondance exacte";
     },
     closeMany: (terms) => terms
@@ -180,8 +181,8 @@ const COPY: Record<string, Copy> = {
       'Si cela vous convient, je rédige le message.',
     ],
     retry: (strengths) => [
-      `${strengths ? ` — ici, la plupart des gens travaillent en ${strengths}` : ''}. Pouvez-vous m'en dire un peu plus, par exemple le secteur, un poste ou une compétence qui vous intéresse ? Je cherche à nouveau.`,
-      `${strengths ? ` — ici, la plupart des gens sont en ${strengths}` : ''}. Dites-m'en un peu plus, comme un secteur, un poste ou une compétence, et je relance la recherche.`,
+      `${strengths ? `, mais je peux vous présenter des personnes en ${strengths}` : ''}. Pouvez-vous m'en dire un peu plus, par exemple le secteur, un poste ou une compétence qui vous intéresse ? Je cherche à nouveau.`,
+      `${strengths ? `, mais vous trouverez ici des personnes en ${strengths}` : ''}. Dites-m'en un peu plus, comme un secteur, un poste ou une compétence, et je relance la recherche.`,
     ],
     join: 'et',
     greeting: (examples) => `Bonjour ! Je suis Ment : je vous aide à trouver des personnes du réseau ESSEC qui peuvent vous aider dans vos études ou votre carrière, et je rédige le message de présentation. Que cherchez-vous ?${examples ? ` Par exemple un domaine comme ${examples}, une compétence ou un type de poste.` : ''}`,

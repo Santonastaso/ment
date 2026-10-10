@@ -82,7 +82,7 @@ export default function TeachSkillsEditor({ value = [], onChange, placeholder, l
                 <span className="block text-sm font-semibold text-foreground">{entry.skill}</span>
                 {(entry.example_project || !tileLayout) && <span className={tileLayout ? 'profile-skill-example block text-xs text-muted-foreground' : 'block truncate text-xs text-muted-foreground'}>{entry.example_project || t('components.teachSkills.giveExample')}</span>}
               </span>
-              {!tileLayout && <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />}
+              {!tileLayout && <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />}
             </button>
           ))}
         </div>
@@ -165,11 +165,13 @@ export default function TeachSkillsEditor({ value = [], onChange, placeholder, l
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="text-destructive hover:text-destructive"
+                className="shrink-0 text-destructive hover:text-destructive"
+                aria-label={t('components.teachSkills.remove', { skill: editing.skill })}
+                title={t('components.teachSkills.remove', { skill: editing.skill })}
                 disabled={busy}
                 onClick={() => removeSkill(editingIdx)}
               >
-                {t('components.teachSkills.remove', { skill: editing.skill })}
+                {t('components.skillTag.removeShort')}
               </Button>
               <Button type="button" size="sm" className="ml-auto" disabled={busy} onClick={() => setEditingIdx(null)}>
                 {t('profile.btn.cancel')}

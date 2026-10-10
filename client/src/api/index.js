@@ -5,6 +5,7 @@
 // `supabase` directly from `client/src/lib/supabase.js`.
 
 import { supabase } from '../lib/supabase.js';
+import { clampDirectoryLimit } from '../lib/directory.mjs';
 import { browserLanguage } from '../lib/esco.js';
 import { getLang } from '../i18n/index.jsx';
 import { firstPersonize } from '../lib/utils.js';
@@ -309,7 +310,7 @@ async function enrichSession(session, viewerId, cache = new Map()) {
 
 async function listDirectory(params = {}) {
   const rpcArgs = {
-    p_limit: Math.min(Math.max(Number(params.limit) || 12, 1), 50),
+    p_limit: clampDirectoryLimit(params.limit),
     p_offset: Math.max(Number(params.offset) || 0, 0),
     p_persona: params.persona || null,
     p_program: params.program || null,
@@ -333,6 +334,8 @@ async function listDirectory(params = {}) {
     });
   return {
     total: Math.max(0, (data?.total ?? 0) - (sourcePeople.length - people.length)),
+    // The limit the database applied; absent until it knows about 100-row pages.
+    limit: data?.limit ?? null,
     people,
     facets: data?.facets || { programs: [], locations: [], languages: [], cohortYears: [] },
   };

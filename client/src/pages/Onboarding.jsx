@@ -12,17 +12,13 @@ import { useT } from '../i18n/index.jsx';
 import LanguageSwitcher from '../i18n/LanguageSwitcher.jsx';
 import { Button } from '../components/ui/button.jsx';
 import { CITY_OPTIONS, normalizeCity } from '../../../shared/cities.mjs';
+import { monthYearValue, parseMonthYear } from '../lib/monthYear.mjs';
 
 function SuggestedPill() {
   const { t } = useT();
-  return <span className="ml-2 text-xs font-medium text-amber-700">{t('onboarding.import.suggested')}</span>;
+  return <span className="ml-2 text-xs font-medium text-[var(--status-waiting-fg)]">{t('onboarding.import.suggested')}</span>;
 }
 
-function monthYearToPicker(year, month) {
-  if (!year) return '';
-  const m = month && month >= 1 && month <= 12 ? month : 1;
-  return `${year}-${String(m).padStart(2, '0')}`;
-}
 
 export default function Onboarding({ returnTo }) {
   const { user, updateUser } = useAuth();
@@ -50,6 +46,13 @@ export default function Onboarding({ returnTo }) {
   // start_date / end_date are "YYYY-MM" strings (native <input type="month"> format)
   const [career, setCareer] = useState([{ role: '', department: '', company: '', start_date: '', end_date: '' }]);
 
+  // Step 4 — Availability: without it nobody knows when to ask.
+  const [weeklyLimit, setWeeklyLimit] = useState(2);
+  const [monthlyLimit, setMonthlyLimit] = useState(5);
+  const [acceptsRequests, setAcceptsRequests] = useState(true);
+  // The saved profile, kept while the availability save is retried.
+  const [savedProfile, setSavedProfile] = useState(null);
+
   // Step 2 — Can teach: array of { skill, example_project }
   const [canTeach, setCanTeach] = useState([]);
 
@@ -60,16 +63,6 @@ export default function Onboarding({ returnTo }) {
     setCareer([...career, { role: '', department: '', company: '', start_date: '', end_date: '' }]);
   }
 
-  function splitDate(s) {
-    if (!s) return { year: null, month: null };
-    const [y, m] = s.split('-');
-    const year = parseInt(y);
-    const month = parseInt(m);
-    return {
-      year: Number.isFinite(year) ? year : null,
-      month: Number.isFinite(month) && month >= 1 && month <= 12 ? month : null,
-    };
-  }
 
   function removeCareer(idx) {
     setCareer(career.filter((_, i) => i !== idx));
@@ -93,8 +86,8 @@ export default function Onboarding({ returnTo }) {
         department: ch.department || proposed.department || '',
         company: ch.company || '',
         description: ch.description || '',
-        start_date: monthYearToPicker(ch.start_year, ch.start_month),
-        end_date: monthYearToPicker(ch.end_year, ch.end_month),
+        start_date: monthYearValue(ch.start_year, ch.start_month),
+        end_date: monthYearValue(ch.end_year, ch.end_month),
       })));
       next.add('career');
     }
@@ -154,8 +147,8 @@ export default function Onboarding({ returnTo }) {
       const validCareer = career
         .filter((c, index) => index === 0 || c.role.trim() || c.department.trim() || c.company.trim() || c.description?.trim() || c.start_date || c.end_date)
         .map(c => {
-          const s = splitDate(c.start_date);
-          const e = splitDate(c.end_date);
+          const s = parseMonthYear(c.start_date);
+          const e = parseMonthYear(c.end_date);
           return {
             role: c.role,
             department: c.department,
@@ -174,6 +167,9 @@ export default function Onboarding({ returnTo }) {
         can_teach: canTeach,
         wants_to_learn: wantsToLearn,
       };
+      // A retry after a failed availability save must not submit the profile twice.
+      let profile = savedProfile;
+      if (!profile) {
       if (draftId) {
         await api.post(`/profile/ingest/${draftId}/accept`, { accepted_json: accepted });
       }
@@ -190,7 +186,21 @@ export default function Onboarding({ returnTo }) {
         linkedin_url: linkedinUrl,
         linkedin_headline: null,
       });
-      updateUser(res.data);
+      profile = res.data;
+      setSavedProfile(profile);
+      }
+      const weekly = Math.max(1, Math.min(50, Number(weeklyLimit) || 1));
+      const monthly = Math.max(weekly, Math.min(200, Number(monthlyLimit) || weekly));
+      // Nothing is shown as saved, and nobody leaves this step, until the
+      // server has accepted the choice.
+      try {
+        await api.put('/users/me', { weekly_meeting_limit: weekly, monthly_meeting_limit: monthly, mentorship_paused: !acceptsRequests });
+      } catch {
+        setError(t('onboarding.error.availabilitySave'));
+        setStep(4);
+        return;
+      }
+      updateUser({ ...profile, weekly_meeting_limit: weekly, monthly_meeting_limit: monthly, mentorship_paused: !acceptsRequests });
       navigate(returnTo || '/');
     } catch (e) {
       setError(t(onboardingErrorKey(e)));
@@ -224,23 +234,23 @@ export default function Onboarding({ returnTo }) {
       <div>
         {/* Progress */}
         <div className="flex items-center gap-2 mb-8">
-          {[0, 1, 2, 3].map(s => (
+          {[0, 1, 2, 3, 4].map(s => (
             <React.Fragment key={s}>
               <div className={`flex items-center gap-1 shrink-0 ${step >= s ? 'text-foreground' : 'text-muted-foreground'}`}>
                 <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold border-2 ${step > s ? 'bg-primary border-primary text-white' : step === s ? 'border-primary text-foreground' : 'border-[var(--input)] text-muted-foreground'}`}>
                   {step > s ? <Check className="size-4" aria-hidden="true" /> : s + 1}
                 </div>
                 <span className="text-xs font-medium hidden md:block">
-                  {s === 0 ? t('onboarding.steps.import') : s === 1 ? t('onboarding.steps.background') : s === 2 ? t('onboarding.steps.teach') : t('onboarding.steps.learn')}
+                  {s === 0 ? t('onboarding.steps.import') : s === 1 ? t('onboarding.steps.background') : s === 2 ? t('onboarding.steps.teach') : s === 3 ? t('onboarding.steps.learn') : t('onboarding.steps.availability')}
                 </span>
               </div>
-              {s < 3 && <div className={`flex-1 min-w-4 h-0.5 ${step > s ? 'bg-primary' : 'bg-gray-200'}`} />}
+              {s < 4 && <div className={`flex-1 min-w-4 h-0.5 ${step > s ? 'bg-primary' : 'bg-[var(--border)]'}`} />}
             </React.Fragment>
           ))}
         </div>
 
         <div key={step} className="onboarding-step-content card p-6 space-y-6">
-          {draftId && <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="note">
+          {draftId && <p className="rounded-lg border border-[var(--border)] bg-[var(--status-waiting-bg)] text-[var(--status-waiting-fg)] px-3 py-2 text-sm" role="note">
             {t('onboarding.import.reviewNotice')}
           </p>}
           {step === 0 && (
@@ -343,7 +353,7 @@ export default function Onboarding({ returnTo }) {
                     <div key={i} className="onboarding-career-entry rounded-lg p-3 space-y-2">
                       <CareerEntryFields value={c} required={i === 0} descriptionLabel={t('onboarding.career.projects')} onChange={next => setCareer(current => current.map((entry, index) => index === i ? next : entry))} />
                       {career.length > 1 && (
-                        <button type="button" onClick={() => removeCareer(i)} className="text-xs text-red-400 hover:text-red-600">{t('onboarding.career.remove')}</button>
+                        <button type="button" onClick={() => removeCareer(i)} className="text-xs text-destructive hover:underline">{t('onboarding.career.remove')}</button>
                       )}
                     </div>
                   ))}
@@ -387,16 +397,38 @@ export default function Onboarding({ returnTo }) {
             </>
           )}
 
-          {error && <p className="text-red-600 text-sm">{error}</p>}
+          {/* STEP 4 */}
+          {step === 4 && (
+            <>
+              <div>
+                <h2 className="text-xl font-medium tracking-[-0.01em] text-foreground mb-1">{t('onboarding.availability.title')}</h2>
+                <p className="text-muted-foreground text-sm">{t('onboarding.availability.desc')}</p>
+              </div>
+              <label className="flex items-center gap-2 text-sm font-medium">
+                <input type="checkbox" checked={acceptsRequests} onChange={e => setAcceptsRequests(e.target.checked)} data-testid="onboarding-accepts-requests" />
+                <span>{t('onboarding.availability.accept')}</span>
+              </label>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="label block">{t('profile.availability.weekly')}
+                  <input type="number" min="1" max="50" className="input mt-1" disabled={!acceptsRequests} aria-label={t('profile.availability.weeklyLimit')} value={weeklyLimit} onChange={e => setWeeklyLimit(e.target.value)} />
+                </label>
+                <label className="label block">{t('profile.availability.monthly')}
+                  <input type="number" min="1" max="200" className="input mt-1" disabled={!acceptsRequests} aria-label={t('profile.availability.monthlyLimit')} value={monthlyLimit} onChange={e => setMonthlyLimit(e.target.value)} />
+                </label>
+              </div>
+            </>
+          )}
+
+          {error && <p className="text-destructive text-sm">{error}</p>}
 
           <div className="flex justify-between pt-2">
             {step > 0 ? (
-              <Button onClick={() => { setError(''); setStep(s => s - 1); }} variant="outline" disabled={saving || uploading}>{t('onboarding.nav.back')}</Button>
+              <Button onClick={() => { setError(''); setStep(s => s - 1); }} variant="outline" disabled={saving || uploading || !!savedProfile}>{t('onboarding.nav.back')}</Button>
             ) : <div />}
 
             {step === 0 ? (
               <Button onClick={() => { setError(''); setStep(1); }} disabled={uploading}>{t('onboarding.nav.skip')}</Button>
-            ) : step < 3 ? (
+            ) : step < 4 ? (
               <Button onClick={handleContinue}>
                 {t('onboarding.nav.continue')}
               </Button>

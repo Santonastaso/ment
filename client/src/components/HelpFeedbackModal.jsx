@@ -68,7 +68,7 @@ export default function HelpFeedbackModal({ onClose }) {
       >
         <div className="p-6 border-b border-[var(--border-subtle)]">
           <div className="flex items-center justify-between gap-3">
-            <h2 id="help-modal-title" className="text-lg font-semibold text-foreground">
+            <h2 id="help-modal-title" className="text-xl font-semibold text-foreground">
               {t('components.help.title')}
             </h2>
             <button
@@ -136,7 +136,7 @@ export default function HelpFeedbackModal({ onClose }) {
             <p className="mt-1 text-caption text-muted-foreground">{message.length}/2000</p>
           </div>
 
-          {error && <p className="text-sm text-rose-600">{error}</p>}
+          {error && <p className="text-sm text-destructive">{error}</p>}
         </div>
 
         <div className="p-5 border-t border-[var(--border-subtle)] flex justify-end gap-2">

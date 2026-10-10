@@ -72,6 +72,8 @@ test('invited member signs in, changes temporary password, imports CV, and finis
   await expect(page.getByRole('heading', { name: 'What you can teach' })).toBeVisible();
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByRole('heading', { name: 'What you want to learn' })).toBeVisible();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'When can people reach you?' })).toBeVisible();
   await page.getByRole('button', { name: 'Finish & see my matches' }).click();
   await expect(page).toHaveURL('http://127.0.0.1:3010/');
   expect(await page.evaluate(async () => {
@@ -164,6 +166,8 @@ test('CV import populates onboarding and can be saved', async ({ page }) => {
   })).toEqual(['cv', 'resume.pdf']);
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'When can people reach you?' })).toBeVisible();
   await page.getByRole('button', { name: 'Finish' }).click();
   await expect(page).toHaveURL('http://127.0.0.1:3010/');
   expect(await page.evaluate(() => window.fixture.calls.some(item => item.path === '/profile/ingest/1/accept'))).toBe(true);
@@ -334,6 +338,186 @@ test('Groups heading aligns with the sidebar toggle without an empty card', asyn
   await expect(page.locator('.group-list-card')).toHaveCount(0);
 });
 
+test('Groups, Explorer and Profile share one page frame', async ({ page }) => {
+  const headers = { '/groups': '.page-title-row', '/explorer': '.page-title-row', '/profile': '.page-title-row' };
+  const frames = {};
+  for (const [route, header] of Object.entries(headers)) {
+    await page.goto(route);
+    const frame = page.locator('.page-frame');
+    await expect(frame).toHaveCount(1);
+    await expect(frame).toBeVisible();
+    frames[route] = await frame.evaluate((element, headerSelector) => {
+      const style = getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      const headerRect = document.querySelector(headerSelector).getBoundingClientRect();
+      return {
+        left: rect.left, right: rect.right, top: rect.top,
+        headerTop: headerRect.top, headerHeight: headerRect.height,
+        border: `${style.borderTopWidth} ${style.borderTopStyle} ${style.borderTopColor}`,
+        radius: style.borderTopLeftRadius, background: style.backgroundColor,
+        // A frame holds dividers and spacing, never another filled panel.
+        panels: [...element.querySelectorAll('[data-slot="card"], section')].filter(panel => getComputedStyle(panel).backgroundColor !== 'rgba(0, 0, 0, 0)').length,
+      };
+    }, header);
+  }
+  const groups = frames['/groups'];
+  for (const frame of Object.values(frames)) {
+    expect(frame.left).toBeCloseTo(groups.left, 0);
+    expect(frame.right).toBeCloseTo(groups.right, 0);
+    expect(frame.headerTop).toBeCloseTo(groups.headerTop, 0);
+    expect(frame.headerHeight).toBeCloseTo(68, 0);
+    expect(frame.border).toBe('1px solid rgb(203, 199, 190)');
+    expect(frame.radius).toBe('24px');
+    expect(frame.background).toBe(groups.background);
+    expect(frame.panels).toBe(0);
+  }
+  // Both tabbed pages start their frame at the same height, under title and tabs.
+  expect(frames['/profile'].top).toBeCloseTo(groups.top, 0);
+});
+
+test('every page title sits on the same line', async ({ page }) => {
+  const titles = {
+    '/': '.discovery-page-title span',
+    '/conversations': '.conversation-list-heading h1',
+    '/groups': '.page-title-row h2',
+    '/explorer': '.page-title-row h1',
+    '/profile': '.page-title-row h1',
+  };
+  const measured = {};
+  for (const [route, selector] of Object.entries(titles)) {
+    await page.goto(route);
+    const title = page.locator(selector);
+    await expect(title).toBeVisible();
+    await waitForMotion(page);
+    measured[route] = await title.evaluate(element => {
+      const rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      return { left: rect.left, center: rect.top + rect.height / 2, size: style.fontSize, weight: style.fontWeight };
+    });
+  }
+  const reference = measured['/groups'];
+  for (const title of Object.values(measured)) {
+    expect(Math.abs(title.left - reference.left)).toBeLessThan(1);
+    expect(Math.abs(title.center - reference.center)).toBeLessThan(2);
+    expect(title.size).toBe('20px');
+    expect(title.weight).toBe(reference.weight);
+  }
+});
+
+test('Groups splits into My groups and Explore tabs', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => {
+    window.fixture.groups.push({ id: 7, name: 'Open Club', description: 'Anyone can ask to join', joined: false, is_owner: false, member_count: 4 });
+  });
+  await page.locator('.app-sidebar').getByRole('link', { name: 'Groups' }).click();
+  const rows = page.locator('main article.person-row');
+  await expect(page.getByRole('tab', { name: 'My groups', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(rows).toHaveCount(1);
+  await expect(rows).toContainText('Test Group');
+  await page.getByRole('tab', { name: 'Explore', exact: true }).click();
+  await expect(page).toHaveURL(/tab=explore/);
+  await expect(page.getByRole('tabpanel')).toHaveAttribute('aria-labelledby', 'groups-tab-explore');
+  await expect(rows).toHaveCount(1);
+  await expect(rows).toContainText('Open Club');
+  await expect(rows.getByRole('button', { name: 'Request to join' })).toBeVisible();
+  await expect(page.locator('.page-frame')).toHaveCount(1);
+  await page.getByRole('tab', { name: 'Explore', exact: true }).press('ArrowLeft');
+  await expect(page.getByRole('tab', { name: 'My groups', exact: true })).toBeFocused();
+  await expect(rows).toContainText('Test Group');
+});
+
+test('the top of a page stays put while its content scrolls', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 320 });
+  const pinned = { '/explorer': ['.page-title-row', '.directory-search-panel form', '.directory-filter', '.directory-pagination'], '/profile': ['.page-title-row', '.page-tabs'] };
+  for (const [route, selectors] of Object.entries(pinned)) {
+    await page.goto(route);
+    await expect(page.locator('.page-frame')).toBeVisible();
+    const tops = () => page.evaluate(list => list.map(selector => document.querySelector(selector).getBoundingClientRect().top), selectors);
+    const frameTop = () => page.locator('.page-frame').evaluate(element => element.getBoundingClientRect().top);
+    const [before, frameBefore] = [await tops(), await frameTop()];
+    await page.locator('main').evaluate(main => { main.scrollTop = 60; });
+    expect(await page.locator('main').evaluate(main => main.scrollTop)).toBeGreaterThan(0);
+    expect(await tops()).toEqual(before);
+    expect(await frameTop()).toBeLessThan(frameBefore);
+  }
+});
+
+test('buttons and fields on a page share one height', async ({ page }) => {
+  for (const route of ['/explorer', '/groups', '/profile', '/profile?tab=availability', '/profile?tab=experience']) {
+    await page.goto(route);
+    await expect(page.locator('.page-frame')).toBeVisible();
+    const heights = await page.locator('main').evaluate(main => [...main.querySelectorAll('[data-slot="button"], input.input')]
+      .filter(element => element.getBoundingClientRect().height > 0 && !element.closest('.page-tabs'))
+      .map(element => Math.round(element.getBoundingClientRect().height)));
+    expect(heights.length).toBeGreaterThan(0);
+    expect([...new Set(heights)], route).toEqual([40]);
+  }
+  // A link to someone's profile is a button like the action beside it.
+  await page.goto('/explorer');
+  const profile = page.locator('.directory-results .person-row-link').first();
+  const action = page.locator('.directory-results .person-row-actions > :last-child').first();
+  const look = locator => locator.evaluate(element => { const style = getComputedStyle(element); return [style.backgroundColor, style.borderTopColor, style.fontSize, style.fontWeight]; });
+  expect(await look(profile)).toEqual(await look(action));
+});
+
+test('Profile tabs are underline tabs in the header row', async ({ page }) => {
+  await page.goto('/profile');
+  const selected = page.getByRole('tab', { name: 'Overview', exact: true });
+  const other = page.getByRole('tab', { name: 'Skills', exact: true });
+  const look = tab => tab.evaluate(element => {
+    const style = getComputedStyle(element);
+    return { background: style.backgroundColor, radius: style.borderRadius, underline: style.boxShadow };
+  });
+  const [on, off] = [await look(selected), await look(other)];
+  expect(on.background).toBe('rgba(0, 0, 0, 0)');
+  expect(on.radius).toBe('0px');
+  expect(on.underline).toContain('0px -2px 0px 0px inset');
+  expect(on.underline).not.toBe(off.underline);
+  expect(off.underline).toContain('rgba(0, 0, 0, 0)');
+});
+
+test('quiet controls keep a visible edge and avatars share one style', async ({ page }) => {
+  const edge = locator => locator.evaluate(element => {
+    const style = getComputedStyle(element);
+    return `${style.borderTopWidth} ${style.borderTopStyle} ${style.borderTopColor}`;
+  });
+  const fill = locator => locator.evaluate(element => getComputedStyle(element).backgroundColor);
+  await page.goto('/explorer');
+  await expect(page.locator('.directory-pagination')).toBeVisible();
+  for (const control of [
+    page.getByRole('button', { name: 'Request a session' }).first(),
+    page.locator('.directory-filter').first(),
+    page.locator('.directory-search-panel input').first(),
+  ]) expect(await edge(control)).toBe('1px solid rgb(203, 199, 190)');
+  expect(await edge(page.getByRole('button', { name: 'Search', exact: true }))).toContain('rgba(0, 0, 0, 0)');
+  const avatar = await fill(page.locator('.person-row [data-slot="avatar-fallback"]').first());
+  expect(avatar).toBe('rgb(226, 223, 215)');
+  expect(await fill(page.locator('.app-sidebar [data-slot="avatar-fallback"]').first())).toBe(avatar);
+  await page.goto('/groups');
+  expect(await fill(page.locator('.group-row-mark').first())).toBe(avatar);
+  await page.goto('/profile');
+  expect(await fill(page.getByRole('tabpanel').locator('[data-slot="avatar-fallback"]').first())).toBe(avatar);
+});
+
+test('dates use one format with the year only outside the current one', async ({ page }) => {
+  await page.goto('/groups');
+  const labels = await page.evaluate(async () => {
+    const { formatDay, formatDayTime } = await import('/src/lib/utils.js');
+    const year = new Date().getFullYear();
+    return {
+      day: formatDay(new Date(year, 9, 13, 14, 5), 'en-US'),
+      dayTime: formatDayTime(new Date(year, 9, 13, 14, 5), 'en-US'),
+      otherYear: formatDayTime(new Date(year - 1, 0, 3, 9, 0), 'en-US'),
+      expectedOtherYear: `Jan 3, ${year - 1}, 09:00`,
+      invalid: formatDayTime('not a date', 'en-US'),
+    };
+  });
+  expect(labels.day).toBe('Oct 13');
+  expect(labels.dayTime).toBe('Oct 13, 14:05');
+  expect(labels.otherYear).toBe(labels.expectedOtherYear);
+  expect(labels.invalid).toBe('');
+});
+
 test('Explorer sticky panel controls share dimensions and use the interactive radius', async ({ page }) => {
   await page.goto('/explorer');
   await expect(page.locator('.directory-pagination')).toBeVisible();
@@ -352,13 +536,19 @@ test('Explorer sticky panel controls share dimensions and use the interactive ra
     expect(height).toBe(homeHeight);
     expect(radius).toBe('24px');
   }
-  const [homeBox, explorerBox, filterBox, clearBox] = await Promise.all([
-    home.boundingBox(), explorerLink.boundingBox(),
+  const messagesLink = page.locator('.app-sidebar').getByRole('link', { name: 'Messages' });
+  const [homeBox, explorerBox, messagesBox, searchRowBox, filterBox, clearBox] = await Promise.all([
+    home.boundingBox(), explorerLink.boundingBox(), messagesLink.boundingBox(),
+    page.locator('.directory-search-panel form').boundingBox(),
     page.locator('.directory-filter').first().boundingBox(),
     page.getByRole('button', { name: 'Clear filters' }).boundingBox(),
   ]);
-  expect(Math.abs(filterBox.y - homeBox.y)).toBeLessThan(2);
-  expect(Math.abs(clearBox.y + clearBox.height / 2 - explorerBox.y - explorerBox.height / 2)).toBeLessThan(2);
+  // Under the title the search row sits beside the first sidebar row; the
+  // filters follow with a clear gap, and the clear action right under them.
+  expect(Math.abs(searchRowBox.y - homeBox.y)).toBeLessThan(2);
+  expect(filterBox.y - (searchRowBox.y + searchRowBox.height)).toBeCloseTo(8, 0);
+  expect(clearBox.y - (filterBox.y + filterBox.height)).toBeLessThan(12);
+  expect(messagesBox.y).toBeGreaterThan(explorerBox.y);
   expect(clearBox.height).toBeLessThan(explorerBox.height);
   const languageFilter = page.getByRole('combobox', { name: 'Languages' });
   await expect(languageFilter).toHaveText('Languages');
@@ -381,7 +571,7 @@ test('Explorer sticky panel controls share dimensions and use the interactive ra
   expect(await option.evaluate(element => getComputedStyle(element).borderRadius)).toBe('999px');
   await page.keyboard.press('Escape');
   const [searchBox, brandBox] = await Promise.all([
-    page.locator('.directory-search-panel form').boundingBox(),
+    page.locator('.page-title-row h1').boundingBox(),
     page.locator('.app-sidebar button[title="Close sidebar"]').first().boundingBox(),
   ]);
   expect(Math.abs(searchBox.y + searchBox.height / 2 - brandBox.y - brandBox.height / 2)).toBeLessThan(3);
@@ -413,7 +603,7 @@ test('a proposed time is checked again before sending a request', async ({ page 
   await expect(dialog.getByText(/Pick one or more topics from .*strengths/)).toHaveCount(0);
   await dialog.getByRole('button', { name: 'Skip' }).click();
   await expect(dialog.getByText('2 / 4')).toBeVisible();
-  await expect(dialog.getByText('What is the one specific question you want to leave this session with an answer to?')).toBeVisible();
+  await expect(dialog.getByText('What would you like to talk about?')).toBeVisible();
   expect(await dialog.getByRole('textbox').evaluate(element => getComputedStyle(element).borderRadius)).toBe('24px');
   expect(await dialog.getByRole('button', { name: 'One-off conversation' }).evaluate(element => getComputedStyle(element).textAlign)).toBe('center');
   await dialog.getByRole('textbox').fill('How can I improve my project planning?');
@@ -438,7 +628,7 @@ test('a proposed time is checked again before sending a request', async ({ page 
 test('Quick reflection opens a card without shifting the profile and preserves drafts', async ({ page }) => {
   await page.goto('/profile');
   const [tabsBox, brandBox] = await Promise.all([
-    page.locator('.profile-tabs').boundingBox(),
+    page.locator('.page-title-row h1').boundingBox(),
     page.locator('.app-sidebar button[title="Close sidebar"]').first().boundingBox(),
   ]);
   expect(Math.abs(tabsBox.y + tabsBox.height / 2 - brandBox.y - brandBox.height / 2)).toBeLessThan(5);
@@ -468,11 +658,33 @@ test('Quick reflection opens a card without shifting the profile and preserves d
   expect(bounds.width).toBeLessThanOrEqual(390);
   await dialog.getByRole('button', { name: 'Save reflection', exact: true }).click();
   await expect(dialog).toBeHidden();
+  // Resizing preserves the open desktop sidebar; dismiss the mobile overlay.
+  await page.getByRole('button', { name: 'Close sidebar', exact: true }).first().click();
   await trigger.click();
   await expect(support).toHaveValue('');
   await page.screenshot({ path: test.info().outputPath('quick-reflection-card.png'), animations: 'disabled' });
   await dialog.press('Escape');
   await expect(dialog).toBeHidden();
+});
+
+test('Profile tabs support keyboard navigation and history', async ({ page }) => {
+  await page.goto('/profile');
+  const overview = page.getByRole('tab', { name: 'Overview', exact: true });
+  await expect(overview).toHaveAttribute('aria-selected', 'true');
+  await page.screenshot({ path: test.info().outputPath('profile-connected-desktop.png'), animations: 'disabled' });
+  await overview.focus();
+  await overview.press('ArrowRight');
+  await expect(page.getByRole('tab', { name: 'Skills', exact: true })).toBeFocused();
+  await expect(page).toHaveURL(/tab=skills/);
+  await page.getByRole('tab', { name: 'Skills', exact: true }).press('End');
+  await expect(page.getByTestId('profile-tab-reflections')).toBeFocused();
+  await expect(page.getByRole('tabpanel')).toHaveAttribute('aria-labelledby', 'profile-tab-reflections');
+  await page.goBack();
+  await expect(page.getByRole('tab', { name: 'Skills', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/profile?tab=reflections');
+  await expect(page.getByTestId('profile-tab-reflections')).toBeInViewport();
+  await page.screenshot({ path: test.info().outputPath('profile-connected-mobile.png'), animations: 'disabled' });
 });
 
 test('Profile skill filters share the navigation pill geometry', async ({ page }) => {
@@ -496,8 +708,9 @@ test('Profile skill filters share the navigation pill geometry', async ({ page }
   const [teaching, learning] = await skillPanels.all();
   expect(await teaching.locator('h3').evaluate(element => getComputedStyle(element).color)).toBe('rgb(32, 30, 27)');
   expect(await learning.locator('h3').evaluate(element => getComputedStyle(element).color)).toBe('rgb(32, 30, 27)');
-  expect(await teaching.evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgb(241, 241, 238)');
-  expect(await learning.evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgb(241, 241, 238)');
+  // Both sections belong to the shared Profile surface; only a divider separates them.
+  expect(await teaching.evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+  expect(await learning.evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
   await expect(page.locator('.profile-tab-content')).toHaveCSS('view-transition-name', 'none');
   expect(await page.locator('.profile-tab-content').evaluate(element => getComputedStyle(element).animationName)).toBe('none');
   for (const tab of ['overview', 'availability', 'experience', 'reflections', 'skills']) {
@@ -598,7 +811,7 @@ test('Explorer shows profile-shaped skeletons until directory results load', asy
 
 test('Explorer keeps existing rows steady while another page loads', async ({ page }) => {
   await page.goto('/');
-  await page.evaluate(() => { window.fixture.directoryTotal = 25; });
+  await page.evaluate(() => { window.fixture.directoryTotal = 75; });
   await page.locator('nav').getByRole('link', { name: 'Explorer' }).click();
   const rows = page.locator('.directory-results .person-row:not(.person-row-skeleton)');
   await expect(rows).toHaveCount(1);
@@ -717,8 +930,14 @@ test('onboarding to discovery, request, acceptance, chat and meeting', async ({ 
   await page.getByLabel('Department *').selectOption('Finance');
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'When can people reach you?' })).toBeVisible();
+  await page.getByLabel('Weekly meeting limit').fill('3');
   await page.getByRole('button', { name: 'Finish & see my matches' }).click();
   await expect(page).toHaveURL('http://127.0.0.1:3010/');
+  // The availability chosen during onboarding is saved with the profile.
+  expect(await page.evaluate(() => window.fixture.calls.some(call => call.method === 'put' && call.path === '/users/me'
+    && call.body?.weekly_meeting_limit === 3 && call.body?.mentorship_paused === false))).toBe(true);
   const composer = page.getByRole('textbox', { name: 'Describe who could help' });
   await composer.fill('finance');
   await composer.press('Enter');
@@ -727,6 +946,13 @@ test('onboarding to discovery, request, acceptance, chat and meeting', async ({ 
   await composer.press('Enter');
   await page.getByRole('button', { name: 'Choose Peer Mentor' }).click();
   await page.getByRole('textbox', { name: 'Suggested draft' }).fill('Please help me with financial modelling.');
+  // The invite has its own title on the card: suggested, editable and required.
+  const inviteTitle = page.locator('.discovery-draft').getByRole('textbox', { name: 'Request title' });
+  await expect(inviteTitle).not.toHaveValue('');
+  await expect(inviteTitle).not.toHaveValue('finance');
+  await inviteTitle.fill('');
+  await expect(page.getByRole('button', { name: 'Send request', exact: true })).toBeDisabled();
+  await inviteTitle.fill('Financial modelling basics');
   const draftBox = await page.locator('.discovery-draft').boundingBox();
   const sendBox = await page.getByRole('button', { name: 'Send request', exact: true }).boundingBox();
   const backBox = await page.getByRole('button', { name: 'Back to matches' }).boundingBox();
@@ -737,6 +963,7 @@ test('onboarding to discovery, request, acceptance, chat and meeting', async ({ 
   await expect(page.getByRole('combobox', { name: 'What kind of support?' })).toContainText('Ongoing support');
   await page.getByRole('button', { name: 'Send request', exact: true }).click();
   expect(await page.evaluate(() => window.fixture.calls.find(call => call.method === 'post' && call.path === '/sessions')?.body.follow_up_intent)).toBe('ongoing');
+  expect(await page.evaluate(() => window.fixture.calls.find(call => call.method === 'post' && call.path === '/sessions')?.body.title)).toBe('Financial modelling basics');
   await page.getByRole('link', { name: 'Open chat', exact: true }).click();
   await expect(page.getByText('Please help me with financial modelling.', { exact: true })).toBeVisible();
   await expect(page.locator('.conversation-header')).not.toContainText('Financial modelling');
@@ -781,6 +1008,10 @@ test('onboarding to discovery, request, acceptance, chat and meeting', async ({ 
   await dialog.getByRole('textbox').fill('Useful conversation');
   await dialog.getByRole('radio').nth(3).click();
   await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+  // Marking a meeting complete offers the check-in that updates skills.
+  await expect(dialog.getByText('Update your skills?')).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Start check-in' })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Not now' }).click();
   await expect(dialog).toBeHidden();
   await page.getByRole('button', { name: 'Edit', exact: true }).click();
   await expect(dialog.getByRole('textbox')).toHaveValue('Useful conversation');
@@ -902,15 +1133,22 @@ test('failed message history does not mark the chat read', async ({ page }) => {
   expect(await page.evaluate(() => window.fixture.calls.some(call => call.path === '/sessions/2/read'))).toBe(false);
 });
 
-test('all profile sections remain visible on a narrow screen', async ({ page }) => {
+test('all profile sections remain reachable in the narrow tab strip', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
   await page.evaluate(() => { window.fixture.capacity = { weekly_limit: 2, monthly_limit: 5, weekly_booked: 1, monthly_booked: 1 }; });
   await page.locator('.app-sidebar').getByRole('link', { name: 'My profile' }).click();
   const tabs = page.locator('.profile-tabs');
+  const stripTop = (await tabs.boundingBox()).y;
   for (const section of ['overview', 'skills', 'availability', 'experience', 'reflections']) {
-    await expect(tabs.getByTestId(`profile-tab-${section}`)).toBeInViewport();
+    const target = tabs.getByTestId(`profile-tab-${section}`);
+    await target.click();
+    await expect(target).toBeInViewport();
+    await expect(target).toHaveAttribute('aria-selected', 'true');
+    expect((await target.boundingBox()).y).toBeGreaterThanOrEqual(stripTop);
+    expect((await target.boundingBox()).y).toBeLessThan(stripTop + 20);
   }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await tabs.getByTestId('profile-tab-availability').click();
   const availabilityStatus = page.getByTestId('availability-status');
   const pause = page.getByTestId('toggle-availability');
@@ -1148,4 +1386,166 @@ test('a person shown again after a follow-up is marked as shown before', async (
   await composer.fill('someone with more experience');
   await composer.press('Enter');
   await expect(page.locator('.discovery-reveal .discovery-seen-badge')).toHaveText('Shown before');
+});
+
+test('a failed availability save keeps the user on onboarding until it succeeds', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => window.fixture.setUser({ ...window.fixture.user, onboarding_complete: false }));
+  await expect(page).toHaveURL(/\/onboarding$/);
+  await page.getByRole('button', { name: /^Skip/ }).click();
+  await page.getByRole('textbox', { name: 'Full name' }).fill('Viewer Student');
+  await page.getByRole('textbox', { name: 'Role title *' }).fill('Student');
+  await page.getByLabel('Department *').selectOption('Finance');
+  for (let step = 0; step < 3; step++) await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  const availability = page.getByRole('heading', { name: 'When can people reach you?' });
+  await expect(availability).toBeVisible();
+  await page.getByTestId('onboarding-accepts-requests').uncheck();
+  await page.evaluate(() => { window.fixture.failPut = '/users/me'; });
+  await page.getByRole('button', { name: 'Finish & see my matches' }).click();
+  // The failure is said aloud, nothing is shown as saved and nobody leaves the step.
+  await expect(page.getByText('Your profile is saved, but your availability could not be saved. Try again.')).toBeVisible();
+  await expect(page).toHaveURL(/\/onboarding$/);
+  await expect(availability).toBeVisible();
+  await expect(page.getByTestId('onboarding-accepts-requests')).not.toBeChecked();
+  // Trying again saves the choice without submitting the profile a second time.
+  await page.getByRole('button', { name: 'Finish & see my matches' }).click();
+  await expect(page).toHaveURL('http://127.0.0.1:3010/');
+  const calls = await page.evaluate(() => window.fixture.calls.filter(call => call.path === '/users/me/onboarding' || (call.method === 'put' && call.path === '/users/me')));
+  expect(calls.filter(call => call.path === '/users/me/onboarding')).toHaveLength(1);
+  const saves = calls.filter(call => call.method === 'put');
+  expect(saves).toHaveLength(2);
+  expect(saves.at(-1).body.mentorship_paused).toBe(true);
+});
+
+test('Explorer page size drives the request, the page count and the boundaries', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => { window.fixture.directoryCrowd = 230; });
+  await page.locator('.app-sidebar').getByRole('link', { name: 'Explorer' }).click();
+  const rows = page.locator('.directory-results .person-row:not(.person-row-skeleton)');
+  const pagination = page.locator('.directory-pagination');
+  const next = pagination.getByRole('button', { name: 'Next', exact: true });
+  const previous = pagination.getByRole('button', { name: 'Previous', exact: true });
+  const choose = async size => {
+    await page.getByRole('combobox', { name: 'Results per page' }).click();
+    await page.locator('.directory-filter-option:visible').filter({ hasText: `${size} per page` }).click();
+  };
+  const lastRequest = () => page.evaluate(() => window.fixture.calls.filter(call => call.path.startsWith('/directory?')).at(-1).path);
+
+  await expect(rows).toHaveCount(25);
+  await expect(pagination).toContainText('Showing 1–25 of 230');
+  await expect(pagination).toContainText('1/10');
+  await expect(previous).toBeDisabled();
+  await next.click();
+  await expect(pagination).toContainText('Showing 26–50 of 230');
+  await expect(page).toHaveURL(/page=2/);
+
+  // Changing the size goes back to the first page and recounts the pages.
+  await choose(100);
+  await expect(rows).toHaveCount(100);
+  await expect(page).toHaveURL(/size=100/);
+  await expect(page).not.toHaveURL(/page=/);
+  await expect(pagination).toContainText('Showing 1–100 of 230');
+  await expect(pagination).toContainText('1/3');
+  await next.click();
+  await expect(pagination).toContainText('Showing 101–200 of 230');
+  await next.click();
+  await expect(rows).toHaveCount(30);
+  await expect(pagination).toContainText('Showing 201–230 of 230');
+  expect(await lastRequest()).toContain('limit=100&offset=200');
+  await expect(next).toBeDisabled();
+  await expect(previous).toBeEnabled();
+  // The size survives moving between pages.
+  await previous.click();
+  await expect(page).toHaveURL(/size=100/);
+  await expect(pagination).toContainText('Showing 101–200 of 230');
+
+  await choose(50);
+  await expect(rows).toHaveCount(50);
+  await expect(pagination).toContainText('1/5');
+  await choose(25);
+  await expect(rows).toHaveCount(25);
+  await expect(page).not.toHaveURL(/size=/);
+
+  // A database that still caps pages at 50 is paged by 50, so nobody is skipped.
+  const callsBeforeCap = await page.evaluate(() => { window.fixture.directoryCap = 50; return window.fixture.calls.length; });
+  await choose(100);
+  await expect(rows).toHaveCount(50);
+  await expect(pagination).toContainText('Showing 1–50 of 230');
+  await expect(pagination).toContainText('1/5');
+  await next.click();
+  await expect(pagination).toContainText('Showing 51–100 of 230');
+  expect(await lastRequest()).toContain('limit=50&offset=50');
+  // Once the cap is known, no later page is first asked for at the wrong offset.
+  const cappedRequests = await page.evaluate(from => window.fixture.calls.slice(from).map(call => call.path).filter(path => path.startsWith('/directory?')), callsBeforeCap);
+  expect(cappedRequests.filter(path => path.includes('limit=100'))).toHaveLength(1);
+  expect(cappedRequests.some(path => path.includes('offset=100'))).toBe(false);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByRole('combobox', { name: 'Results per page' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+});
+
+test('older check-ins lead with two suggestions a side and keep the rest one tap away', async ({ page }) => {
+  await page.goto('/profile');
+  await page.evaluate(() => {
+    window.fixture.reflections = [
+      { id: 1, created_at: '2026-01-05T10:00:00Z', support_needed: 'Legacy leadership entry', managed_well: 'connect with new people', applied: false, classifier_source: 'mistral:fixture',
+        extracted_gaps: ['leadership', 'strategic_planning', 'team_cohesion', 'conflict_resolution', 'vision_articulation'],
+        extracted_strengths: ['social_skills', 'networking', 'adaptability', 'collaboration', 'empathy'] },
+      { id: 2, created_at: '2026-01-12T10:00:00Z', support_needed: 'Focused new entry', managed_well: '', applied: false, classifier_source: 'mistral:fixture',
+        extracted_gaps: ['public speaking'], extracted_strengths: [] },
+    ];
+  });
+  await page.getByTestId('profile-tab-reflections').click();
+  await page.getByRole('button', { name: /Legacy leadership entry/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Weekly check-in' });
+  await dialog.getByRole('button', { name: 'Review suggestions' }).click();
+  await expect(dialog.getByRole('checkbox')).toHaveCount(4);
+  await expect(dialog.getByRole('checkbox', { name: 'strategic planning' })).toBeChecked();
+  await expect(dialog.getByRole('button', { name: 'Add 4 to my skills' })).toBeVisible();
+  // Nothing was deleted: the other six are there, unticked, for whoever wants them.
+  await dialog.getByTestId('reflection-show-more').click();
+  await expect(dialog.getByRole('checkbox')).toHaveCount(10);
+  await expect(dialog.getByRole('checkbox', { checked: true })).toHaveCount(4);
+  await expect(dialog.getByRole('checkbox', { name: 'vision articulation' })).not.toBeChecked();
+  await dialog.getByRole('checkbox', { name: 'empathy' }).check();
+  await expect(dialog.getByRole('button', { name: 'Add 5 to my skills' })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Close' }).click();
+
+  await page.getByRole('button', { name: /Focused new entry/ }).click();
+  await dialog.getByRole('button', { name: 'Review suggestions' }).click();
+  await expect(dialog.getByRole('checkbox')).toHaveCount(1);
+  await expect(dialog.getByTestId('reflection-show-more')).toHaveCount(0);
+});
+
+test('removing a long skill keeps the popup footer usable on a phone', async ({ page }) => {
+  const skill = 'Cross-functional stakeholder management and executive communication';
+  await page.setViewportSize({ width: 360, height: 780 });
+  await page.goto('/');
+  await page.evaluate(name => {
+    window.fixture.profile = { ...window.fixture.user, career: [], skills: [{ id: 1, skill: name, type: 'wants_to_learn' }] };
+  }, skill);
+  await page.locator('.app-sidebar').getByRole('link', { name: 'My profile' }).click();
+  await page.getByTestId('profile-tab-skills').click();
+  await page.getByRole('button', { name: skill, exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toContainText(skill);
+  // The button says only "Remove"; the skill it removes is in its accessible name.
+  const remove = dialog.getByRole('button', { name: `Remove ${skill}` });
+  await expect(remove).toHaveText('Remove');
+  const done = dialog.getByRole('button', { name: 'Done', exact: true });
+  const [removeBox, doneBox, dialogBox] = await Promise.all([remove.boundingBox(), done.boundingBox(), dialog.boundingBox()]);
+  expect(removeBox.x + removeBox.width).toBeLessThanOrEqual(doneBox.x);
+  expect(doneBox.x + doneBox.width).toBeLessThanOrEqual(dialogBox.x + dialogBox.width);
+  expect(Math.abs(removeBox.y - doneBox.y)).toBeLessThan(2);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+});
+
+test('the landing page carries no unexplained folio labels', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => window.fixture.setUser(null));
+  await page.goto('/welcome');
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await expect(page.getByText(/MENT \/ 0\d/)).toHaveCount(0);
+  await expect(page.locator('.landing-hero-index, .landing-preview-folio')).toHaveCount(0);
 });

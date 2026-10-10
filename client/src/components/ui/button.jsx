@@ -4,11 +4,11 @@ import { forwardRef } from "react";
 
 import { cn } from "@/lib/utils"
 
-const quietButton = "bg-[var(--control-surface)] text-foreground hover:bg-[var(--control-surface-hover)] aria-expanded:bg-[var(--control-surface-hover)] aria-expanded:text-foreground";
-const primaryButton = "bg-primary text-primary-foreground hover:bg-[var(--primary-hover)]";
+const quietButton = "border-[var(--border)] bg-[var(--control-surface)] text-foreground hover:bg-[var(--control-surface-hover)] aria-expanded:bg-[var(--control-surface-hover)] aria-expanded:text-foreground";
+const primaryButton = "border-transparent bg-primary text-primary-foreground hover:bg-[var(--primary-hover)]";
 
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center rounded-[var(--control-radius)] border border-transparent bg-clip-padding text-sm font-semibold whitespace-nowrap transition-[background-color,border-color,color,box-shadow,opacity] duration-200 ease-out outline-none select-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/button inline-flex shrink-0 items-center justify-center rounded-[var(--control-radius)] border bg-clip-padding text-sm font-semibold whitespace-nowrap transition-[background-color,border-color,color,box-shadow,opacity] duration-200 ease-out outline-none select-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
@@ -18,20 +18,22 @@ const buttonVariants = cva(
         danger: `${quietButton} text-destructive hover:text-destructive`,
         secondary: primaryButton,
         destructive:
-          "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
-        link: "text-primary underline-offset-4 hover:underline",
+          "border-transparent bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
+        link: "border-transparent text-primary underline-offset-4 hover:underline",
       },
       // One radius (pill) and one three-step scale everywhere: sm for dense
       // tables, default 44px aligned to input height, lg for page-level CTAs.
       size: {
         default:
-          "h-11 gap-1.5 px-4 has-data-[icon=inline-end]:pr-3.5 has-data-[icon=inline-start]:pl-3.5",
-        xs: "h-7 gap-1 px-3 text-xs [&_svg:not([class*='size-'])]:size-3",
-        sm: "h-9 gap-1 px-4 text-sm [&_svg:not([class*='size-'])]:size-3.5",
-        lg: "h-12 gap-2 px-6 text-base has-data-[icon=inline-end]:pr-5 has-data-[icon=inline-start]:pl-5",
-        icon: "size-9",
-        "icon-xs": "size-6 [&_svg:not([class*='size-'])]:size-3",
-        "icon-sm": "size-8",
+          "h-10 gap-1.5 px-4 has-data-[icon=inline-end]:pr-3.5 has-data-[icon=inline-start]:pl-3.5",
+        // Controls on a page are 40px (default and sm); 32 (xs) is for dense rows
+        // and 44 (lg) for the one call to action on landing and sign-in screens.
+        xs: "h-8 gap-1 px-3 text-xs",
+        sm: "h-10 gap-1 px-4 text-sm",
+        lg: "h-11 gap-2 px-6 text-base has-data-[icon=inline-end]:pr-5 has-data-[icon=inline-start]:pl-5",
+        icon: "size-10",
+        "icon-xs": "size-8",
+        "icon-sm": "size-10",
         "icon-lg": "size-11",
       },
     },

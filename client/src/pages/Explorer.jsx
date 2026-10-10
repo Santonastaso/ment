@@ -3,6 +3,8 @@ import { Link, useSearchParams } from 'react-router-dom';
 import SessionRequestModal from '../components/SessionRequestModal.jsx';
 import DirectoryFilter from '../components/DirectoryFilter.jsx';
 import { PageShell } from '../components/PageShell.jsx';
+import { DEFAULT_PAGE_SIZE, PAGE_SIZES, pageSizeFrom, serverPageCap } from '../lib/directory.mjs';
+import PageHeader from '../components/PageHeader.jsx';
 import { Surface, SurfaceBody } from '../components/Surface.jsx';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,7 +15,6 @@ import { useT } from '../i18n/index.jsx';
 import { sessionPath } from '../lib/conversationLinks.mjs';
 import { languageOptions } from '../lib/languages.js';
 
-const PAGE_SIZE = 12;
 
 export default function Explorer() {
   const { t, lang } = useT();
@@ -29,13 +30,20 @@ export default function Explorer() {
   const languageKey = language.join(',');
   const sort = searchParams.get('sort') === 'name' ? 'name' : 'relevance';
   const page = Number.isSafeInteger(Number(searchParams.get('page'))) && Number(searchParams.get('page')) > 0 ? Number(searchParams.get('page')) : 1;
-  const requestKey = JSON.stringify([query, persona, program, cohort, location, language, sort, page]);
+  const pageSize = pageSizeFrom(searchParams.get('size'));
+  const requestKey = JSON.stringify([query, persona, program, cohort, location, language, sort, page, pageSize]);
 
   const [inputValue, setInputValue] = useState(query);
   const [dirError, setDirError] = useState(false);
   const [retry, setRetry] = useState(0);
   const [dirData, setDirData] = useState(null);
   const [dirLoading, setDirLoading] = useState(true);
+  // Offsets and page counts follow the size the server really pages by. That
+  // is the chosen size unless the server showed it serves less; the cap is
+  // kept apart from any one response, so a small page never limits a larger
+  // size chosen afterwards.
+  const [serverCap, setServerCap] = useState(null);
+  const size = serverCap ? Math.min(pageSize, serverCap) : pageSize;
   const [requestingMentor, setRequestingMentor] = useState(null);
 
   function updateParams(mutate) {
@@ -69,8 +77,8 @@ export default function Explorer() {
     setDirLoading(true);
     setDirError(false);
     const params = new URLSearchParams({
-      limit: String(PAGE_SIZE),
-      offset: String((page - 1) * PAGE_SIZE),
+      limit: String(size),
+      offset: String((page - 1) * size),
     });
     if (query) params.set('q', query);
     if (persona) params.set('persona', persona);
@@ -82,8 +90,12 @@ export default function Explorer() {
     api.get(`/directory?${params.toString()}`)
       .then(res => {
         if (cancelled) return;
+        // Served less than asked: these rows belong to a different paging, so
+        // remember the cap and let the request run again at that size.
+        const cap = serverPageCap(size, res.data);
+        if (cap) { setServerCap(cap); return; }
         setDirData({ ...res.data, requestKey });
-        const lastPage = Math.max(1, Math.ceil(res.data.total / PAGE_SIZE));
+        const lastPage = Math.max(1, Math.ceil(res.data.total / size));
         if (page > lastPage) setSearchParams(previous => {
           const next = new URLSearchParams(previous);
           if (lastPage === 1) next.delete('page'); else next.set('page', String(lastPage));
@@ -95,7 +107,7 @@ export default function Explorer() {
         if (!cancelled) setDirLoading(false);
       });
     return () => { cancelled = true; };
-  }, [query, persona, program, cohort, location, languageKey, sort, page, retry]);
+  }, [query, persona, program, cohort, location, languageKey, sort, page, size, retry]);
 
   function submitSearch(e) {
     e?.preventDefault();
@@ -107,21 +119,21 @@ export default function Explorer() {
 
   const facets = dirData?.facets || {};
   const total = dirData?.total ?? 0;
-  const from = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
-  const to = Math.min(page * PAGE_SIZE, total);
-  const pageCount = Math.max(Math.ceil(total / PAGE_SIZE), 1);
+  const from = total === 0 ? 0 : (page - 1) * size + 1;
+  const to = Math.min(page * size, total);
+  const pageCount = Math.max(Math.ceil(total / size), 1);
   const updatingResults = dirLoading || Boolean(dirData && dirData.requestKey !== requestKey);
   const languageChoices = languageOptions(facets.languages, lang);
   const hasActiveFilters = Boolean(query || persona || program || cohort || location || language.length || sort !== 'relevance');
 
   return (
-    <PageShell className="gap-6">
+    <PageShell className="gap-2">
+      <PageHeader title={t('explorer.title')} />
 
               <div className="directory-rail directory-search-panel grid min-w-0 gap-0.5">
-                  <h1 className="sr-only">{t('explorer.title')}</h1>
-                  <form onSubmit={submitSearch} className="mb-1 grid min-h-[var(--workspace-top-row)] w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-                    <Input aria-label={t('explorer.searchLabel')} placeholder={t('explorer.searchLabel')} value={inputValue} onChange={e => setInputValue(e.target.value)} />
-                    <Button type="submit">{t('explorer.searchButton')}</Button>
+                  <form onSubmit={submitSearch} className="mb-1.5 grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+                    <Input className="h-10 min-h-10" aria-label={t('explorer.searchLabel')} placeholder={t('explorer.searchLabel')} value={inputValue} onChange={e => setInputValue(e.target.value)} />
+                    <Button type="submit" size="sm">{t('explorer.searchButton')}</Button>
                   </form>
                 <div className="grid w-full min-w-0 grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-[repeat(4,minmax(0,1fr))_minmax(0,1.35fr)_minmax(0,1fr)]">
                   <DirectoryFilter label={t('explorer.filterPersona')} value={persona} onChange={value => setParam('persona', value)} options={[{ value: '', label: t('explorer.personaAny') }, { value: 'student', label: t('explorer.personaStudent') }, { value: 'alumnus', label: t('explorer.personaAlumnus') }]} />
@@ -138,15 +150,20 @@ export default function Explorer() {
                   <div className="directory-pagination mt-6 flex min-h-14 flex-wrap items-center justify-between gap-3 border-t border-border pt-4 text-sm" aria-hidden="true">
                     <Skeleton className="h-4 w-32" />
                     <div className="flex items-center gap-2">
-                      <Skeleton className="h-9 w-24 rounded-full" />
+                      <Skeleton className="h-10 w-24 rounded-full" />
                       <Skeleton className="h-4 w-8" />
-                      <Skeleton className="h-9 w-16 rounded-full" />
+                      <Skeleton className="h-10 w-16 rounded-full" />
                     </div>
                   </div>
                 ) : !dirError && total > 0 && (
                   <div className="directory-pagination mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4 text-sm text-muted-foreground">
                     {updatingResults ? <Skeleton className="h-4 w-28" /> : <span>{t('explorer.showing', { from, to, total })}</span>}
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="directory-page-size">
+                        <DirectoryFilter label={t('explorer.perPage')} value={String(pageSize)} disabled={updatingResults}
+                          onChange={value => setParam('size', Number(value) === DEFAULT_PAGE_SIZE ? '' : value)}
+                          options={PAGE_SIZES.map(count => ({ value: String(count), label: t('explorer.perPageOption', { count }) }))} />
+                      </div>
                       <Button type="button" size="sm" variant="outline" disabled={updatingResults || page <= 1} onClick={() => setParam('page', String(page - 1))}>
                         {t('explorer.prev')}
                       </Button>
@@ -161,7 +178,7 @@ export default function Explorer() {
 
               <div className="directory-results" data-loading={updatingResults && !!dirData} aria-busy={updatingResults} inert={updatingResults && !!dirData ? '' : undefined}>
               {updatingResults && !dirData ? (
-                <div className="directory-rail grid gap-1" role="status" aria-label={t('common.loading')}>
+                <div className="directory-rail page-frame page-frame-list grid" role="status" aria-label={t('common.loading')}>
                   {[1, 2, 3, 4, 5, 6].map(i => (
                     <article key={i} className="person-row person-row-skeleton" aria-hidden="true">
                       <Skeleton className="person-row-avatar size-10 rounded-full" />
@@ -172,12 +189,12 @@ export default function Explorer() {
                   ))}
                 </div>
               ) : dirError ? (
-                <Surface><SurfaceBody className="space-y-3" role="alert">
+                <Surface className="page-frame"><SurfaceBody className="space-y-3" role="alert">
                   <p role="alert">{t('explorer.directoryError')}</p>
                   <Button onClick={() => setRetry(n => n + 1)}>{t('explorer.retry')}</Button>
                 </SurfaceBody></Surface>
               ) : total === 0 ? (
-                <Surface>
+                <Surface className="page-frame">
                   <SurfaceBody className="py-12 text-center">
                     <p className="font-medium text-foreground">{t('explorer.directoryEmptyTitle')}</p>
                     <p className="mt-1 text-sm text-muted-foreground">{t('explorer.directoryEmptyBody')}</p>
@@ -185,7 +202,7 @@ export default function Explorer() {
                 </Surface>
               ) : (
                 <>
-                  <div className="directory-rail grid gap-1">
+                  <div className="directory-rail page-frame page-frame-list grid">
                     {dirData.people.map(person => (
                       <PersonCard key={person.id} person={person} onRequest={() => setRequestingMentor(person)} />
                     ))}
@@ -221,7 +238,7 @@ function PersonCard({ person, onRequest }) {
   return (
     <article className="person-row">
       <Avatar className="person-row-avatar size-10">
-        <AvatarFallback className="bg-accent text-sm font-semibold text-primary">{initials}</AvatarFallback>
+        <AvatarFallback>{initials}</AvatarFallback>
       </Avatar>
 
       <span className="person-row-identity">
@@ -238,7 +255,7 @@ function PersonCard({ person, onRequest }) {
       </span>
 
       <span className="person-row-actions">
-        <Link to={`/profile/${person.id}`} className="person-row-link">{t('explorer.viewProfile')}</Link>
+        <Button variant="ghost" size="sm" className="person-row-link" render={<Link to={`/profile/${person.id}`} />}>{t('explorer.viewProfile')}</Button>
         {person.session_id ? (
           <Button variant="ghost" size="sm" render={<Link to={sessionPath({ id: person.session_id, route_token: person.session_token })} />}>
             {t('explorer.openChat')}

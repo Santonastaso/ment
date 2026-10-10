@@ -77,7 +77,7 @@ export default function SkillTagInput({ value = [], onChange, placeholder, lang,
               className={tileLayout ? 'profile-skill-tile is-learning' : 'flex w-full items-center justify-between gap-3 rounded-full px-3 py-2 text-left hover:bg-[var(--control-surface)]'}
             >
               <span className={tileLayout ? 'min-w-0 text-sm font-medium text-foreground' : 'min-w-0 truncate text-sm font-medium text-foreground'}>{skill}</span>
-              {!tileLayout && <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />}
+              {!tileLayout && <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />}
             </button>
           ))}
         </div>
@@ -135,10 +135,12 @@ export default function SkillTagInput({ value = [], onChange, placeholder, lang,
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="text-destructive hover:text-destructive"
+                className="shrink-0 text-destructive hover:text-destructive"
+                aria-label={t('components.skillTag.remove', { skill: value[openIdx] })}
+                title={t('components.skillTag.remove', { skill: value[openIdx] })}
                 onClick={() => removeSkill(openIdx)}
               >
-                {t('components.skillTag.remove', { skill: value[openIdx] })}
+                {t('components.skillTag.removeShort')}
               </Button>
               <Button type="button" size="sm" className="ml-auto" onClick={() => setOpenIdx(null)}>
                 {t('components.popup.done')}

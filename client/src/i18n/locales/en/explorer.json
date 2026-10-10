@@ -30,6 +30,8 @@
   "explorer.allCohorts": "All years",
   "explorer.allLocations": "All locations",
   "explorer.showing": "Showing {from}–{to} of {total}",
+  "explorer.perPage": "Results per page",
+  "explorer.perPageOption": "{count} per page",
   "explorer.prev": "Previous",
   "explorer.next": "Next",
   "explorer.emptyChatTitle": "No one matched that search",

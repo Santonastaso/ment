@@ -100,7 +100,7 @@ export default function SignUp() {
         <CardHeader>
           <div className="flex items-center justify-between gap-3">
             <div>
-              <CardTitle className="text-lg font-medium">{t('auth.signup.title')}</CardTitle>
+              <CardTitle className="text-xl font-medium">{t('auth.signup.title')}</CardTitle>
               <CardDescription>
                 {t('auth.signup.description')}
               </CardDescription>

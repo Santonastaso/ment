@@ -1,4 +1,5 @@
 ﻿import React, { useEffect, useRef, useState } from 'react';
+import { formatDay } from '../lib/utils.js';
 import { Info, X } from 'lucide-react';
 import api from '../api/index.js';
 import { useT } from '../i18n/index.jsx';
@@ -167,15 +168,15 @@ export default function ReflectionLog({
         ? t('components.reflection.timeAgoWeekAgo', { count: weeks })
         : t('components.reflection.timeAgoWeeksAgo', { count: weeks });
     }
-    return normalized.toLocaleDateString(lang, { year: 'numeric', month: 'short', day: 'numeric' });
+    return formatDay(normalized, lang);
   }
 
   return (
     <div className="space-y-4">
-      <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="note">
+      <p className="rounded-lg border border-[var(--border)] bg-[var(--status-waiting-bg)] text-[var(--status-waiting-fg)] px-3 py-2 text-sm" role="note">
         {t('components.reflection.demo.notice')}
       </p>
-      {error && <p role="alert" className="text-rose-600 text-sm">{error}</p>}
+      {error && <p role="alert" className="text-destructive text-sm">{error}</p>}
       {toast && (
         <div className="border border-[var(--border)] text-foreground text-sm rounded-lg px-3 py-2 bg-muted/40">
           {toast}

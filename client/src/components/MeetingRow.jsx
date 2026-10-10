@@ -1,4 +1,5 @@
 ﻿import React, { useState } from 'react';
+import { formatChatClock, formatDay } from '../lib/utils.js';
 import { Link } from 'react-router-dom';
 import RatingPicker from './RatingPicker.jsx';
 import SessionRequestModal from './SessionRequestModal.jsx';
@@ -62,8 +63,8 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
   }
   const hasDate = !!session.scheduled_at;
   const date = hasDate ? new Date(session.scheduled_at) : null;
-  const dateLabel = hasDate ? date.toLocaleDateString(lang, { year: 'numeric', month: 'short', day: 'numeric' }) : null;
-  const timeLabel = hasDate ? date.toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' }) : '';
+  const dateLabel = hasDate ? formatDay(date, lang) : null;
+  const timeLabel = hasDate ? formatChatClock(date) : '';
   const relative = hasDate
     ? relativeMeetingTime(date, t, mode)
     : null;
@@ -74,8 +75,8 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
   let statusBadge = null;
   if (session.status === 'pending') {
     statusBadge = isMentor
-      ? { label: t('components.meeting.statusAwaitingYours'), className: 'bg-amber-100 text-amber-800 border border-amber-300' }
-      : { label: t('components.meeting.statusAwaitingTheirs'), className: 'bg-amber-50 text-amber-700 border border-amber-200' };
+      ? { label: t('components.meeting.statusAwaitingYours'), className: 'border border-[var(--border)] bg-[var(--status-waiting-bg)] text-[var(--status-waiting-fg)]' }
+      : { label: t('components.meeting.statusAwaitingTheirs'), className: 'border border-[var(--border)] bg-[var(--status-waiting-bg)] text-[var(--status-waiting-fg)]' };
   } else if (session.status === 'scheduled' && !hasDate) {
     statusBadge = { label: t('components.meeting.statusConfirmedNoDate'), className: 'bg-muted text-muted-foreground border border-[var(--border)]' };
   }
@@ -95,7 +96,7 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
         onClick={() => setExpanded(e => !e)}
         className="w-full text-left p-4 hover:bg-muted transition-colors flex items-start gap-3"
       >
-        <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-semibold flex-shrink-0">
+        <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center text-sm text-[var(--primary-hover)] font-semibold flex-shrink-0 shadow-[inset_0_0_0_1px_var(--border)]">
           {counterpart?.name?.charAt(0)}
         </div>
         <div className="flex-1 min-w-0 space-y-1">
@@ -125,7 +126,7 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
               </span>
             )}
             {awaitingMark && (
-              <span className="text-micro uppercase tracking-wide bg-amber-100 text-amber-800 rounded-full px-2 py-0.5">
+              <span className="text-micro uppercase tracking-wide bg-[var(--status-waiting-bg)] text-[var(--status-waiting-fg)] rounded-full px-2 py-0.5">
                 {t('components.meeting.awaitingMark')}
               </span>
             )}
@@ -313,7 +314,7 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
           {mode === 'past' && counterpart?.id && !counterpart?.deactivated_at && (
             <div className="pt-1 border-t border-[var(--border-subtle)]">
               {followupDone ? (
-                <p className="text-xs text-emerald-700 font-medium pt-2">{t('components.meeting.followUpSent')}</p>
+                <p className="text-xs text-[var(--status-scheduled-fg)] font-medium pt-2">{t('components.meeting.followUpSent')}</p>
               ) : (
                 <Button
                   onClick={openFollowup}

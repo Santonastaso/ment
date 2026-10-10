@@ -1,3 +1,4 @@
+import { formatDay } from '../../lib/utils.js';
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ArrowUp, ArrowUpRight, Check, Clock3, Pencil, RefreshCw, Search, Send, ThumbsDown, ThumbsUp, Trash2, X } from 'lucide-react';
@@ -39,7 +40,6 @@ const COPY = {
   },
 };
 
-const avatarTints = ['#fbeee6', '#eef0e7', '#e9eef7'];
 const pause = (ms) => new Promise(resolve => window.setTimeout(resolve, ms));
 const text = (copy, key, vars = {}) => copy[key].replace(/\{(\w+)\}/g, (_, name) => vars[name] ?? '');
 
@@ -91,11 +91,18 @@ function visibleTurns(storedTurns) {
   });
 }
 
+// A title for the invite: the expertise the person was matched on, else their
+// field, and only as a last resort the words that were searched.
+function suggestedTitle(match, query) {
+  const topic = String(match?.expertise?.[0] || match?.person?.department || query || '').trim();
+  return (topic.charAt(0).toUpperCase() + topic.slice(1)).slice(0, 120);
+}
+
 function MatchCard({ match, index, selected, onSelect, copy, style, profileHref, onViewProfile, seenBefore = false }) {
   const person = match.person;
   const jobTitle = person.job_title || person.current_role;
   const titleAt = jobTitle && person.current_company ? copy.roleAt.replace('{role}', jobTitle).replace('{company}', person.current_company) : jobTitle;
-  const role = [titleAt, person.department].filter(Boolean).join(' · ');
+  const role = [titleAt, person.department, person.location].filter(Boolean).join(' · ');
 
   // The subtitle already names the role and department, and the server falls
   // back to exactly those when it has no matched expertise — so drop anything
@@ -108,7 +115,7 @@ function MatchCard({ match, index, selected, onSelect, copy, style, profileHref,
 
   return (
     <article role="radio" aria-checked={selected} style={style} className={`person-row discovery-match-card ${selected ? 'is-selected' : ''}`}>
-      <span className="discovery-avatar person-row-avatar" style={{ backgroundColor: avatarTints[index % avatarTints.length] }}>
+      <span className="discovery-avatar person-row-avatar">
         {initials(person.name)}
         {selected && <span className="discovery-selected-mark"><Check /></span>}
       </span>
@@ -119,7 +126,7 @@ function MatchCard({ match, index, selected, onSelect, copy, style, profileHref,
       </span>
 
       <span className="person-row-actions">
-        <Link className="person-row-link" to={profileHref(person.id)}
+        <Button variant="ghost" size="sm" className="person-row-link" render={<Link to={profileHref(person.id)} />}
           onClick={(event) => {
             // A plain click stays in the app and remembers the chat; a
             // modifier click still opens the profile in a new tab.
@@ -127,7 +134,7 @@ function MatchCard({ match, index, selected, onSelect, copy, style, profileHref,
             event.preventDefault();
             onViewProfile(person.id);
           }}
-        >{copy.viewProfile}</Link>
+        >{copy.viewProfile}</Button>
         <Button variant={selected ? 'default' : 'ghost'} size="sm"
           type="button"
           aria-label={`${copy.choose} ${person.name}`}
@@ -164,6 +171,9 @@ export default function DiscoveryFlow() {
   const [selected, setSelected] = useState(null);
   const [draftVariant, setDraftVariant] = useState(0);
   const [draft, setDraft] = useState('');
+  // The invite's own title, shown and editable on the draft card. It starts
+  // from what the conversation would be about, not from the search text.
+  const [requestTitle, setRequestTitle] = useState('');
   const [requestIntent, setRequestIntent] = useState('one_off');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
@@ -309,7 +319,7 @@ export default function DiscoveryFlow() {
   async function choose(match) {
     const version = flowVersion.current;
     idempotencyKey.current = null;
-    setSelected(match); setDraftVariant(0);
+    setSelected(match); setDraftVariant(0); setRequestTitle(suggestedTitle(match, submittedQuery));
     setStage('drafting'); setError('');
     try {
       const { data } = await api.post('/discovery/draft', { query: submittedQuery, person_id: match.person.id, variant: 0, thread_id: threadId });
@@ -334,11 +344,11 @@ export default function DiscoveryFlow() {
   }
 
   async function sendRequest() {
-    if (!selected || !draft.trim() || sending) return;
+    if (!selected || !draft.trim() || !requestTitle.trim() || sending) return;
     setSending(true); setError('');
     try {
       idempotencyKey.current ||= crypto.randomUUID();
-      const response = await api.post('/sessions', { mentor_id: selected.person.id, title: submittedQuery.slice(0, 80), pre_session_question: submittedQuery, message: draft.trim(), duration_minutes: 60, follow_up_intent: requestIntent, idempotency_key: idempotencyKey.current });
+      const response = await api.post('/sessions', { mentor_id: selected.person.id, title: requestTitle.trim().slice(0, 120), pre_session_question: submittedQuery, message: draft.trim(), duration_minutes: 60, follow_up_intent: requestIntent, idempotency_key: idempotencyKey.current });
       setSessionId(response.data.id);
       setSentSessionToken(response.data.route_token || '');
       setStage('sent');
@@ -377,12 +387,12 @@ export default function DiscoveryFlow() {
         const sentSession = (sessions || []).find(session =>
           session.mentee_id === user?.id &&
           session.mentor_id === lastAssistant.person.id &&
-          ['pending', 'scheduled'].includes(session.status) &&
-          session.title === requestText(lastAssistant.search_request, lastUser.content).slice(0, 80),
+          ['pending', 'scheduled'].includes(session.status),
         );
         if (sentSession) {
           setSelected({ person: lastAssistant.person, expertise: lastAssistant.person.expertise || [], background: lastAssistant.person.background || '', reasons: lastAssistant.person.reasons || [] });
           setDraft(lastAssistant.content || '');
+          setRequestTitle(sentSession.title || '');
           setSubmittedQuery(requestText(lastAssistant.search_request, lastUser.content));
           setSessionId(sentSession.id);
           setThreadId(id);
@@ -407,6 +417,7 @@ export default function DiscoveryFlow() {
         const person = lastAssistant.person;
         setSelected({ person, expertise: person.expertise || [], background: person.background || '', reasons: person.reasons || [] });
         setDraft(lastAssistant.content || '');
+        setRequestTitle(suggestedTitle({ person, expertise: person.expertise || [] }, requestText(lastAssistant.search_request, lastUser.content)));
         setStage('reachout');
       }
     } catch {
@@ -433,7 +444,7 @@ export default function DiscoveryFlow() {
     flowVersion.current += 1;
     const currentThread = threadId;
     setConnectionCategory(null);
-    setStage('ask'); setQuery(''); setSubmittedQuery(''); setTurns([]); setMatches([]); setSelected(null); setDraft(''); setRequestIntent('one_off'); setSending(false); setError(''); setSessionId(null); setThreadId(null); setClarification(''); setNoMatchReason(''); setMatchFeedback(null); idempotencyKey.current = null;
+    setStage('ask'); setQuery(''); setSubmittedQuery(''); setTurns([]); setMatches([]); setSelected(null); setDraft(''); setRequestTitle(''); setRequestIntent('one_off'); setSending(false); setError(''); setSessionId(null); setThreadId(null); setClarification(''); setNoMatchReason(''); setMatchFeedback(null); idempotencyKey.current = null;
     if (currentThread) api.put(`/discovery/threads/${currentThread}`, { archived: true }).then(refreshHistory).catch(() => {});
   }
 
@@ -467,7 +478,7 @@ export default function DiscoveryFlow() {
     }
     return out;
   }, [turns]);
-  return <section className={`discovery-flow ${isConversation ? 'is-conversation' : ''}`} aria-label="Ment discovery"><div className="discovery-thread">
+  return <section className={`discovery-flow ${isConversation ? 'is-conversation' : ''}`} aria-label="Ment discovery">{stage === 'ask' && <div className="discovery-page-title" aria-hidden="true"><span>{t('nav.home')}</span></div>}<div className="discovery-thread">
     {stage === 'ask' && (
       <div className="discovery-ask-block">
         <h1 className="discovery-greeting-scene">{copy.greeting.replace('{name}', firstName)}</h1>
@@ -488,7 +499,7 @@ export default function DiscoveryFlow() {
                   <div className="discovery-history-list" aria-label={copy.recentSearches}>{history.map(item => {
                     const title = [...(item.turns || [])].reverse().find(turn => turn?.role === 'user')?.content || requestText(item.title);
                     const date = item.updated_at ? new Date(item.updated_at) : null;
-                    const dateLabel = date && !Number.isNaN(date.getTime()) ? date.toLocaleDateString(lang, { month: 'short', day: 'numeric' }) : '';
+                    const dateLabel = date && !Number.isNaN(date.getTime()) ? formatDay(date, lang) : '';
                     return <div className="discovery-history-row" key={item.id}>
                       <button type="button" className="discovery-history-open" onClick={() => resumeSearch(item.id)} aria-label={`${copy.resume}: ${title}`} title={title}>
                         <span className="discovery-history-date">{dateLabel}</span><span className="discovery-history-title">{title}</span><span className="discovery-history-arrow"><ArrowUpRight aria-hidden="true" /></span>
@@ -528,7 +539,7 @@ export default function DiscoveryFlow() {
                       const peer = session.mentor_id === user?.id ? session.mentee : session.mentor;
                       const href = session.route_token ? sessionPath(session) : `/conversations?filter=${connectionCategory}&session=${session.id}`;
                       return <Link key={session.id} className="discovery-connection-card" to={href} aria-label={`${copy.openChat}: ${peer?.name || ''}`}>
-                        <span className="discovery-avatar" style={{ backgroundColor: avatarTints[index % avatarTints.length] }} aria-hidden="true">{initials(peer?.name)}</span>
+                        <span className="discovery-avatar" aria-hidden="true">{initials(peer?.name)}</span>
                         <span><strong>{peer?.name}</strong><small>{requestText(session.title, t('conversations.requestTitle'))}</small></span>
                         <ArrowUpRight aria-hidden="true" />
                       </Link>;
@@ -581,7 +592,7 @@ export default function DiscoveryFlow() {
       <Link to={`/explorer?mode=directory&q=${encodeURIComponent(submittedQuery)}`} className="discovery-result-icon" aria-label={copy.browse} title={copy.browse}><Search /></Link>
       {matchFeedback !== null && <span className="sr-only" role="status">{copy.feedbackSaved}</span>}
     </div></div>}
-    {stage === 'empty' && <div className="discovery-empty"><Button type="button" variant="ghost" size="sm" onClick={reset}><RefreshCw size={15} aria-hidden="true" />{copy.retry}</Button></div>}
+    {stage === 'empty' && <div className="discovery-empty"><button type="button" className="quiet-link" onClick={reset}>{copy.retry}</button></div>}
     {(stage === 'reachout' || stage === 'sent') && selected && (
       <div className="discovery-reachout discovery-reveal">
         <div className="discovery-assistant-message">
@@ -589,7 +600,7 @@ export default function DiscoveryFlow() {
           <div className="discovery-message-body">
             <p>{copy.intro}</p>
             <div className="discovery-to-row">
-              <span className="discovery-avatar size-10" style={{ backgroundColor: avatarTints[0] }}>{initials(selected.person.name)}</span>
+              <span className="discovery-avatar size-10">{initials(selected.person.name)}</span>
               <span>
                 <span className="discovery-micro">{copy.to}</span>
                 <strong>{selected.person.name}</strong>
@@ -598,6 +609,10 @@ export default function DiscoveryFlow() {
             </div>
             <div className={`discovery-draft ${stage === 'sent' ? 'is-sent' : ''}`}>
               <span className="discovery-draft-tag">{copy.suggested}</span>
+              <label className="discovery-draft-title">
+                <span>{t('components.sessionRequest.requestTitle')}</span>
+                <input type="text" data-control-radius-exempt value={requestTitle} maxLength={120} onChange={event => setRequestTitle(event.target.value)} disabled={stage === 'sent' || sending} />
+              </label>
               <textarea value={draft} onChange={event => setDraft(event.target.value)} disabled={stage === 'sent' || sending} aria-label={copy.suggested} />
             </div>
             {stage === 'reachout' ? (
@@ -608,7 +623,7 @@ export default function DiscoveryFlow() {
                     <DirectoryFilter label={intentCopy.intent} value={requestIntent} onChange={setRequestIntent} disabled={sending} options={[{ value: 'one_off', label: intentCopy.oneOff }, { value: 'ongoing', label: intentCopy.ongoing }]} renderValue={requestIntent === 'ongoing' ? intentCopy.ongoing : intentCopy.oneOff} />
                   </div>
                   <Button type="button" variant="ghost" onClick={regenerate}><RefreshCw />{copy.regenerate}</Button>
-                  <Button type="button" onClick={sendRequest} disabled={sending || !draft.trim()}>{sending ? <RefreshCw className="animate-spin" /> : <Send />}{copy.send}</Button>
+                  <Button type="button" onClick={sendRequest} disabled={sending || !draft.trim() || !requestTitle.trim()}>{sending ? <RefreshCw className="animate-spin" /> : <Send />}{copy.send}</Button>
                 </div>
               </div>
             ) : (

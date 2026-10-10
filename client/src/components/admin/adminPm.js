@@ -1,3 +1,4 @@
+import { formatDayTime } from '../../lib/utils.js';
 // Fallback copy while the shared catalogs are updated by their owner.
 export const adminPmCopy = {
   'graph.filter.persona': 'Persona',
@@ -44,7 +45,5 @@ export function formatAdminDate(value, missing = '—', locale) {
   // Only timestamps without a timezone need the database's UTC suffix.
   const normalized = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(raw) && !/(Z|[+-]\d{2}(?::?\d{2})?)$/i.test(raw) ? `${raw}Z` : raw;
   const date = new Date(normalized);
-  return Number.isNaN(date.getTime()) ? missing : date.toLocaleString(locale, {
-    year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-  });
+  return formatDayTime(date, locale) || missing;
 }

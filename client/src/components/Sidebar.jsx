@@ -36,7 +36,7 @@ export default function Sidebar({ collapsed = false, onNavigate, onToggle }) {
           MENT
         </Link>
         {onToggle && <button type="button" onClick={onToggle} tabIndex={collapsed ? -1 : undefined} aria-hidden={collapsed} className={cn('sidebar-end-toggle absolute right-1 grid size-10 place-items-center rounded-full text-muted-foreground outline-none hover:bg-[var(--sidebar-accent)] hover:text-foreground focus-visible:ring-3 focus-visible:ring-[var(--sidebar-ring)]', collapsed && 'is-hidden')} aria-label="Close sidebar" title="Close sidebar">
-          <PanelLeft className="size-[22px]" strokeWidth={2.3} />
+          <PanelLeft className="size-5" strokeWidth={2.3} />
         </button>}
       </div>
 
