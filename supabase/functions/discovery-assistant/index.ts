@@ -534,19 +534,19 @@ async function classifyPlace(place: string): Promise<'real' | 'fictional' | 'not
 // exclusion: it says the place was ignored. It is searched as the earlier
 // request in that place, so the reply is about the place.
 const PLACE_NEGATION = /\b(not|aren'?t|isn'?t|none|nobody|no one|ne sont pas|n'est pas|n'y est|ne travaillent pas|aucun[e]?|personne n|non sono|non [eè]|nessuno)\b/iu;
-const COMPLAINT_FILLER = new Set(['not', 'none', 'nobody', 'one', 'pas', 'aucun', 'aucune', 'non', 'nessuno', 'them', 'they', 'are', 'actually',
-  'located', 'location', 'live', 'living', 'vivent', 'habitent', 'travaillent', 'lavorano', 'vivono', 'situés', 'situées', 'tous', 'toutes', 'tutti']);
 function placeComplaint(message: string, priorTurns: Array<Record<string, unknown>>) {
   const shownAt = priorTurns.findLastIndex((turn) => turn.role === 'assistant' && turn.kind === 'matches');
   if (shownAt < 0 || !PLACE_NEGATION.test(message)) return '';
   const lower = message.toLowerCase();
+  // Short, and not a change of subject: frustration may ride along ("...
+  // en chine, c'est nul"), a new request may not.
+  if (wordsOf(message).length > 12 || SWITCH_PATTERN.test(lower)) return '';
   const place = countryIn(message) || regionIn(message)
     || [...WORLD_CITIES, ...new Set(Object.values(REGION_CITIES).flat().map((city) => city.toLowerCase()))]
       .find((city) => new RegExp(`(^|[^\\p{L}])${escapeRegex(city)}([^\\p{L}]|$)`, 'u').test(lower)) || '';
   if (!place) return '';
   const placeWords = new Set(wordsOf(place));
-  const rest = contentWords(message).filter((word) => !placeWords.has(word) && !COMPLAINT_FILLER.has(word));
-  if (rest.length) return '';
+  if (lower.search(PLACE_NEGATION) > lower.indexOf(place)) return '';
   const asked = priorTurns.slice(0, shownAt).reverse().find((turn) => turn.role === 'user');
   const earlier = cleanText(asked?.content, 400) || cleanText(priorTurns[shownAt].search_request, 400);
   if (!earlier) return '';
@@ -793,7 +793,8 @@ Deno.serve(async (req) => {
       if (turn.role !== 'assistant' || turn.kind !== 'matches' || !Array.isArray(turn.matches)) continue;
       for (const match of turn.matches as Array<{ id?: string }>) if (match?.id) seenBefore.add(String(match.id));
     }
-    query = placeComplaint(spoken, priorTurns) || spoken;
+    const placePushback = placeComplaint(spoken, priorTurns);
+    query = placePushback || spoken;
     requestForMatch = query;
     recentReplies = priorTurns.filter((turn) => turn.role === 'assistant' && typeof turn.content === 'string' && turn.kind !== 'draft')
       .slice(-2).map((turn) => cleanText(turn.content, 600));
@@ -1110,7 +1111,9 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
       const detected = messageIntent(latestRaw, Boolean(lastShown), namesSomething);
       // Pushback stays pushback; any other follow-up naming a new subject is a
       // fresh search rather than a refinement of the old one.
-      const intent = detected === 'reject' ? 'reject' : topicShift && (detected === 'refine' || detected === 'more' || detected === '') ? '' : detected;
+      // Pushback about the place is the earlier request asked again, not a
+      // refinement of the people shown: refining kept them and dropped the place.
+      const intent = placePushback ? '' : detected === 'reject' ? 'reject' : topicShift && (detected === 'refine' || detected === 'more' || detected === '') ? '' : detected;
       if (intent === 'reject' && lastShown) {
         // "None of these have anything to do with construction": search again
         // without the people just shown -- for the subject named now if there

@@ -1009,3 +1009,21 @@ test('pronouns and auxiliaries are never searched as a subject', async () => {
   const result = await (await run(fixture, { action: 'chat', thread_id: 'thread', query: 'ils ne sont pas bien', lang: 'fr' })).json();
   assert.doesNotMatch(JSON.stringify(result), /travaille en ils|en ils sont/);
 });
+
+test('the reported China conversation stays about China', async () => {
+  const ops = { id: 'ops', name: 'Ops Person', job_title: 'Operations Manager', department: 'Operations', program: 'MBA', skills: ['operations strategy'], location: 'Paris' };
+  const first = withLocations(discoveryFixture({ candidates: [ops], responses: [clarify({ named_subject: 'operations', parts: { field: 'operations', department: 'Operations' } })] }), ['Paris']);
+  const asked = await (await run(first, { action: 'chat', query: "quelqu'un qui travail dans les operations en chine", lang: 'fr' })).json();
+  assert.equal(asked.matches.length, 0);
+  assert.match(asked.clarification, /^Je n'ai trouvé personne en Chine\./);
+
+  const turns = [
+    { role: 'user', content: "quelqu'un qui travail dans les operations en chine" },
+    { role: 'assistant', kind: 'matches', framed: true, content: 'Bonne nouvelle.', search_request: 'operations', department: 'Operations', location: '',
+      matches: [{ id: ops.id, name: ops.name, location: 'Paris' }] },
+  ];
+  const second = withLocations(discoveryFixture({ candidates: [ops], turns, responses: [clarify()] }), ['Paris']);
+  const pushed = await (await run(second, { action: 'chat', thread_id: 'thread', query: 'ils ne sont pas en chine grosse merde', lang: 'fr' })).json();
+  assert.match(pushed.clarification, /^Je n'ai trouvé personne en Chine\./);
+  assert.doesNotMatch(JSON.stringify(pushed), /ils sont|grosse|merde/);
+});
