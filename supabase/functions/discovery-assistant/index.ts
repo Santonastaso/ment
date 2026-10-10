@@ -3,6 +3,7 @@ import { recordAiRun } from '../_shared/ai-telemetry.ts';
 import { aiErrorResponse, mistralJson } from '../_shared/mistral.ts';
 import { enforceRateLimit } from '../_shared/rate-limit.ts';
 import { canHelpWithCareerGoal, hasGroundedExpertise } from '../_shared/discovery-guards.mjs';
+import { atPlace, countryIn, isCountry } from './places.ts';
 import { departmentChoices, frameChat, frameExhausted, frameNarrow, frameNoMatch, frameOpenAgain, frameRefineNone, frameSmallTalk, frameNudge, frameSamePeople, frameSomeRepeated, frameRejectedNone, framePrivacy, frameDirectory, framePerson, exploreChoice, frameWhichFirst, narrowChoices, ownWordsInvite, scopeChoices, type Choice, frameResults, namesARole, NO_GAP, type Gap, frameConflict, conflictChoices, frameScope, frameBroad } from './framing.ts';
 import { keepsFacts, repeats, sameOpening, VOICE_PROMPT, withoutRepeats } from './voice.ts';
 import { NO_PARTS, narrowStepwise, negatedWords, readParts, withoutExcluded, type Filter, type Parts } from './request.ts';
@@ -12,14 +13,14 @@ const PROMPT_VERSION = 'discovery-v25';
 // Written here rather than by the model, so the gap names the place the user
 // actually typed instead of drifting to a vaguer sentence about seniority.
 const LOCATION_GAP: Record<string, (place: string) => string> = {
-  English: (place) => `Nobody here is based in ${place}.`,
-  Italian: (place) => `Qui non c'e nessuno a ${place}.`,
-  French: (place) => `Personne ici n'est base a ${place}.`,
+  English: (place) => `Nobody here is based ${atPlace('English', place)}.`,
+  Italian: (place) => `Qui non c'è nessuno ${atPlace('Italian', place)}.`,
+  French: (place) => `Personne ici n'est basé ${atPlace('French', place)}.`,
 };
 const LOCATION_BUSY: Record<string, (place: string) => string> = {
-  English: (place) => `No one in ${place} is free to talk right now.`,
+  English: (place) => `No one ${atPlace('English', place)} is free to talk right now.`,
   Italian: (place) => `Nessuno a ${place} e disponibile in questo momento.`,
-  French: (place) => `Personne a ${place} n'est disponible en ce moment.`,
+  French: (place) => `Personne ${atPlace('French', place)} n'est disponible en ce moment.`,
 };
 
 type Candidate = {
@@ -163,9 +164,9 @@ function candidateForModel(candidate: Candidate, redactIdentity: boolean) {
 // network is strongest in turns "no" into something the user can act on, and
 // costs nothing: it is counted from the candidates already in hand.
 const STRENGTH_SENTENCE: Record<string, (list: string) => string> = {
-  English: (list) => ` Most people here work in ${list}.`,
-  Italian: (list) => ` Qui la maggior parte delle persone lavora in ${list}.`,
-  French: (list) => ` Ici, la plupart des gens travaillent en ${list}.`,
+  English: (list) => ` I can introduce you to people in ${list}, though.`,
+  Italian: (list) => ` Posso però presentarti persone in ${list}.`,
+  French: (list) => ` Je peux en revanche vous présenter des personnes en ${list}.`,
 };
 const STRENGTH_JOIN: Record<string, string> = { English: 'and', Italian: 'e', French: 'et' };
 
@@ -240,7 +241,9 @@ const LOOKUP_STOPWORDS = new Set(['someone', 'somebody', 'person', 'people', 'lo
   'cerco', 'cercando', 'qualcuno', 'persona', 'persone', 'posso', 'puoi', 'proposta', 'proposte', 'precisa',
   'preciso', 'specifica', 'specifico', 'qualche', 'altro', 'altra', 'une', 'des', 'pour', 'avec', 'que', 'pas',
   'suis', 'voudrais', 'veux', 'cherche', 'quelqu', 'personne', 'personnes', 'précise', 'précis', 'spécifique',
-  'peux', 'pouvez', 'aimerais', 'besoin', 'specific', 'compétence', 'compétences', 'métier', 'métiers', 'rôle', 'rôles']);
+  'peux', 'pouvez', 'aimerais', 'besoin', 'specific',
+  'ils', 'elles', 'sont', 'est', 'ont', 'ces', 'ceux', 'celles', 'mais', 'dans', 'chez', 'aux', 'les', 'leur', 'leurs',
+  'they', 'them', 'isn', 'aren', 'these', 'loro', 'essi', 'questi', 'queste', 'nel', 'nella', 'gli', 'stanno', 'basés', 'bases', 'basées', 'basati', 'compétence', 'compétences', 'métier', 'métiers', 'rôle', 'rôles']);
 const wordsOf = (value: string) => value.toLowerCase().split(/[^\p{L}\p{N}&]+/u).filter(Boolean);
 const contentWords = (value: string) => wordsOf(value).filter((word) => word.length >= 3 && !LOOKUP_STOPWORDS.has(word));
 
@@ -275,8 +278,8 @@ const ASK_SENTENCE: Record<string, (list: string) => string> = {
 
 const BROAD_SENTENCE: Record<string, (field: string) => string> = {
   English: (field) => `What in ${field} would help most \u2014 a specific skill, a type of role, or career advice?`,
-  Italian: (field) => `Cosa ti servirebbe di piu in ${field} \u2014 una competenza precisa, un tipo di ruolo o un consiglio di carriera?`,
-  French: (field) => `Qu'est-ce qui vous aiderait le plus en ${field} \u2014 une competence precise, un type de poste ou un conseil de carriere ?`,
+  Italian: (field) => `Cosa ti servirebbe di più in ${field} \u2014 una competenza precisa, un tipo di ruolo o un consiglio di carriera?`,
+  French: (field) => `Qu'est-ce qui vous aiderait le plus en ${field} \u2014 une compétence précise, un type de poste ou un conseil de carrière ?`,
 };
 
 // The funnel. A question is asked only while the answer so far narrows
@@ -296,17 +299,17 @@ function metaKind(text: string) {
 const FIELD_SENTENCE: Record<string, (list: string) => string> = {
   English: (list) => `Which field are you thinking of${list ? ` \u2014 for example ${list}` : ''}?`,
   Italian: (list) => `A quale settore stai pensando${list ? ` \u2014 per esempio ${list}` : ''}?`,
-  French: (list) => `A quel domaine pensez-vous${list ? ` \u2014 par exemple ${list}` : ''} ?`,
+  French: (list) => `À quel domaine pensez-vous${list ? ` \u2014 par exemple ${list}` : ''} ?`,
 };
 const SKILL_SENTENCE: Record<string, (field: string) => string> = {
   English: (field) => field ? `Which ${field} skill would you like help with?` : 'Which skill would you like help with?',
   Italian: (field) => field ? `Con quale competenza in ${field} ti serve aiuto?` : 'Con quale competenza ti serve aiuto?',
-  French: (field) => field ? `Sur quelle competence en ${field} aimeriez-vous de l'aide ?` : "Sur quelle competence aimeriez-vous de l'aide ?",
+  French: (field) => field ? `Sur quelle compétence en ${field} aimeriez-vous de l'aide ?` : "Sur quelle compétence aimeriez-vous de l'aide ?",
 };
 const ROLE_SENTENCE: Record<string, (field: string) => string> = {
   English: (field) => field ? `Which kind of ${field} role are you interested in?` : 'Which kind of role are you interested in?',
   Italian: (field) => field ? `Che tipo di ruolo in ${field} ti interessa?` : 'Che tipo di ruolo ti interessa?',
-  French: (field) => field ? `Quel type de poste en ${field} vous interesse ?` : 'Quel type de poste vous interesse ?',
+  French: (field) => field ? `Quel type de poste en ${field} vous intéresse ?` : 'Quel type de poste vous intéresse ?',
 };
 
 function departmentExamples(language: string, coverage: unknown) {
@@ -527,6 +530,29 @@ async function classifyPlace(place: string): Promise<'real' | 'fictional' | 'not
   }
 }
 
+// After results, "they are not in China" is not a new subject and not an
+// exclusion: it says the place was ignored. It is searched as the earlier
+// request in that place, so the reply is about the place.
+const PLACE_NEGATION = /\b(not|aren'?t|isn'?t|none|nobody|no one|ne sont pas|n'est pas|n'y est|ne travaillent pas|aucun[e]?|personne n|non sono|non [eè]|nessuno)\b/iu;
+const COMPLAINT_FILLER = new Set(['not', 'none', 'nobody', 'one', 'pas', 'aucun', 'aucune', 'non', 'nessuno', 'them', 'they', 'are', 'actually',
+  'located', 'location', 'live', 'living', 'vivent', 'habitent', 'travaillent', 'lavorano', 'vivono', 'situés', 'situées', 'tous', 'toutes', 'tutti']);
+function placeComplaint(message: string, priorTurns: Array<Record<string, unknown>>) {
+  const shownAt = priorTurns.findLastIndex((turn) => turn.role === 'assistant' && turn.kind === 'matches');
+  if (shownAt < 0 || !PLACE_NEGATION.test(message)) return '';
+  const lower = message.toLowerCase();
+  const place = countryIn(message) || regionIn(message)
+    || [...WORLD_CITIES, ...new Set(Object.values(REGION_CITIES).flat().map((city) => city.toLowerCase()))]
+      .find((city) => new RegExp(`(^|[^\\p{L}])${escapeRegex(city)}([^\\p{L}]|$)`, 'u').test(lower)) || '';
+  if (!place) return '';
+  const placeWords = new Set(wordsOf(place));
+  const rest = contentWords(message).filter((word) => !placeWords.has(word) && !COMPLAINT_FILLER.has(word));
+  if (rest.length) return '';
+  const asked = priorTurns.slice(0, shownAt).reverse().find((turn) => turn.role === 'user');
+  const earlier = cleanText(asked?.content, 400) || cleanText(priorTurns[shownAt].search_request, 400);
+  if (!earlier) return '';
+  return wordsOf(earlier).some((word) => placeWords.has(word)) ? earlier : `${earlier} (${place})`;
+}
+
 // "Anywhere" lets go of a place given earlier in the conversation.
 const ANYWHERE = /\b(anywhere|any (city|location|place)|ovunque|qualsiasi citt[aà]|n'importe o[uù]|partout)\b/i;
 
@@ -689,7 +715,9 @@ Deno.serve(async (req) => {
   } catch {
     return jsonError('rate_limit_unavailable', 503);
   }
-  const query = cleanText(body.query);
+  // What the user typed, kept for the thread; `query` is what gets searched.
+  const spoken = cleanText(body.query);
+  let query = spoken;
   let requestForMatch = query;
   let nearestOnly = false;
   let nearestTerms: string[] = [];
@@ -765,6 +793,8 @@ Deno.serve(async (req) => {
       if (turn.role !== 'assistant' || turn.kind !== 'matches' || !Array.isArray(turn.matches)) continue;
       for (const match of turn.matches as Array<{ id?: string }>) if (match?.id) seenBefore.add(String(match.id));
     }
+    query = placeComplaint(spoken, priorTurns) || spoken;
+    requestForMatch = query;
     recentReplies = priorTurns.filter((turn) => turn.role === 'assistant' && typeof turn.content === 'string' && turn.kind !== 'draft')
       .slice(-2).map((turn) => cleanText(turn.content, 600));
     const conversation = conversationFromTurns(priorTurns, query)
@@ -891,6 +921,7 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
         knownLocations.some((known) => known.toLowerCase() === value.toLowerCase())
         || placeCities(value, knownLocations).length > 0
         || WORLD_CITIES.has(value.toLowerCase())
+        || isCountry(value)
         || capitalised(value));
       // A place counts when this message names it, or when it answers one of
       // our questions; otherwise a city from an earlier search would make
@@ -900,11 +931,11 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
       // A well-known fictional place is recognised in any case ("wakanda").
       const fictionalNamed = fictionalPlaceIn(latestOriginal);
       const extractedPlace = ANYWHERE.test(latestOriginal) ? ''
-        : fictionalNamed || (placeHere(extractedLocation) && !isVocabulary && plausiblePlace(extractedLocation) ? extractedLocation : '') || regionIn(latestOriginal);
+        : fictionalNamed || (placeHere(extractedLocation) && !isVocabulary && plausiblePlace(extractedLocation) ? extractedLocation : '') || regionIn(latestOriginal) || countryIn(latestOriginal);
       // Any other place we cannot vouch for gets one direct question. Asked as
       // a field among many, the model let "Gotham city" through as real; asked
       // on its own, it answers reliably.
-      const vouched = (place: string) => WORLD_CITIES.has(place.toLowerCase()) || Boolean(regionIn(place))
+      const vouched = (place: string) => WORLD_CITIES.has(place.toLowerCase()) || isCountry(place) || Boolean(regionIn(place))
         || knownLocations.some((known) => known.toLowerCase().includes(place.toLowerCase()) || place.toLowerCase().includes(known.toLowerCase()));
       const placeKind = fictionalNamed ? 'fictional' : extractedPlace && !vouched(extractedPlace) ? await classifyPlace(extractedPlace) : 'real';
       const namedLocation = placeKind === 'not_a_place' ? '' : extractedPlace;
@@ -1072,7 +1103,7 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
       if (asksPrivate || asksEveryone || (personName && !meaningfulLatest.length)) {
         const reply = asksPrivate ? framePrivacy(language, personName) : asksEveryone ? frameDirectory(language) : framePerson(language, personName);
         const choices = [exploreChoice(language, personName), ...departmentChoices(language, preferredDepartments(departments)).slice(0, 3)];
-        const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'chat', content: reply, suggestions: choices });
+        const threadId = await persistTurns(ctx, body.thread_id, spoken, { kind: 'chat', content: reply, suggestions: choices });
         return answer({ matches: [], clarification: reply, suggestions: choices, thread_id: threadId });
       }
       const namesSomething = meaningfulLatest.length > 0 || namesPlace;
@@ -1103,7 +1134,7 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
           ? await smallTalkReply(language, latestRaw)
           : await voiced(language, frameChat(language, intent, departmentExamples(language, coverage)), latestOriginal, recentReplies);
         const choices = intent === 'greeting' || intent === 'smalltalk' ? departmentChoices(language, preferredDepartments(departments)) : [];
-        const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'chat', content: reply, suggestions: choices });
+        const threadId = await persistTurns(ctx, body.thread_id, spoken, { kind: 'chat', content: reply, suggestions: choices });
         return answer({ matches: [], clarification: reply, suggestions: choices, thread_id: threadId });
       }
       const answeringNarrow = answering && previous?.stage === 'narrow';
@@ -1225,7 +1256,7 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
             : step.stage === 'narrow' ? narrowChoices(language, shownLocations(lastShown)) : [];
         step.suggestions = choices;
         const question = await voiced(language, choices.length ? `${step.question} ${ownWordsInvite(language)}` : step.question, latestOriginal, recentReplies);
-        const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'clarification', content: question, stage: step.stage, department: step.department || '', suggestions: choices });
+        const threadId = await persistTurns(ctx, body.thread_id, spoken, { kind: 'clarification', content: question, stage: step.stage, department: step.department || '', suggestions: choices });
         return answer({ matches: [], clarification: question, suggestions: choices, thread_id: threadId });
       }
       // A fresh request, with no question asked yet, may be scoped once the
@@ -1300,7 +1331,7 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
         model: result.model,
         latencyMs: result.latencyMs,
       });
-      const threadId = await persistTurns(ctx, body.thread_id, query, {
+      const threadId = await persistTurns(ctx, body.thread_id, spoken, {
         kind: 'draft',
         content: draft,
         search_request: query,
@@ -1375,12 +1406,12 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
     // Nobody is available at all, so asking for more detail would not help.
     if (refineFallback.length) {
       const message = await voiced(language, frameRefineNone(language), query, recentReplies);
-      const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'matches', content: message, framed: true, search_request: requestForMatch, matches: refineFallback, nearest: true });
+      const threadId = await persistTurns(ctx, body.thread_id, spoken, { kind: 'matches', content: message, framed: true, search_request: requestForMatch, matches: refineFallback, nearest: true });
       return answer({ matches: refineFallback, clarification: '', nearest: true, message, no_match_reason: message, resolved_request: requestForMatch, thread_id: threadId });
     }
     const reason = await voiced(language, followUp === 'reject' ? frameRejectedNone(language, rejectedSubject)
       : followUp === 'more' ? frameExhausted(language) : EMPTY_POOL_MESSAGES[language], query, recentReplies);
-    const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'no_match', content: reason, search_request: requestForMatch });
+    const threadId = await persistTurns(ctx, body.thread_id, spoken, { kind: 'no_match', content: reason, search_request: requestForMatch });
     return answer({ matches: [], clarification: '', no_match: true, no_match_reason: reason, resolved_request: requestForMatch, thread_id: threadId });
   }
   // Scope before answering. If the only honest answer is "nothing exact, but
@@ -1413,7 +1444,7 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
         : null;
     if (scope) {
       const question = await voiced(language, `${scope.question} ${ownWordsInvite(language)}`, query, recentReplies);
-      const threadId = await persistTurns(ctx, body.thread_id, query, {
+      const threadId = await persistTurns(ctx, body.thread_id, spoken, {
         kind: 'clarification', content: question, stage: 'scope', suggestions: scope.choices,
         // What "show me the closest" will run, and the scope an answer keeps.
         department: requiredDepartment, company: companyFilter, location: namedLocationFilter,
@@ -1542,7 +1573,7 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
       : [];
     if (!matches.length && !fallback.length && !typedCarriers.length && refineFallback.length) {
       const message = await voiced(language, frameRefineNone(language), query, recentReplies);
-      const threadId = await persistTurns(ctx, body.thread_id, query, {
+      const threadId = await persistTurns(ctx, body.thread_id, spoken, {
         kind: 'matches', content: message, framed: true, search_request: requestForMatch,
         matches: refineFallback, nearest: true, department: requiredDepartment,
         location: locationFilterApplied ? namedLocationFilter : '',
@@ -1556,7 +1587,7 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
       const shownGap = describedGap(gapState, subjectLabel);
       const reason = await voiced(language, followUp === 'reject' ? frameRejectedNone(language, rejectedSubject)
         : followUp === 'more' ? frameExhausted(language) : frameNoMatch(language, shownGap, topDepartments(networkCandidates.filter((candidate) => candidate.department !== requiredDepartment))), query, recentReplies);
-      const threadId = await persistTurns(ctx, body.thread_id, query, { kind: 'no_match', content: reason, search_request: requestForMatch });
+      const threadId = await persistTurns(ctx, body.thread_id, spoken, { kind: 'no_match', content: reason, search_request: requestForMatch });
       return answer({ matches: [], clarification: '', no_match: true, no_match_reason: reason, resolved_request: requestForMatch, thread_id: threadId, model: result.model });
     }
     // A near result is still a result: the people render as cards, under the
@@ -1578,7 +1609,7 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
         ? { first: String(shown[0].name).split(/\s+/)[0], title: String(shown[0].job_title) } : undefined });
     const message = await voiced(language, repeated && repeated === shown.length ? frameSamePeople(language, shown.length)
       : repeated ? `${framed} ${frameSomeRepeated(language, shown.length - repeated)}` : framed, query, recentReplies);
-    const threadId = await persistTurns(ctx, body.thread_id, query, {
+    const threadId = await persistTurns(ctx, body.thread_id, spoken, {
       kind: 'matches',
       content: message,
       framed: true,

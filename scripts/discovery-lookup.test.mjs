@@ -323,7 +323,7 @@ test('the greeting offers the same starting choices', async () => {
 test('a category answer in Italian or French asks "which one" instead of searching', async () => {
   const turns = [{ role: 'user', content: 'Mi interessa marketing' }, { role: 'assistant', kind: 'clarification', content: 'Cosa ti servirebbe di piu in marketing?', stage: 'department', department: 'Marketing' }];
   const marketing = { ...finance, id: 'mkt', department: 'Marketing', job_title: 'SEO & Content Lead', skills: ['content strategy'] };
-  for (const [lang, reply, expected] of [['it', 'una competenza precisa', /Con quale competenza in marketing/], ['fr', 'une compétence précise', /Sur quelle competence en marketing/]]) {
+  for (const [lang, reply, expected] of [['it', 'una competenza precisa', /Con quale competenza in marketing/], ['fr', 'une compétence précise', /Sur quelle compétence en marketing/]]) {
     const fixture = discoveryFixture({ candidates: [marketing], turns, responses: [clarify()] });
     const result = await (await run(fixture, { action: 'chat', thread_id: 'thread', query: reply, lang })).json();
     assert.match(result.clarification, expected);
@@ -970,4 +970,42 @@ test('an unknown real town is never called fictional', async () => {
   const fixture = askedAbout('real')(withLocations(discoveryFixture({ candidates: financePeople, responses: [clarify({ named_subject: 'finance', named_location: 'Bordeaux' })] }), ['Paris', 'Milan']));
   const result = await chat(fixture, 'someone in finance in Bordeaux');
   assert.match(result.clarification, /^I couldn't find anyone based in Bordeaux\./);
+});
+
+test('a country typed in lower case is still a place', async () => {
+  for (const [query, named] of [["je cherche quelqu'un en finance en chine", 'chine'], ["je cherche quelqu'un en finance en chine", '']]) {
+    const fixture = withLocations(discoveryFixture({ candidates: [finance], responses: [
+      clarify({ named_subject: 'finance', named_location: named }),
+    ] }), ['Paris']);
+    const result = await (await run(fixture, { action: 'chat', query, lang: 'fr' })).json();
+    assert.equal(result.matches.length, 0, 'nobody elsewhere is offered as if they were there');
+    assert.match(result.clarification, /^Je n'ai trouvé personne en Chine\. Paris vous conviendrait, ou n'importe où \?/);
+    assert.equal(result.understood.location, 'chine');
+  }
+});
+
+test('"they are not in China" after results asks about the place again', async () => {
+  const turns = [
+    { role: 'user', content: "je cherche quelqu'un en finance en chine" },
+    { role: 'assistant', kind: 'matches', framed: true, content: 'Bonne nouvelle.', search_request: 'finance en chine', department: '', location: '',
+      matches: [{ id: finance.id, name: finance.name, location: 'Paris' }] },
+  ];
+  const fixture = withLocations(discoveryFixture({ candidates: [finance], turns, responses: [clarify({ named_location: 'chine' })] }), ['Paris']);
+  const result = await (await run(fixture, { action: 'chat', thread_id: 'thread', query: 'ils ne sont pas en chine', lang: 'fr' })).json();
+  assert.match(result.clarification, /^Je n'ai trouvé personne en Chine\./);
+  assert.doesNotMatch(JSON.stringify(result), /ils sont|la plupart des gens/);
+  assert.deepEqual(result.understood.exclude, []);
+  // The thread keeps what the user actually typed.
+  assert.equal(fixture.thread.turns.at(-2).content, 'ils ne sont pas en chine');
+});
+
+test('pronouns and auxiliaries are never searched as a subject', async () => {
+  const turns = [
+    { role: 'user', content: 'finance' },
+    { role: 'assistant', kind: 'matches', framed: true, content: 'Bonne nouvelle.', search_request: 'finance', department: 'Finance', location: '',
+      matches: [{ id: finance.id, name: finance.name, location: 'Paris' }] },
+  ];
+  const fixture = discoveryFixture({ candidates: [finance], turns, responses: [clarify(), { outcome: 'no_match', matches: [] }] });
+  const result = await (await run(fixture, { action: 'chat', thread_id: 'thread', query: 'ils ne sont pas bien', lang: 'fr' })).json();
+  assert.doesNotMatch(JSON.stringify(result), /travaille en ils|en ils sont/);
 });
