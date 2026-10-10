@@ -583,7 +583,7 @@ export default function Profile() {
           <div className="profile-identity-row flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
               <Avatar className="size-12">
-                <AvatarFallback className="bg-primary text-sm font-semibold text-primary-foreground">
+                <AvatarFallback className="text-base">
                   {profile.name?.charAt(0)}
                 </AvatarFallback>
               </Avatar>

@@ -334,6 +334,102 @@ test('Groups heading aligns with the sidebar toggle without an empty card', asyn
   await expect(page.locator('.group-list-card')).toHaveCount(0);
 });
 
+test('Groups, Explorer and Profile share one page frame', async ({ page }) => {
+  const headers = { '/groups': 'main header', '/explorer': '.directory-search-panel form', '/profile': '.profile-tabs' };
+  const frames = {};
+  for (const [route, header] of Object.entries(headers)) {
+    await page.goto(route);
+    const frame = page.locator('.page-frame');
+    await expect(frame).toHaveCount(1);
+    await expect(frame).toBeVisible();
+    frames[route] = await frame.evaluate((element, headerSelector) => {
+      const style = getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      const headerRect = document.querySelector(headerSelector).getBoundingClientRect();
+      return {
+        left: rect.left, right: rect.right, top: rect.top,
+        headerTop: headerRect.top, headerHeight: headerRect.height,
+        border: `${style.borderTopWidth} ${style.borderTopStyle} ${style.borderTopColor}`,
+        radius: style.borderTopLeftRadius, background: style.backgroundColor,
+        // A frame holds dividers and spacing, never another filled panel.
+        panels: [...element.querySelectorAll('[data-slot="card"], section')].filter(panel => getComputedStyle(panel).backgroundColor !== 'rgba(0, 0, 0, 0)').length,
+      };
+    }, header);
+  }
+  const groups = frames['/groups'];
+  for (const frame of Object.values(frames)) {
+    expect(frame.left).toBeCloseTo(groups.left, 0);
+    expect(frame.right).toBeCloseTo(groups.right, 0);
+    expect(frame.headerTop).toBeCloseTo(groups.headerTop, 0);
+    expect(frame.headerHeight).toBeCloseTo(68, 0);
+    expect(frame.border).toBe('1px solid rgb(203, 199, 190)');
+    expect(frame.radius).toBe('24px');
+    expect(frame.background).toBe(groups.background);
+    expect(frame.panels).toBe(0);
+  }
+  // Where nothing sits between them, the frame starts right under the header row.
+  expect(groups.top).toBeCloseTo(groups.headerTop + groups.headerHeight, 0);
+  expect(frames['/profile'].top).toBeCloseTo(groups.top, 0);
+});
+
+test('Profile tabs are underline tabs in the header row', async ({ page }) => {
+  await page.goto('/profile');
+  const selected = page.getByRole('tab', { name: 'Overview', exact: true });
+  const other = page.getByRole('tab', { name: 'Skills', exact: true });
+  const look = tab => tab.evaluate(element => {
+    const style = getComputedStyle(element);
+    return { background: style.backgroundColor, radius: style.borderRadius, underline: style.boxShadow };
+  });
+  const [on, off] = [await look(selected), await look(other)];
+  expect(on.background).toBe('rgba(0, 0, 0, 0)');
+  expect(on.radius).toBe('0px');
+  expect(on.underline).toContain('0px -2px 0px 0px inset');
+  expect(on.underline).not.toBe(off.underline);
+  expect(off.underline).toContain('rgba(0, 0, 0, 0)');
+});
+
+test('quiet controls keep a visible edge and avatars share one style', async ({ page }) => {
+  const edge = locator => locator.evaluate(element => {
+    const style = getComputedStyle(element);
+    return `${style.borderTopWidth} ${style.borderTopStyle} ${style.borderTopColor}`;
+  });
+  const fill = locator => locator.evaluate(element => getComputedStyle(element).backgroundColor);
+  await page.goto('/explorer');
+  await expect(page.locator('.directory-pagination')).toBeVisible();
+  for (const control of [
+    page.getByRole('button', { name: 'Request a session' }).first(),
+    page.locator('.directory-filter').first(),
+    page.locator('.directory-search-panel input').first(),
+  ]) expect(await edge(control)).toBe('1px solid rgb(203, 199, 190)');
+  expect(await edge(page.getByRole('button', { name: 'Search', exact: true }))).toContain('rgba(0, 0, 0, 0)');
+  const avatar = await fill(page.locator('.person-row [data-slot="avatar-fallback"]').first());
+  expect(avatar).toBe('rgb(226, 223, 215)');
+  expect(await fill(page.locator('.app-sidebar [data-slot="avatar-fallback"]').first())).toBe(avatar);
+  await page.goto('/groups');
+  expect(await fill(page.locator('.group-row-mark').first())).toBe(avatar);
+  await page.goto('/profile');
+  expect(await fill(page.getByRole('tabpanel').locator('[data-slot="avatar-fallback"]').first())).toBe(avatar);
+});
+
+test('dates use one format with the year only outside the current one', async ({ page }) => {
+  await page.goto('/groups');
+  const labels = await page.evaluate(async () => {
+    const { formatDay, formatDayTime } = await import('/src/lib/utils.js');
+    const year = new Date().getFullYear();
+    return {
+      day: formatDay(new Date(year, 9, 13, 14, 5), 'en-US'),
+      dayTime: formatDayTime(new Date(year, 9, 13, 14, 5), 'en-US'),
+      otherYear: formatDayTime(new Date(year - 1, 0, 3, 9, 0), 'en-US'),
+      expectedOtherYear: `Jan 3, ${year - 1}, 09:00`,
+      invalid: formatDayTime('not a date', 'en-US'),
+    };
+  });
+  expect(labels.day).toBe('Oct 13');
+  expect(labels.dayTime).toBe('Oct 13, 14:05');
+  expect(labels.otherYear).toBe(labels.expectedOtherYear);
+  expect(labels.invalid).toBe('');
+});
+
 test('Explorer sticky panel controls share dimensions and use the interactive radius', async ({ page }) => {
   await page.goto('/explorer');
   await expect(page.locator('.directory-pagination')).toBeVisible();

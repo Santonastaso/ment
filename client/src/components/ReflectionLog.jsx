@@ -1,4 +1,5 @@
 ﻿import React, { useEffect, useRef, useState } from 'react';
+import { formatDay } from '../lib/utils.js';
 import { Info, X } from 'lucide-react';
 import api from '../api/index.js';
 import { useT } from '../i18n/index.jsx';
@@ -167,7 +168,7 @@ export default function ReflectionLog({
         ? t('components.reflection.timeAgoWeekAgo', { count: weeks })
         : t('components.reflection.timeAgoWeeksAgo', { count: weeks });
     }
-    return normalized.toLocaleDateString(lang, { year: 'numeric', month: 'short', day: 'numeric' });
+    return formatDay(normalized, lang);
   }
 
   return (

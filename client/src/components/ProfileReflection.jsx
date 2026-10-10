@@ -1,3 +1,4 @@
+import { formatDay } from '../lib/utils.js';
 import React, { useEffect, useId, useRef, useState } from 'react';
 import api from '../api/index.js';
 import { useT } from '../i18n/index.jsx';
@@ -207,7 +208,7 @@ function ReflectionReview({ entry, busy, onApply, onReclassify, lang }) {
   const strengths = (entry.extracted_strengths || []).filter(skill => !dismissed.includes('strength:' + skill));
   const date = new Date(entry.created_at);
   const count = gaps.length + strengths.length;
-  const dateLabel = Number.isNaN(date.getTime()) ? t('components.reflection.timeAgoRecently') : date.toLocaleDateString(lang);
+  const dateLabel = Number.isNaN(date.getTime()) ? t('components.reflection.timeAgoRecently') : formatDay(date, lang);
   const summary = entry.support_needed || entry.managed_well || t('components.reflection.noSignals');
 
   useEffect(() => {

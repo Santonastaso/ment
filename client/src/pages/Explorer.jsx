@@ -221,7 +221,7 @@ function PersonCard({ person, onRequest }) {
   return (
     <article className="person-row">
       <Avatar className="person-row-avatar size-10">
-        <AvatarFallback className="bg-accent text-sm font-semibold text-primary">{initials}</AvatarFallback>
+        <AvatarFallback>{initials}</AvatarFallback>
       </Avatar>
 
       <span className="person-row-identity">

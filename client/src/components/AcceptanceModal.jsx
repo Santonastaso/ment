@@ -1,4 +1,5 @@
 ﻿import React, { useEffect, useState } from 'react';
+import { formatDayTime } from '../lib/utils.js';
 import IcsDownloadButton from './IcsDownloadButton.jsx';
 import api from '../api/index.js';
 import { useModalA11y } from '../lib/useModalA11y.js';
@@ -16,16 +17,7 @@ import Portal from './ui/portal.jsx';
 // modal does not reappear on subsequent logins.
 function formatScheduled(iso, lang) {
   if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleString(lang, {
-    weekday: 'short',
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
+  return formatDayTime(iso, lang) || null;
 }
 
 function minDateTimeLocal() {

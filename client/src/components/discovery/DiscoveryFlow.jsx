@@ -1,3 +1,4 @@
+import { formatDay } from '../../lib/utils.js';
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ArrowUp, ArrowUpRight, Check, Clock3, Pencil, RefreshCw, Search, Send, ThumbsDown, ThumbsUp, Trash2, X } from 'lucide-react';
@@ -39,7 +40,6 @@ const COPY = {
   },
 };
 
-const avatarTints = ['#fbeee6', '#eef0e7', '#e9eef7'];
 const pause = (ms) => new Promise(resolve => window.setTimeout(resolve, ms));
 const text = (copy, key, vars = {}) => copy[key].replace(/\{(\w+)\}/g, (_, name) => vars[name] ?? '');
 
@@ -108,7 +108,7 @@ function MatchCard({ match, index, selected, onSelect, copy, style, profileHref,
 
   return (
     <article role="radio" aria-checked={selected} style={style} className={`person-row discovery-match-card ${selected ? 'is-selected' : ''}`}>
-      <span className="discovery-avatar person-row-avatar" style={{ backgroundColor: avatarTints[index % avatarTints.length] }}>
+      <span className="discovery-avatar person-row-avatar">
         {initials(person.name)}
         {selected && <span className="discovery-selected-mark"><Check /></span>}
       </span>
@@ -488,7 +488,7 @@ export default function DiscoveryFlow() {
                   <div className="discovery-history-list" aria-label={copy.recentSearches}>{history.map(item => {
                     const title = [...(item.turns || [])].reverse().find(turn => turn?.role === 'user')?.content || requestText(item.title);
                     const date = item.updated_at ? new Date(item.updated_at) : null;
-                    const dateLabel = date && !Number.isNaN(date.getTime()) ? date.toLocaleDateString(lang, { month: 'short', day: 'numeric' }) : '';
+                    const dateLabel = date && !Number.isNaN(date.getTime()) ? formatDay(date, lang) : '';
                     return <div className="discovery-history-row" key={item.id}>
                       <button type="button" className="discovery-history-open" onClick={() => resumeSearch(item.id)} aria-label={`${copy.resume}: ${title}`} title={title}>
                         <span className="discovery-history-date">{dateLabel}</span><span className="discovery-history-title">{title}</span><span className="discovery-history-arrow"><ArrowUpRight aria-hidden="true" /></span>
@@ -528,7 +528,7 @@ export default function DiscoveryFlow() {
                       const peer = session.mentor_id === user?.id ? session.mentee : session.mentor;
                       const href = session.route_token ? sessionPath(session) : `/conversations?filter=${connectionCategory}&session=${session.id}`;
                       return <Link key={session.id} className="discovery-connection-card" to={href} aria-label={`${copy.openChat}: ${peer?.name || ''}`}>
-                        <span className="discovery-avatar" style={{ backgroundColor: avatarTints[index % avatarTints.length] }} aria-hidden="true">{initials(peer?.name)}</span>
+                        <span className="discovery-avatar" aria-hidden="true">{initials(peer?.name)}</span>
                         <span><strong>{peer?.name}</strong><small>{requestText(session.title, t('conversations.requestTitle'))}</small></span>
                         <ArrowUpRight aria-hidden="true" />
                       </Link>;
@@ -589,7 +589,7 @@ export default function DiscoveryFlow() {
           <div className="discovery-message-body">
             <p>{copy.intro}</p>
             <div className="discovery-to-row">
-              <span className="discovery-avatar size-10" style={{ backgroundColor: avatarTints[0] }}>{initials(selected.person.name)}</span>
+              <span className="discovery-avatar size-10">{initials(selected.person.name)}</span>
               <span>
                 <span className="discovery-micro">{copy.to}</span>
                 <strong>{selected.person.name}</strong>

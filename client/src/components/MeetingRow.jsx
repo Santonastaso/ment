@@ -1,4 +1,5 @@
 ﻿import React, { useState } from 'react';
+import { formatChatClock, formatDay } from '../lib/utils.js';
 import { Link } from 'react-router-dom';
 import RatingPicker from './RatingPicker.jsx';
 import SessionRequestModal from './SessionRequestModal.jsx';
@@ -62,8 +63,8 @@ export default function MeetingRow({ session, currentUserId, mode = 'past', onUp
   }
   const hasDate = !!session.scheduled_at;
   const date = hasDate ? new Date(session.scheduled_at) : null;
-  const dateLabel = hasDate ? date.toLocaleDateString(lang, { year: 'numeric', month: 'short', day: 'numeric' }) : null;
-  const timeLabel = hasDate ? date.toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' }) : '';
+  const dateLabel = hasDate ? formatDay(date, lang) : null;
+  const timeLabel = hasDate ? formatChatClock(date) : '';
   const relative = hasDate
     ? relativeMeetingTime(date, t, mode)
     : null;

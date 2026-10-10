@@ -1,4 +1,5 @@
 ﻿import React, { useMemo, useState } from 'react';
+import { formatDayTime } from '../lib/utils.js';
 import api from '../api/index.js';
 import { useEffect, useRef } from 'react';
 import { homeCopy } from './demo/homeCopy.js';
@@ -283,7 +284,7 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
               <section className="space-y-1" aria-label={t('components.sessionRequest.reviewWhen')}>
                 <p className="block text-sm font-semibold">{t('components.sessionRequest.reviewWhen')}</p>
                 <div className="flex items-center gap-2">
-                  <p className="input flex min-h-10 flex-1 items-center rounded-full">{scheduledAt ? new Date(scheduledAt).toLocaleString(lang) : t('components.sessionRequest.reviewNoTime')}</p>
+                  <p className="input flex min-h-10 flex-1 items-center rounded-full">{scheduledAt ? formatDayTime(scheduledAt, lang) : t('components.sessionRequest.reviewNoTime')}</p>
                   <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => setStep(3)}>{t(scheduledAt ? 'conversations.reschedule' : 'components.sessionRequest.pickTime')}</Button>
                 </div>
               </section>

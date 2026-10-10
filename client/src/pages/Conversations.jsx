@@ -5,7 +5,7 @@ import api from '../api/index.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useT } from '../i18n/index.jsx';
 import { Field } from '../components/ui/field.jsx';
-import { formatChatClock, formatMessageTime } from '../lib/utils.js';
+import { formatChatClock, formatDayTime } from '../lib/utils.js';
 import { Button } from '../components/ui/button.jsx';
 import { Avatar, AvatarFallback } from '../components/ui/avatar.jsx';
 import { Skeleton } from '../components/ui/skeleton.jsx';
@@ -46,14 +46,14 @@ function statusLabel(session, t) {
 }
 
 // Short enough to sit inline beside the name.
-function stateLabel(session, state, t) {
+function stateLabel(session, state, t, lang) {
   if (state === 'needs') {
     if (session.status === 'pending') return t('conversations.state.reply');
     if (!session.scheduled_at) return t('conversations.state.confirmTime');
     return t('conversations.state.markComplete');
   }
   if (state === 'waiting') return t('conversations.state.awaitingReply');
-  if (state === 'scheduled') return formatMessageTime(session.scheduled_at);
+  if (state === 'scheduled') return formatDayTime(session.scheduled_at, lang);
   return statusLabel(session, t);
 }
 
@@ -622,7 +622,7 @@ export default function Conversations() {
                 {/* Who, what state, when — the scannable line. */}
                 <span className="conversation-list-top">
                   <strong>{peer?.name}</strong>
-                  <em className={`conversation-state is-${state}`}>{stateLabel(session, state, t)}</em>
+                  <em className={`conversation-state is-${state}`}>{stateLabel(session, state, t, lang)}</em>
                 </span>
                 <small>{sessionPreview(session, t)}</small>
               </span>
@@ -632,7 +632,7 @@ export default function Conversations() {
         })}
         {showGroups && groups.map((group) => (
           <button key={`group-${group.id}`} type="button" onClick={() => selectThread('group', group.id)} className={cn('conversation-list-item', group.id === selectedGroupId && 'is-active')}>
-            <Avatar className="size-9"><AvatarFallback><UsersRound className="size-4" /></AvatarFallback></Avatar>
+            <Avatar className="size-9"><AvatarFallback className="text-secondary-foreground"><UsersRound className="size-4" /></AvatarFallback></Avatar>
             <span className="min-w-0">
               <span className="conversation-list-top">
                 <strong>{group.name}</strong>
@@ -663,7 +663,7 @@ export default function Conversations() {
           <>
             {selectedGroup ? <header className="conversation-header">
               <button className="conversation-back" type="button" onClick={() => setParams({})} aria-label={t('common.close')}><ChevronLeft /></button>
-              <Avatar className="size-9"><AvatarFallback><UsersRound className="size-4" /></AvatarFallback></Avatar>
+              <Avatar className="size-9"><AvatarFallback className="text-secondary-foreground"><UsersRound className="size-4" /></AvatarFallback></Avatar>
               <div className="conversation-header-person"><strong>{selectedGroup.name}</strong><span>{selectedGroup.description || t('nav.groups')}</span></div>
               <div className="conversation-header-actions"><Button type="button" variant="ghost" size="icon" onClick={openGroupOverview} aria-label={t('groups.info')} title={t('groups.info')} aria-haspopup="dialog"><Info aria-hidden="true" /></Button></div>
             </header> : <header className="conversation-header">
@@ -749,7 +749,7 @@ export default function Conversations() {
             {selected.status === 'pending' && !isExpired(selected) && selected.request_expires_at && <p className="text-sm text-muted-foreground">{expiryLabel(expiryInDays(selected.request_expires_at), t)}</p>}
             <div>
               <p className="label-meta">{t('components.sessionRequest.reviewWhen')}</p>
-              <p className="text-sm">{selected.scheduled_at ? formatMessageTime(selected.scheduled_at) : t('components.sessionRequest.reviewNoTime')}</p>
+              <p className="text-sm">{selected.scheduled_at ? formatDayTime(selected.scheduled_at, lang) : t('components.sessionRequest.reviewNoTime')}</p>
               {selected.status === 'scheduled' && !scheduleOpen && <Button size="sm" variant="ghost" className="mt-3" onClick={() => setScheduleOpen(true)}>{t(selected.scheduled_at ? 'conversations.reschedule' : 'conversations.schedule')}</Button>}
             </div>
             {selected.status === 'scheduled' && scheduleOpen && <div className="conversation-scheduler">
