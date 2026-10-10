@@ -319,7 +319,7 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
             </div>
           )}
 
-          {error && <p role="alert" className="text-red-600 text-sm">{error}</p>}
+          {error && <p role="alert" className="text-destructive text-sm">{error}</p>}
         </div>
 
         <div className="flex flex-shrink-0 justify-end gap-2 px-6 py-4">

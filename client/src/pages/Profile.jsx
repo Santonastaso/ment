@@ -600,11 +600,11 @@ export default function Profile() {
                   <Button variant="outline" onClick={() => setEditing(true)}>{t('profile.btn.editProfile')}</Button>
                 )
               ) : profile.session_id ? (
-                <Link to={sessionPath({ id: profile.session_id, route_token: profile.session_token })} className="inline-flex h-11 items-center rounded-full bg-[var(--control-surface)] px-5 text-sm font-semibold text-foreground hover:bg-[var(--control-surface-hover)]">
+                <Link to={sessionPath({ id: profile.session_id, route_token: profile.session_token })} className="inline-flex h-10 items-center rounded-full border border-[var(--border)] bg-[var(--control-surface)] px-4 text-sm font-semibold text-foreground hover:bg-[var(--control-surface-hover)]">
                   {t('profile.btn.openChat')}
                 </Link>
               ) : profile.mentorship_available === false ? (
-                <Button variant="outline" className="h-11 px-6 text-base" disabled>
+                <Button variant="outline" disabled>
                   {t('profile.btn.currentlyUnavailable')}
                 </Button>
               ) : (
@@ -613,7 +613,7 @@ export default function Profile() {
             </div>
           </div>
           {!isOwnProfile && profile.mentorship_available === false && (
-            <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-800 border border-amber-200">
+            <p className="mt-2 inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium border-[var(--border)] bg-[var(--status-waiting-bg)] text-[var(--status-waiting-fg)]">
               {profile.mentorship_unavailable_until && new Date(profile.mentorship_unavailable_until) > new Date()
                 ? t('profile.mentoring.pausedUntil', { date: profile.mentorship_unavailable_until })
                 : t('profile.mentoring.notAccepting')}
@@ -669,7 +669,7 @@ export default function Profile() {
               />
               <div className="space-y-2 sm:col-span-2 lg:col-span-3">
                 <label className="flex items-start gap-2 text-sm text-muted-foreground">
-                  <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-[#a95035]" checked={cvConsent} onChange={event => setCvConsent(event.target.checked)} />
+                  <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-[var(--primary)]" checked={cvConsent} onChange={event => setCvConsent(event.target.checked)} />
                   <span>{t('onboarding.import.consent')}</span>
                 </label>
                 <input id="profile-cv-upload" className="peer sr-only" aria-label={t('onboarding.import.browse')} type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" disabled={cvBusy || !cvConsent} onChange={event => { handleCvUpload(event.target.files?.[0]); event.target.value = ''; }} />
@@ -834,7 +834,7 @@ export default function Profile() {
                 <section key={item.period}>
                   <div className="flex items-start justify-between gap-3">
                     <div><h3 className="text-section font-semibold">{t(`profile.availability.${item.period}`)}</h3><p className="mt-0.5 text-xs text-muted-foreground">{t('profile.availability.booked', { booked: item.booked, limit: item.limit })}</p></div>
-                    <input type="number" min="1" max={item.max} className="input h-9 min-h-0 w-20 text-center" aria-label={t(`profile.availability.${item.period}Limit`)} value={item.limit} disabled={availabilitySaving} onChange={event => setCapacityDraft(previous => ({ ...previous, [`${item.period}_limit`]: event.target.value }))} />
+                    <input type="number" min="1" max={item.max} className="input w-20 text-center" aria-label={t(`profile.availability.${item.period}Limit`)} value={item.limit} disabled={availabilitySaving} onChange={event => setCapacityDraft(previous => ({ ...previous, [`${item.period}_limit`]: event.target.value }))} />
                   </div>
                   <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-[var(--control-surface)]"><div data-testid={`capacity-fill-${item.period}`} className="capacity-fill h-full rounded-full bg-primary" style={{ width: `${Math.min(100, (item.booked / Math.max(1, Number(item.limit))) * 100)}%` }} /></div>
                 </section>
@@ -854,7 +854,7 @@ export default function Profile() {
               <Button
                 type="button"
                 variant={showAddCareer ? 'outline' : 'default'}
-                size="icon-lg"
+                size="icon"
                 aria-label={showAddCareer ? t('profile.btn.cancel') : t('profile.career.addEntry')}
                 title={showAddCareer ? t('profile.btn.cancel') : t('profile.career.addEntry')}
                 aria-expanded={showAddCareer}

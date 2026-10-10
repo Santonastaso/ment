@@ -572,7 +572,7 @@ export default function Conversations() {
         <div className={cn('conversation-list-content', railMenu && `menu-${railMenu}`)}>
         {pageLoading ? (
           <div className="conversation-filters conversation-filters-skeleton" aria-hidden="true">
-            {FILTERS.map(option => <Skeleton key={option.key} className="h-9 rounded-full" />)}
+            {FILTERS.map(option => <Skeleton key={option.key} className="h-10 rounded-full" />)}
           </div>
         ) : (sessions.length > 0 || groups.length > 0) && (
           <div id="conversation-list-filters" className="conversation-filters" role="group" aria-label={t('conversations.filter.label')}>

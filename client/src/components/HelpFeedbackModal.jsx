@@ -136,7 +136,7 @@ export default function HelpFeedbackModal({ onClose }) {
             <p className="mt-1 text-caption text-muted-foreground">{message.length}/2000</p>
           </div>
 
-          {error && <p className="text-sm text-rose-600">{error}</p>}
+          {error && <p className="text-sm text-destructive">{error}</p>}
         </div>
 
         <div className="p-5 border-t border-[var(--border-subtle)] flex justify-end gap-2">

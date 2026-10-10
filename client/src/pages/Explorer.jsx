@@ -139,9 +139,9 @@ export default function Explorer() {
                   <div className="directory-pagination mt-6 flex min-h-14 flex-wrap items-center justify-between gap-3 border-t border-border pt-4 text-sm" aria-hidden="true">
                     <Skeleton className="h-4 w-32" />
                     <div className="flex items-center gap-2">
-                      <Skeleton className="h-9 w-24 rounded-full" />
+                      <Skeleton className="h-10 w-24 rounded-full" />
                       <Skeleton className="h-4 w-8" />
-                      <Skeleton className="h-9 w-16 rounded-full" />
+                      <Skeleton className="h-10 w-16 rounded-full" />
                     </div>
                   </div>
                 ) : !dirError && total > 0 && (
@@ -239,7 +239,7 @@ function PersonCard({ person, onRequest }) {
       </span>
 
       <span className="person-row-actions">
-        <Link to={`/profile/${person.id}`} className="person-row-link">{t('explorer.viewProfile')}</Link>
+        <Button variant="ghost" size="sm" className="person-row-link" render={<Link to={`/profile/${person.id}`} />}>{t('explorer.viewProfile')}</Button>
         {person.session_id ? (
           <Button variant="ghost" size="sm" render={<Link to={sessionPath({ id: person.session_id, route_token: person.session_token })} />}>
             {t('explorer.openChat')}

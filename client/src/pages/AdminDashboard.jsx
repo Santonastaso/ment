@@ -742,7 +742,7 @@ export default function AdminDashboard() {
             </div>
 
             <div
-              className={`cursor-pointer rounded border-2 border-dashed p-10 text-center transition-colors ${dragOver ? 'border-[#1264a3] bg-[#f0f7fc]' : 'border-[#dddddd] hover:border-[#1264a3] hover:bg-[#f8f8f8]'}`}
+              className={`cursor-pointer rounded border-2 border-dashed p-10 text-center transition-colors ${dragOver ? 'border-primary bg-[#f0f7fc]' : 'border-[#dddddd] hover:border-primary hover:bg-[#f8f8f8]'}`}
               onClick={() => fileRef.current?.click()}
               onDragOver={e => { e.preventDefault(); setDragOver(true); }}
               onDragLeave={() => setDragOver(false)}
@@ -762,7 +762,7 @@ export default function AdminDashboard() {
               />
               {uploading ? (
                 <div className="space-y-2">
-                  <div className="mx-auto size-8 animate-spin rounded-full border-2 border-[#1264a3] border-t-transparent" />
+                  <div className="mx-auto size-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                   <p className="text-sm text-muted-foreground">{t('admin.import.processing')}</p>
                 </div>
               ) : (
@@ -789,12 +789,12 @@ export default function AdminDashboard() {
                   <p className="font-medium">{uploadResult.failures.length} row(s) need attention</p>
                   <ul className="mt-1 space-y-1">{uploadResult.failures.map((failure, index) => <li key={`${failure.row}-${index}`}>Row {failure.row} ({failure.email || 'no email'}): {failure.error}</li>)}</ul>
                 </div>}
-                {uploadResult.warnings?.length > 0 && <p role="status" className="mt-3 text-amber-700">Some secondary tasks need attention: {uploadResult.warnings.join(', ')}</p>}
+                {uploadResult.warnings?.length > 0 && <p role="status" className="mt-3 text-[var(--status-waiting-fg)]">Some secondary tasks need attention: {uploadResult.warnings.join(', ')}</p>}
               </div>
             )}
 
             {uploadError && (
-              <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{uploadError}</div>
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--status-error-bg)] p-4 text-sm text-[var(--status-error-fg)]">{uploadError}</div>
             )}
             </SurfaceBody>
           </Surface>
@@ -892,7 +892,7 @@ export default function AdminDashboard() {
                           </select>
                         )}
                       </td>
-                      <td className="py-2 pr-4 text-secondary-foreground">{u.manager_email || <span className="text-gray-300">—</span>}</td>
+                      <td className="py-2 pr-4 text-secondary-foreground">{u.manager_email || <span className="text-muted-foreground">—</span>}</td>
                       <td className="py-2 space-x-2 whitespace-nowrap">
                         {!u.deactivated_at && (
                           <>

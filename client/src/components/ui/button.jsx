@@ -25,8 +25,9 @@ const buttonVariants = cva(
       // tables, default 44px aligned to input height, lg for page-level CTAs.
       size: {
         default:
-          "h-11 gap-1.5 px-4 has-data-[icon=inline-end]:pr-3.5 has-data-[icon=inline-start]:pl-3.5",
-        // Three heights only: 32 (xs), 40 (sm), 44 (default / lg). Icons are 16px.
+          "h-10 gap-1.5 px-4 has-data-[icon=inline-end]:pr-3.5 has-data-[icon=inline-start]:pl-3.5",
+        // Controls on a page are 40px (default and sm); 32 (xs) is for dense rows
+        // and 44 (lg) for the one call to action on landing and sign-in screens.
         xs: "h-8 gap-1 px-3 text-xs",
         sm: "h-10 gap-1 px-4 text-sm",
         lg: "h-11 gap-2 px-6 text-base has-data-[icon=inline-end]:pr-5 has-data-[icon=inline-start]:pl-5",

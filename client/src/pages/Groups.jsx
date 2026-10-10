@@ -202,7 +202,7 @@ export default function Groups() {
         as="h2"
         title={t('groups.list.title')}
         action={
-        <Button type="button" size="icon-lg" aria-label={t('groups.create.title')} title={t('groups.create.title')} onClick={() => { setError(''); setCreateOpen(true); }}><Plus className="size-5" aria-hidden="true" /></Button>
+        <Button type="button" size="icon" aria-label={t('groups.create.title')} title={t('groups.create.title')} onClick={() => { setError(''); setCreateOpen(true); }}><Plus className="size-5" aria-hidden="true" /></Button>
         }
       />
       <PageTabs
@@ -256,7 +256,7 @@ export default function Groups() {
                         {t('groups.chat')}
                       </Button>
                     )}
-                    {!group.is_owner && <Button variant={group.joined ? 'link' : 'ghost'} size="sm"
+                    {!group.is_owner && <Button variant="ghost" size="sm"
                       type="button"
                       disabled={saving}
                       onClick={() => toggleMembership(group)}
@@ -286,7 +286,7 @@ export default function Groups() {
               <label className="label" htmlFor="group-description">{t('groups.create.descriptionLabel')}</label>
               <input id="group-description" className="input text-sm" maxLength={160} value={description} onChange={(event) => setDescription(event.target.value)} placeholder={t('groups.create.descriptionPlaceholder')} />
             </div>
-            {error && <p className="text-sm text-rose-600" role="alert">{error}</p>}
+            {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
             <div className="flex justify-end">
               <Button type="submit" disabled={saving || name.trim().length < 2}>{saving ? t('groups.saving') : t('groups.create.submit')}</Button>
             </div>

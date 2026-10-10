@@ -119,7 +119,7 @@ function MatchCard({ match, index, selected, onSelect, copy, style, profileHref,
       </span>
 
       <span className="person-row-actions">
-        <Link className="person-row-link" to={profileHref(person.id)}
+        <Button variant="ghost" size="sm" className="person-row-link" render={<Link to={profileHref(person.id)} />}
           onClick={(event) => {
             // A plain click stays in the app and remembers the chat; a
             // modifier click still opens the profile in a new tab.
@@ -127,7 +127,7 @@ function MatchCard({ match, index, selected, onSelect, copy, style, profileHref,
             event.preventDefault();
             onViewProfile(person.id);
           }}
-        >{copy.viewProfile}</Link>
+        >{copy.viewProfile}</Button>
         <Button variant={selected ? 'default' : 'ghost'} size="sm"
           type="button"
           aria-label={`${copy.choose} ${person.name}`}
@@ -581,7 +581,7 @@ export default function DiscoveryFlow() {
       <Link to={`/explorer?mode=directory&q=${encodeURIComponent(submittedQuery)}`} className="discovery-result-icon" aria-label={copy.browse} title={copy.browse}><Search /></Link>
       {matchFeedback !== null && <span className="sr-only" role="status">{copy.feedbackSaved}</span>}
     </div></div>}
-    {stage === 'empty' && <div className="discovery-empty"><button type="button" className="person-row-link" onClick={reset}>{copy.retry}</button></div>}
+    {stage === 'empty' && <div className="discovery-empty"><button type="button" className="quiet-link" onClick={reset}>{copy.retry}</button></div>}
     {(stage === 'reachout' || stage === 'sent') && selected && (
       <div className="discovery-reachout discovery-reveal">
         <div className="discovery-assistant-message">

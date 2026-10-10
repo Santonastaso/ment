@@ -220,7 +220,7 @@ export default function AcceptanceModal({ sessions, onAcknowledged, onClose }) {
         </div>
 
         <div className="p-5 border-t border-[var(--border-subtle)] flex-shrink-0 space-y-2">
-          {error && <p className="text-sm text-rose-600">{error}</p>}
+          {error && <p className="text-sm text-destructive">{error}</p>}
           <div className="flex justify-end gap-2">
             <Button
               type="button"

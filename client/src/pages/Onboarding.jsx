@@ -15,7 +15,7 @@ import { CITY_OPTIONS, normalizeCity } from '../../../shared/cities.mjs';
 
 function SuggestedPill() {
   const { t } = useT();
-  return <span className="ml-2 text-xs font-medium text-amber-700">{t('onboarding.import.suggested')}</span>;
+  return <span className="ml-2 text-xs font-medium text-[var(--status-waiting-fg)]">{t('onboarding.import.suggested')}</span>;
 }
 
 // The import returns text ("2021", "9"); anything that is not a plausible
@@ -247,13 +247,13 @@ export default function Onboarding({ returnTo }) {
                   {s === 0 ? t('onboarding.steps.import') : s === 1 ? t('onboarding.steps.background') : s === 2 ? t('onboarding.steps.teach') : s === 3 ? t('onboarding.steps.learn') : t('onboarding.steps.availability')}
                 </span>
               </div>
-              {s < 4 && <div className={`flex-1 min-w-4 h-0.5 ${step > s ? 'bg-primary' : 'bg-gray-200'}`} />}
+              {s < 4 && <div className={`flex-1 min-w-4 h-0.5 ${step > s ? 'bg-primary' : 'bg-[var(--border)]'}`} />}
             </React.Fragment>
           ))}
         </div>
 
         <div key={step} className="onboarding-step-content card p-6 space-y-6">
-          {draftId && <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="note">
+          {draftId && <p className="rounded-lg border border-[var(--border)] bg-[var(--status-waiting-bg)] text-[var(--status-waiting-fg)] px-3 py-2 text-sm" role="note">
             {t('onboarding.import.reviewNotice')}
           </p>}
           {step === 0 && (
@@ -356,7 +356,7 @@ export default function Onboarding({ returnTo }) {
                     <div key={i} className="onboarding-career-entry rounded-lg p-3 space-y-2">
                       <CareerEntryFields value={c} required={i === 0} descriptionLabel={t('onboarding.career.projects')} onChange={next => setCareer(current => current.map((entry, index) => index === i ? next : entry))} />
                       {career.length > 1 && (
-                        <button type="button" onClick={() => removeCareer(i)} className="text-xs text-red-400 hover:text-red-600">{t('onboarding.career.remove')}</button>
+                        <button type="button" onClick={() => removeCareer(i)} className="text-xs text-destructive hover:underline">{t('onboarding.career.remove')}</button>
                       )}
                     </div>
                   ))}
@@ -422,7 +422,7 @@ export default function Onboarding({ returnTo }) {
             </>
           )}
 
-          {error && <p className="text-red-600 text-sm">{error}</p>}
+          {error && <p className="text-destructive text-sm">{error}</p>}
 
           <div className="flex justify-between pt-2">
             {step > 0 ? (

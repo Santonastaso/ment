@@ -442,6 +442,24 @@ test('the top of a page stays put while its content scrolls', async ({ page }) =
   }
 });
 
+test('buttons and fields on a page share one height', async ({ page }) => {
+  for (const route of ['/explorer', '/groups', '/profile', '/profile?tab=availability', '/profile?tab=experience']) {
+    await page.goto(route);
+    await expect(page.locator('.page-frame')).toBeVisible();
+    const heights = await page.locator('main').evaluate(main => [...main.querySelectorAll('[data-slot="button"], input.input')]
+      .filter(element => element.getBoundingClientRect().height > 0 && !element.closest('.page-tabs'))
+      .map(element => Math.round(element.getBoundingClientRect().height)));
+    expect(heights.length).toBeGreaterThan(0);
+    expect([...new Set(heights)], route).toEqual([40]);
+  }
+  // A link to someone's profile is a button like the action beside it.
+  await page.goto('/explorer');
+  const profile = page.locator('.directory-results .person-row-link').first();
+  const action = page.locator('.directory-results .person-row-actions > :last-child').first();
+  const look = locator => locator.evaluate(element => { const style = getComputedStyle(element); return [style.backgroundColor, style.borderTopColor, style.fontSize, style.fontWeight]; });
+  expect(await look(profile)).toEqual(await look(action));
+});
+
 test('Profile tabs are underline tabs in the header row', async ({ page }) => {
   await page.goto('/profile');
   const selected = page.getByRole('tab', { name: 'Overview', exact: true });
