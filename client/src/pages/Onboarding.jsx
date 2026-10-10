@@ -18,10 +18,14 @@ function SuggestedPill() {
   return <span className="ml-2 text-xs font-medium text-amber-700">{t('onboarding.import.suggested')}</span>;
 }
 
+// The import returns text ("2021", "9"); anything that is not a plausible
+// year is dropped rather than turned into a wrong date.
 function monthYearToPicker(year, month) {
-  if (!year) return '';
-  const m = month && month >= 1 && month <= 12 ? month : 1;
-  return `${year}-${String(m).padStart(2, '0')}`;
+  const y = String(year ?? '').match(/\b(19|20)\d{2}\b/)?.[0];
+  if (!y) return '';
+  const parsed = Number.parseInt(month, 10);
+  const m = parsed >= 1 && parsed <= 12 ? parsed : 1;
+  return `${y}-${String(m).padStart(2, '0')}`;
 }
 
 export default function Onboarding({ returnTo }) {
@@ -49,6 +53,11 @@ export default function Onboarding({ returnTo }) {
   const [linkedinUrl, setLinkedinUrl] = useState(user?.linkedin_url || '');
   // start_date / end_date are "YYYY-MM" strings (native <input type="month"> format)
   const [career, setCareer] = useState([{ role: '', department: '', company: '', start_date: '', end_date: '' }]);
+
+  // Step 4 — Availability: without it nobody knows when to ask.
+  const [weeklyLimit, setWeeklyLimit] = useState(2);
+  const [monthlyLimit, setMonthlyLimit] = useState(5);
+  const [acceptsRequests, setAcceptsRequests] = useState(true);
 
   // Step 2 — Can teach: array of { skill, example_project }
   const [canTeach, setCanTeach] = useState([]);
@@ -190,7 +199,11 @@ export default function Onboarding({ returnTo }) {
         linkedin_url: linkedinUrl,
         linkedin_headline: null,
       });
-      updateUser(res.data);
+      // The profile is saved; a failure here only leaves the default limits.
+      const weekly = Math.max(1, Math.min(50, Number(weeklyLimit) || 1));
+      const monthly = Math.max(weekly, Math.min(200, Number(monthlyLimit) || weekly));
+      await api.put('/users/me', { weekly_meeting_limit: weekly, monthly_meeting_limit: monthly, mentorship_paused: !acceptsRequests }).catch(() => {});
+      updateUser({ ...res.data, mentorship_paused: !acceptsRequests });
       navigate(returnTo || '/');
     } catch (e) {
       setError(t(onboardingErrorKey(e)));
@@ -224,17 +237,17 @@ export default function Onboarding({ returnTo }) {
       <div>
         {/* Progress */}
         <div className="flex items-center gap-2 mb-8">
-          {[0, 1, 2, 3].map(s => (
+          {[0, 1, 2, 3, 4].map(s => (
             <React.Fragment key={s}>
               <div className={`flex items-center gap-1 shrink-0 ${step >= s ? 'text-foreground' : 'text-muted-foreground'}`}>
                 <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold border-2 ${step > s ? 'bg-primary border-primary text-white' : step === s ? 'border-primary text-foreground' : 'border-[var(--input)] text-muted-foreground'}`}>
                   {step > s ? <Check className="size-4" aria-hidden="true" /> : s + 1}
                 </div>
                 <span className="text-xs font-medium hidden md:block">
-                  {s === 0 ? t('onboarding.steps.import') : s === 1 ? t('onboarding.steps.background') : s === 2 ? t('onboarding.steps.teach') : t('onboarding.steps.learn')}
+                  {s === 0 ? t('onboarding.steps.import') : s === 1 ? t('onboarding.steps.background') : s === 2 ? t('onboarding.steps.teach') : s === 3 ? t('onboarding.steps.learn') : t('onboarding.steps.availability')}
                 </span>
               </div>
-              {s < 3 && <div className={`flex-1 min-w-4 h-0.5 ${step > s ? 'bg-primary' : 'bg-gray-200'}`} />}
+              {s < 4 && <div className={`flex-1 min-w-4 h-0.5 ${step > s ? 'bg-primary' : 'bg-gray-200'}`} />}
             </React.Fragment>
           ))}
         </div>
@@ -387,6 +400,28 @@ export default function Onboarding({ returnTo }) {
             </>
           )}
 
+          {/* STEP 4 */}
+          {step === 4 && (
+            <>
+              <div>
+                <h2 className="text-xl font-medium tracking-[-0.01em] text-foreground mb-1">{t('onboarding.availability.title')}</h2>
+                <p className="text-muted-foreground text-sm">{t('onboarding.availability.desc')}</p>
+              </div>
+              <label className="flex items-center gap-2 text-sm font-medium">
+                <input type="checkbox" checked={acceptsRequests} onChange={e => setAcceptsRequests(e.target.checked)} data-testid="onboarding-accepts-requests" />
+                <span>{t('onboarding.availability.accept')}</span>
+              </label>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="label block">{t('profile.availability.weekly')}
+                  <input type="number" min="1" max="50" className="input mt-1" disabled={!acceptsRequests} aria-label={t('profile.availability.weeklyLimit')} value={weeklyLimit} onChange={e => setWeeklyLimit(e.target.value)} />
+                </label>
+                <label className="label block">{t('profile.availability.monthly')}
+                  <input type="number" min="1" max="200" className="input mt-1" disabled={!acceptsRequests} aria-label={t('profile.availability.monthlyLimit')} value={monthlyLimit} onChange={e => setMonthlyLimit(e.target.value)} />
+                </label>
+              </div>
+            </>
+          )}
+
           {error && <p className="text-red-600 text-sm">{error}</p>}
 
           <div className="flex justify-between pt-2">
@@ -396,7 +431,7 @@ export default function Onboarding({ returnTo }) {
 
             {step === 0 ? (
               <Button onClick={() => { setError(''); setStep(1); }} disabled={uploading}>{t('onboarding.nav.skip')}</Button>
-            ) : step < 3 ? (
+            ) : step < 4 ? (
               <Button onClick={handleContinue}>
                 {t('onboarding.nav.continue')}
               </Button>

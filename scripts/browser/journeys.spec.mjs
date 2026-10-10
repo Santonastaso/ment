@@ -72,6 +72,8 @@ test('invited member signs in, changes temporary password, imports CV, and finis
   await expect(page.getByRole('heading', { name: 'What you can teach' })).toBeVisible();
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByRole('heading', { name: 'What you want to learn' })).toBeVisible();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'When can people reach you?' })).toBeVisible();
   await page.getByRole('button', { name: 'Finish & see my matches' }).click();
   await expect(page).toHaveURL('http://127.0.0.1:3010/');
   expect(await page.evaluate(async () => {
@@ -164,6 +166,8 @@ test('CV import populates onboarding and can be saved', async ({ page }) => {
   })).toEqual(['cv', 'resume.pdf']);
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'When can people reach you?' })).toBeVisible();
   await page.getByRole('button', { name: 'Finish' }).click();
   await expect(page).toHaveURL('http://127.0.0.1:3010/');
   expect(await page.evaluate(() => window.fixture.calls.some(item => item.path === '/profile/ingest/1/accept'))).toBe(true);
@@ -563,7 +567,7 @@ test('a proposed time is checked again before sending a request', async ({ page 
   await expect(dialog.getByText(/Pick one or more topics from .*strengths/)).toHaveCount(0);
   await dialog.getByRole('button', { name: 'Skip' }).click();
   await expect(dialog.getByText('2 / 4')).toBeVisible();
-  await expect(dialog.getByText('What is the one specific question you want to leave this session with an answer to?')).toBeVisible();
+  await expect(dialog.getByText('What would you like to talk about?')).toBeVisible();
   expect(await dialog.getByRole('textbox').evaluate(element => getComputedStyle(element).borderRadius)).toBe('24px');
   expect(await dialog.getByRole('button', { name: 'One-off conversation' }).evaluate(element => getComputedStyle(element).textAlign)).toBe('center');
   await dialog.getByRole('textbox').fill('How can I improve my project planning?');
@@ -890,8 +894,14 @@ test('onboarding to discovery, request, acceptance, chat and meeting', async ({ 
   await page.getByLabel('Department *').selectOption('Finance');
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'When can people reach you?' })).toBeVisible();
+  await page.getByLabel('Weekly meeting limit').fill('3');
   await page.getByRole('button', { name: 'Finish & see my matches' }).click();
   await expect(page).toHaveURL('http://127.0.0.1:3010/');
+  // The availability chosen during onboarding is saved with the profile.
+  expect(await page.evaluate(() => window.fixture.calls.some(call => call.method === 'put' && call.path === '/users/me'
+    && call.body?.weekly_meeting_limit === 3 && call.body?.mentorship_paused === false))).toBe(true);
   const composer = page.getByRole('textbox', { name: 'Describe who could help' });
   await composer.fill('finance');
   await composer.press('Enter');
@@ -954,6 +964,10 @@ test('onboarding to discovery, request, acceptance, chat and meeting', async ({ 
   await dialog.getByRole('textbox').fill('Useful conversation');
   await dialog.getByRole('radio').nth(3).click();
   await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+  // Marking a meeting complete offers the check-in that updates skills.
+  await expect(dialog.getByText('Update your skills?')).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Start check-in' })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Not now' }).click();
   await expect(dialog).toBeHidden();
   await page.getByRole('button', { name: 'Edit', exact: true }).click();
   await expect(dialog.getByRole('textbox')).toHaveValue('Useful conversation');

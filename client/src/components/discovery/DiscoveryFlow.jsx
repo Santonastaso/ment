@@ -95,7 +95,7 @@ function MatchCard({ match, index, selected, onSelect, copy, style, profileHref,
   const person = match.person;
   const jobTitle = person.job_title || person.current_role;
   const titleAt = jobTitle && person.current_company ? copy.roleAt.replace('{role}', jobTitle).replace('{company}', person.current_company) : jobTitle;
-  const role = [titleAt, person.department].filter(Boolean).join(' · ');
+  const role = [titleAt, person.department, person.location].filter(Boolean).join(' · ');
 
   // The subtitle already names the role and department, and the server falls
   // back to exactly those when it has no matched expertise — so drop anything
@@ -582,7 +582,7 @@ export default function DiscoveryFlow() {
       <Link to={`/explorer?mode=directory&q=${encodeURIComponent(submittedQuery)}`} className="discovery-result-icon" aria-label={copy.browse} title={copy.browse}><Search /></Link>
       {matchFeedback !== null && <span className="sr-only" role="status">{copy.feedbackSaved}</span>}
     </div></div>}
-    {stage === 'empty' && <div className="discovery-empty"><Button type="button" variant="ghost" size="sm" onClick={reset}><RefreshCw size={15} aria-hidden="true" />{copy.retry}</Button></div>}
+    {stage === 'empty' && <div className="discovery-empty"><button type="button" className="person-row-link" onClick={reset}>{copy.retry}</button></div>}
     {(stage === 'reachout' || stage === 'sent') && selected && (
       <div className="discovery-reachout discovery-reveal">
         <div className="discovery-assistant-message">

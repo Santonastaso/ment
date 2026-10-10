@@ -17,7 +17,7 @@ import { enforceRateLimit } from '../_shared/rate-limit.ts';
 import { CITY_OPTIONS, normalizeCity } from '../../../shared/cities.mjs';
 
 const LANGUAGE_NAMES: Record<string, string> = { en: 'English', it: 'Italian', fr: 'French' };
-const PROMPT_VERSION = 'profile-ingest-v3';
+const PROMPT_VERSION = 'profile-ingest-v4';
 const MAX_EXTRACTED_CHARS = 30000;
 const MAX_PDF_PAGES = 100;
 const MAX_DOCX_UNCOMPRESSED = 4 * 1024 * 1024;
@@ -32,8 +32,8 @@ const PROFILE_SCHEMA = {
         career_history: {
           type: 'array', items: {
             type: 'object',
-            properties: { company: string, role_title: string, start_year: string, end_year: string, description: string },
-            required: ['company', 'role_title', 'start_year', 'end_year', 'description'],
+            properties: { company: string, role_title: string, start_year: string, start_month: string, end_year: string, end_month: string, description: string },
+            required: ['company', 'role_title', 'start_year', 'start_month', 'end_year', 'end_month', 'description'],
             additionalProperties: false,
           },
         },
@@ -157,7 +157,7 @@ Deno.serve(async (req) => {
   try {
     const result = await mistralJson<{ proposed?: unknown }>({
       feature: 'profile_ingest',
-      system: `Extract a professional profile from the supplied document. Write descriptive text and skill names in ${language}. The bio must be written in first person as the profile owner's own words, starting with “I” (or the equivalent in ${language}); never describe the owner by name or as he/she/they. For location, return exactly one current city from this list when possible: ${CITY_OPTIONS.join(', ')}. Otherwise return exactly one current city or “Remote”; never return multiple places, countries, alternatives, or explanations. Return JSON with a proposed object containing: job_title (string), department (string), location (string), bio (string, max 500 characters), career_history (array of objects with company, role_title, start_year, end_year, description), can_teach (array of objects with skill and example_project, where example_project is at most 80 characters), and wants_to_learn (array of strings). Use short, conventional skill names as they would appear in a professional skills list: two or three words, lower case, noun form. Use only explicit evidence from the document. Use empty strings or arrays when evidence is absent. Never infer sensitive personal data.`,
+      system: `Extract a professional profile from the supplied document. Write descriptive text and skill names in ${language}. The bio must be written in first person as the profile owner's own words, starting with “I” (or the equivalent in ${language}); never describe the owner by name or as he/she/they. For location, return exactly one current city from this list when possible: ${CITY_OPTIONS.join(', ')}. Otherwise return exactly one current city or “Remote”; never return multiple places, countries, alternatives, or explanations. Return JSON with a proposed object containing: job_title (string), department (string), location (string), bio (string, max 500 characters), career_history (array of objects with company, role_title, start_year, start_month, end_year, end_month, description), can_teach (array of objects with skill and example_project, where example_project is at most 80 characters), and wants_to_learn (array of strings). Use short, conventional skill names as they would appear in a professional skills list: two or three words, lower case, noun form. Dates: copy each role's own dates exactly as the document gives them, and never take a date from a neighbouring entry. start_year and end_year are four-digit years; start_month and end_month are the month number from 1 to 12 when the document states a month, otherwise an empty string. For a role that is still current (\"present\", \"aujourd'hui\", \"oggi\", \"en cours\") leave end_year and end_month empty. Never estimate a date that is not written. Each description is one or two sentences that keep the concrete figures from the document exactly as written: amounts, percentages, team sizes, volumes and named results. Use only explicit evidence from the document. Use empty strings or arrays when evidence is absent. Never infer sensitive personal data.`,
       user: JSON.stringify({ source_kind: kind, document_text: rawText.slice(0, 30000) }),
       temperature: 0,
       maxTokens: 3000,

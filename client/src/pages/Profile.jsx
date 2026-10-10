@@ -105,6 +105,10 @@ function attachSkillEvidence(profile, evidence) {
   return { ...profile, skills, skillProgress };
 }
 
+// A CV import returns dates as text; only a real year or month is kept.
+const cvYear = value => { const year = String(value ?? '').match(/\b(19|20)\d{2}\b/)?.[0]; return year ? Number(year) : null; };
+const cvMonth = value => { const month = Number.parseInt(value, 10); return month >= 1 && month <= 12 ? month : null; };
+
 export default function Profile() {
   const { id } = useParams();
   const { user: currentUser, updateUser } = useAuth();
@@ -146,6 +150,14 @@ export default function Profile() {
   const [toast, setToast] = useState('');
   const [reflectionDraft, setReflectionDraft] = useState({ support_needed: '', managed_well: '' });
   const [reflectionOpen, setReflectionOpen] = useState(false);
+  // Arriving from a finished meeting opens the check-in straight away.
+  useEffect(() => {
+    if (!isOwnProfile || searchParams.get('checkin') !== '1') return;
+    setReflectionOpen(true);
+    const params = new URLSearchParams(searchParams);
+    params.delete('checkin');
+    setSearchParams(params, { replace: true });
+  }, [isOwnProfile, searchParams]);
   const reflectionTriggerRef = React.useRef(null);
   const [skillFilter, setSkillFilter] = useState('all');
   const [notifyEmail, setNotifyEmail] = useState('');
@@ -394,8 +406,8 @@ export default function Profile() {
           role: entry.role || entry.role_title || proposed.job_title || profile.current_role || '',
           department: entry.department || proposed.department || profile.department || '',
           company: entry.company || '', description: entry.description || '',
-          start_year: entry.start_year ?? null, start_month: entry.start_month ?? null,
-          end_year: entry.end_year ?? null, end_month: entry.end_month ?? null,
+          start_year: cvYear(entry.start_year), start_month: cvMonth(entry.start_month),
+          end_year: cvYear(entry.end_year), end_month: cvMonth(entry.end_month),
         }))
       : profile.career?.length ? profile.career : [{ role: proposed.job_title || profile.current_role || '', department: proposed.department || profile.department || '' }];
     const primary = career[0] || {};

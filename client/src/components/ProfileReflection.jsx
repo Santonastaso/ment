@@ -204,8 +204,12 @@ function ReflectionReview({ entry, busy, onApply, onReclassify, lang }) {
   const [review, setReview] = useState(false);
   const [dismissed, setDismissed] = useState([]);
   const dialogRef = useModalA11y(open);
-  const gaps = (entry.extracted_gaps || []).filter(skill => !dismissed.includes('gap:' + skill));
-  const strengths = (entry.extracted_strengths || []).filter(skill => !dismissed.includes('strength:' + skill));
+  // Earlier entries stored machine-style names ("strategic_planning").
+  const readable = list => [...new Set((list || []).map(skill => String(skill || '').replace(/_/g, ' ').replace(/\s+/g, ' ').trim()).filter(Boolean))];
+  const suggestedGaps = readable(entry.extracted_gaps);
+  const suggestedStrengths = readable(entry.extracted_strengths);
+  const gaps = suggestedGaps.filter(skill => !dismissed.includes('gap:' + skill));
+  const strengths = suggestedStrengths.filter(skill => !dismissed.includes('strength:' + skill));
   const date = new Date(entry.created_at);
   const count = gaps.length + strengths.length;
   const dateLabel = Number.isNaN(date.getTime()) ? t('components.reflection.timeAgoRecently') : formatDay(date, lang);
@@ -246,7 +250,7 @@ function ReflectionReview({ entry, busy, onApply, onReclassify, lang }) {
               {entry.classifier_source?.startsWith('demo') && <p className="text-xs text-muted-foreground">{t('components.reflection.demoLabel')}</p>}
               {entry.applied ? <p role="status" className="text-sm">{t('components.reflection.appliedToSkills')}</p> : review ? (
                 <div className="space-y-3 rounded-xl bg-[var(--surface)] p-3">
-                  {[['gap', entry.extracted_gaps || [], 'profile.manageSkills.wantsToLearn'], ['strength', entry.extracted_strengths || [], 'profile.manageSkills.canTeach']].map(([kind, skills, label]) => (
+                  {[['gap', suggestedGaps, 'profile.manageSkills.wantsToLearn'], ['strength', suggestedStrengths, 'profile.manageSkills.canTeach']].filter(([, skills]) => skills.length > 0).map(([kind, skills, label]) => (
                     <div key={kind}>
                       <h3 className="text-sm font-semibold">{t(label)}</h3>
                       {skills.map(skill => <label key={skill} className="mt-1 flex items-center gap-2 text-sm"><input type="checkbox" disabled={busy} checked={!dismissed.includes(kind + ':' + skill)} onChange={event => setDismissed(previous => event.target.checked ? previous.filter(item => item !== kind + ':' + skill) : [...previous, kind + ':' + skill])} />{skill}</label>)}

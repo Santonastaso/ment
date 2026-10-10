@@ -47,15 +47,15 @@ Deno.serve(async (req) => {
   try {
     const classified = await mistralJson<{ extracted_gaps?: string[]; extracted_strengths?: string[] }>({
       feature: 'reflection',
-      system: `Classify a private professional reflection into concise skill names written in ${language}. Return JSON with extracted_gaps and extracted_strengths arrays. Use at most five items per array. Use only evidence in the reflection, do not diagnose or infer sensitive traits.
+      system: `Classify a private professional reflection into concise skill names written in ${language}. Return JSON with extracted_gaps and extracted_strengths arrays. Name only the skill each answer is actually about: usually one per array, never more than two, and an empty array when the answer names none. Do not add related, broader or implied skills: \"leadership\" is one skill, not leadership plus strategic planning and conflict resolution. Use only evidence in the reflection, do not diagnose or infer sensitive traits.
 
-Use short, conventional skill names as they would appear in a professional skills list: two or three words, lower case, noun form ("financial modelling", not "modelling financial statements"). Prefer a widely used name over a precise description.`,
+Use short, conventional skill names as they would appear in a professional skills list: two or three words separated by spaces, never underscores, lower case, noun form ("financial modelling", not "modelling financial statements"). Prefer a widely used name over a precise description.`,
       user: JSON.stringify({ support_needed: log.support_needed || '', managed_well: log.managed_well || '' }),
       temperature: 0,
       maxTokens: 350,
     });
     const normalize = (items: unknown) => Array.isArray(items)
-      ? [...new Set(items.map((item) => String(item || '').trim()).filter(Boolean))].slice(0, 5)
+      ? [...new Set(items.map((item) => String(item || '').replace(/_/g, ' ').replace(/\s+/g, ' ').trim()).filter(Boolean))].slice(0, 2)
       : [];
     result = {
       extracted_gaps: normalize(classified.value.extracted_gaps),

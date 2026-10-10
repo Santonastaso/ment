@@ -67,17 +67,17 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
     if (!draftEdited) {
       setGeneratingDraft(true);
       try {
-        const { data } = await api.post('/discovery/draft', { query: question.trim(), person_id: mentor.id, variant: 0 });
+        const { data } = await api.post('/discovery/draft', { query: focus, person_id: mentor.id, variant: 0 });
         setDraft(data.draft || '');
       } catch {
-        setDraft(question.trim());
+        setDraft(focus);
         setDraftEdited(true);
         setError('');
       } finally {
         setGeneratingDraft(false);
       }
     }
-    if (!requestTitle.trim()) setRequestTitle(question.trim().slice(0, 80));
+    if (!requestTitle.trim()) setRequestTitle(focus.slice(0, 80));
     setStep(4);
   }
 
@@ -96,6 +96,25 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
     return out;
   }, [mentor]);
 
+  // What the conversation can be about: who they are (role, employer) and
+  // what they can teach.
+  const topicOptions = useMemo(() => {
+    const seen = new Set();
+    return [mentor?.job_title || mentor?.current_role, mentor?.current_company, ...teachSkills].filter(item => {
+      const key = String(item || '').toLowerCase().trim();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [mentor, teachSkills]);
+  // A topic is enough to start a conversation; not everyone has one precise question.
+  const focus = question.trim() || (selectedTopics.length ? t('components.sessionRequest.generalInterest', { topics: selectedTopics.join(', ') }) : '');
+  const sameDay = days => {
+    const date = new Date();
+    date.setDate(date.getDate() + days);
+    return scheduledAt.slice(0, 10) === new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  };
+
   const stepTitle = [
     t('components.sessionRequest.step1Label'),
     t('components.sessionRequest.step2Label'),
@@ -113,7 +132,7 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
     if (step !== 4 || submitLock.current) return;
     if (hasInvalidTime()) { setError(t('components.sessionRequest.step3Invalid')); setStep(3); return; }
     if (!draft.trim() || !requestTitle.trim()) { setError(copy.emptyDraft); return; }
-    if (!question.trim()) {
+    if (!focus) {
       setError(t('components.sessionRequest.errorFocusQuestion'));
       setStep(2);
       return;
@@ -126,7 +145,7 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
         mentor_id: mentor.id,
         title: requestTitle.trim(),
         scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
-        pre_session_question: question.trim(),
+        pre_session_question: focus,
         message: draft.trim(),
         follow_up_intent: intent,
         idempotency_key: idempotencyKey.current,
@@ -164,13 +183,13 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
           {/* STEP 1 — Topics */}
           {step === 1 && (
             <div>
-              {teachSkills.length === 0 ? (
+              {topicOptions.length === 0 ? (
                 <p className="text-sm text-muted-foreground italic">
                   {t('components.sessionRequest.step1NoSkills', { name: mentor.name.split(' ')[0] })}
                 </p>
               ) : (
                 <div className="flex flex-wrap gap-2">
-                  {teachSkills.map(skill => {
+                  {topicOptions.map(skill => {
                     const active = selectedTopics.includes(skill);
                     return (
                       <button
@@ -218,8 +237,8 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
                 <p className="label mb-2">{copy.intent}</p>
                 <div className="grid grid-cols-2 gap-2" role="group" aria-label={copy.intent}>
                   {[
-                    { value: 'one_off', label: copy.oneOff },
-                    { value: 'ongoing', label: copy.ongoing },
+                    { value: 'one_off', label: copy.oneOff, hint: copy.oneOffHint },
+                    { value: 'ongoing', label: copy.ongoing, hint: copy.ongoingHint },
                   ].map(option => {
                     const active = intent === option.value;
                     return (
@@ -228,10 +247,11 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
                         type="button"
                         variant={active ? 'default' : 'outline'}
                         aria-pressed={active}
-                        className="h-auto min-h-11 justify-center whitespace-normal px-4 py-3 text-center"
+                        className="h-auto min-h-11 flex-col justify-center gap-0.5 whitespace-normal px-4 py-3 text-center"
                         onClick={() => setIntent(option.value)}
                       >
-                        {option.label}
+                        <span>{option.label}</span>
+                        <span className="text-xs font-normal opacity-80">{option.hint}</span>
                       </Button>
                     );
                   })}
@@ -249,7 +269,8 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
               </div>
               {scheduledAt && <div className="flex flex-wrap items-end gap-3">
                 <div className="flex w-full flex-wrap gap-2 pb-1">
-                  {[1, 3, 7].map(days => <Button key={days} type="button" size="sm" variant="outline" onClick={() => pickDay(days)}>{t(`components.sessionRequest.day${days}`)}</Button>)}
+                  {[1, 3, 7].map(days => <Button key={days} type="button" size="sm" variant={sameDay(days) ? 'default' : 'outline'} aria-pressed={sameDay(days)} onClick={() => pickDay(days)}>{t(`components.sessionRequest.day${days}`)}</Button>)}
+                  <p className="w-full text-xs text-muted-foreground">{t('components.sessionRequest.quickDayHint')}</p>
                 </div>
                 <label className="label block w-40">{t('components.sessionRequest.date')}
                   <input type="date" className="input mt-1 text-center" min={minDateTime.slice(0, 10)} value={scheduledAt.slice(0, 10)} onChange={e => setScheduledAt(`${e.target.value}T${scheduledAt.slice(11, 16)}`)} />
@@ -277,8 +298,8 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
                   <ChevronDown aria-hidden="true" className={`transition-transform duration-200 ${topicsOpen ? 'rotate-180' : ''}`} />
                 </Button>
                 {topicsOpen && <div id="session-request-review-topics" className="flex flex-wrap gap-2 pt-1">
-                  {teachSkills.map(skill => <Button key={skill} type="button" size="sm" variant={selectedTopics.includes(skill) ? 'default' : 'outline'} aria-pressed={selectedTopics.includes(skill)} onClick={() => toggleTopic(skill)}>{skill}</Button>)}
-                  {teachSkills.length === 0 && <p className="text-muted-foreground">{t('components.sessionRequest.step1NoSkills', { name: mentor.name.split(' ')[0] })}</p>}
+                  {topicOptions.map(skill => <Button key={skill} type="button" size="sm" variant={selectedTopics.includes(skill) ? 'default' : 'outline'} aria-pressed={selectedTopics.includes(skill)} onClick={() => toggleTopic(skill)}>{skill}</Button>)}
+                  {topicOptions.length === 0 && <p className="text-muted-foreground">{t('components.sessionRequest.step1NoSkills', { name: mentor.name.split(' ')[0] })}</p>}
                 </div>}
               </section>
               <section className="space-y-1" aria-label={t('components.sessionRequest.reviewWhen')}>
@@ -314,7 +335,7 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
             <>
               <Button onClick={() => { setStep(1); setError(''); }} variant="outline">{t('components.sessionRequest.back')}</Button>
               <Button
-                onClick={() => { if (question.trim()) { setStep(3); setError(''); } else setError(t('components.sessionRequest.errorFocusQuestion')); }}
+                onClick={() => { if (focus) { setStep(3); setError(''); } else setError(t('components.sessionRequest.errorFocusQuestion')); }}
               >
                 {t('components.sessionRequest.next')}
               </Button>
