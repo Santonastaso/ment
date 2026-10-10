@@ -91,6 +91,13 @@ function visibleTurns(storedTurns) {
   });
 }
 
+// A title for the invite: the expertise the person was matched on, else their
+// field, and only as a last resort the words that were searched.
+function suggestedTitle(match, query) {
+  const topic = String(match?.expertise?.[0] || match?.person?.department || query || '').trim();
+  return (topic.charAt(0).toUpperCase() + topic.slice(1)).slice(0, 120);
+}
+
 function MatchCard({ match, index, selected, onSelect, copy, style, profileHref, onViewProfile, seenBefore = false }) {
   const person = match.person;
   const jobTitle = person.job_title || person.current_role;
@@ -164,6 +171,9 @@ export default function DiscoveryFlow() {
   const [selected, setSelected] = useState(null);
   const [draftVariant, setDraftVariant] = useState(0);
   const [draft, setDraft] = useState('');
+  // The invite's own title, shown and editable on the draft card. It starts
+  // from what the conversation would be about, not from the search text.
+  const [requestTitle, setRequestTitle] = useState('');
   const [requestIntent, setRequestIntent] = useState('one_off');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
@@ -309,7 +319,7 @@ export default function DiscoveryFlow() {
   async function choose(match) {
     const version = flowVersion.current;
     idempotencyKey.current = null;
-    setSelected(match); setDraftVariant(0);
+    setSelected(match); setDraftVariant(0); setRequestTitle(suggestedTitle(match, submittedQuery));
     setStage('drafting'); setError('');
     try {
       const { data } = await api.post('/discovery/draft', { query: submittedQuery, person_id: match.person.id, variant: 0, thread_id: threadId });
@@ -334,11 +344,11 @@ export default function DiscoveryFlow() {
   }
 
   async function sendRequest() {
-    if (!selected || !draft.trim() || sending) return;
+    if (!selected || !draft.trim() || !requestTitle.trim() || sending) return;
     setSending(true); setError('');
     try {
       idempotencyKey.current ||= crypto.randomUUID();
-      const response = await api.post('/sessions', { mentor_id: selected.person.id, title: submittedQuery.slice(0, 80), pre_session_question: submittedQuery, message: draft.trim(), duration_minutes: 60, follow_up_intent: requestIntent, idempotency_key: idempotencyKey.current });
+      const response = await api.post('/sessions', { mentor_id: selected.person.id, title: requestTitle.trim().slice(0, 120), pre_session_question: submittedQuery, message: draft.trim(), duration_minutes: 60, follow_up_intent: requestIntent, idempotency_key: idempotencyKey.current });
       setSessionId(response.data.id);
       setSentSessionToken(response.data.route_token || '');
       setStage('sent');
@@ -377,12 +387,12 @@ export default function DiscoveryFlow() {
         const sentSession = (sessions || []).find(session =>
           session.mentee_id === user?.id &&
           session.mentor_id === lastAssistant.person.id &&
-          ['pending', 'scheduled'].includes(session.status) &&
-          session.title === requestText(lastAssistant.search_request, lastUser.content).slice(0, 80),
+          ['pending', 'scheduled'].includes(session.status),
         );
         if (sentSession) {
           setSelected({ person: lastAssistant.person, expertise: lastAssistant.person.expertise || [], background: lastAssistant.person.background || '', reasons: lastAssistant.person.reasons || [] });
           setDraft(lastAssistant.content || '');
+          setRequestTitle(sentSession.title || '');
           setSubmittedQuery(requestText(lastAssistant.search_request, lastUser.content));
           setSessionId(sentSession.id);
           setThreadId(id);
@@ -407,6 +417,7 @@ export default function DiscoveryFlow() {
         const person = lastAssistant.person;
         setSelected({ person, expertise: person.expertise || [], background: person.background || '', reasons: person.reasons || [] });
         setDraft(lastAssistant.content || '');
+        setRequestTitle(suggestedTitle({ person, expertise: person.expertise || [] }, requestText(lastAssistant.search_request, lastUser.content)));
         setStage('reachout');
       }
     } catch {
@@ -433,7 +444,7 @@ export default function DiscoveryFlow() {
     flowVersion.current += 1;
     const currentThread = threadId;
     setConnectionCategory(null);
-    setStage('ask'); setQuery(''); setSubmittedQuery(''); setTurns([]); setMatches([]); setSelected(null); setDraft(''); setRequestIntent('one_off'); setSending(false); setError(''); setSessionId(null); setThreadId(null); setClarification(''); setNoMatchReason(''); setMatchFeedback(null); idempotencyKey.current = null;
+    setStage('ask'); setQuery(''); setSubmittedQuery(''); setTurns([]); setMatches([]); setSelected(null); setDraft(''); setRequestTitle(''); setRequestIntent('one_off'); setSending(false); setError(''); setSessionId(null); setThreadId(null); setClarification(''); setNoMatchReason(''); setMatchFeedback(null); idempotencyKey.current = null;
     if (currentThread) api.put(`/discovery/threads/${currentThread}`, { archived: true }).then(refreshHistory).catch(() => {});
   }
 
@@ -598,6 +609,10 @@ export default function DiscoveryFlow() {
             </div>
             <div className={`discovery-draft ${stage === 'sent' ? 'is-sent' : ''}`}>
               <span className="discovery-draft-tag">{copy.suggested}</span>
+              <label className="discovery-draft-title">
+                <span>{t('components.sessionRequest.requestTitle')}</span>
+                <input type="text" data-control-radius-exempt value={requestTitle} maxLength={120} onChange={event => setRequestTitle(event.target.value)} disabled={stage === 'sent' || sending} />
+              </label>
               <textarea value={draft} onChange={event => setDraft(event.target.value)} disabled={stage === 'sent' || sending} aria-label={copy.suggested} />
             </div>
             {stage === 'reachout' ? (
@@ -608,7 +623,7 @@ export default function DiscoveryFlow() {
                     <DirectoryFilter label={intentCopy.intent} value={requestIntent} onChange={setRequestIntent} disabled={sending} options={[{ value: 'one_off', label: intentCopy.oneOff }, { value: 'ongoing', label: intentCopy.ongoing }]} renderValue={requestIntent === 'ongoing' ? intentCopy.ongoing : intentCopy.oneOff} />
                   </div>
                   <Button type="button" variant="ghost" onClick={regenerate}><RefreshCw />{copy.regenerate}</Button>
-                  <Button type="button" onClick={sendRequest} disabled={sending || !draft.trim()}>{sending ? <RefreshCw className="animate-spin" /> : <Send />}{copy.send}</Button>
+                  <Button type="button" onClick={sendRequest} disabled={sending || !draft.trim() || !requestTitle.trim()}>{sending ? <RefreshCw className="animate-spin" /> : <Send />}{copy.send}</Button>
                 </div>
               </div>
             ) : (

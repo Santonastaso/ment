@@ -946,6 +946,13 @@ test('onboarding to discovery, request, acceptance, chat and meeting', async ({ 
   await composer.press('Enter');
   await page.getByRole('button', { name: 'Choose Peer Mentor' }).click();
   await page.getByRole('textbox', { name: 'Suggested draft' }).fill('Please help me with financial modelling.');
+  // The invite has its own title on the card: suggested, editable and required.
+  const inviteTitle = page.locator('.discovery-draft').getByRole('textbox', { name: 'Request title' });
+  await expect(inviteTitle).not.toHaveValue('');
+  await expect(inviteTitle).not.toHaveValue('finance');
+  await inviteTitle.fill('');
+  await expect(page.getByRole('button', { name: 'Send request', exact: true })).toBeDisabled();
+  await inviteTitle.fill('Financial modelling basics');
   const draftBox = await page.locator('.discovery-draft').boundingBox();
   const sendBox = await page.getByRole('button', { name: 'Send request', exact: true }).boundingBox();
   const backBox = await page.getByRole('button', { name: 'Back to matches' }).boundingBox();
@@ -956,6 +963,7 @@ test('onboarding to discovery, request, acceptance, chat and meeting', async ({ 
   await expect(page.getByRole('combobox', { name: 'What kind of support?' })).toContainText('Ongoing support');
   await page.getByRole('button', { name: 'Send request', exact: true }).click();
   expect(await page.evaluate(() => window.fixture.calls.find(call => call.method === 'post' && call.path === '/sessions')?.body.follow_up_intent)).toBe('ongoing');
+  expect(await page.evaluate(() => window.fixture.calls.find(call => call.method === 'post' && call.path === '/sessions')?.body.title)).toBe('Financial modelling basics');
   await page.getByRole('link', { name: 'Open chat', exact: true }).click();
   await expect(page.getByText('Please help me with financial modelling.', { exact: true })).toBeVisible();
   await expect(page.locator('.conversation-header')).not.toContainText('Financial modelling');
