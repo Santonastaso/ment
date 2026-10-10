@@ -120,6 +120,7 @@ export default function Profile() {
     ? ['overview', 'skills', 'availability', 'experience', 'reflections']
     : ['overview', 'experience'];
   const tab = validTabs.includes(rawTab) ? rawTab : 'overview';
+  const tabsRef = React.useRef(null);
   // Arrived from a chat result: offer the way back to that conversation.
   const fromChat = !isOwnProfile && searchParams.get('from') === 'chat';
   const chatThread = searchParams.get('thread');
@@ -130,10 +131,32 @@ export default function Profile() {
     setSearchParams(params);
   }
 
+  function onTabKeyDown(event, key) {
+    const index = validTabs.indexOf(key);
+    const nextIndex = event.key === 'ArrowRight' ? (index + 1) % validTabs.length
+      : event.key === 'ArrowLeft' ? (index - 1 + validTabs.length) % validTabs.length
+      : event.key === 'Home' ? 0
+      : event.key === 'End' ? validTabs.length - 1 : null;
+    if (nextIndex === null) return;
+    event.preventDefault();
+    tabsRef.current?.querySelectorAll('[role="tab"]')[nextIndex]?.focus({ preventScroll: true });
+    setTab(validTabs[nextIndex]);
+  }
+
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
+  // Scroll only the strip, so deep links and back/forward never move the page.
+  useEffect(() => {
+    const strip = tabsRef.current;
+    const active = strip?.querySelector('[aria-selected="true"]');
+    if (!active) return;
+    const bounds = strip.getBoundingClientRect();
+    const item = active.getBoundingClientRect();
+    if (item.left < bounds.left + 8) strip.scrollLeft += item.left - bounds.left - 8;
+    else if (item.right > bounds.right - 28) strip.scrollLeft += item.right - bounds.right + 28;
+  }, [tab, loading]);
   const [editing, setEditing] = useState(false);
   const [cvConsent, setCvConsent] = useState(false);
   const [cvBusy, setCvBusy] = useState(false);
@@ -528,30 +551,34 @@ export default function Profile() {
         </div>
       )}
 
+      <div className="profile-workspace">
       {validTabs.length > 1 && (
-        <nav className="profile-tabs flex min-h-0 flex-wrap items-center gap-1 sm:flex-nowrap" aria-label={t('profile.tabs.label')}>
+        <div ref={tabsRef} className="profile-tabs" role="tablist" aria-label={t('profile.tabs.label')}>
           {validTabs.map(key => (
             <button
               key={key}
               type="button"
               onClick={() => setTab(key)}
+              role="tab"
+              id={`profile-tab-${key}`}
+              aria-selected={tab === key}
+              aria-controls={`profile-panel-${key}`}
+              tabIndex={tab === key ? 0 : -1}
+              data-control-radius-exempt
+              onKeyDown={event => onTabKeyDown(event, key)}
               data-testid={`profile-tab-${key}`}
-              className={`rounded-full px-3.5 py-1.5 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/40 ${
-                tab === key
-                  ? 'bg-[var(--control-surface)] font-medium text-foreground'
-                  : 'text-muted-foreground hover:bg-[var(--control-surface)] hover:text-foreground'
-              }`}
+              className="profile-tab"
             >
               {t(`profile.tab.${key}`)}
             </button>
           ))}
-        </nav>
+        </div>
       )}
 
-      <div key={tab} className="profile-tab-content">
+      <div key={tab} id={`profile-panel-${tab}`} role="tabpanel" aria-labelledby={`profile-tab-${tab}`} tabIndex={0} className="profile-tab-content page-frame page-frame-body">
       {tab === 'overview' && (
       <>
-      <Surface className="profile-overview-header">
+      <Surface className="profile-section profile-overview-header">
         <SurfaceBody className="profile-overview-header-body space-y-3 px-4 pb-4 pt-4 sm:px-5 sm:pb-5 sm:pt-5">
           <div className="profile-identity-row flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
@@ -677,15 +704,15 @@ export default function Profile() {
         </SurfaceBody>
       </Surface>
 
-      <div className="flex flex-col gap-12">
-      <Surface className="overflow-visible">
+      <div className="profile-overview-sections">
+      <Surface className="profile-section overflow-visible">
         <SurfaceHeader
           title={skillTitle}
           action={isOwnProfile ? <SkillCloudFilters value={skillFilter} onChange={setSkillFilter} /> : null}
         />
         <SurfaceBody className="min-w-0 pt-3">
           {isOwnProfile && !(profile.skillProgress?.length ? profile.skillProgress : profile.skills || []).length ? (
-            <div className="rounded-[var(--panel-radius)] bg-[var(--surface)] p-5">
+            <div>
               <p className="text-sm text-muted-foreground">{t('profile.skillLandscape.firstDay')}</p>
               <Button size="sm" variant="outline" className="mt-3" onClick={() => setTab('skills')}>{t('profile.skillLandscape.addSkills')}</Button>
             </div>
@@ -713,7 +740,7 @@ export default function Profile() {
       </Surface>
 
       {isOwnProfile && (
-        <Surface className="bg-[var(--surface)] px-1">
+        <Surface className="profile-section">
           <SurfaceHeader
             className="sm:px-4"
             title={t('profile.reflection.quickTitle')}
@@ -746,8 +773,8 @@ export default function Profile() {
       )}
 
       {isOwnProfile && tab === 'skills' && (
-        <div className="grid items-start gap-5 lg:grid-cols-2">
-          <div className="min-w-0 rounded-[var(--panel-radius)] border border-[var(--border-subtle)] bg-[var(--surface)] p-4 sm:p-5">
+        <div className="profile-skills-sections grid items-start lg:grid-cols-2">
+          <div className="profile-skills-section min-w-0">
             <h3 className="mb-3 text-section font-semibold">{t('profile.manageSkills.canTeach')}</h3>
             <TeachSkillsEditor
               tileLayout
@@ -758,7 +785,7 @@ export default function Profile() {
             />
           </div>
 
-          <div className="min-w-0 rounded-[var(--panel-radius)] border border-[var(--border-subtle)] bg-[var(--surface)] p-4 sm:p-5">
+          <div className="profile-skills-section min-w-0">
             <h3 className="mb-3 text-section font-semibold">{t('profile.manageSkills.wantsToLearn')}</h3>
             <SkillTagInput
               tileLayout
@@ -772,7 +799,7 @@ export default function Profile() {
       )}
 
       {isOwnProfile && tab === 'availability' && (
-        <Surface className="overflow-visible bg-transparent">
+        <Surface className="profile-section overflow-visible">
           <SurfaceBody className="px-0 pt-0 sm:px-0">
             <div className="mb-5 flex items-center justify-between gap-3">
               <p className="text-sm font-medium" data-testid="availability-status">
@@ -795,7 +822,7 @@ export default function Profile() {
 
             {/* Where notifications go. Blank means the address you sign in
                 with, which is what most people want. */}
-            <section className="mb-6 rounded-[var(--panel-radius)] bg-[var(--surface)] p-4">
+            <section className="border-t border-[var(--border-subtle)] pt-6">
               <h3 className="text-section font-semibold">{t('profile.notifyEmail.title')}</h3>
               <p className="mt-0.5 text-xs text-muted-foreground">{t('profile.notifyEmail.help')}</p>
               <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -818,17 +845,17 @@ export default function Profile() {
                 <p className="mt-2 text-xs text-muted-foreground">{t('profile.notifyEmail.usingLogin', { email: profile.email })}</p>
               )}
             </section>
-            {capacity && <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            {capacity && <div className="mt-6 grid gap-x-8 gap-y-6 border-t border-[var(--border-subtle)] pt-6 sm:grid-cols-2">
               {[
                 { period: 'weekly', limit: capacityDraft.weekly_limit, booked: capacity.weekly_booked, max: 50 },
                 { period: 'monthly', limit: capacityDraft.monthly_limit, booked: capacity.monthly_booked, max: 200 },
               ].map(item => (
-                <section key={item.period} className="rounded-[var(--panel-radius)] bg-[var(--surface)] p-4">
+                <section key={item.period}>
                   <div className="flex items-start justify-between gap-3">
                     <div><h3 className="text-section font-semibold">{t(`profile.availability.${item.period}`)}</h3><p className="mt-0.5 text-xs text-muted-foreground">{t('profile.availability.booked', { booked: item.booked, limit: item.limit })}</p></div>
                     <input type="number" min="1" max={item.max} className="input h-9 min-h-0 w-20 text-center" aria-label={t(`profile.availability.${item.period}Limit`)} value={item.limit} disabled={availabilitySaving} onChange={event => setCapacityDraft(previous => ({ ...previous, [`${item.period}_limit`]: event.target.value }))} />
                   </div>
-                  <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-background"><div data-testid={`capacity-fill-${item.period}`} className="capacity-fill h-full rounded-full bg-primary" style={{ width: `${Math.min(100, (item.booked / Math.max(1, Number(item.limit))) * 100)}%` }} /></div>
+                  <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-[var(--control-surface)]"><div data-testid={`capacity-fill-${item.period}`} className="capacity-fill h-full rounded-full bg-primary" style={{ width: `${Math.min(100, (item.booked / Math.max(1, Number(item.limit))) * 100)}%` }} /></div>
                 </section>
               ))}
             </div>}
@@ -838,7 +865,7 @@ export default function Profile() {
       )}
 
       {tab === 'experience' && (
-      <Surface>
+      <Surface className="profile-section">
         <SurfaceHeader
           title={t('profile.career.title')}
           action={
@@ -923,7 +950,7 @@ export default function Profile() {
       )}
 
       {isOwnProfile && tab === 'reflections' && (
-        <Surface className="scroll-mt-8" id="reflection-log">
+        <Surface className="profile-section scroll-mt-8" id="reflection-log">
           <SurfaceHeader
             title={t('profile.reflection.title')}
             description={
@@ -939,6 +966,7 @@ export default function Profile() {
           </SurfaceBody>
         </Surface>
       )}
+      </div>
       </div>
 
       {showModal && (

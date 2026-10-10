@@ -468,11 +468,33 @@ test('Quick reflection opens a card without shifting the profile and preserves d
   expect(bounds.width).toBeLessThanOrEqual(390);
   await dialog.getByRole('button', { name: 'Save reflection', exact: true }).click();
   await expect(dialog).toBeHidden();
+  // Resizing preserves the open desktop sidebar; dismiss the mobile overlay.
+  await page.getByRole('button', { name: 'Close sidebar', exact: true }).first().click();
   await trigger.click();
   await expect(support).toHaveValue('');
   await page.screenshot({ path: test.info().outputPath('quick-reflection-card.png'), animations: 'disabled' });
   await dialog.press('Escape');
   await expect(dialog).toBeHidden();
+});
+
+test('Profile tabs support keyboard navigation and history', async ({ page }) => {
+  await page.goto('/profile');
+  const overview = page.getByRole('tab', { name: 'Overview', exact: true });
+  await expect(overview).toHaveAttribute('aria-selected', 'true');
+  await page.screenshot({ path: test.info().outputPath('profile-connected-desktop.png'), animations: 'disabled' });
+  await overview.focus();
+  await overview.press('ArrowRight');
+  await expect(page.getByRole('tab', { name: 'Skills', exact: true })).toBeFocused();
+  await expect(page).toHaveURL(/tab=skills/);
+  await page.getByRole('tab', { name: 'Skills', exact: true }).press('End');
+  await expect(page.getByTestId('profile-tab-reflections')).toBeFocused();
+  await expect(page.getByRole('tabpanel')).toHaveAttribute('aria-labelledby', 'profile-tab-reflections');
+  await page.goBack();
+  await expect(page.getByRole('tab', { name: 'Skills', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/profile?tab=reflections');
+  await expect(page.getByTestId('profile-tab-reflections')).toBeInViewport();
+  await page.screenshot({ path: test.info().outputPath('profile-connected-mobile.png'), animations: 'disabled' });
 });
 
 test('Profile skill filters share the navigation pill geometry', async ({ page }) => {
@@ -496,8 +518,9 @@ test('Profile skill filters share the navigation pill geometry', async ({ page }
   const [teaching, learning] = await skillPanels.all();
   expect(await teaching.locator('h3').evaluate(element => getComputedStyle(element).color)).toBe('rgb(32, 30, 27)');
   expect(await learning.locator('h3').evaluate(element => getComputedStyle(element).color)).toBe('rgb(32, 30, 27)');
-  expect(await teaching.evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgb(241, 241, 238)');
-  expect(await learning.evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgb(241, 241, 238)');
+  // Both sections belong to the shared Profile surface; only a divider separates them.
+  expect(await teaching.evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+  expect(await learning.evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
   await expect(page.locator('.profile-tab-content')).toHaveCSS('view-transition-name', 'none');
   expect(await page.locator('.profile-tab-content').evaluate(element => getComputedStyle(element).animationName)).toBe('none');
   for (const tab of ['overview', 'availability', 'experience', 'reflections', 'skills']) {
@@ -902,15 +925,22 @@ test('failed message history does not mark the chat read', async ({ page }) => {
   expect(await page.evaluate(() => window.fixture.calls.some(call => call.path === '/sessions/2/read'))).toBe(false);
 });
 
-test('all profile sections remain visible on a narrow screen', async ({ page }) => {
+test('all profile sections remain reachable in the narrow tab strip', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
   await page.evaluate(() => { window.fixture.capacity = { weekly_limit: 2, monthly_limit: 5, weekly_booked: 1, monthly_booked: 1 }; });
   await page.locator('.app-sidebar').getByRole('link', { name: 'My profile' }).click();
   const tabs = page.locator('.profile-tabs');
+  const stripTop = (await tabs.boundingBox()).y;
   for (const section of ['overview', 'skills', 'availability', 'experience', 'reflections']) {
-    await expect(tabs.getByTestId(`profile-tab-${section}`)).toBeInViewport();
+    const target = tabs.getByTestId(`profile-tab-${section}`);
+    await target.click();
+    await expect(target).toBeInViewport();
+    await expect(target).toHaveAttribute('aria-selected', 'true');
+    expect((await target.boundingBox()).y).toBeGreaterThanOrEqual(stripTop);
+    expect((await target.boundingBox()).y).toBeLessThan(stripTop + 20);
   }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await tabs.getByTestId('profile-tab-availability').click();
   const availabilityStatus = page.getByTestId('availability-status');
   const pause = page.getByTestId('toggle-availability');

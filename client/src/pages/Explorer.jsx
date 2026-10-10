@@ -115,7 +115,7 @@ export default function Explorer() {
   const hasActiveFilters = Boolean(query || persona || program || cohort || location || language.length || sort !== 'relevance');
 
   return (
-    <PageShell className="gap-6">
+    <PageShell className="gap-2">
 
               <div className="directory-rail directory-search-panel grid min-w-0 gap-0.5">
                   <h1 className="sr-only">{t('explorer.title')}</h1>
@@ -161,7 +161,7 @@ export default function Explorer() {
 
               <div className="directory-results" data-loading={updatingResults && !!dirData} aria-busy={updatingResults} inert={updatingResults && !!dirData ? '' : undefined}>
               {updatingResults && !dirData ? (
-                <div className="directory-rail grid gap-1" role="status" aria-label={t('common.loading')}>
+                <div className="directory-rail page-frame page-frame-list grid" role="status" aria-label={t('common.loading')}>
                   {[1, 2, 3, 4, 5, 6].map(i => (
                     <article key={i} className="person-row person-row-skeleton" aria-hidden="true">
                       <Skeleton className="person-row-avatar size-10 rounded-full" />
@@ -172,12 +172,12 @@ export default function Explorer() {
                   ))}
                 </div>
               ) : dirError ? (
-                <Surface><SurfaceBody className="space-y-3" role="alert">
+                <Surface className="page-frame"><SurfaceBody className="space-y-3" role="alert">
                   <p role="alert">{t('explorer.directoryError')}</p>
                   <Button onClick={() => setRetry(n => n + 1)}>{t('explorer.retry')}</Button>
                 </SurfaceBody></Surface>
               ) : total === 0 ? (
-                <Surface>
+                <Surface className="page-frame">
                   <SurfaceBody className="py-12 text-center">
                     <p className="font-medium text-foreground">{t('explorer.directoryEmptyTitle')}</p>
                     <p className="mt-1 text-sm text-muted-foreground">{t('explorer.directoryEmptyBody')}</p>
@@ -185,7 +185,7 @@ export default function Explorer() {
                 </Surface>
               ) : (
                 <>
-                  <div className="directory-rail grid gap-1">
+                  <div className="directory-rail page-frame page-frame-list grid">
                     {dirData.people.map(person => (
                       <PersonCard key={person.id} person={person} onRequest={() => setRequestingMentor(person)} />
                     ))}

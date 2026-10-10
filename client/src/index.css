@@ -187,7 +187,75 @@ button:not(:disabled):active, [data-slot="button"]:not([aria-disabled="true"]):a
 .filter-control { height: var(--navigation-row-height); min-height: var(--navigation-row-height); border-radius: var(--control-radius); }
 select.filter-control { border-color: transparent; background-color: var(--control-surface); }
 
-.profile-tabs { min-height: calc(var(--workspace-top-row) - 6px); }
+/* Page frame: under the 68px header row every page puts its content in one
+   bordered container. Lists run edge to edge with dividers; anything else
+   gets the body padding. */
+.page-frame { min-width: 0; border: 1px solid var(--border); border-radius: var(--panel-radius); background: var(--card); }
+.page-frame-body { padding: 24px; }
+.page-frame-list { overflow: hidden; }
+.page-frame-list .person-row { border-radius: 0; border-bottom-color: var(--border-subtle); padding-inline: 20px; }
+.page-frame-list .person-row:last-child { border-bottom-color: transparent; }
+
+.profile-workspace { display: flex; min-width: 0; flex-direction: column; }
+.profile-tabs {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  min-height: var(--workspace-top-row);
+  gap: 24px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  /* Room for the focus ring, which the scroll container would otherwise clip. */
+  margin-inline: -4px;
+  padding-inline: 4px;
+}
+.profile-tabs::-webkit-scrollbar { display: none; }
+.profile-tab {
+  flex: 0 0 auto;
+  height: var(--navigation-row-height);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: inset 0 -2px transparent;
+  padding: 0;
+  color: var(--secondary-foreground);
+  font-size: var(--type-label);
+  line-height: 20px;
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+  transition: color var(--motion-control) var(--motion-ease), box-shadow var(--motion-control) var(--motion-ease);
+}
+.profile-tab[aria-selected="true"] { box-shadow: inset 0 -2px var(--foreground); color: var(--foreground); }
+/* Navigation stays anchored on press. */
+.profile-tabs .profile-tab:active { scale: 1; }
+.profile-tab:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) {
+  .profile-tab[aria-selected="false"]:hover { color: var(--foreground); }
+}
+.profile-workspace > .profile-tab-content { min-width: 0; gap: 0; }
+.profile-tab-content:focus-visible { outline: 2px solid var(--primary); outline-offset: -4px; }
+.profile-workspace .profile-section { border: 0; border-radius: 0; background: transparent; overflow: visible; }
+.profile-section > :is([data-slot="card-header"], [data-slot="card-content"]) { padding-inline: 0; }
+.profile-section > [data-slot="card-header"] { align-items: center; padding-top: 0; gap: 16px; }
+.profile-section > [data-slot="card-content"] { padding-bottom: 0; }
+.profile-overview-header.profile-section > [data-slot="card-content"] { padding-top: 0; }
+.profile-overview-sections { display: flex; flex-direction: column; }
+.profile-overview-sections > .profile-section { margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border-subtle); }
+.profile-skills-section + .profile-skills-section { margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border-subtle); }
+@media (min-width: 1024px) {
+  .profile-skills-sections { gap: 24px; }
+  .profile-skills-section + .profile-skills-section { margin-top: 0; padding-top: 0; padding-left: 24px; border-top: 0; border-left: 1px solid var(--border-subtle); }
+}
+@media (max-width: 700px) {
+  .page-frame-body { padding: 20px 16px; }
+  .page-frame-list .person-row { padding-inline: 16px; }
+  .page-frame-list .person-row-actions { flex-wrap: wrap; }
+  /* The fade says there is more to scroll to; the end padding lets the last tab clear it. */
+  .profile-tabs { gap: 20px; padding-right: 28px; mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
+  .profile-section > [data-slot="card-header"] { flex-wrap: wrap; }
+  .profile-section > [data-slot="card-header"] > :last-child { min-width: 0; max-width: 100%; padding-left: 0; }
+}
 .profile-tab-content { animation: none; view-transition-name: none; }
 .capacity-fill { transform-origin: left; animation: capacityFill 900ms var(--motion-ease) both; }
 @keyframes capacityFill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
@@ -289,7 +357,7 @@ select.filter-control { border-color: transparent; background-color: var(--contr
 .skill-cloud-filters button[aria-pressed="true"] { background: var(--control-surface); color: var(--foreground); font-weight: var(--font-weight-medium); }
 .skill-cloud-filters button:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 
-.skill-cloud-stage { border-radius: var(--panel-radius); background: var(--surface); padding: 10px 12px 14px; }
+.skill-cloud-stage { padding: 0; }
 .skill-cloud {
   display: flex; min-height: 148px; flex-wrap: wrap; align-items: center; justify-content: center;
   gap: 2px 14px; padding: 20px 6px 18px;
@@ -315,7 +383,7 @@ select.filter-control { border-color: transparent; background-color: var(--contr
 
 .skill-cloud-legend {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 18px;
-  margin: 0 6px; border-top: 1px solid var(--border-subtle); padding-top: 11px;
+  border-top: 1px solid var(--border-subtle); padding-top: 11px;
   color: var(--muted-foreground); font-size: var(--type-caption); line-height: 16px;
 }
 .skill-cloud-legend span { display: inline-flex; align-items: center; gap: 6px; }
@@ -513,7 +581,7 @@ a.person-row-name:hover { color: var(--primary); text-decoration: underline; }
 .discovery-error { margin-top: 1rem; color: var(--status-error-fg); font-size: var(--type-label); line-height: 20px; }
 .discovery-empty { width: fit-content; margin: 1rem 0 0 2.45rem; }
 .discovery-empty p { margin: 0 0 .7rem; }
-.directory-search-panel { position: sticky; top: 0; z-index: 10; margin-inline: 0; padding: 1rem 0; background: var(--background); border-bottom: 1px solid var(--border-subtle); }
+.directory-search-panel { position: sticky; top: 0; z-index: 10; margin-inline: 0; padding: 1rem 0; background: var(--background); }
 .directory-search-panel::before { content: ''; position: absolute; inset: -1.5rem 0 auto; height: 1.5rem; background: var(--background); pointer-events: none; }
 .directory-pagination { min-width: 0; }
 .directory-filter > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

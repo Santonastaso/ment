@@ -182,18 +182,18 @@ export default function Groups() {
   }
 
   return (
-    <PageShell>
+    <PageShell className="gap-0">
       <h1 className="sr-only">{t('groups.pageTitle')}</h1>
       <header className="flex min-h-[var(--workspace-top-row)] items-center justify-between">
         <h2 className="text-title font-semibold tracking-[-0.02em]">{t('groups.list.title')}</h2>
         <Button type="button" size="icon-lg" aria-label={t('groups.create.title')} title={t('groups.create.title')} onClick={() => { setError(''); setCreateOpen(true); }}><Plus className="size-5" aria-hidden="true" /></Button>
       </header>
       <div>
-          {error && !createOpen && !joinTarget && !reviewTarget && <p className="text-sm text-destructive" role="alert">{error}</p>}
+          {error && !createOpen && !joinTarget && !reviewTarget && <p className="mb-3 text-sm text-destructive" role="alert">{error}</p>}
           {loading ? (
-            <div role="status" aria-label={t('common.loading')} className="space-y-2">
+            <div role="status" aria-label={t('common.loading')} className="page-frame page-frame-list">
               {[0, 1, 2].map(index => (
-                <div key={index} className="flex items-center gap-3 px-3 py-4">
+                <div key={index} className="flex items-center gap-3 px-5 py-4">
                   <Skeleton className="size-10 shrink-0 rounded-full" />
                   <div className="flex-1 space-y-2"><Skeleton className="h-4 w-36" /><Skeleton className="h-3 w-52 max-w-full" /></div>
                   <Skeleton className="h-8 w-20 rounded-full" />
@@ -201,9 +201,9 @@ export default function Groups() {
               ))}
             </div>
           ) : groups.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t('groups.list.empty')}</p>
+            <p className="page-frame page-frame-body text-sm text-muted-foreground">{t('groups.list.empty')}</p>
           ) : (
-            <div aria-busy={loading}>
+            <div aria-busy={loading} className="page-frame page-frame-list">
               {groups.map((group) => (
                 <article key={group.id} className="person-row">
                   <span className="person-row-avatar group-row-mark" aria-hidden="true">
