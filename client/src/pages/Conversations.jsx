@@ -112,6 +112,12 @@ export default function Conversations() {
   const [railMenu, setRailMenu] = useState(null);
   const railRef = useRef(null);
   const filter = FILTERS.some(option => option.key === params.get('filter')) ? params.get('filter') : 'all';
+  // A thread opened by its own link lives in the path, so leaving it means going
+  // back to the list; the filter keeps the list from reopening the first chat.
+  function closeThread() {
+    if (sessionToken || groupToken) navigate(`/conversations?filter=${filter}`);
+    else setParams({});
+  }
   function selectThread(key, id) {
     const item = key === 'session' ? sessions.find(session => session.id === id) : groups.find(group => group.id === id);
     if (item?.route_token) {
@@ -662,12 +668,12 @@ export default function Conversations() {
         ) : (
           <>
             {selectedGroup ? <header className="conversation-header">
-              <button className="conversation-back" type="button" onClick={() => setParams({})} aria-label={t('common.close')}><ChevronLeft /></button>
+              <button className="conversation-back" type="button" onClick={closeThread} aria-label={t('common.close')}><ChevronLeft /></button>
               <Avatar className="size-9"><AvatarFallback className="text-secondary-foreground"><UsersRound className="size-4" /></AvatarFallback></Avatar>
               <div className="conversation-header-person"><strong>{selectedGroup.name}</strong><span>{selectedGroup.description || t('nav.groups')}</span></div>
               <div className="conversation-header-actions"><Button type="button" variant="ghost" size="icon" onClick={openGroupOverview} aria-label={t('groups.info')} title={t('groups.info')} aria-haspopup="dialog"><Info aria-hidden="true" /></Button></div>
             </header> : <header className="conversation-header">
-              <button className="conversation-back" type="button" onClick={() => setParams({})} aria-label={t('common.close')}><ChevronLeft /></button>
+              <button className="conversation-back" type="button" onClick={closeThread} aria-label={t('common.close')}><ChevronLeft /></button>
               <Avatar className="size-9"><AvatarFallback>{initials(person?.name)}</AvatarFallback></Avatar>
               <div className="conversation-header-person"><strong>{person?.name}</strong><span>{selected.status === 'pending' && !isExpired(selected) && selected.isMentee ? t('conversations.requestSent') : stateLabel(selected, rowState(selected), t)}</span></div>
               <div className="conversation-header-actions">

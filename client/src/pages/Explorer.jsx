@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import SessionRequestModal from '../components/SessionRequestModal.jsx';
 import DirectoryFilter from '../components/DirectoryFilter.jsx';
 import { PageShell } from '../components/PageShell.jsx';
+import PageHeader from '../components/PageHeader.jsx';
 import { Surface, SurfaceBody } from '../components/Surface.jsx';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -116,12 +117,12 @@ export default function Explorer() {
 
   return (
     <PageShell className="gap-2">
+      <PageHeader title={t('explorer.title')} />
 
               <div className="directory-rail directory-search-panel grid min-w-0 gap-0.5">
-                  <h1 className="sr-only">{t('explorer.title')}</h1>
-                  <form onSubmit={submitSearch} className="mb-1 grid min-h-[var(--workspace-top-row)] w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-                    <Input aria-label={t('explorer.searchLabel')} placeholder={t('explorer.searchLabel')} value={inputValue} onChange={e => setInputValue(e.target.value)} />
-                    <Button type="submit">{t('explorer.searchButton')}</Button>
+                  <form onSubmit={submitSearch} className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+                    <Input className="h-10 min-h-10" aria-label={t('explorer.searchLabel')} placeholder={t('explorer.searchLabel')} value={inputValue} onChange={e => setInputValue(e.target.value)} />
+                    <Button type="submit" size="sm">{t('explorer.searchButton')}</Button>
                   </form>
                 <div className="grid w-full min-w-0 grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-[repeat(4,minmax(0,1fr))_minmax(0,1.35fr)_minmax(0,1fr)]">
                   <DirectoryFilter label={t('explorer.filterPersona')} value={persona} onChange={value => setParam('persona', value)} options={[{ value: '', label: t('explorer.personaAny') }, { value: 'student', label: t('explorer.personaStudent') }, { value: 'alumnus', label: t('explorer.personaAlumnus') }]} />

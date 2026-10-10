@@ -4,6 +4,8 @@ import api from '../api/index.js';
 import { useT } from '../i18n/index.jsx';
 import { groupPath } from '../lib/conversationLinks.mjs';
 import { PageShell } from '../components/PageShell.jsx';
+import PageHeader from '../components/PageHeader.jsx';
+import PageTabs from '../components/PageTabs.jsx';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Plus, Users } from 'lucide-react';
@@ -40,6 +42,17 @@ export default function Groups() {
   const [manageSaving, setManageSaving] = useState(false);
   const [manageError, setManageError] = useState('');
   const [rosterRevision, setRosterRevision] = useState(0);
+
+  const tab = params.get('tab') === 'explore' ? 'explore' : 'mine';
+  function setTab(next) {
+    setParams(current => {
+      const updated = new URLSearchParams(current);
+      if (next === 'explore') updated.set('tab', 'explore'); else updated.delete('tab');
+      return updated;
+    });
+  }
+  const isMine = group => group.joined || group.is_owner;
+  const shownGroups = groups.filter(group => (tab === 'mine') === Boolean(isMine(group)));
 
   async function load() {
     setLoading(true);
@@ -103,6 +116,7 @@ export default function Groups() {
     try {
       const { data: created } = await api.post('/groups', { name: name.trim(), description: description.trim() });
       setManageTarget({ id: created.id, name: name.trim() });
+      setTab('mine');
       setMemberSearch('');
       setName('');
       setDescription('');
@@ -184,11 +198,21 @@ export default function Groups() {
   return (
     <PageShell className="gap-0">
       <h1 className="sr-only">{t('groups.pageTitle')}</h1>
-      <header className="flex min-h-[var(--workspace-top-row)] items-center justify-between">
-        <h2 className="text-title font-semibold tracking-[-0.02em]">{t('groups.list.title')}</h2>
+      <PageHeader
+        as="h2"
+        title={t('groups.list.title')}
+        action={
         <Button type="button" size="icon-lg" aria-label={t('groups.create.title')} title={t('groups.create.title')} onClick={() => { setError(''); setCreateOpen(true); }}><Plus className="size-5" aria-hidden="true" /></Button>
-      </header>
-      <div>
+        }
+      />
+      <PageTabs
+        idPrefix="groups"
+        label={t('groups.tabs.label')}
+        tabs={[{ key: 'mine', label: t('groups.tab.mine') }, { key: 'explore', label: t('groups.tab.explore') }]}
+        value={tab}
+        onChange={setTab}
+      />
+      <div id={`groups-panel-${tab}`} role="tabpanel" aria-labelledby={`groups-tab-${tab}`}>
           {error && !createOpen && !joinTarget && !reviewTarget && <p className="mb-3 text-sm text-destructive" role="alert">{error}</p>}
           {loading ? (
             <div role="status" aria-label={t('common.loading')} className="page-frame page-frame-list">
@@ -200,11 +224,14 @@ export default function Groups() {
                 </div>
               ))}
             </div>
-          ) : groups.length === 0 ? (
-            <p className="page-frame page-frame-body text-sm text-muted-foreground">{t('groups.list.empty')}</p>
+          ) : shownGroups.length === 0 ? (
+            <div className="page-frame page-frame-body">
+              <p className="text-sm text-muted-foreground">{t(tab === 'mine' ? 'groups.mine.empty' : 'groups.explore.empty')}</p>
+              {tab === 'mine' && groups.length > 0 && <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => setTab('explore')}>{t('groups.mine.browse')}</Button>}
+            </div>
           ) : (
             <div aria-busy={loading} className="page-frame page-frame-list">
-              {groups.map((group) => (
+              {shownGroups.map((group) => (
                 <article key={group.id} className="person-row">
                   <span className="person-row-avatar group-row-mark" aria-hidden="true">
                     <Users className="size-4" />

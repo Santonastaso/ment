@@ -468,6 +468,7 @@ export default function DiscoveryFlow() {
     return out;
   }, [turns]);
   return <section className={`discovery-flow ${isConversation ? 'is-conversation' : ''}`} aria-label="Ment discovery"><div className="discovery-thread">
+    {stage === 'ask' && <div className="discovery-page-title" aria-hidden="true">{t('nav.home')}</div>}
     {stage === 'ask' && (
       <div className="discovery-ask-block">
         <h1 className="discovery-greeting-scene">{copy.greeting.replace('{name}', firstName)}</h1>

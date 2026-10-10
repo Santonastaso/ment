@@ -10,6 +10,8 @@ import SessionRequestModal from '../components/SessionRequestModal.jsx';
 import CareerEntryFields, { DEPARTMENTS } from '../components/CareerEntryFields.jsx';
 import ProfileReflection from '../components/ProfileReflection.jsx';
 import { PageShell } from '../components/PageShell.jsx';
+import PageHeader from '../components/PageHeader.jsx';
+import PageTabs from '../components/PageTabs.jsx';
 import { Surface, SurfaceBody, SurfaceHeader } from '../components/Surface.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -120,7 +122,6 @@ export default function Profile() {
     ? ['overview', 'skills', 'availability', 'experience', 'reflections']
     : ['overview', 'experience'];
   const tab = validTabs.includes(rawTab) ? rawTab : 'overview';
-  const tabsRef = React.useRef(null);
   // Arrived from a chat result: offer the way back to that conversation.
   const fromChat = !isOwnProfile && searchParams.get('from') === 'chat';
   const chatThread = searchParams.get('thread');
@@ -131,32 +132,10 @@ export default function Profile() {
     setSearchParams(params);
   }
 
-  function onTabKeyDown(event, key) {
-    const index = validTabs.indexOf(key);
-    const nextIndex = event.key === 'ArrowRight' ? (index + 1) % validTabs.length
-      : event.key === 'ArrowLeft' ? (index - 1 + validTabs.length) % validTabs.length
-      : event.key === 'Home' ? 0
-      : event.key === 'End' ? validTabs.length - 1 : null;
-    if (nextIndex === null) return;
-    event.preventDefault();
-    tabsRef.current?.querySelectorAll('[role="tab"]')[nextIndex]?.focus({ preventScroll: true });
-    setTab(validTabs[nextIndex]);
-  }
-
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
-  // Scroll only the strip, so deep links and back/forward never move the page.
-  useEffect(() => {
-    const strip = tabsRef.current;
-    const active = strip?.querySelector('[aria-selected="true"]');
-    if (!active) return;
-    const bounds = strip.getBoundingClientRect();
-    const item = active.getBoundingClientRect();
-    if (item.left < bounds.left + 8) strip.scrollLeft += item.left - bounds.left - 8;
-    else if (item.right > bounds.right - 28) strip.scrollLeft += item.right - bounds.right + 28;
-  }, [tab, loading]);
   const [editing, setEditing] = useState(false);
   const [cvConsent, setCvConsent] = useState(false);
   const [cvBusy, setCvBusy] = useState(false);
@@ -512,10 +491,13 @@ export default function Profile() {
   const linkedinHref = safeLinkedInHref(profile?.linkedin_url);
   const headlineSummary = conciseHeadline(profile || {});
 
+  const pageTitle = isOwnProfile ? t('nav.myProfile') : t('profile.pageTitle');
+
   if (loading) {
     return (
-      <PageShell>
-        <Skeleton className="h-36 w-full rounded-xl" />
+      <PageShell className="gap-0">
+        <PageHeader title={pageTitle} />
+        <Skeleton className="mb-5 h-36 w-full rounded-xl" />
         <Skeleton className="h-64 w-full rounded-xl" />
       </PageShell>
     );
@@ -534,16 +516,17 @@ export default function Profile() {
     : t('profile.skillLandscape.titleOther', { name: firstName });
 
   return (
-    <PageShell className="profile-page gap-8">
-      {fromChat && (
-        <div className="-mb-4">
-          <Button type="button" variant="ghost" size="sm" className="-ml-2"
+    <PageShell className="profile-page gap-0">
+      <PageHeader
+        title={pageTitle}
+        action={fromChat ? (
+          <Button type="button" variant="ghost" size="sm"
             onClick={() => navigate(chatThread ? `/?thread=${encodeURIComponent(chatThread)}` : '/')}>
             <ArrowLeft aria-hidden="true" />
             {t('profile.backToChat')}
           </Button>
-        </div>
-      )}
+        ) : null}
+      />
       {/* Toast */}
       {toast && (
         <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-lg border border-primary bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground">
@@ -552,28 +535,14 @@ export default function Profile() {
       )}
 
       <div className="profile-workspace">
-      {validTabs.length > 1 && (
-        <div ref={tabsRef} className="profile-tabs" role="tablist" aria-label={t('profile.tabs.label')}>
-          {validTabs.map(key => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setTab(key)}
-              role="tab"
-              id={`profile-tab-${key}`}
-              aria-selected={tab === key}
-              aria-controls={`profile-panel-${key}`}
-              tabIndex={tab === key ? 0 : -1}
-              data-control-radius-exempt
-              onKeyDown={event => onTabKeyDown(event, key)}
-              data-testid={`profile-tab-${key}`}
-              className="profile-tab"
-            >
-              {t(`profile.tab.${key}`)}
-            </button>
-          ))}
-        </div>
-      )}
+      <PageTabs
+        className="profile-tabs"
+        idPrefix="profile"
+        label={t('profile.tabs.label')}
+        tabs={validTabs.map(key => ({ key, label: t(`profile.tab.${key}`) }))}
+        value={tab}
+        onChange={setTab}
+      />
 
       <div key={tab} id={`profile-panel-${tab}`} role="tabpanel" aria-labelledby={`profile-tab-${tab}`} tabIndex={0} className="profile-tab-content page-frame page-frame-body">
       {tab === 'overview' && (
@@ -588,7 +557,7 @@ export default function Profile() {
                 </AvatarFallback>
               </Avatar>
               <div className="min-w-0 flex-1">
-                <h1 className="text-title font-semibold tracking-[-0.02em]">{profile.name}</h1>
+                <h2 className="text-title font-semibold tracking-[-0.02em]">{profile.name}</h2>
                 <div className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
                   {editing ? null : (
                     <>

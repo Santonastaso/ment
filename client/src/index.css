@@ -197,21 +197,21 @@ select.filter-control { background-color: var(--control-surface); }
 .page-frame-list .person-row:last-child { border-bottom-color: transparent; }
 
 .profile-workspace { display: flex; min-width: 0; flex-direction: column; }
-.profile-tabs {
+.page-tabs {
   display: flex;
   align-items: center;
   min-width: 0;
-  min-height: var(--workspace-top-row);
+  min-height: var(--navigation-row-height);
   gap: 24px;
   overflow-x: auto;
   overscroll-behavior-x: contain;
   scrollbar-width: none;
   /* Room for the focus ring, which the scroll container would otherwise clip. */
-  margin-inline: -4px;
+  margin: 6px -4px 12px;
   padding-inline: 4px;
 }
-.profile-tabs::-webkit-scrollbar { display: none; }
-.profile-tab {
+.page-tabs::-webkit-scrollbar { display: none; }
+.page-tab {
   flex: 0 0 auto;
   height: var(--navigation-row-height);
   border: 0;
@@ -226,12 +226,12 @@ select.filter-control { background-color: var(--control-surface); }
   white-space: nowrap;
   transition: color var(--motion-control) var(--motion-ease), box-shadow var(--motion-control) var(--motion-ease);
 }
-.profile-tab[aria-selected="true"] { box-shadow: inset 0 -2px var(--foreground); color: var(--foreground); }
+.page-tab[aria-selected="true"] { box-shadow: inset 0 -2px var(--foreground); color: var(--foreground); }
 /* Navigation stays anchored on press. */
-.profile-tabs .profile-tab:active { scale: 1; }
-.profile-tab:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.page-tabs .page-tab:active { scale: 1; }
+.page-tab:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 @media (hover: hover) and (pointer: fine) {
-  .profile-tab[aria-selected="false"]:hover { color: var(--foreground); }
+  .page-tab[aria-selected="false"]:hover { color: var(--foreground); }
 }
 .profile-workspace > .profile-tab-content { min-width: 0; gap: 0; }
 .profile-tab-content:focus-visible { outline: 2px solid var(--primary); outline-offset: -4px; }
@@ -252,7 +252,7 @@ select.filter-control { background-color: var(--control-surface); }
   .page-frame-list .person-row { padding-inline: 16px; }
   .page-frame-list .person-row-actions { flex-wrap: wrap; }
   /* The fade says there is more to scroll to; the end padding lets the last tab clear it. */
-  .profile-tabs { gap: 20px; padding-right: 28px; mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
+  .page-tabs { gap: 20px; padding-right: 28px; mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
   .profile-section > [data-slot="card-header"] { flex-wrap: wrap; }
   .profile-section > [data-slot="card-header"] > :last-child { min-width: 0; max-width: 100%; padding-left: 0; }
 }
@@ -397,7 +397,8 @@ select.filter-control { background-color: var(--control-surface); }
 .skill-cloud-detail .person-row-identity { min-height: 0; }
 
 /* Discovery mirrors the calm reading rhythm of a familiar conversation tool. */
-.discovery-flow { min-height: 100vh; background: var(--background); color: var(--foreground); padding: 0 1.5rem 3rem; }
+.discovery-page-title { position: absolute; top: 16px; left: 32px; display: flex; height: var(--workspace-top-row); align-items: center; font-size: var(--font-size-page-title); line-height: 28px; font-weight: var(--font-weight-semibold); letter-spacing: -.02em; }
+.discovery-flow { position: relative; min-height: 100vh; background: var(--background); color: var(--foreground); padding: 0 1.5rem 3rem; }
 .discovery-flow.is-conversation { display: grid; height: 100vh; min-height: 0; grid-template-rows: minmax(0, 1fr) auto; padding: 0 1.5rem; }
 .discovery-thread { width: 100%; max-width: 760px; margin: 0 auto; }
 /* The transcript is a single column — a scroll track adds nothing but noise. */
@@ -581,7 +582,7 @@ a.person-row-name:hover { color: var(--primary); text-decoration: underline; }
 .discovery-error { margin-top: 1rem; color: var(--status-error-fg); font-size: var(--type-label); line-height: 20px; }
 .discovery-empty { width: fit-content; margin: 1rem 0 0 2.45rem; }
 .discovery-empty p { margin: 0 0 .7rem; }
-.directory-search-panel { position: sticky; top: 0; z-index: 10; margin-inline: 0; padding: 1rem 0; background: var(--background); }
+.directory-search-panel { position: sticky; top: 0; z-index: 10; margin: -8px 0 0; padding: 6px 0 1rem; background: var(--background); }
 .directory-search-panel::before { content: ''; position: absolute; inset: -1.5rem 0 auto; height: 1.5rem; background: var(--background); pointer-events: none; }
 .directory-pagination { min-width: 0; }
 .directory-filter > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -622,7 +623,7 @@ a.person-row-name:hover { color: var(--primary); text-decoration: underline; }
 .conversations-shell { display: grid; grid-template-columns: 340px minmax(0, 1fr); height: 100vh; min-height: 0; background: var(--background); transition: grid-template-columns var(--motion-panel) var(--motion-round); }
 .conversation-list { position: relative; z-index: 4; display: flex; min-width: 0; min-height: 0; flex-direction: column; border-right: 1px solid var(--sidebar-border); background: var(--sidebar); padding: 16px 16px 8px; }
 .conversation-list > header { position: relative; display: flex; height: var(--workspace-top-row); flex-shrink: 0; align-items: center; justify-content: flex-end; overflow: hidden; padding: 0 8px; }
-.conversation-list-heading { position: absolute; left: 8px; display: flex; min-width: 0; align-items: center; gap: 8px; white-space: nowrap; transition: opacity 160ms var(--motion-ease); }
+.conversation-list-heading { position: absolute; left: 16px; display: flex; min-width: 0; align-items: center; gap: 8px; white-space: nowrap; transition: opacity 160ms var(--motion-ease); }
 .conversation-list-heading h1 { font-size: var(--font-size-page-title); line-height: 28px; font-weight: var(--font-weight-semibold); letter-spacing: -.02em; }
 .conversation-list-count { border-radius: 999px; background: var(--control-surface); color: var(--muted-foreground); padding: 2px 7px; font-size: var(--type-caption); line-height: 16px; font-variant-numeric: tabular-nums; }
 .conversation-list-toggle { display: grid; width: 40px; height: 40px; place-items: center; border-radius: var(--control-radius); color: var(--muted-foreground); }
@@ -648,15 +649,15 @@ a.person-row-name:hover { color: var(--primary); text-decoration: underline; }
 .is-list-collapsed .menu-filters .conversation-filters { margin-bottom: 8px; }
 .conversation-list-scroll { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
 .conversation-filters-skeleton { pointer-events: none; }
-.conversation-list-skeleton { padding: 0 2px; }
-.conversation-list-skeleton-row { display: grid; grid-template-columns: 36px minmax(0, 1fr) 48px; align-items: center; gap: 10px; margin: 2px 0; padding: 9px 10px; }
+.conversation-list-skeleton { padding: 0; }
+.conversation-list-skeleton-row { display: grid; grid-template-columns: 36px minmax(0, 1fr) 48px; align-items: center; gap: 10px; margin: 2px 0; padding: 9px 16px; }
 .conversation-list-skeleton-copy { display: grid; min-width: 0; gap: 7px; }
 .conversation-thread-skeleton { position: absolute; inset: 16px; display: flex; flex-direction: column; gap: 16px; }
 .conversation-thread-skeleton-message { display: flex; flex: 1; flex-direction: column; justify-content: center; gap: 18px; padding: 0 6%; }
 .conversation-messages-skeleton { display: flex; min-height: 100%; flex-direction: column; justify-content: center; gap: 18px; padding: 24px 6%; }
 /* Row: avatar, then a two-line block. Top line is who / what state / the
    state's own timing; second line is what they actually asked about. */
-.conversation-list-item { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; width: 100%; align-items: center; gap: 10px; margin: 2px 0; border: 0; border-radius: var(--panel-radius); background: transparent; padding: 9px 10px; text-align: left; transition: background-color var(--motion-control) var(--motion-ease); }
+.conversation-list-item { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; width: 100%; align-items: center; gap: 10px; margin: 2px 0; border: 0; border-radius: var(--panel-radius); background: transparent; padding: 9px 16px; text-align: left; transition: background-color var(--motion-control) var(--motion-ease); }
 .conversation-list-item:hover, .conversation-list-item.is-active { background: var(--sidebar-accent); }
 .conversation-list-top { display: flex; min-width: 0; align-items: baseline; gap: 7px; }
 .conversation-list-item strong, .conversation-list-item small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -668,7 +669,7 @@ a.person-row-name:hover { color: var(--primary); text-decoration: underline; }
 .conversation-state.is-needs { background: var(--status-attention-bg); color: var(--status-attention-fg); }
 .conversation-state.is-scheduled { background: var(--status-scheduled-bg); color: var(--status-scheduled-fg); }
 
-.conversation-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin: 6px 8px 18px; }
+.conversation-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin: 6px 16px 18px; }
 .conversation-filters button { position: relative; width: 100%; justify-content: center; gap: 6px; padding-inline: 28px; font-size: var(--type-small); line-height: 16px; text-align: center; }
 .conversation-filters button[aria-pressed="true"] { background: var(--primary); color: var(--primary-foreground); }
 .conversation-filter-count { position: absolute; right: 12px; min-width: 16px; opacity: .7; font-size: var(--type-micro); line-height: 16px; text-align: center; font-variant-numeric: tabular-nums; }
@@ -679,7 +680,7 @@ a.person-row-name:hover { color: var(--primary); text-decoration: underline; }
 .conversation-empty p, .conversation-placeholder p { margin: 0; font-size: var(--type-label); line-height: 20px; }
 .conversation-empty a { border-radius: var(--control-radius); background: var(--control-surface); color: var(--foreground); padding: 8px 13px; font-size: var(--type-small); line-height: 16px; font-weight: var(--font-weight-semibold); }
 .conversation-thread { position: relative; display: grid; min-width: 0; min-height: 0; grid-template-rows: auto minmax(0, 1fr) auto; background: var(--background); background-image: none; }
-.conversation-header { display: grid; grid-row: 1; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: var(--workspace-top-row); margin: 16px 20px 0; border-radius: var(--dialog-radius); background: var(--control-surface); padding: 14px 16px; }
+.conversation-header { display: grid; grid-row: 1; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: var(--workspace-top-row); margin: 16px 24px 0; border-radius: var(--dialog-radius); background: var(--control-surface); padding: 14px 16px; }
 .conversation-header > div strong, .conversation-header > div span { display: block; }
 .conversation-header > div strong { font-size: var(--type-body); line-height: 20px; }
 .conversation-header > div span { color: var(--muted-foreground); font-size: var(--type-caption); line-height: 16px; }
@@ -751,28 +752,28 @@ a.person-row-name:hover { color: var(--primary); text-decoration: underline; }
   .surface-header { gap: .75rem; }
   .surface-header > :last-child { padding-left: 0; }
   .surface-header > :last-child > :is(button, select, [data-slot="button"]) { max-width: 100%; }
-  .directory-results .person-row:not(.person-row-skeleton) .person-row-actions { display: flex; width: 100%; flex-wrap: wrap; }
+  .directory-results .person-row:not(.person-row-skeleton) .person-row-actions { display: flex; width: 100%; flex-direction: row-reverse; justify-content: flex-end; }
   .directory-results .person-row:not(.person-row-skeleton) .person-row-actions > :first-child { justify-self: auto; }
   .directory-results .person-row:not(.person-row-skeleton) .person-row-actions > :last-child { width: auto; }
   .directory-filter { min-width: 0; }
 }
 @media (max-width: 700px) { .directory-search-panel { position: static; } .directory-search-panel::before { display: none; } }
-@media (min-width: 1001px) and (max-width: 1200px) { .conversations-shell { grid-template-columns: 280px minmax(0, 1fr); } }
+@media (min-width: 1001px) and (max-width: 1200px) { .conversations-shell { grid-template-columns: 296px minmax(0, 1fr); } }
 @media (max-width: 1000px) {
   .conversations-shell { grid-template-columns: 1fr; }
   .conversations-shell.has-selection .conversation-list, .conversation-list-toggle, .conversation-rail-controls { display: none; }
   .conversations-shell:not(.has-selection) .conversation-thread { display: none; }
   .conversation-back { display: grid; place-items: center; }
-  .conversation-header { grid-template-columns: 24px 32px minmax(0, 1fr) auto; gap: 8px; margin: 12px 12px 0; padding: 12px; }
+  .conversation-header { grid-template-columns: 24px 32px minmax(0, 1fr) auto; gap: 8px; margin: 12px 16px 0; padding: 12px; }
   .conversation-header-actions { gap: 3px; }
   .conversation-messages { padding-inline: 16px; }
-  .conversation-composer { width: calc(100% - 24px); }
+  .conversation-composer { width: calc(100% - 32px); }
   .conversations-shell.is-list-collapsed { grid-template-columns: 1fr; }
-  .is-list-collapsed .conversation-list > header { justify-content: space-between; padding: 0 12px; }
+  .is-list-collapsed .conversation-list > header { justify-content: space-between; padding: 0 16px; }
   .is-list-collapsed .conversation-list-content { display: flex; position: static; width: auto; max-height: none; overflow: visible; border: 0; border-radius: 0; background: transparent; box-shadow: none; padding: 0; }
   .is-list-collapsed .menu-filters .conversation-list-scroll { display: block; }
   .is-list-collapsed .menu-chats .conversation-filters { display: grid; }
-  .conversation-list > header { justify-content: space-between; }
+  .conversation-list > header { justify-content: space-between; padding: 0 16px; }
   .conversation-list-heading { position: static; }
   .is-list-collapsed .conversation-list-heading { opacity: 1; }
   .conversation-list-content { animation: none; }
@@ -852,4 +853,10 @@ a.person-row-name:hover { color: var(--primary); text-decoration: underline; }
    denser 32 / 36 / 44 scale. */
 @media (pointer: coarse) {
   [data-slot="button"] { min-height: 40px; min-width: 40px; }
+}
+
+/* Below the sm breakpoint the page gutter is 20px; titles follow it. */
+@media (max-width: 639px) {
+  .discovery-page-title { left: 20px; }
+  .conversation-list, .is-list-collapsed .conversation-list { padding-inline: 4px; }
 }

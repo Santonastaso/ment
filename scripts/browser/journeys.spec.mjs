@@ -335,7 +335,7 @@ test('Groups heading aligns with the sidebar toggle without an empty card', asyn
 });
 
 test('Groups, Explorer and Profile share one page frame', async ({ page }) => {
-  const headers = { '/groups': 'main header', '/explorer': '.directory-search-panel form', '/profile': '.profile-tabs' };
+  const headers = { '/groups': '.page-title-row', '/explorer': '.page-title-row', '/profile': '.page-title-row' };
   const frames = {};
   for (const [route, header] of Object.entries(headers)) {
     await page.goto(route);
@@ -367,9 +367,59 @@ test('Groups, Explorer and Profile share one page frame', async ({ page }) => {
     expect(frame.background).toBe(groups.background);
     expect(frame.panels).toBe(0);
   }
-  // Where nothing sits between them, the frame starts right under the header row.
-  expect(groups.top).toBeCloseTo(groups.headerTop + groups.headerHeight, 0);
+  // Both tabbed pages start their frame at the same height, under title and tabs.
   expect(frames['/profile'].top).toBeCloseTo(groups.top, 0);
+});
+
+test('every page title sits on the same line', async ({ page }) => {
+  const titles = {
+    '/': '.discovery-page-title',
+    '/conversations': '.conversation-list-heading h1',
+    '/groups': '.page-title-row h2',
+    '/explorer': '.page-title-row h1',
+    '/profile': '.page-title-row h1',
+  };
+  const measured = {};
+  for (const [route, selector] of Object.entries(titles)) {
+    await page.goto(route);
+    const title = page.locator(selector);
+    await expect(title).toBeVisible();
+    await waitForMotion(page);
+    measured[route] = await title.evaluate(element => {
+      const rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      return { left: rect.left, center: rect.top + rect.height / 2, size: style.fontSize, weight: style.fontWeight };
+    });
+  }
+  const reference = measured['/groups'];
+  for (const title of Object.values(measured)) {
+    expect(Math.abs(title.left - reference.left)).toBeLessThan(1);
+    expect(Math.abs(title.center - reference.center)).toBeLessThan(2);
+    expect(title.size).toBe('20px');
+    expect(title.weight).toBe(reference.weight);
+  }
+});
+
+test('Groups splits into My groups and Explore tabs', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => {
+    window.fixture.groups.push({ id: 7, name: 'Open Club', description: 'Anyone can ask to join', joined: false, is_owner: false, member_count: 4 });
+  });
+  await page.locator('.app-sidebar').getByRole('link', { name: 'Groups' }).click();
+  const rows = page.locator('main article.person-row');
+  await expect(page.getByRole('tab', { name: 'My groups', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(rows).toHaveCount(1);
+  await expect(rows).toContainText('Test Group');
+  await page.getByRole('tab', { name: 'Explore', exact: true }).click();
+  await expect(page).toHaveURL(/tab=explore/);
+  await expect(page.getByRole('tabpanel')).toHaveAttribute('aria-labelledby', 'groups-tab-explore');
+  await expect(rows).toHaveCount(1);
+  await expect(rows).toContainText('Open Club');
+  await expect(rows.getByRole('button', { name: 'Request to join' })).toBeVisible();
+  await expect(page.locator('.page-frame')).toHaveCount(1);
+  await page.getByRole('tab', { name: 'Explore', exact: true }).press('ArrowLeft');
+  await expect(page.getByRole('tab', { name: 'My groups', exact: true })).toBeFocused();
+  await expect(rows).toContainText('Test Group');
 });
 
 test('Profile tabs are underline tabs in the header row', async ({ page }) => {
@@ -448,13 +498,17 @@ test('Explorer sticky panel controls share dimensions and use the interactive ra
     expect(height).toBe(homeHeight);
     expect(radius).toBe('24px');
   }
-  const [homeBox, explorerBox, filterBox, clearBox] = await Promise.all([
-    home.boundingBox(), explorerLink.boundingBox(),
+  const messagesLink = page.locator('.app-sidebar').getByRole('link', { name: 'Messages' });
+  const [homeBox, explorerBox, messagesBox, searchRowBox, filterBox, clearBox] = await Promise.all([
+    home.boundingBox(), explorerLink.boundingBox(), messagesLink.boundingBox(),
+    page.locator('.directory-search-panel form').boundingBox(),
     page.locator('.directory-filter').first().boundingBox(),
     page.getByRole('button', { name: 'Clear filters' }).boundingBox(),
   ]);
-  expect(Math.abs(filterBox.y - homeBox.y)).toBeLessThan(2);
-  expect(Math.abs(clearBox.y + clearBox.height / 2 - explorerBox.y - explorerBox.height / 2)).toBeLessThan(2);
+  // Under the title, each row sits beside a sidebar row: search, filters, clear.
+  expect(Math.abs(searchRowBox.y - homeBox.y)).toBeLessThan(2);
+  expect(Math.abs(filterBox.y - explorerBox.y)).toBeLessThan(2);
+  expect(Math.abs(clearBox.y + clearBox.height / 2 - messagesBox.y - messagesBox.height / 2)).toBeLessThan(2);
   expect(clearBox.height).toBeLessThan(explorerBox.height);
   const languageFilter = page.getByRole('combobox', { name: 'Languages' });
   await expect(languageFilter).toHaveText('Languages');
@@ -477,7 +531,7 @@ test('Explorer sticky panel controls share dimensions and use the interactive ra
   expect(await option.evaluate(element => getComputedStyle(element).borderRadius)).toBe('999px');
   await page.keyboard.press('Escape');
   const [searchBox, brandBox] = await Promise.all([
-    page.locator('.directory-search-panel form').boundingBox(),
+    page.locator('.page-title-row h1').boundingBox(),
     page.locator('.app-sidebar button[title="Close sidebar"]').first().boundingBox(),
   ]);
   expect(Math.abs(searchBox.y + searchBox.height / 2 - brandBox.y - brandBox.height / 2)).toBeLessThan(3);
@@ -534,7 +588,7 @@ test('a proposed time is checked again before sending a request', async ({ page 
 test('Quick reflection opens a card without shifting the profile and preserves drafts', async ({ page }) => {
   await page.goto('/profile');
   const [tabsBox, brandBox] = await Promise.all([
-    page.locator('.profile-tabs').boundingBox(),
+    page.locator('.page-title-row h1').boundingBox(),
     page.locator('.app-sidebar button[title="Close sidebar"]').first().boundingBox(),
   ]);
   expect(Math.abs(tabsBox.y + tabsBox.height / 2 - brandBox.y - brandBox.height / 2)).toBeLessThan(5);
