@@ -120,7 +120,7 @@ export default function Explorer() {
       <PageHeader title={t('explorer.title')} />
 
               <div className="directory-rail directory-search-panel grid min-w-0 gap-0.5">
-                  <form onSubmit={submitSearch} className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+                  <form onSubmit={submitSearch} className="mb-1.5 grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
                     <Input className="h-10 min-h-10" aria-label={t('explorer.searchLabel')} placeholder={t('explorer.searchLabel')} value={inputValue} onChange={e => setInputValue(e.target.value)} />
                     <Button type="submit" size="sm">{t('explorer.searchButton')}</Button>
                   </form>

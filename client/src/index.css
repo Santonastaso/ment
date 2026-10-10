@@ -190,6 +190,12 @@ select.filter-control { background-color: var(--control-surface); }
 /* Page frame: under the 68px header row every page puts its content in one
    bordered container. Lists run edge to edge with dividers; anything else
    gets the body padding. */
+/* The top of a page stays put: title, then tabs or search, are pinned and only
+   what is under them scrolls. Each is pinned where it already sits, so
+   nothing moves when scrolling starts. */
+:root { --page-top-pad: 16px; }
+.page-title-row { position: sticky; top: 0; z-index: 11; background: var(--background); }
+.page-title-row::before { content: ''; position: absolute; inset: auto 0 100%; height: var(--page-top-pad); background: var(--background); }
 .page-frame { min-width: 0; border: 1px solid var(--border); border-radius: var(--panel-radius); background: var(--card); }
 .page-frame-body { padding: 24px; }
 .page-frame-list { overflow: hidden; }
@@ -201,14 +207,19 @@ select.filter-control { background-color: var(--control-surface); }
   display: flex;
   align-items: center;
   min-width: 0;
+  box-sizing: content-box;
   min-height: var(--navigation-row-height);
   gap: 24px;
   overflow-x: auto;
   overscroll-behavior-x: contain;
   scrollbar-width: none;
   /* Room for the focus ring, which the scroll container would otherwise clip. */
-  margin: 6px -4px 12px;
-  padding-inline: 4px;
+  margin: 0 -4px;
+  padding: 6px 4px 12px;
+  position: sticky;
+  top: var(--workspace-top-row);
+  z-index: 10;
+  background: var(--background);
 }
 .page-tabs::-webkit-scrollbar { display: none; }
 .page-tab {
@@ -251,8 +262,8 @@ select.filter-control { background-color: var(--control-surface); }
   .page-frame-body { padding: 20px 16px; }
   .page-frame-list .person-row { padding-inline: 16px; }
   .page-frame-list .person-row-actions { flex-wrap: wrap; }
-  /* The fade says there is more to scroll to; the end padding lets the last tab clear it. */
-  .page-tabs { gap: 20px; padding-right: 28px; mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
+  /* The end padding lets the last tab scroll clear of the edge. */
+  .page-tabs { gap: 20px; padding-right: 28px; }
   .profile-section > [data-slot="card-header"] { flex-wrap: wrap; }
   .profile-section > [data-slot="card-header"] > :last-child { min-width: 0; max-width: 100%; padding-left: 0; }
 }
@@ -397,7 +408,10 @@ select.filter-control { background-color: var(--control-surface); }
 .skill-cloud-detail .person-row-identity { min-height: 0; }
 
 /* Discovery mirrors the calm reading rhythm of a familiar conversation tool. */
-.discovery-page-title { position: absolute; top: 16px; left: 32px; display: flex; height: var(--workspace-top-row); align-items: center; font-size: var(--font-size-page-title); line-height: 28px; font-weight: var(--font-weight-semibold); letter-spacing: -.02em; }
+/* Pinned like every other page title; the negative margin keeps it from
+   pushing the greeting down. */
+.discovery-page-title { position: sticky; top: var(--page-top-pad); z-index: 3; display: flex; height: var(--workspace-top-row); align-items: center; margin: var(--page-top-pad) -1.5rem calc(-1 * (var(--page-top-pad) + var(--workspace-top-row))); padding-left: 32px; background: var(--background); font-size: var(--font-size-page-title); line-height: 28px; font-weight: var(--font-weight-semibold); letter-spacing: -.02em; }
+.discovery-page-title::before { content: ''; position: absolute; inset: auto 0 100%; height: var(--page-top-pad); background: var(--background); }
 .discovery-flow { position: relative; min-height: 100vh; background: var(--background); color: var(--foreground); padding: 0 1.5rem 3rem; }
 .discovery-flow.is-conversation { display: grid; height: 100vh; min-height: 0; grid-template-rows: minmax(0, 1fr) auto; padding: 0 1.5rem; }
 .discovery-thread { width: 100%; max-width: 760px; margin: 0 auto; }
@@ -585,8 +599,7 @@ a.person-row-name:hover { color: var(--primary); text-decoration: underline; }
 .discovery-error { margin-top: 1rem; color: var(--status-error-fg); font-size: var(--type-label); line-height: 20px; }
 .discovery-empty { width: fit-content; margin: 1rem 0 0 2.45rem; }
 .discovery-empty p { margin: 0 0 .7rem; }
-.directory-search-panel { position: sticky; top: 0; z-index: 10; margin: -8px 0 0; padding: 6px 0 1rem; background: var(--background); }
-.directory-search-panel::before { content: ''; position: absolute; inset: -1.5rem 0 auto; height: 1.5rem; background: var(--background); pointer-events: none; }
+.directory-search-panel { position: sticky; top: var(--workspace-top-row); z-index: 10; margin: -8px 0 0; padding: 6px 0 1rem; background: var(--background); }
 .directory-pagination { min-width: 0; }
 .directory-filter > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .directory-filter-positioner { z-index: 50; width: var(--anchor-width); }
@@ -747,7 +760,7 @@ a.person-row-name:hover { color: var(--primary); text-decoration: underline; }
 @keyframes discoveryAppear { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes discoveryMatchReveal { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes discoveryAgentPulse { 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--primary) 14%, transparent); } }
-@media (max-width: 700px) { .discovery-flow { padding-inline: 1rem; } .discovery-ask-block { padding-top: 22vh; } .discovery-meta-row { gap: 12px; } .discovery-connection-bubbles { gap: 8px; } .discovery-connection-cards { grid-template-columns: 1fr; } .person-row { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "avatar identity" ". detail" ". meta" ". actions"; gap: .5rem .65rem; padding: 14px 10px; } .person-row-actions { justify-content: flex-start; padding-top: .15rem; } .discovery-user-bubble { max-width: 88%; } .discovery-actions { align-items: flex-start; flex-direction: column; } .discovery-action-controls { width: 100%; } .discovery-assistant-message { grid-template-columns: 28px minmax(0, 1fr); gap: .55rem; } .discovery-agent-mark { width: 28px; height: 28px; } }
+@media (max-width: 700px) { .discovery-flow { padding-inline: 1rem; } .discovery-page-title { margin-inline: -1rem; } .discovery-ask-block { padding-top: 22vh; } .discovery-meta-row { gap: 12px; } .discovery-connection-bubbles { gap: 8px; } .discovery-connection-cards { grid-template-columns: 1fr; } .person-row { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "avatar identity" ". detail" ". meta" ". actions"; gap: .5rem .65rem; padding: 14px 10px; } .person-row-actions { justify-content: flex-start; padding-top: .15rem; } .discovery-user-bubble { max-width: 88%; } .discovery-actions { align-items: flex-start; flex-direction: column; } .discovery-action-controls { width: 100%; } .discovery-assistant-message { grid-template-columns: 28px minmax(0, 1fr); gap: .55rem; } .discovery-agent-mark { width: 28px; height: 28px; } }
 @media (max-width: 700px) {
   .profile-identity-row { flex-direction: column; gap: 1rem; }
   .profile-identity-row > .shrink-0 { width: 100%; justify-content: flex-start; flex-wrap: wrap; }
@@ -760,7 +773,7 @@ a.person-row-name:hover { color: var(--primary); text-decoration: underline; }
   .directory-results .person-row:not(.person-row-skeleton) .person-row-actions > :last-child { width: auto; }
   .directory-filter { min-width: 0; }
 }
-@media (max-width: 700px) { .directory-search-panel { position: static; } .directory-search-panel::before { display: none; } }
+@media (max-width: 700px) { .directory-search-panel { position: static; } }
 @media (min-width: 1001px) and (max-width: 1200px) { .conversations-shell { grid-template-columns: 296px minmax(0, 1fr); } }
 @media (max-width: 1000px) {
   .conversations-shell { grid-template-columns: 1fr; }
@@ -860,6 +873,6 @@ a.person-row-name:hover { color: var(--primary); text-decoration: underline; }
 
 /* Below the sm breakpoint the page gutter is 20px; titles follow it. */
 @media (max-width: 639px) {
-  .discovery-page-title { left: 20px; }
+  .discovery-page-title { padding-left: 20px; }
   .conversation-list, .is-list-collapsed .conversation-list { padding-inline: 4px; }
 }

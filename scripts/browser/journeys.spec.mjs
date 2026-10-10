@@ -377,7 +377,7 @@ test('Groups, Explorer and Profile share one page frame', async ({ page }) => {
 
 test('every page title sits on the same line', async ({ page }) => {
   const titles = {
-    '/': '.discovery-page-title',
+    '/': '.discovery-page-title span',
     '/conversations': '.conversation-list-heading h1',
     '/groups': '.page-title-row h2',
     '/explorer': '.page-title-row h1',
@@ -424,6 +424,22 @@ test('Groups splits into My groups and Explore tabs', async ({ page }) => {
   await page.getByRole('tab', { name: 'Explore', exact: true }).press('ArrowLeft');
   await expect(page.getByRole('tab', { name: 'My groups', exact: true })).toBeFocused();
   await expect(rows).toContainText('Test Group');
+});
+
+test('the top of a page stays put while its content scrolls', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 320 });
+  const pinned = { '/explorer': ['.page-title-row', '.directory-search-panel form', '.directory-filter', '.directory-pagination'], '/profile': ['.page-title-row', '.page-tabs'] };
+  for (const [route, selectors] of Object.entries(pinned)) {
+    await page.goto(route);
+    await expect(page.locator('.page-frame')).toBeVisible();
+    const tops = () => page.evaluate(list => list.map(selector => document.querySelector(selector).getBoundingClientRect().top), selectors);
+    const frameTop = () => page.locator('.page-frame').evaluate(element => element.getBoundingClientRect().top);
+    const [before, frameBefore] = [await tops(), await frameTop()];
+    await page.locator('main').evaluate(main => { main.scrollTop = 60; });
+    expect(await page.locator('main').evaluate(main => main.scrollTop)).toBeGreaterThan(0);
+    expect(await tops()).toEqual(before);
+    expect(await frameTop()).toBeLessThan(frameBefore);
+  }
 });
 
 test('Profile tabs are underline tabs in the header row', async ({ page }) => {
@@ -509,10 +525,12 @@ test('Explorer sticky panel controls share dimensions and use the interactive ra
     page.locator('.directory-filter').first().boundingBox(),
     page.getByRole('button', { name: 'Clear filters' }).boundingBox(),
   ]);
-  // Under the title, each row sits beside a sidebar row: search, filters, clear.
+  // Under the title the search row sits beside the first sidebar row; the
+  // filters follow with a clear gap, and the clear action right under them.
   expect(Math.abs(searchRowBox.y - homeBox.y)).toBeLessThan(2);
-  expect(Math.abs(filterBox.y - explorerBox.y)).toBeLessThan(2);
-  expect(Math.abs(clearBox.y + clearBox.height / 2 - messagesBox.y - messagesBox.height / 2)).toBeLessThan(2);
+  expect(filterBox.y - (searchRowBox.y + searchRowBox.height)).toBeCloseTo(8, 0);
+  expect(clearBox.y - (filterBox.y + filterBox.height)).toBeLessThan(12);
+  expect(messagesBox.y).toBeGreaterThan(explorerBox.y);
   expect(clearBox.height).toBeLessThan(explorerBox.height);
   const languageFilter = page.getByRole('combobox', { name: 'Languages' });
   await expect(languageFilter).toHaveText('Languages');
