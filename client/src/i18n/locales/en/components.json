@@ -178,5 +178,20 @@
   "components.appError.reload": "Reload page",
   "components.appError.report": "Report problem",
   "components.appError.reported": "The team received your report.",
-  "components.appError.reportFailed": "Could not send the report. Please try again."
+  "components.appError.reportFailed": "Could not send the report. Please try again.",
+  "components.sessionRequest.day1": "Tomorrow",
+  "components.sessionRequest.day3": "In 3 days",
+  "components.sessionRequest.day7": "Next week",
+  "components.monthYear.month01": "Jan",
+  "components.monthYear.month02": "Feb",
+  "components.monthYear.month03": "Mar",
+  "components.monthYear.month04": "Apr",
+  "components.monthYear.month05": "May",
+  "components.monthYear.month06": "Jun",
+  "components.monthYear.month07": "Jul",
+  "components.monthYear.month08": "Aug",
+  "components.monthYear.month09": "Sep",
+  "components.monthYear.month10": "Oct",
+  "components.monthYear.month11": "Nov",
+  "components.monthYear.month12": "Dec"
 }

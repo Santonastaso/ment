@@ -13,6 +13,7 @@ import LanguageSwitcher from '../i18n/LanguageSwitcher.jsx';
 import { Button } from '../components/ui/button.jsx';
 import { CITY_OPTIONS, normalizeCity } from '../../../shared/cities.mjs';
 import { monthYearValue, parseMonthYear } from '../lib/monthYear.mjs';
+import { Dropdown } from '../components/DirectoryFilter.jsx';
 
 function SuggestedPill() {
   const { t } = useT();
@@ -321,7 +322,7 @@ export default function Onboarding({ returnTo }) {
                 </div>
                 <div className="sm:col-span-2">
                   <label className="label">{t('onboarding.fields.location')}{suggested.has('location') && <SuggestedPill source={classifierSource} />} <span className="font-normal text-muted-foreground">{t('onboarding.fields.locationHint')}</span></label>
-                  <select className="input" aria-label={t('onboarding.fields.location')} value={locationChoice} onChange={event => {
+                  <Dropdown aria-label={t('onboarding.fields.location')} value={locationChoice} onChange={event => {
                     const choice = event.target.value;
                     setLocationChoice(choice);
                     if (choice === '__other') {
@@ -331,7 +332,7 @@ export default function Onboarding({ returnTo }) {
                     <option value="">{t('onboarding.fields.locationPlaceholder')}</option>
                     {CITY_OPTIONS.map(city => <option key={city} value={city}>{city}</option>)}
                     <option value="__other">{t('onboarding.fields.locationOther')}</option>
-                  </select>
+                  </Dropdown>
                   {locationChoice === '__other' && <input className="input mt-2" aria-label={t('onboarding.fields.locationOther')} value={location} onChange={event => setLocation(event.target.value)} onBlur={event => setLocation(normalizeCity(event.target.value))} placeholder={t('onboarding.fields.locationOtherPlaceholder')} />}
                 </div>
                 <div className="sm:col-span-2">

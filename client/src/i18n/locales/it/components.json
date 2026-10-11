@@ -162,5 +162,20 @@
   "components.appError.reload": "Ricarica la pagina",
   "components.appError.report": "Segnala il problema",
   "components.appError.reported": "Il team ha ricevuto la segnalazione.",
-  "components.appError.reportFailed": "Impossibile inviare la segnalazione. Riprova."
+  "components.appError.reportFailed": "Impossibile inviare la segnalazione. Riprova.",
+  "components.sessionRequest.day1": "Domani",
+  "components.sessionRequest.day3": "Fra 3 giorni",
+  "components.sessionRequest.day7": "La prossima settimana",
+  "components.monthYear.month01": "Gen",
+  "components.monthYear.month02": "Feb",
+  "components.monthYear.month03": "Mar",
+  "components.monthYear.month04": "Apr",
+  "components.monthYear.month05": "Mag",
+  "components.monthYear.month06": "Giu",
+  "components.monthYear.month07": "Lug",
+  "components.monthYear.month08": "Ago",
+  "components.monthYear.month09": "Set",
+  "components.monthYear.month10": "Ott",
+  "components.monthYear.month11": "Nov",
+  "components.monthYear.month12": "Dic"
 }

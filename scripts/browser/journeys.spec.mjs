@@ -66,8 +66,8 @@ test('invited member signs in, changes temporary password, imports CV, and finis
   });
   await expect(page.getByRole('heading', { name: 'Your background' })).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Full name' })).toHaveValue('Invited Tester');
-  await expect(page.locator('select').first()).toHaveValue('Zurich');
-  await expect(page.getByLabel('Department *')).toHaveValue('Engineering');
+  await expect(page.getByRole('combobox').first()).toContainText('Zurich');
+  await expect(page.getByLabel('Department *')).toContainText('Engineering');
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByRole('heading', { name: 'What you can teach' })).toBeVisible();
   await page.getByRole('button', { name: 'Continue' }).click();
@@ -927,7 +927,8 @@ test('onboarding to discovery, request, acceptance, chat and meeting', async ({ 
   await page.getByRole('button', { name: /^Skip/ }).click();
   await page.getByRole('textbox', { name: 'Full name' }).fill('Viewer Student');
   await page.getByRole('textbox', { name: 'Role title *' }).fill('Student');
-  await page.getByLabel('Department *').selectOption('Finance');
+  await page.getByLabel('Department *').click();
+  await page.getByRole('option', { name: 'Finance', exact: true }).click();
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
@@ -1395,7 +1396,8 @@ test('a failed availability save keeps the user on onboarding until it succeeds'
   await page.getByRole('button', { name: /^Skip/ }).click();
   await page.getByRole('textbox', { name: 'Full name' }).fill('Viewer Student');
   await page.getByRole('textbox', { name: 'Role title *' }).fill('Student');
-  await page.getByLabel('Department *').selectOption('Finance');
+  await page.getByLabel('Department *').click();
+  await page.getByRole('option', { name: 'Finance', exact: true }).click();
   for (let step = 0; step < 3; step++) await page.getByRole('button', { name: 'Continue', exact: true }).click();
   const availability = page.getByRole('heading', { name: 'When can people reach you?' });
   await expect(availability).toBeVisible();

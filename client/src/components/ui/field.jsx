@@ -1,5 +1,6 @@
 import React, { useId } from 'react';
 import { cn } from '@/lib/utils';
+import { Dropdown } from '../DirectoryFilter.jsx';
 
 // Floating-label field. The label sits inside the control and rises to a small
 // caption once the field has a value or focus, so a dense form stays readable
@@ -29,9 +30,7 @@ export function Field({
 
   const control =
     as === 'select' ? (
-      <select id={id} value={value ?? ''} onChange={onChange} disabled={readOnly} {...props}>
-        {children}
-      </select>
+      <Dropdown id={id} value={value} onChange={onChange} disabled={readOnly}>{children}</Dropdown>
     ) : as === 'textarea' ? (
       <textarea id={id} value={value ?? ''} onChange={onChange} readOnly={readOnly} {...props} />
     ) : (
