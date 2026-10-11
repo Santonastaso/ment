@@ -24,7 +24,6 @@
   "groups.create.submit": "Create",
   "groups.saving": "Saving...",
   "groups.list.title": "Campus groups",
-  "groups.list.empty": "No groups yet.",
   "groups.tabs.label": "Group sections",
   "groups.tab.mine": "My groups",
   "groups.tab.explore": "Explore",
@@ -54,8 +53,5 @@
   "groups.error.load": "Could not load groups. Try again.",
   "groups.error.save": "Could not save that change. Try again.",
   "groups.chat": "Chat",
-  "groups.chatSubtitle": "Group conversation",
-  "groups.chatEmpty": "No messages yet. Start the conversation.",
-  "groups.chatPlaceholder": "Message the group",
-  "groups.chatSend": "Send message"
+  "groups.chatSubtitle": "Group conversation"
 }

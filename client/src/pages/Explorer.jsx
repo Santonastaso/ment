@@ -6,7 +6,7 @@ import { PageShell } from '../components/PageShell.jsx';
 import { DEFAULT_PAGE_SIZE, PAGE_SIZES, pageSizeFrom, serverPageCap } from '../lib/directory.mjs';
 import PageHeader from '../components/PageHeader.jsx';
 import { Surface, SurfaceBody } from '../components/Surface.jsx';
-import { Button } from '@/components/ui/button';
+import { Button, ButtonLink } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -255,11 +255,11 @@ function PersonCard({ person, onRequest }) {
       </span>
 
       <span className="person-row-actions">
-        <Button variant="ghost" size="sm" className="person-row-link" render={<Link to={`/profile/${person.id}`} />}>{t('explorer.viewProfile')}</Button>
+        <ButtonLink size="sm" className="person-row-link" to={`/profile/${person.id}`}>{t('explorer.viewProfile')}</ButtonLink>
         {person.session_id ? (
-          <Button variant="ghost" size="sm" render={<Link to={sessionPath({ id: person.session_id, route_token: person.session_token })} />}>
+          <ButtonLink size="sm" to={sessionPath({ id: person.session_id, route_token: person.session_token })}>
             {t('explorer.openChat')}
-          </Button>
+          </ButtonLink>
         ) : (
           <Button type="button" variant="ghost" size="sm" onClick={onRequest}>{t('explorer.requestSession')}</Button>
         )}

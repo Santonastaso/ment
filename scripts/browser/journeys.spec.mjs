@@ -1558,3 +1558,18 @@ test('pending join requests show on Groups in the sidebar', async ({ page }) => 
   await expect(badge).toHaveText('2');
   await expect(badge).toHaveAccessibleName('2 join requests');
 });
+
+test('leaving a group asks in the app, not in a browser box', async ({ page }) => {
+  let nativeDialogs = 0;
+  page.on('dialog', dialog => { nativeDialogs++; dialog.dismiss(); });
+  await page.goto('/');
+  await page.evaluate(() => { window.fixture.groups.push({ id: 8, name: 'Chess Club', joined: true, is_owner: false, member_count: 5 }); });
+  await page.locator('.app-sidebar').getByRole('link', { name: 'Groups' }).click();
+  await page.getByRole('button', { name: 'Leave', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toContainText('Chess Club');
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  expect(nativeDialogs).toBe(0);
+  expect(await page.evaluate(() => window.fixture.calls.some(call => call.method === 'delete'))).toBe(false);
+});

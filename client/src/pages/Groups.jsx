@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../api/index.js';
 import { useT } from '../i18n/index.jsx';
@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Plus, Users } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog.jsx';
 import { supabase } from '../lib/supabase.js';
+import { useConfirm } from '../components/ui/confirm.jsx';
 
 function requestExpiryLabel(value, t) {
   const days = Math.max(0, Math.ceil((new Date(value).getTime() - Date.now()) / 86_400_000));
@@ -23,6 +24,7 @@ export default function Groups() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const { t } = useT();
+  const [confirm, confirmDialog] = useConfirm();
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
@@ -132,7 +134,7 @@ export default function Groups() {
   async function toggleMembership(group) {
     if (saving) return;
     if (group.is_owner) return;
-    if (group.joined && !window.confirm(t('groups.confirmLeave', { name: group.name }))) return;
+    if (group.joined && !(await confirm(t('groups.confirmLeave', { name: group.name })))) return;
     if (!group.joined && group.join_status !== 'pending') {
       setError(''); setReason(''); setJoinTarget(group);
       return;
@@ -182,7 +184,7 @@ export default function Groups() {
 
   async function changeMember(member, add) {
     if (!manageTarget || manageSaving) return;
-    if (!add && !window.confirm(t('groups.confirmRemove', { name: member.name }))) return;
+    if (!add && !(await confirm(t('groups.confirmRemove', { name: member.name })))) return;
     setManageSaving(true); setManageError('');
     try {
       const { error: changeError } = await supabase.rpc('manage_group_member', {
@@ -338,6 +340,7 @@ export default function Groups() {
           {manageError && <p role="alert" className="text-sm text-destructive">{manageError}</p>}
         </DialogContent>
       </Dialog>
+      {confirmDialog}
     </PageShell>
   );
 }

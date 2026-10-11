@@ -196,6 +196,8 @@ select.filter-control { background-color: var(--control-surface); }
 :root { --page-top-pad: 16px; }
 .page-title-row { position: sticky; top: 0; z-index: 11; background: var(--background); }
 .page-title-row::before { content: ''; position: absolute; inset: auto 0 100%; height: var(--page-top-pad); background: var(--background); }
+/* Checkboxes and radios keep the native control, in the app's colour and size. */
+input[type="checkbox"], input[type="radio"] { width: 16px; height: 16px; flex-shrink: 0; accent-color: var(--primary); }
 .page-frame { min-width: 0; border: 1px solid var(--border); border-radius: var(--panel-radius); background: var(--card); }
 .page-frame-body { padding: 24px; }
 .page-frame-list { overflow: hidden; }
@@ -332,7 +334,7 @@ select.filter-control { background-color: var(--control-surface); }
 .floating-field.is-readonly:focus-within { border-color: transparent; background: var(--surface); }
 .floating-field.is-readonly input, .floating-field.is-readonly select, .floating-field.is-readonly textarea { color: var(--muted-foreground); cursor: default; }
 .floating-field.is-readonly.is-select::after { opacity: .35; }
-.floating-field-hint { position: absolute; right: 12px; bottom: 6px; color: var(--muted-foreground); font-size: var(--type-micro); line-height: 16px; pointer-events: none; }
+.floating-field-hint { position: absolute; right: 12px; top: 6px; color: var(--muted-foreground); font-size: var(--type-micro); line-height: 16px; pointer-events: none; }
 .floating-field.is-readonly.is-select .floating-field-hint { right: 30px; }
 /* The month/year pickers are two controls, so the period carries one caption
    above them rather than a floating label inside each. */

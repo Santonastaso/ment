@@ -1,6 +1,5 @@
 {
   "onboarding.background.academic": "Parcours universitaire",
-  "onboarding.background.work": "Expérience professionnelle",
   "onboarding.error.session": "Votre session a expiré. Reconnectez-vous et réessayez.",
   "onboarding.error.unavailable": "L'enregistrement du profil est temporairement indisponible. Vos informations sont conservées sur cette page.",
   "onboarding.error.busy": "Veuillez réessayer dans un instant.",
@@ -32,7 +31,6 @@
   "onboarding.background.title": "Votre parcours",
   "onboarding.background.desc": "Parlez-nous de votre lieu de vie et de ce sur quoi vous avez travaillé pour trouver des contacts pertinents.",
   "onboarding.fields.fullName": "Nom complet",
-  "onboarding.fields.fullNamePlaceholder": "Votre nom",
   "onboarding.fields.selectDepartment": "Choisir un département",
   "onboarding.fields.location": "Lieu",
   "onboarding.fields.locationHint": "(une seule ville ou télétravail)",
@@ -56,8 +54,6 @@
   "onboarding.learn.desc": "Quelles compétences souhaitez-vous développer dans les 6 à 12 prochains mois ? Saisissez une compétence puis appuyez sur Entrée.",
   "onboarding.learn.placeholder": "Par ex. leadership, Python, référencement, gestion de projet…",
   "onboarding.learn.aria": "Ajouter une compétence à apprendre",
-  "onboarding.learn.shadowLabel": "Si vous pouviez passer une journée auprès d'une personne exerçant un métier très différent, lequel choisiriez-vous ?",
-  "onboarding.learn.shadowPlaceholder": "Quelques phrases suffisent. Vous seul pourrez les voir.",
   "onboarding.error.generic": "Something went wrong. Please try again.",
   "onboarding.nav.back": "Retour",
   "onboarding.nav.skip": "Ignorer et saisir manuellement",

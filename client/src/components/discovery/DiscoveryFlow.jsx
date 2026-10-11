@@ -6,7 +6,7 @@ import api from '../../api/index.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useT } from '../../i18n/index.jsx';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog.jsx';
-import { Button } from '../ui/button.jsx';
+import { Button, ButtonLink } from '../ui/button.jsx';
 import { Skeleton } from '../ui/skeleton.jsx';
 import DirectoryFilter from '../DirectoryFilter.jsx';
 import { CONVERSATION_FILTERS, conversationState, requestText, resumableSearch } from '../../lib/conversations.mjs';
@@ -126,7 +126,7 @@ function MatchCard({ match, index, selected, onSelect, copy, style, profileHref,
       </span>
 
       <span className="person-row-actions">
-        <Button variant="ghost" size="sm" className="person-row-link" render={<Link to={profileHref(person.id)} />}
+        <ButtonLink size="sm" className="person-row-link" to={profileHref(person.id)}
           onClick={(event) => {
             // A plain click stays in the app and remembers the chat; a
             // modifier click still opens the profile in a new tab.
@@ -134,7 +134,7 @@ function MatchCard({ match, index, selected, onSelect, copy, style, profileHref,
             event.preventDefault();
             onViewProfile(person.id);
           }}
-        >{copy.viewProfile}</Button>
+        >{copy.viewProfile}</ButtonLink>
         <Button variant={selected ? 'default' : 'ghost'} size="sm"
           type="button"
           aria-label={`${copy.choose} ${person.name}`}
@@ -184,7 +184,6 @@ export default function DiscoveryFlow() {
   const [sessionId, setSessionId] = useState(null);
   const [threadId, setThreadId] = useState(null);
   const [clarification, setClarification] = useState('');
-  const [noMatchReason, setNoMatchReason] = useState('');
   const [history, setHistory] = useState([]);
   const [resumeThread, setResumeThread] = useState(null);
   const [historyError, setHistoryError] = useState('');
@@ -268,7 +267,7 @@ export default function DiscoveryFlow() {
     const message = nextQuery.trim();
     if (!message) return;
     setTurns(current => [...current, { role: 'user', content: message, at: new Date().toISOString() }]);
-    setError(''); setStage('matching'); setClarification(''); setNoMatchReason(''); setMatchFeedback(null);
+    setError(''); setStage('matching'); setClarification(''); setMatchFeedback(null);
     setSelected(null); setDraft('');
     try {
       const [{ data }] = await Promise.all([api.post('/discovery/matches', { query: message, thread_id: activeThreadId }), pause(350)]);
@@ -283,7 +282,7 @@ export default function DiscoveryFlow() {
         setStage('clarify');
       } else {
         setSubmittedQuery(requestText(data.resolved_request, message));
-        setNoMatchReason(data.no_match_reason || '');
+       
         setTurns(current => [...current, {
           role: 'assistant',
           kind: nextMatches.length ? 'matches' : 'no_match',
@@ -403,7 +402,7 @@ export default function DiscoveryFlow() {
       await api.put(`/discovery/threads/${id}`, { archived: false });
       setThreadId(id);
       setSubmittedQuery(requestText(lastAssistant.search_request, lastUser.content));
-      setQuery(''); setMatches([]); setSelected(null); setDraft(''); setClarification(''); setNoMatchReason('');
+      setQuery(''); setMatches([]); setSelected(null); setDraft(''); setClarification('');
       if (lastAssistant.kind === 'matches' && Array.isArray(lastAssistant.matches)) {
         setMatches(lastAssistant.matches.map(person => ({ person, expertise: person.expertise || [], background: person.background || '', reasons: person.reasons || [] })));
         setStage('choose');
@@ -411,7 +410,7 @@ export default function DiscoveryFlow() {
         setClarification(lastAssistant.content || '');
         setStage('clarify');
       } else if (lastAssistant.kind === 'no_match') {
-        setNoMatchReason(lastAssistant.content || '');
+       
         setStage('empty');
       } else if (lastAssistant.kind === 'draft' && lastAssistant.person) {
         const person = lastAssistant.person;
@@ -444,7 +443,7 @@ export default function DiscoveryFlow() {
     flowVersion.current += 1;
     const currentThread = threadId;
     setConnectionCategory(null);
-    setStage('ask'); setQuery(''); setSubmittedQuery(''); setTurns([]); setMatches([]); setSelected(null); setDraft(''); setRequestTitle(''); setRequestIntent('one_off'); setSending(false); setError(''); setSessionId(null); setThreadId(null); setClarification(''); setNoMatchReason(''); setMatchFeedback(null); idempotencyKey.current = null;
+    setStage('ask'); setQuery(''); setSubmittedQuery(''); setTurns([]); setMatches([]); setSelected(null); setDraft(''); setRequestTitle(''); setRequestIntent('one_off'); setSending(false); setError(''); setSessionId(null); setThreadId(null); setClarification(''); setMatchFeedback(null); idempotencyKey.current = null;
     if (currentThread) api.put(`/discovery/threads/${currentThread}`, { archived: true }).then(refreshHistory).catch(() => {});
   }
 
@@ -629,7 +628,7 @@ export default function DiscoveryFlow() {
             ) : (
               <>
                 <div className="discovery-confirmation"><Check /><div><strong>{text(copy, 'sent', { name: selected.person.name.split(' ')[0] })}</strong><p>{copy.sentSubline}</p></div></div>
-                {sessionId && <Button variant="ghost" className="mt-4" render={<Link to={sessionPath({ id: sessionId, route_token: sentSessionToken })} />}>{copy.openChat}</Button>}
+                {sessionId && <ButtonLink className="mt-4" to={sessionPath({ id: sessionId, route_token: sentSessionToken })}>{copy.openChat}</ButtonLink>}
                 <Button type="button" variant="ghost" onClick={reset}>{copy.again}</Button>
               </>
             )}

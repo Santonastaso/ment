@@ -24,7 +24,6 @@
   "groups.create.submit": "Crea",
   "groups.saving": "Salvataggio...",
   "groups.list.title": "Gruppi del campus",
-  "groups.list.empty": "Nessun gruppo ancora.",
   "groups.tabs.label": "Sezioni dei gruppi",
   "groups.tab.mine": "I miei gruppi",
   "groups.tab.explore": "Esplora",
@@ -54,8 +53,5 @@
   "groups.error.load": "Impossibile caricare i gruppi. Riprova.",
   "groups.error.save": "Impossibile salvare la modifica. Riprova.",
   "groups.chat": "Chat",
-  "groups.chatSubtitle": "Conversazione di gruppo",
-  "groups.chatEmpty": "Nessun messaggio. Inizia la conversazione.",
-  "groups.chatPlaceholder": "Scrivi al gruppo",
-  "groups.chatSend": "Invia messaggio"
+  "groups.chatSubtitle": "Conversazione di gruppo"
 }
