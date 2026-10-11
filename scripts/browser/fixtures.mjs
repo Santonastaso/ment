@@ -108,7 +108,7 @@ function fixtureApi(state, ApiError) {
         if (row && !same(row, body)) throw new ApiError('idempotency_conflict', 400);
         if (!row) {
           const id = Math.max(2, ...state.sessions.map(session => session.id)) + 1;
-          row = { ...body, id, status: 'pending', mentor: state.peer, mentee: state.user, mentee_id: state.user.id, request_expires_at: new Date(Date.now() + 7 * 86400000).toISOString() };
+          row = { ...body, outbound_message: body.message, id, status: 'pending', mentor: state.peer, mentee: state.user, mentee_id: state.user.id, request_expires_at: new Date(Date.now() + 7 * 86400000).toISOString() };
           state.sessions.push(row);
           state.messages[`/sessions/${id}/messages`] = [{ id: 1, sender_id: state.user.id, kind: 'request', body: body.message, created_at: new Date().toISOString() }];
         }

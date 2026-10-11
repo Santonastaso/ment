@@ -403,7 +403,8 @@ export default function DiscoveryFlow() {
         if (sentSession) {
           setSentStatus(isExpired(sentSession) ? 'expired' : sentSession.status);
           setSelected({ person: lastAssistant.person, expertise: lastAssistant.person.expertise || [], background: lastAssistant.person.background || '', reasons: lastAssistant.person.reasons || [] });
-          setDraft(lastAssistant.content || '');
+          // What was sent, which the user may have reworded after it was drafted.
+          setDraft(sentSession.outbound_message || lastAssistant.content || '');
           setRequestTitle(sentSession.title || '');
           setSubmittedQuery(requestText(lastAssistant.search_request, lastUser.content));
           setSessionId(sentSession.id);

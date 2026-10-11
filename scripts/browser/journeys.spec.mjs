@@ -1639,6 +1639,20 @@ test('a Home request that was saved but whose answer was lost is not sent twice'
   expect(posts[1].idempotency_key).toBe(posts[0].idempotency_key);
 });
 
+test('reopening a search shows the message that was sent, not the draft before it was edited', async ({ page }) => {
+  const invite = await draftHomeInvite(page);
+  const generated = await invite.draft.inputValue();
+  await invite.draft.fill('My own wording, edited before sending.');
+  await invite.send.click();
+  await expect(page.getByRole('link', { name: 'Open chat', exact: true })).toBeVisible();
+  // The saved search still holds the generated draft; the request holds what was sent.
+  await page.evaluate(() => { window.fixture.threadDraft = true; history.pushState({}, '', '/?thread=thread'); dispatchEvent(new PopStateEvent('popstate')); });
+  const reopened = page.getByRole('textbox', { name: 'Suggested draft' });
+  await expect(reopened).toHaveValue('My own wording, edited before sending.');
+  expect(generated).not.toBe('My own wording, edited before sending.');
+  await expect(page.getByText('Request sent to Peer.')).toBeVisible();
+});
+
 test('a Home request the server refused can be edited and sent as a new one', async ({ page }) => {
   const invite = await draftHomeInvite(page);
   // A refusal the app has no sentence for shows the general message, not the code.
@@ -1694,7 +1708,7 @@ test('choosing a skill suggestion saves it once, whether the save is fast, slow 
 });
 
 test('a reopened search is "sent" only when it carries its own request', async ({ page }) => {
-  const request = status => ({ id: 9, status, title: 'Another request', mentor_id: 'peer', mentee_id: 'viewer', route_token: 'tok9',
+  const request = status => ({ id: 9, status, title: 'Another request', outbound_message: 'The wording I actually sent.', mentor_id: 'peer', mentee_id: 'viewer', route_token: 'tok9',
     mentor: { id: 'peer', name: 'Peer Mentor' }, mentee: { id: 'viewer', name: 'Viewer Student' } });
   // The fixture is rebuilt on every load, so state is set first and the search opened in-app.
   const reopen = async (flags, session) => {
@@ -1721,6 +1735,8 @@ test('a reopened search is "sent" only when it carries its own request', async (
   await expect(page.locator('.discovery-confirmation')).toContainText('Declined');
   await expect(page.getByRole('link', { name: 'Open chat', exact: true })).toHaveAttribute('href', '/c/tok9');
   await expect(draft).toBeDisabled();
+  // The message shown is the one sent, not the draft it started from.
+  await expect(draft).toHaveValue('The wording I actually sent.');
 });
 
 // In-app navigation: the fixture is rebuilt on a full page load.
