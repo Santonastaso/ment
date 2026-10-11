@@ -278,12 +278,10 @@ export default function DiscoveryFlow() {
       const nextMatches = (data.matches || []).map((person) => ({ person, expertise: person.expertise || [], background: person.background || '', reasons: person.reasons || [] }));
       setMatches(nextMatches);
       if (data.clarification) {
-       
         setTurns(current => [...current, { role: 'assistant', kind: 'clarification', content: data.clarification, suggestions: Array.isArray(data.suggestions) ? data.suggestions : [], at: new Date().toISOString() }]);
         setStage('clarify');
       } else {
         setSubmittedQuery(requestText(data.resolved_request, message));
-       
         setTurns(current => [...current, {
           role: 'assistant',
           kind: nextMatches.length ? 'matches' : 'no_match',
@@ -418,10 +416,8 @@ export default function DiscoveryFlow() {
         setMatches(lastAssistant.matches.map(person => ({ person, expertise: person.expertise || [], background: person.background || '', reasons: person.reasons || [] })));
         setStage('choose');
       } else if ((lastAssistant.kind === 'clarification' || lastAssistant.kind === 'chat')) {
-       
         setStage('clarify');
       } else if (lastAssistant.kind === 'no_match') {
-       
         setStage('empty');
       } else if (lastAssistant.kind === 'draft' && lastAssistant.person) {
         const person = lastAssistant.person;
@@ -632,7 +628,7 @@ export default function DiscoveryFlow() {
                   <div className="discovery-intent-select">
                     <DirectoryFilter label={intentCopy.intent} value={requestIntent} onChange={setRequestIntent} disabled={sending || !!pendingRequest} options={[{ value: 'one_off', label: intentCopy.oneOff }, { value: 'ongoing', label: intentCopy.ongoing }]} renderValue={requestIntent === 'ongoing' ? intentCopy.ongoing : intentCopy.oneOff} />
                   </div>
-                  <Button type="button" variant="ghost" onClick={regenerate}><RefreshCw />{copy.regenerate}</Button>
+                  <Button type="button" variant="ghost" onClick={regenerate} disabled={sending || !!pendingRequest}><RefreshCw />{copy.regenerate}</Button>
                   <Button type="button" onClick={sendRequest} disabled={sending || !draft.trim() || !requestTitle.trim()}>{sending ? <RefreshCw className="animate-spin" /> : <Send />}{copy.send}</Button>
                 </div>
               </div>
