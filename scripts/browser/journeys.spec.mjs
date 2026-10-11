@@ -1613,6 +1613,8 @@ test('a Home request that failed without an answer is retried unchanged', async 
   // The first attempt may have been saved, so it cannot be reworded before the retry.
   await expect(invite.draft).toBeDisabled();
   await expect(invite.title).toBeDisabled();
+  // Nor replaced: a new draft on screen would not be the message the retry sends.
+  await expect(page.getByRole('button', { name: 'Regenerate' })).toBeDisabled();
   await invite.send.click();
   await expect(page.getByRole('link', { name: 'Open chat', exact: true })).toBeVisible();
   const posts = await invite.posts();
