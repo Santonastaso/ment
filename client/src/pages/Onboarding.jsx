@@ -1,9 +1,8 @@
 ﻿import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import SkillTagInput from '../components/SkillTagInput.jsx';
 import TeachSkillsEditor from '../components/TeachSkillsEditor.jsx';
-import CareerEntryFields from '../components/CareerEntryFields.jsx';
+import CareerEntryFields, { department } from '../components/CareerEntryFields.jsx';
 import { Field } from '../components/ui/field.jsx';
 import { hasPlaceholderName, onboardingErrorKey } from '../lib/onboarding.mjs';
 import { Check } from 'lucide-react';
@@ -21,9 +20,8 @@ function SuggestedPill() {
 }
 
 
-export default function Onboarding({ returnTo }) {
+export default function Onboarding() {
   const { user, updateUser } = useAuth();
-  const navigate = useNavigate();
   const { t } = useT();
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -78,11 +76,11 @@ export default function Onboarding({ returnTo }) {
     if (proposed.bio) { setBio(proposed.bio); next.add('bio'); }
     const importedCareer = Array.isArray(proposed.career_history) && proposed.career_history.length
       ? proposed.career_history
-      : [{ role_title: proposed.job_title || proposed.current_role || '', department: proposed.department || '' }];
+      : [{ role_title: proposed.job_title || proposed.current_role || '', department: department(proposed.department) }];
     if (importedCareer[0].role_title || importedCareer[0].role || importedCareer[0].department) {
       setCareer(importedCareer.map(ch => ({
         role: ch.role || ch.role_title || proposed.job_title || proposed.current_role || '',
-        department: ch.department || proposed.department || '',
+        department: department(ch.department || proposed.department),
         company: ch.company || '',
         description: ch.description || '',
         start_date: monthYearValue(ch.start_year, ch.start_month),
@@ -193,8 +191,8 @@ export default function Onboarding({ returnTo }) {
         linkedin_url: linkedinUrl,
         linkedin_headline: null,
       });
+      // The onboarding route sends a completed user on: back where they were headed, or to their home.
       updateUser({ ...res.data, weekly_meeting_limit: weekly, monthly_meeting_limit: monthly, mentorship_paused: !acceptsRequests });
-      navigate(returnTo || '/');
     } catch (e) {
       setError(t(onboardingErrorKey(e)));
     } finally {

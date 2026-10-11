@@ -1722,3 +1722,92 @@ test('a reopened search is "sent" only when it carries its own request', async (
   await expect(page.getByRole('link', { name: 'Open chat', exact: true })).toHaveAttribute('href', '/c/tok9');
   await expect(draft).toBeDisabled();
 });
+
+// In-app navigation: the fixture is rebuilt on a full page load.
+const visit = (page, path) => page.evaluate(to => { history.pushState({}, '', to); dispatchEvent(new PopStateEvent('popstate')); }, path);
+
+test('a slow profile answer does not replace the profile opened after it', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => { window.fixture.holdLoads = ['/users/peer']; });
+  await visit(page, '/profile/peer');
+  await expect.poll(() => page.evaluate(() => window.fixture.pendingLoads.length)).toBeGreaterThan(0);
+  // Same route, another person: the page is reused, so only the load itself can tell them apart.
+  await visit(page, '/profile/viewer');
+  await expect(page.locator('main')).toContainText('Viewer Student');
+  // The first profile's answer arrives only now, after the user has moved on.
+  await page.evaluate(() => { window.fixture.holdLoads = []; window.fixture.pendingLoads.splice(0).forEach(resolve => resolve()); });
+  await page.waitForTimeout(400);
+  await expect(page.locator('main')).toContainText('Viewer Student');
+  await expect(page.locator('main')).not.toContainText('Peer Mentor');
+});
+
+test('a department a CV import brings in is kept as written, never turned into "Other"', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => {
+    window.fixture.ingestProposed = { job_title: 'Researcher', department: '', bio: 'Built useful systems.', can_teach: [], wants_to_learn: [],
+      career_history: [{ role_title: 'Researcher', department: 'Research & Development' }, { role_title: 'Analyst', department: 'finance' }] };
+    window.fixture.setUser({ ...window.fixture.user, onboarding_complete: false });
+  });
+  await page.getByRole('checkbox').check();
+  await page.locator('input[type="file"]').setInputFiles({ name: 'resume.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 synthetic CV') });
+  await expect(page.getByRole('heading', { name: /Your background/i })).toBeVisible();
+  // Shown as its own choice, and still there in the list next to the standard ones.
+  const first = page.getByLabel('Department *').first();
+  await expect(first).toContainText('Research & Development');
+  await first.click();
+  await expect(page.getByRole('option', { name: 'Research & Development', exact: true })).toBeVisible();
+  await expect(page.getByRole('option', { name: 'Other', exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.getByRole('button', { name: 'Finish' }).click();
+  await expect.poll(() => page.evaluate(() => window.fixture.calls.find(call => call.path === '/users/me/onboarding')?.body.career.map(entry => entry.department)))
+    .toEqual(['Research & Development', 'Finance']);
+});
+
+async function finishOnboarding(page) {
+  await expect(page).toHaveURL(/\/onboarding$/);
+  await page.getByRole('button', { name: /^Skip/ }).click();
+  await page.getByRole('textbox', { name: 'Role title *' }).fill('Analyst');
+  await page.getByLabel('Department *').click();
+  await page.getByRole('option', { name: 'Finance', exact: true }).click();
+  for (let step = 0; step < 3; step++) await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.getByRole('button', { name: /^Finish/ }).click();
+}
+
+test('an alumnus who finishes onboarding lands in Messages', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => window.fixture.setUser({ ...window.fixture.user, role: 'alumnus', onboarding_complete: false }));
+  await finishOnboarding(page);
+  await expect(page).toHaveURL(/\/conversations$/);
+});
+
+test('finishing onboarding returns the user to the page they were headed for', async ({ page }) => {
+  await page.goto('/');
+  await visit(page, '/explorer');
+  await page.evaluate(() => window.fixture.setUser({ ...window.fixture.user, role: 'alumnus', onboarding_complete: false }));
+  await finishOnboarding(page);
+  await expect(page).toHaveURL(/\/explorer$/);
+});
+
+test('Groups keeps its list on screen while it refreshes', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('nav').getByRole('link', { name: 'Groups' }).click();
+  const group = page.locator('main article.person-row');
+  await expect(group).toContainText('Test Group');
+  await page.evaluate(() => { window.fixture.holdLoads = ['/groups']; window.dispatchEvent(new Event('focus')); });
+  await expect.poll(() => page.evaluate(() => window.fixture.pendingLoads.length)).toBeGreaterThan(0);
+  // The reload is in flight: the list stays and no skeleton takes its place.
+  await expect(group).toContainText('Test Group');
+  await expect(page.locator('main [role="status"]')).toHaveCount(0);
+  await page.evaluate(() => { window.fixture.holdLoads = []; window.fixture.pendingLoads.splice(0).forEach(resolve => resolve()); });
+});
+
+test('a paused mentor shows a readable return date', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => Object.assign(window.fixture.peer, { mentorship_available: false, mentorship_unavailable_until: `${new Date().getFullYear() + 1}-03-09` }));
+  await visit(page, '/profile/peer');
+  // Day and month order follow the reader's language; the raw 2027-03-09 never shows.
+  await expect(page.getByText(/^Not available for new requests until (9 Mar|Mar 9),? \d{4}$/)).toBeVisible();
+});

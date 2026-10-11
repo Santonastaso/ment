@@ -144,21 +144,23 @@ export function AuthProvider({ children }) {
   const refreshUnreadCounts = useCallback(async () => {
     if (!session?.user?.id) { setUnreadCounts({ sessions: 0, groups: 0, sessionMessages: {}, groupMessages: {} }); return; }
     try {
-      // Row security shows a join request to its sender and to the group's
-      // owner, so the pending ones that are not mine are the ones I must answer.
-      const [{ data, error }, requests] = await Promise.all([
-        supabase.rpc('my_unread_message_counts'),
-        supabase.from('group_join_requests').select('group_id', { count: 'exact', head: true })
-          .eq('status', 'pending').gt('expires_at', new Date().toISOString()).neq('user_id', session.user.id),
-      ]);
-      if (!error && data) setUnreadCounts({
-        groupRequests: requests.count || 0,
+      const { data, error } = await supabase.rpc('my_unread_message_counts');
+      if (!error && data) setUnreadCounts(current => ({
+        groupRequests: current.groupRequests,
         sessions: data.sessions || 0,
         groups: data.groups || 0,
         sessionMessages: data.session_unread || {},
         groupMessages: data.group_unread || {},
-      });
+      }));
     } catch { /* Keep the last known badge state during a transient network error. */ }
+  }, [session?.user?.id]);
+
+  // Row security shows a join request to its sender and to the group's owner,
+  // so the pending ones that are not mine are the ones I must answer.
+  const refreshGroupRequests = useCallback(async () => {
+    const { count, error } = await supabase.from('group_join_requests').select('group_id', { count: 'exact', head: true })
+      .eq('status', 'pending').gt('expires_at', new Date().toISOString()).neq('user_id', session.user.id);
+    if (!error) setUnreadCounts(current => ({ ...current, groupRequests: count || 0 }));
   }, [session?.user?.id]);
 
   // Refresh on login + every time the active session id changes
@@ -170,18 +172,20 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     if (!session?.user?.id) { setUnreadCounts({ sessions: 0, groups: 0, sessionMessages: {}, groupMessages: {} }); return undefined; }
-    refreshUnreadCounts();
+    const refreshAll = () => { refreshUnreadCounts(); refreshGroupRequests().catch(() => {}); };
     const channel = supabase.channel(`unread-messages:${session.user.id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'session_messages' }, refreshUnreadCounts)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_messages' }, refreshUnreadCounts)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'group_join_requests' }, refreshUnreadCounts)
-      .subscribe();
-    window.addEventListener('focus', refreshUnreadCounts);
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'group_join_requests' }, refreshAll)
+      // Subscribing is both the first load and every reconnection.
+      .subscribe(status => { if (status === 'SUBSCRIBED') refreshAll(); });
+    refreshAll();
+    window.addEventListener('focus', refreshAll);
     return () => {
-      window.removeEventListener('focus', refreshUnreadCounts);
+      window.removeEventListener('focus', refreshAll);
       supabase.removeChannel(channel);
     };
-  }, [session?.user?.id, refreshUnreadCounts]);
+  }, [session?.user?.id, refreshUnreadCounts, refreshGroupRequests]);
 
   return (
     <AuthContext.Provider

@@ -182,11 +182,12 @@ function OnboardingRoute() {
   if (profileError && !user) return <ProfileLoadError />;
   if (!user) return <Navigate to="/login" replace />;
   if (user.must_change_password) return <Navigate to={authGatePath(user)} replace />;
-  if (user.onboarding_complete || user.is_admin) return <Navigate to={destination || homePath(user)} replace />;
+  // "/" is where everyone is sent by default, not somewhere the user chose to go.
+  if (user.onboarding_complete || user.is_admin) return <Navigate to={destination && destination !== '/' ? destination : homePath(user)} replace />;
   return page(
     <div className="min-h-screen bg-background">
       <main className="mx-auto max-w-4xl px-4 py-10">
-        <Onboarding returnTo={destination} />
+        <Onboarding />
       </main>
     </div>
   );

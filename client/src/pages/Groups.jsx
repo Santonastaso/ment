@@ -57,7 +57,6 @@ export default function Groups() {
   const shownGroups = groups.filter(group => (tab === 'mine') === Boolean(isMine(group)));
 
   async function load() {
-    setLoading(true);
     try {
       const res = await api.get('/groups');
       setGroups(res.data || []);
