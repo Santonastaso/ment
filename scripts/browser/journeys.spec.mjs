@@ -1617,6 +1617,10 @@ test('a Home request that failed without an answer is retried unchanged', async 
   expect(posts).toHaveLength(2);
   expect(posts[1]).toEqual(posts[0]);
   expect(await invite.created()).toBe(1);
+  // The request names the search it came from; the server links them, so no
+  // second call is made that could fail and leave the search looking unsent.
+  expect(posts[0].thread_id).toBe('thread');
+  expect(await page.evaluate(() => window.fixture.calls.some(call => call.method === 'put' && call.path === '/discovery/threads/thread' && call.body?.archived === true))).toBe(false);
 });
 
 test('a Home request that was saved but whose answer was lost is not sent twice', async ({ page }) => {
@@ -1679,4 +1683,34 @@ test('choosing a skill suggestion saves it once, whether the save is fast, slow 
     expect(made, label).toHaveLength(1);
     expect(made[0], label).toEqual(['leadership']);
   }
+});
+
+test('a reopened search is "sent" only when it carries its own request', async ({ page }) => {
+  const request = status => ({ id: 9, status, title: 'Another request', mentor_id: 'peer', mentee_id: 'viewer', route_token: 'tok9',
+    mentor: { id: 'peer', name: 'Peer Mentor' }, mentee: { id: 'viewer', name: 'Viewer Student' } });
+  // The fixture is rebuilt on every load, so state is set first and the search opened in-app.
+  const reopen = async (flags, session) => {
+    await page.goto('/');
+    await page.evaluate(([extra, row]) => {
+      Object.assign(window.fixture, extra);
+      window.fixture.sessions.push(row);
+      history.pushState({}, '', '/?thread=thread');
+      dispatchEvent(new PopStateEvent('popstate'));
+    }, [flags, session]);
+  };
+  const draft = page.getByRole('textbox', { name: 'Suggested draft' });
+
+  // Drafted, never sent, while another request with the same person is open: still a draft.
+  await reopen({ threadDraft: true }, request('pending'));
+  await expect(draft).toHaveValue('Hi Peer, a drafted invite.');
+  await expect(draft).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Send request', exact: true })).toBeVisible();
+  await expect(page.getByText('Request sent to Peer.')).toHaveCount(0);
+
+  // Sent from this search and since declined: still sent, with its own chat and where it stands.
+  await reopen({ threadDraft: true, threadSession: 9 }, request('declined'));
+  await expect(page.getByText('Request sent to Peer.')).toBeVisible();
+  await expect(page.locator('.discovery-confirmation')).toContainText('Declined');
+  await expect(page.getByRole('link', { name: 'Open chat', exact: true })).toHaveAttribute('href', '/c/tok9');
+  await expect(draft).toBeDisabled();
 });

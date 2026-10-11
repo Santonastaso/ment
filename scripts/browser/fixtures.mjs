@@ -42,10 +42,13 @@ function fixtureApi(state, ApiError) {
         return { people: people.slice(offset, offset + limit), total: people.length, ...(state.directoryCap ? {} : { limit }), facets: { languages: ['fr', 'it'] } };
       }
       // A saved conversation and a peer profile, for the view-profile round trip.
-      if (path === '/discovery/threads/thread') return { id: 'thread', turns: [
+      // threadDraft adds an invite drafted for the peer; threadSession is the request the search produced, if any.
+      if (path === '/discovery/threads/thread') return { id: 'thread', session_id: state.threadSession ?? null, turns: [
         { role: 'user', content: 'Financial modelling' },
         { role: 'assistant', kind: 'matches', framed: true, content: 'I found someone who could be a great fit.', search_request: 'Financial modelling',
           matches: [{ ...state.peer, expertise: ['Financial modelling'], reasons: ['Teaches financial modelling.'] }] },
+        ...(state.threadDraft ? [{ role: 'assistant', kind: 'draft', content: 'Hi Peer, a drafted invite.', search_request: 'Financial modelling',
+          person: { ...state.peer, expertise: ['Financial modelling'], reasons: [] } }] : []),
       ] };
       if (path === `/users/${state.peer.id}`) return { ...state.peer, skills: [], career: [] };
       if (path.startsWith('/discovery/threads')) return [];
@@ -109,6 +112,8 @@ function fixtureApi(state, ApiError) {
           state.sessions.push(row);
           state.messages[`/sessions/${id}/messages`] = [{ id: 1, sender_id: state.user.id, kind: 'request', body: body.message, created_at: new Date().toISOString() }];
         }
+        // As the server does: the search is linked in the same step that makes the request.
+        if (body.thread_id) state.threadSession = row.id;
         if (state.failAfterCommit === path) { state.failAfterCommit = null; throw dropped(); }
         return payload(row);
       }
