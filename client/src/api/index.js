@@ -524,7 +524,8 @@ async function get(url) {
       .eq('id', viewer.id)
       .single();
     const pendingFromAdmin = !!profile?.pending_checkin;
-    const dueFromTime = lastDays === null || lastDays >= 4;
+    // Weekly means a week, as the email reminder already assumes.
+    const dueFromTime = lastDays === null || lastDays >= 7;
 
     return ok({
       entries: (rows || []).map((r) => ({
