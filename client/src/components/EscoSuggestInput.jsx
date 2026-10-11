@@ -45,6 +45,10 @@ export default function EscoSuggestInput({
   const containerRef = useRef(null);
   const abortRef = useRef(null);
   const blurTimerRef = useRef(null);
+  // The text last handed to the parent to save, until the user edits it. One
+  // choice is one save: leaving the field never submits it a second time, and
+  // after a failed save the retry is the user's (Enter), not a side effect.
+  const committedRef = useRef(null);
   // Refs mirror the latest values so the blur timeout never closes over stale
   // state (a fresh keystroke would otherwise commit the previous text).
   const valueRef = useRef(value);
@@ -58,7 +62,7 @@ export default function EscoSuggestInput({
 
   // Debounced ESCO query. Aborts prior in-flight request on each keystroke.
   useEffect(() => {
-    if (!value || value.trim().length < 2) {
+    if (!value || value.trim().length < 2 || value.trim() === committedRef.current) {
       setSuggestions([]);
       setOpen(false);
       setLoading(false);
@@ -120,6 +124,10 @@ export default function EscoSuggestInput({
 
   function selectEsco(item) {
     if (!item) return;
+    if (blurTimerRef.current) { clearTimeout(blurTimerRef.current); blurTimerRef.current = null; }
+    // The box shows what was chosen, not the letters typed to find it.
+    committedRef.current = item.label;
+    onChange(item.label);
     onCommitEsco?.(item);
     setOpen(false);
     setSuggestions([]);
@@ -135,6 +143,7 @@ export default function EscoSuggestInput({
     const exact = currentSuggestions.find((s) => s.label.toLowerCase() === raw.toLowerCase());
     if (exact) selectEsco(exact);
     else {
+      committedRef.current = raw;
       onCommitCustom?.(raw);
       setOpen(false);
       setSuggestions([]);
@@ -192,6 +201,7 @@ export default function EscoSuggestInput({
             clearTimeout(blurTimerRef.current);
             blurTimerRef.current = null;
           }
+          committedRef.current = null;
           onChange(e.target.value);
         }}
         onKeyDown={handleKeyDown}
@@ -200,7 +210,8 @@ export default function EscoSuggestInput({
           if (blurTimerRef.current) clearTimeout(blurTimerRef.current);
           blurTimerRef.current = setTimeout(() => {
             blurTimerRef.current = null;
-            if ((valueRef.current || '').trim()) commitCustom();
+            const pending = (valueRef.current || '').trim();
+            if (pending && pending !== committedRef.current) commitCustom();
             setOpen(false);
           }, 120);
         }}

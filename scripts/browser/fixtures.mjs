@@ -75,6 +75,15 @@ function fixtureApi(state, ApiError) {
         } };
       }
       if (path === '/profile/ingest/1/accept') return { ok: true };
+      if (path === '/users/me/skills/batch') {
+        // skillSave = { delay, fail }: a slow save, and one that ends in a dropped connection.
+        if (state.skillSave?.delay) await new Promise(resolve => setTimeout(resolve, state.skillSave.delay));
+        if (state.skillSave?.fail) throw dropped();
+        const current = state.profile || { ...state.user, skills: [], career: [] };
+        state.profile = { ...current, skills: [...(current.skills || []).filter(skill => skill.type !== body.type),
+          ...body.skills.map((skill, index) => ({ id: skill.id || 100 + index, skill: skill.skill, type: body.type, example_project: skill.example_project || '' }))] };
+        return null;
+      }
       if (path === '/users/me/onboarding') {
         state.profile = { ...state.user, ...body, skills: [
           ...(body.can_teach || []).map(skill => ({ ...skill, type: 'can_teach' })),
@@ -172,6 +181,11 @@ export const test = base.extend({
     await page.route('**/*', async route => {
       const url = new URL(route.request().url());
       if (url.origin === 'https://fonts.googleapis.com') return route.fulfill({ contentType: 'text/css', body: '' });
+      // The public skills taxonomy: one known suggestion, so choosing it can be tested.
+      if (url.origin === 'https://ec.europa.eu') {
+        const results = (url.searchParams.get('text') || '').startsWith('lead') ? [{ title: 'leadership', uri: 'esco:leadership', preferredLabel: { en: 'leadership' } }] : [];
+        return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ _embedded: { results } }) });
+      }
       if (url.origin !== baseURL) { externalRequests.push(url.origin); return route.abort(); }
       if (url.pathname === '/src/main.jsx') {
         const response = await route.fetch();

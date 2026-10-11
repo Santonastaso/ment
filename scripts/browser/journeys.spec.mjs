@@ -1649,3 +1649,34 @@ test('a Home request the server refused can be edited and sent as a new one', as
   expect(posts[1].idempotency_key).not.toBe(posts[0].idempotency_key);
   expect(await invite.created()).toBe(1);
 });
+
+test('choosing a skill suggestion saves it once, whether the save is fast, slow or fails', async ({ page }) => {
+  await page.goto('/profile?tab=skills');
+  const input = page.getByRole('combobox', { name: 'Add a skill you want to learn' });
+  const saves = () => page.evaluate(() => window.fixture.calls.filter(call => call.path === '/users/me/skills/batch').map(call => call.body.skills.map(skill => skill.skill)));
+  for (const [label, skillSave, fails] of [
+    ['fast failure', { fail: true }, true],
+    ['slow failure', { fail: true, delay: 500 }, true],
+    ['success', { delay: 200 }, false],
+  ]) {
+    const before = (await saves()).length;
+    await page.evaluate(mode => { window.fixture.skillSave = mode; }, skillSave);
+    await input.fill('');
+    await input.fill('lead');
+    await page.getByRole('option', { name: /leadership/ }).click();
+    // Leaving the field, as people do, must not submit anything more.
+    await page.getByRole('heading', { name: 'What you want to learn' }).click();
+    if (fails) {
+      await expect(page.getByRole('alert').first()).toBeVisible();
+      // What was chosen stays in the box for the user to retry; the letters typed do not.
+      await expect(input).toHaveValue('leadership');
+    } else {
+      await expect(page.getByRole('button', { name: 'leadership', exact: true })).toBeVisible();
+      await expect(input).toHaveValue('');
+    }
+    await page.waitForTimeout(400);
+    const made = (await saves()).slice(before);
+    expect(made, label).toHaveLength(1);
+    expect(made[0], label).toEqual(['leadership']);
+  }
+});
