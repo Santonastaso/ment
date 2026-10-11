@@ -51,6 +51,8 @@ const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$
 const wholeWord = (name: string) => new RegExp(`(^|[^\\p{L}])${escapeRegex(name)}([^\\p{L}]|$)`, 'u');
 
 export const isCountry = (value: string) => BY_NAME.has(value.toLowerCase().trim());
+/** Every country name the assistant knows, longest first. */
+export const COUNTRY_NAMES = NAMES;
 
 /** The country a text names, as the user wrote it, or ''. */
 export function countryIn(text: string) {
