@@ -357,8 +357,11 @@ export default function DiscoveryFlow() {
       if (threadId) await api.put(`/discovery/threads/${threadId}`, { archived: true, selected_person_id: selected.person.id }).catch(() => {});
       refreshHistory().catch(() => {});
     } catch (requestError) {
-      // A refusal from the server saved nothing, so the request can be edited again.
-      if (requestError.response) setPendingRequest(null);
+      // Only a refusal (4xx) is known to have saved nothing, so only then may
+      // the request be edited. Every failure carries a response, a dropped
+      // connection included, so the status is what tells them apart.
+      const status = requestError.response?.status;
+      if (status >= 400 && status < 500) setPendingRequest(null);
       setError(requestError.response?.data?.error || copy.error);
     }
     finally { setSending(false); }

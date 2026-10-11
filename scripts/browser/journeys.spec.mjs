@@ -1583,7 +1583,8 @@ test('leaving a group asks in the app, not in a browser box', async ({ page }) =
   expect(await page.evaluate(() => window.fixture.calls.some(call => call.method === 'delete'))).toBe(false);
 });
 
-test('a Home request whose answer was lost is retried unchanged', async ({ page }) => {
+// One step from the Home chat's opening to an editable invite for Peer Mentor.
+async function draftHomeInvite(page) {
   await page.goto('/');
   const composer = page.getByRole('textbox', { name: 'Describe who could help' });
   await composer.fill('finance');
@@ -1594,15 +1595,57 @@ test('a Home request whose answer was lost is retried unchanged', async ({ page 
   await page.getByRole('button', { name: 'Choose Peer Mentor' }).click();
   const draft = page.getByRole('textbox', { name: 'Suggested draft' });
   await draft.fill('First wording.');
+  return {
+    draft,
+    title: page.locator('.discovery-draft').getByRole('textbox', { name: 'Request title' }),
+    send: page.getByRole('button', { name: 'Send request', exact: true }),
+    posts: () => page.evaluate(() => window.fixture.calls.filter(call => call.method === 'post' && call.path === '/sessions').map(call => call.body)),
+    created: () => page.evaluate(() => window.fixture.sessions.filter(session => session.idempotency_key).length),
+  };
+}
+
+test('a Home request that failed without an answer is retried unchanged', async ({ page }) => {
+  const invite = await draftHomeInvite(page);
   await page.evaluate(() => { window.fixture.failNext = '/sessions'; });
-  const send = page.getByRole('button', { name: 'Send request', exact: true });
-  await send.click();
+  await invite.send.click();
   // The first attempt may have been saved, so it cannot be reworded before the retry.
-  await expect(draft).toBeDisabled();
-  await expect(page.locator('.discovery-draft').getByRole('textbox', { name: 'Request title' })).toBeDisabled();
-  await send.click();
+  await expect(invite.draft).toBeDisabled();
+  await expect(invite.title).toBeDisabled();
+  await invite.send.click();
   await expect(page.getByRole('link', { name: 'Open chat', exact: true })).toBeVisible();
-  const posts = await page.evaluate(() => window.fixture.calls.filter(call => call.method === 'post' && call.path === '/sessions').map(call => call.body));
+  const posts = await invite.posts();
   expect(posts).toHaveLength(2);
   expect(posts[1]).toEqual(posts[0]);
+  expect(await invite.created()).toBe(1);
+});
+
+test('a Home request that was saved but whose answer was lost is not sent twice', async ({ page }) => {
+  const invite = await draftHomeInvite(page);
+  await page.evaluate(() => { window.fixture.failAfterCommit = '/sessions'; });
+  await invite.send.click();
+  await expect(invite.draft).toBeDisabled();
+  expect(await invite.created()).toBe(1);
+  await invite.send.click();
+  await expect(page.getByRole('link', { name: 'Open chat', exact: true })).toBeVisible();
+  // The retry found the request already made: still one on the server.
+  expect(await invite.created()).toBe(1);
+  const posts = await invite.posts();
+  expect(posts[1].idempotency_key).toBe(posts[0].idempotency_key);
+});
+
+test('a Home request the server refused can be edited and sent as a new one', async ({ page }) => {
+  const invite = await draftHomeInvite(page);
+  await page.evaluate(() => { window.fixture.refuseNext = { path: '/sessions', code: 'mentor_at_capacity' }; });
+  await invite.send.click();
+  // Nothing was saved, so the wording is the user's to change.
+  await expect(invite.draft).toBeEnabled();
+  await expect(invite.title).toBeEnabled();
+  expect(await invite.created()).toBe(0);
+  await invite.draft.fill('Second wording.');
+  await invite.send.click();
+  await expect(page.getByRole('link', { name: 'Open chat', exact: true })).toBeVisible();
+  const posts = await invite.posts();
+  expect(posts[1].message).toBe('Second wording.');
+  expect(posts[1].idempotency_key).not.toBe(posts[0].idempotency_key);
+  expect(await invite.created()).toBe(1);
 });
