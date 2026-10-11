@@ -58,6 +58,8 @@ member records.
    (all functions when shared code changes), and checks production RLS. Vercel
    promotes the matching website deployment only after that job succeeds.
    Check both systems report success for the same commit.
+   When several merges land close together, only the newest commit is
+   released: the older runs end green with `release-supabase` skipped.
 4. Trigger `notification-outbox` once and inspect sent/failed counts. Rows older
    than two days (seven for reflections) are marked failed rather than mailed.
    Investigate the pre-existing stale queue before setting `NOTIFICATIONS_ENABLED=true`.

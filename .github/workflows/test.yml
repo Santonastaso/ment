@@ -6,8 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+# A pull request keeps only its newest run. Each commit on main gets its own
+# run: queued in one group, the middle of three quick merges was cancelled.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
@@ -145,12 +147,40 @@ jobs:
         if: always()
         run: supabase stop --no-backup
 
-  release-supabase:
+  # Only the newest commit on main is released. An older commit released
+  # after a newer one fails at "Apply migrations": production already holds a
+  # migration that commit does not have. Its run ends green with the release
+  # skipped, and the newest commit's run releases everything.
+  newest-on-main:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [changed-functions, gitleaks, build, edge-functions, database]
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      newest: ${{ steps.tip.outputs.newest }}
+    steps:
+      - id: tip
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tip=$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)
+          if [ "$tip" = "$GITHUB_SHA" ]; then
+            echo 'newest=true' >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::main has moved on to $tip; that commit's run does the release."
+          fi
+
+  release-supabase:
+    if: needs.newest-on-main.outputs.newest == 'true'
+    needs: newest-on-main
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: production
+    # One release at a time, never interrupted.
+    concurrency:
+      group: release-supabase-production
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v5
 
