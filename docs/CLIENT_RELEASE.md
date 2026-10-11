@@ -24,6 +24,10 @@ member records.
 - Leave the GitHub Actions variable `NOTIFICATIONS_ENABLED` unset until sender
   secrets and recipient addresses are verified. Set it to `true` only after a
   successful manual `notification-outbox` run to enable the 15-minute schedule.
+- Leave the GitHub Actions variable `CALENDAR_SYNC_ENABLED` unset until the
+  calendar provider secrets are set and the repository has `SUPABASE_URL` and
+  `SUPABASE_SERVICE_ROLE_KEY`. Set it to `true` only after a successful manual
+  `calendar-sync` run to enable the 5-minute schedule.
 
 ## 2. Staging verification
 
