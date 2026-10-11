@@ -4,6 +4,7 @@ import { aiErrorResponse, mistralJson } from '../_shared/mistral.ts';
 import { enforceRateLimit } from '../_shared/rate-limit.ts';
 import { canHelpWithCareerGoal, hasGroundedExpertise } from '../_shared/discovery-guards.mjs';
 import { atPlace, COUNTRY_NAMES, countryIn, isCountry } from './places.ts';
+import { COUNTRY_EXCLUSION_NAMES, outsideExcludedPlaces } from './location-exclusions.ts';
 import { departmentChoices, frameChat, frameExhausted, frameNarrow, frameNoMatch, frameOpenAgain, frameRefineNone, frameSmallTalk, frameNudge, frameSamePeople, frameSomeRepeated, frameRejectedNone, framePrivacy, frameDirectory, framePerson, exploreChoice, frameWhichFirst, narrowChoices, ownWordsInvite, scopeChoices, type Choice, frameResults, namesARole, NO_GAP, type Gap, frameConflict, conflictChoices, frameScope, frameBroad } from './framing.ts';
 import { keepsFacts, repeats, sameOpening, VOICE_PROMPT, withoutRepeats } from './voice.ts';
 import { NO_PARTS, narrowStepwise, negatedWords, readParts, withoutExcluded, type Filter, type Parts } from './request.ts';
@@ -569,9 +570,10 @@ function placeComplaint(message: string, priorTurns: Array<Record<string, unknow
 const LEAVE_OUT_CUE = "(?:not|except|excluding|without|outside|pas|sauf|sans|hors|non|tranne|senza|fuori)\\s+(?:(?:in|at|from|of|à|a|au|aux|en|dans|de|ad|da|di)\\s+)?(?:the\\s+|la\\s+|le\\s+|les\\s+|l['’]|il\\s+|lo\\s+)?";
 function excludedPlaces(message: string, known: string[] = []) {
   const lower = message.toLowerCase();
-  const names = [...new Set([...known.map((place) => place.toLowerCase()), ...COUNTRY_NAMES, ...Object.keys(REGION_CITIES),
+  const names = [...new Set([...known.map((place) => place.toLowerCase()), ...COUNTRY_NAMES, ...COUNTRY_EXCLUSION_NAMES, ...Object.keys(REGION_CITIES),
     ...WORLD_CITIES, ...Object.values(REGION_CITIES).flat().map((city) => city.toLowerCase())])]
-    .filter((name) => name.length > 2).sort((a, b) => b.length - a.length);
+    // Two letters are too easily an ordinary word ("pas eu le temps", "not in my field"); "uk" is the one such name people type.
+    .filter((name) => name.length > 2 || name === 'uk').sort((a, b) => b.length - a.length);
   const found: string[] = [];
   for (const name of names) {
     if (found.some((longer) => longer.includes(name))) continue;
@@ -1418,17 +1420,11 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
   if (leaveOut.length) {
     // A country or region stands for the cities it covers.
     const out = new Set(leaveOut.flatMap((place) => [place, ...(REGION_CITIES[place] || []).map((city) => city.toLowerCase())]));
-    candidates = candidates.filter((candidate) => {
-      const where = cleanText(candidate.location, 80).toLowerCase();
-      return !where || ![...out].some((place) => where === place || where.includes(place));
-    });
+    candidates = candidates.filter(candidate => outsideExcludedPlaces(cleanText(candidate.location, 80), leaveOut, REGION_CITIES));
     // Neither a place carried over from the earlier search nor the people
     // already shown may bring the left-out place back.
     if (out.has(namedLocationFilter.toLowerCase())) { namedLocationFilter = ''; locationCities = []; }
-    refineFallback = refineFallback.filter((match) => {
-      const where = cleanText(match.location, 80).toLowerCase();
-      return !where || ![...out].some((place) => where === place || where.includes(place));
-    });
+    refineFallback = refineFallback.filter(match => outsideExcludedPlaces(cleanText(match.location, 80), leaveOut, REGION_CITIES));
   }
   const networkCandidates = candidates;
 

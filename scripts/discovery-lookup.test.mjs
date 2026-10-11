@@ -1040,12 +1040,23 @@ const financeShown = (people) => [
 const everyone = (people) => ({ outcome: 'matches', matches: people.map((person) => ({ profile_id: person.id, confidence: 0.9, reasons: ['Finance.'], matched_expertise: ['Financial modelling'] })) });
 
 test('a bare negated place leaves that place out and keeps people elsewhere', async () => {
-  for (const [query, lang, out, kept] of [
+  for (const [query, lang, out, kept, named = out] of [
     ['not in London please', 'en', 'London', 'Paris'],
     ['pas à Paris', 'fr', 'Paris', 'London'],
     ['non a Milano', 'it', 'Milano', 'Paris'],
     ['not in New York', 'en', 'New York', 'Paris'],
     ['except London', 'en', 'London', 'Paris'],
+    // A country is left out by geography, not by a short list of its cities.
+    ['not in UK', 'en', 'Leeds', 'Paris', 'uk'],
+    ['not in the UK', 'en', 'Glasgow', 'Paris', 'uk'],
+    ['not in France', 'en', 'Lyon', 'Berlin', 'france'],
+    ['pas en France', 'fr', 'Marseille', 'London', 'france'],
+    ['non in Italia', 'it', 'Bari', 'Berlin', 'italia'],
+    ['not in Germany', 'en', 'Leipzig', 'Rome', 'germany'],
+    // Rome, Paris and London also exist in the United States; the well-known one is meant.
+    ['not in the USA', 'en', 'Denver', 'Rome', 'usa'],
+    ['not in the United States', 'en', 'Chicago', 'Paris', 'united states'],
+    ['pas aux États-Unis', 'fr', 'New York', 'London', 'états-unis'],
   ]) {
     const people = [inCity('out', out), inCity('kept', kept)];
     // The model does its worst: it names the excluded place as the place wanted
@@ -1056,11 +1067,22 @@ test('a bare negated place leaves that place out and keeps people elsewhere', as
     const result = await (await run(fixture, { action: 'chat', thread_id: 'thread', query, lang })).json();
     assert.deepEqual(result.matches.map((match) => match.location), [kept], query);
     assert.notEqual(String(result.understood.location).toLowerCase(), out.toLowerCase(), query);
-    assert.ok(result.understood.exclude.includes(out.toLowerCase()), query);
+    assert.ok(result.understood.exclude.includes(named.toLowerCase()), `${query}: ${result.understood.exclude}`);
     // The search is still the finance search, refined; no new question is asked.
     assert.equal(result.clarification, '', query);
     assert.match(lastPayload(fixture).request, /finance/i, query);
     assert.deepEqual(lastPayload(fixture).candidates.map((candidate) => candidate.id), ['kept'], query);
+  }
+});
+
+test('ordinary short words after "not" are not read as countries or regions', async () => {
+  const people = [inCity('a', 'Kuala Lumpur'), inCity('b', 'Paris'), inCity('c', '')];
+  for (const [query, lang] of [['someone not in my field', 'en'], ["je n'ai pas eu de réponse", 'fr'], ['non in ma con loro', 'it']]) {
+    const fixture = withLocations(discoveryFixture({ candidates: people, turns: financeShown(people), responses: [
+      clarify({ named_subject: 'finance' }), everyone(people), { kind: 'real' }, { kind: 'real' },
+    ] }), ['Kuala Lumpur', 'Paris']);
+    const result = await (await run(fixture, { action: 'chat', thread_id: 'thread', query, lang })).json();
+    assert.deepEqual(result.understood?.exclude?.filter((word) => ['my', 'eu', 'ma', 'europe', 'malaysia'].includes(word)) || [], [], query);
   }
 });
 
