@@ -46,7 +46,7 @@ export default function Sidebar({ collapsed = false, onNavigate, onToggle }) {
             ? item.match(location.pathname, user?.id)
             : location.pathname === item.to;
           const Icon = item.icon;
-          const badgeCount = item.to === '/conversations'
+          const badgeCount = item.to === '/groups' ? unreadCounts.groupRequests || 0 : item.to === '/conversations'
             ? Math.max(pendingAcceptanceCount, unreadCounts.sessions + unreadCounts.groups)
             : 0;
           return (
@@ -75,9 +75,9 @@ export default function Sidebar({ collapsed = false, onNavigate, onToggle }) {
               <span className={cn('sidebar-nav-label flex-1 whitespace-nowrap', collapsed && 'is-hidden')}>{item.label}</span>
               {badgeCount > 0 && (
                 <span
-                  data-testid="nav-messages-unread-badge"
+                  data-testid={item.to === '/groups' ? 'nav-groups-requests-badge' : 'nav-messages-unread-badge'}
                   className={cn('inline-flex items-center justify-center rounded-full bg-primary text-micro font-semibold text-primary-foreground', collapsed ? 'absolute right-1 top-1 size-4' : 'ml-auto h-5 min-w-[1.25rem] px-1.5')}
-                  aria-label={t('nav.unreadConversations', { count: badgeCount })}
+                  aria-label={t(item.to === '/groups' ? 'nav.groupRequests' : 'nav.unreadConversations', { count: badgeCount })}
                 >
                   {badgeCount > 99 ? '99+' : badgeCount}
                 </span>

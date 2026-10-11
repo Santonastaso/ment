@@ -56,7 +56,7 @@ function DialogContent({
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
-          "app-dialog-popup fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-[var(--dialog-radius)] border border-[var(--border)] bg-popover p-4 text-sm text-popover-foreground [box-shadow:var(--shadow-overlay)] outline-none sm:max-w-sm",
+          "app-dialog-popup fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-[var(--dialog-radius)] border border-[var(--border)] bg-popover p-5 text-sm text-popover-foreground [box-shadow:var(--shadow-overlay)] outline-none sm:max-w-sm",
           className
         )}
         {...props}>
@@ -65,7 +65,7 @@ function DialogContent({
           <DialogPrimitive.Close
             data-slot="dialog-close"
             render={
-              <Button variant="ghost" className="absolute top-2 right-2" size="icon-sm" />
+              <Button variant="ghost" className="absolute top-3 right-3" size="icon-sm" />
             }>
             <XIcon />
             <span className="sr-only">Close</span>
@@ -83,7 +83,7 @@ function DialogHeader({
   return (
     <div
       data-slot="dialog-header"
-      className={cn("flex flex-col gap-2", className)}
+      className={cn("flex flex-col gap-2 pr-10", className)}
       {...props} />
   );
 }
@@ -119,7 +119,7 @@ function DialogTitle({
   return (
     <DialogPrimitive.Title
       data-slot="dialog-title"
-      className={cn("font-heading text-base leading-none font-medium", className)}
+      className={cn("font-heading text-section font-semibold", className)}
       {...props} />
   );
 }

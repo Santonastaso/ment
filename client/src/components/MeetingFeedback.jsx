@@ -67,7 +67,7 @@ export default function MeetingFeedback({ session, onSaved, compact = false }) {
         <form onSubmit={save} className="space-y-4">
           <label className="grid gap-2">
             <span>{t('components.meeting.yourReflectionPrivate')}</span>
-            <textarea className="min-h-24 rounded-lg border p-3" maxLength={4000} value={reflection} onChange={event => setReflection(event.target.value)} disabled={saving} />
+            <textarea className="input min-h-24" maxLength={4000} value={reflection} onChange={event => setReflection(event.target.value)} disabled={saving} />
           </label>
           <div className="grid gap-2"><span>{t('components.meeting.yourRatingPrivate')}</span><RatingPicker value={rating} onChange={setRating} disabled={saving} /></div>
           {error && <p role="alert" className="text-destructive">{error}</p>}

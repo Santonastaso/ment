@@ -66,8 +66,8 @@ test('invited member signs in, changes temporary password, imports CV, and finis
   });
   await expect(page.getByRole('heading', { name: 'Your background' })).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Full name' })).toHaveValue('Invited Tester');
-  await expect(page.locator('select').first()).toHaveValue('Zurich');
-  await expect(page.getByLabel('Department *')).toHaveValue('Engineering');
+  await expect(page.getByRole('combobox').first()).toContainText('Zurich');
+  await expect(page.getByLabel('Department *')).toContainText('Engineering');
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByRole('heading', { name: 'What you can teach' })).toBeVisible();
   await page.getByRole('button', { name: 'Continue' }).click();
@@ -927,7 +927,8 @@ test('onboarding to discovery, request, acceptance, chat and meeting', async ({ 
   await page.getByRole('button', { name: /^Skip/ }).click();
   await page.getByRole('textbox', { name: 'Full name' }).fill('Viewer Student');
   await page.getByRole('textbox', { name: 'Role title *' }).fill('Student');
-  await page.getByLabel('Department *').selectOption('Finance');
+  await page.getByLabel('Department *').click();
+  await page.getByRole('option', { name: 'Finance', exact: true }).click();
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
@@ -1395,7 +1396,8 @@ test('a failed availability save keeps the user on onboarding until it succeeds'
   await page.getByRole('button', { name: /^Skip/ }).click();
   await page.getByRole('textbox', { name: 'Full name' }).fill('Viewer Student');
   await page.getByRole('textbox', { name: 'Role title *' }).fill('Student');
-  await page.getByLabel('Department *').selectOption('Finance');
+  await page.getByLabel('Department *').click();
+  await page.getByRole('option', { name: 'Finance', exact: true }).click();
   for (let step = 0; step < 3; step++) await page.getByRole('button', { name: 'Continue', exact: true }).click();
   const availability = page.getByRole('heading', { name: 'When can people reach you?' });
   await expect(availability).toBeVisible();
@@ -1403,11 +1405,13 @@ test('a failed availability save keeps the user on onboarding until it succeeds'
   await page.evaluate(() => { window.fixture.failPut = '/users/me'; });
   await page.getByRole('button', { name: 'Finish & see my matches' }).click();
   // The failure is said aloud, nothing is shown as saved and nobody leaves the step.
-  await expect(page.getByText('Your profile is saved, but your availability could not be saved. Try again.')).toBeVisible();
+  await expect(page.getByText('Your availability could not be saved. Try again.')).toBeVisible();
+  // Onboarding is not completed behind the user's back: the profile is not submitted yet.
+  expect(await page.evaluate(() => window.fixture.calls.some(call => call.path === '/users/me/onboarding'))).toBe(false);
   await expect(page).toHaveURL(/\/onboarding$/);
   await expect(availability).toBeVisible();
   await expect(page.getByTestId('onboarding-accepts-requests')).not.toBeChecked();
-  // Trying again saves the choice without submitting the profile a second time.
+  // Trying again saves the choice, then the profile, once.
   await page.getByRole('button', { name: 'Finish & see my matches' }).click();
   await expect(page).toHaveURL('http://127.0.0.1:3010/');
   const calls = await page.evaluate(() => window.fixture.calls.filter(call => call.path === '/users/me/onboarding' || (call.method === 'put' && call.path === '/users/me')));
@@ -1462,6 +1466,7 @@ test('Explorer page size drives the request, the page count and the boundaries',
   await choose(50);
   await expect(rows).toHaveCount(50);
   await expect(pagination).toContainText('1/5');
+  await expect(next).toBeEnabled();
   await choose(25);
   await expect(rows).toHaveCount(25);
   await expect(page).not.toHaveURL(/size=/);
@@ -1475,6 +1480,10 @@ test('Explorer page size drives the request, the page count and the boundaries',
   await next.click();
   await expect(pagination).toContainText('Showing 51–100 of 230');
   expect(await lastRequest()).toContain('limit=50&offset=50');
+  // Choosing the size the server already serves must not leave the list stuck loading.
+  await choose(50);
+  await expect(page.locator('.directory-results')).toHaveAttribute('aria-busy', 'false');
+  await expect(next).toBeEnabled();
   // Once the cap is known, no later page is first asked for at the wrong offset.
   const cappedRequests = await page.evaluate(from => window.fixture.calls.slice(from).map(call => call.path).filter(path => path.startsWith('/directory?')), callsBeforeCap);
   expect(cappedRequests.filter(path => path.includes('limit=100'))).toHaveLength(1);
@@ -1548,4 +1557,128 @@ test('the landing page carries no unexplained folio labels', async ({ page }) =>
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   await expect(page.getByText(/MENT \/ 0\d/)).toHaveCount(0);
   await expect(page.locator('.landing-hero-index, .landing-preview-folio')).toHaveCount(0);
+});
+
+test('pending join requests show on Groups in the sidebar', async ({ page }) => {
+  await page.goto('/');
+  const badge = page.getByTestId('nav-groups-requests-badge');
+  await expect(badge).toHaveCount(0);
+  await page.evaluate(() => { window.fixture.unread.groupRequests = 2; window.fixture.setUser({ ...window.fixture.user }); });
+  await expect(badge).toHaveText('2');
+  await expect(badge).toHaveAccessibleName('2 join requests');
+});
+
+test('leaving a group asks in the app, not in a browser box', async ({ page }) => {
+  let nativeDialogs = 0;
+  page.on('dialog', dialog => { nativeDialogs++; dialog.dismiss(); });
+  await page.goto('/');
+  await page.evaluate(() => { window.fixture.groups.push({ id: 8, name: 'Chess Club', joined: true, is_owner: false, member_count: 5 }); });
+  await page.locator('.app-sidebar').getByRole('link', { name: 'Groups' }).click();
+  await page.getByRole('button', { name: 'Leave', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toContainText('Chess Club');
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  expect(nativeDialogs).toBe(0);
+  expect(await page.evaluate(() => window.fixture.calls.some(call => call.method === 'delete'))).toBe(false);
+});
+
+// One step from the Home chat's opening to an editable invite for Peer Mentor.
+async function draftHomeInvite(page) {
+  await page.goto('/');
+  const composer = page.getByRole('textbox', { name: 'Describe who could help' });
+  await composer.fill('finance');
+  await composer.press('Enter');
+  await expect(page.getByText('Which finance skill would you like help with?')).toBeVisible();
+  await composer.fill('Financial modelling');
+  await composer.press('Enter');
+  await page.getByRole('button', { name: 'Choose Peer Mentor' }).click();
+  const draft = page.getByRole('textbox', { name: 'Suggested draft' });
+  await draft.fill('First wording.');
+  return {
+    draft,
+    title: page.locator('.discovery-draft').getByRole('textbox', { name: 'Request title' }),
+    send: page.getByRole('button', { name: 'Send request', exact: true }),
+    posts: () => page.evaluate(() => window.fixture.calls.filter(call => call.method === 'post' && call.path === '/sessions').map(call => call.body)),
+    created: () => page.evaluate(() => window.fixture.sessions.filter(session => session.idempotency_key).length),
+  };
+}
+
+test('a Home request that failed without an answer is retried unchanged', async ({ page }) => {
+  const invite = await draftHomeInvite(page);
+  await page.evaluate(() => { window.fixture.failNext = '/sessions'; });
+  await invite.send.click();
+  // The first attempt may have been saved, so it cannot be reworded before the retry.
+  await expect(invite.draft).toBeDisabled();
+  await expect(invite.title).toBeDisabled();
+  // Nor replaced: a new draft on screen would not be the message the retry sends.
+  await expect(page.getByRole('button', { name: 'Regenerate' })).toBeDisabled();
+  await invite.send.click();
+  await expect(page.getByRole('link', { name: 'Open chat', exact: true })).toBeVisible();
+  const posts = await invite.posts();
+  expect(posts).toHaveLength(2);
+  expect(posts[1]).toEqual(posts[0]);
+  expect(await invite.created()).toBe(1);
+});
+
+test('a Home request that was saved but whose answer was lost is not sent twice', async ({ page }) => {
+  const invite = await draftHomeInvite(page);
+  await page.evaluate(() => { window.fixture.failAfterCommit = '/sessions'; });
+  await invite.send.click();
+  await expect(invite.draft).toBeDisabled();
+  expect(await invite.created()).toBe(1);
+  await invite.send.click();
+  await expect(page.getByRole('link', { name: 'Open chat', exact: true })).toBeVisible();
+  // The retry found the request already made: still one on the server.
+  expect(await invite.created()).toBe(1);
+  const posts = await invite.posts();
+  expect(posts[1].idempotency_key).toBe(posts[0].idempotency_key);
+});
+
+test('a Home request the server refused can be edited and sent as a new one', async ({ page }) => {
+  const invite = await draftHomeInvite(page);
+  await page.evaluate(() => { window.fixture.refuseNext = { path: '/sessions', code: 'mentor_at_capacity' }; });
+  await invite.send.click();
+  // Nothing was saved, so the wording is the user's to change.
+  await expect(invite.draft).toBeEnabled();
+  await expect(invite.title).toBeEnabled();
+  expect(await invite.created()).toBe(0);
+  await invite.draft.fill('Second wording.');
+  await invite.send.click();
+  await expect(page.getByRole('link', { name: 'Open chat', exact: true })).toBeVisible();
+  const posts = await invite.posts();
+  expect(posts[1].message).toBe('Second wording.');
+  expect(posts[1].idempotency_key).not.toBe(posts[0].idempotency_key);
+  expect(await invite.created()).toBe(1);
+});
+
+test('choosing a skill suggestion saves it once, whether the save is fast, slow or fails', async ({ page }) => {
+  await page.goto('/profile?tab=skills');
+  const input = page.getByRole('combobox', { name: 'Add a skill you want to learn' });
+  const saves = () => page.evaluate(() => window.fixture.calls.filter(call => call.path === '/users/me/skills/batch').map(call => call.body.skills.map(skill => skill.skill)));
+  for (const [label, skillSave, fails] of [
+    ['fast failure', { fail: true }, true],
+    ['slow failure', { fail: true, delay: 500 }, true],
+    ['success', { delay: 200 }, false],
+  ]) {
+    const before = (await saves()).length;
+    await page.evaluate(mode => { window.fixture.skillSave = mode; }, skillSave);
+    await input.fill('');
+    await input.fill('lead');
+    await page.getByRole('option', { name: /leadership/ }).click();
+    // Leaving the field, as people do, must not submit anything more.
+    await page.getByRole('heading', { name: 'What you want to learn' }).click();
+    if (fails) {
+      await expect(page.getByRole('alert').first()).toBeVisible();
+      // What was chosen stays in the box for the user to retry; the letters typed do not.
+      await expect(input).toHaveValue('leadership');
+    } else {
+      await expect(page.getByRole('button', { name: 'leadership', exact: true })).toBeVisible();
+      await expect(input).toHaveValue('');
+    }
+    await page.waitForTimeout(400);
+    const made = (await saves()).slice(before);
+    expect(made, label).toHaveLength(1);
+    expect(made[0], label).toEqual(['leadership']);
+  }
 });

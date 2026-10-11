@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useT } from '../i18n/index.jsx';
 import { Field } from '../components/ui/field.jsx';
 import { formatChatClock, formatDayTime } from '../lib/utils.js';
-import { Button } from '../components/ui/button.jsx';
+import { Button, ButtonLink } from '../components/ui/button.jsx';
 import { Avatar, AvatarFallback } from '../components/ui/avatar.jsx';
 import { Skeleton } from '../components/ui/skeleton.jsx';
 import IcsDownloadButton from '../components/IcsDownloadButton.jsx';
@@ -767,7 +767,7 @@ export default function Conversations() {
             {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           </div>
           <DialogFooter className="conversation-overview-footer">
-            <Button variant="ghost" size="sm" render={<Link to={`/profile/${person?.id}`} />}><UserRound aria-hidden="true" />{t('conversations.profile')}</Button>
+            <ButtonLink size="sm" to={`/profile/${person?.id}`}><UserRound aria-hidden="true" />{t('conversations.profile')}</ButtonLink>
           </DialogFooter>
         </DialogContent>
       </Dialog>}

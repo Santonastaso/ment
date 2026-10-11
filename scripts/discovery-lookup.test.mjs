@@ -1027,3 +1027,140 @@ test('the reported China conversation stays about China', async () => {
   assert.match(pushed.clarification, /^Je n'ai trouvé personne en Chine\./);
   assert.doesNotMatch(JSON.stringify(pushed), /ils sont|grosse|merde/);
 });
+
+// A negated place is an exclusion unless it is said about the people shown.
+// Every case has someone in the excluded place and someone suitable elsewhere:
+// returning nobody would not count as leaving the place out.
+const inCity = (id, city) => ({ id, name: `${city} Person`, job_title: 'Financial Analyst', department: 'Finance', program: 'MBA', skills: ['Financial modelling'], location: city });
+const financeShown = (people) => [
+  { role: 'user', content: 'someone in finance' },
+  { role: 'assistant', kind: 'matches', framed: true, content: 'Good news.', search_request: 'finance', department: 'Finance', location: '',
+    matches: people.map((person) => ({ id: person.id, name: person.name, location: person.location })) },
+];
+const everyone = (people) => ({ outcome: 'matches', matches: people.map((person) => ({ profile_id: person.id, confidence: 0.9, reasons: ['Finance.'], matched_expertise: ['Financial modelling'] })) });
+
+// What the model returns when it reads an exclusion: the place as the user
+// wrote it, and the network's own locations that lie inside it.
+const rulesOut = (written, locations) => ({ ruled_out_places: [written], exclude_locations: locations });
+
+test('a ruled-out place is left out and people elsewhere stay', async () => {
+  for (const [query, lang, written, out, kept] of [
+    ['not in London please', 'en', 'London', 'London', 'Paris'],
+    ['pas à Paris', 'fr', 'Paris', 'Paris', 'London'],
+    ['non a Milano', 'it', 'Milano', 'Milano', 'Paris'],
+    ['not in New York', 'en', 'New York', 'New York', 'Paris'],
+    ['except London', 'en', 'London', 'London', 'Paris'],
+    // A country or region is the network's own cities inside it, whichever they are.
+    ['not in UK', 'en', 'UK', 'Leeds', 'Paris'],
+    ['not in France', 'en', 'France', 'Lyon', 'Berlin'],
+    ['pas en France', 'fr', 'France', 'Marseille', 'London'],
+    ['non in Italia', 'it', 'Italia', 'Bari', 'Berlin'],
+    ['pas aux États-Unis', 'fr', 'États-Unis', 'Denver', 'Rome'],
+    ['outside Europe please', 'en', 'Europe', 'Leipzig', 'Tokyo'],
+  ]) {
+    const people = [inCity('out', out), inCity('kept', kept), inCity('unknown', '')];
+    // Besides reading the exclusion, the model does its worst: it also names
+    // the ruled-out place as the place wanted, and ranks the person there.
+    const fixture = withLocations(discoveryFixture({ candidates: people, turns: financeShown(people), responses: [
+      clarify({ named_subject: 'finance', named_location: written, ...rulesOut(written, [out]) }), everyone(people), { kind: 'real' }, { kind: 'real' },
+    ] }), [out, kept]);
+    const result = await (await run(fixture, { action: 'chat', thread_id: 'thread', query, lang })).json();
+    // Someone whose location is unknown is not known to be there, so they stay.
+    assert.deepEqual(result.matches.map((match) => match.location).sort(), ['', kept].sort(), query);
+    assert.equal(result.understood.location, '', query);
+    assert.ok(result.understood.exclude.includes(written.toLowerCase()), `${query}: ${result.understood.exclude}`);
+    // The search is still the finance search, refined; no new question is asked.
+    assert.equal(result.clarification, '', query);
+    assert.match(lastPayload(fixture).request, /finance/i, query);
+    assert.deepEqual(lastPayload(fixture).candidates.map((candidate) => candidate.id).sort(), ['kept', 'unknown'], query);
+  }
+});
+
+test('the model cannot rule out a place the user never named, or drop a location the network does not have', async () => {
+  const people = [inCity('lon', 'London'), inCity('par', 'Paris')];
+  for (const [label, reading, query] of [
+    ['a place not in the user\'s words', rulesOut('Paris', ['Paris']), 'someone not in my field'],
+    ['locations without a ruled-out place', { ruled_out_places: [], exclude_locations: ['Paris', 'London'] }, "je n'ai pas eu de réponse"],
+    ['a location outside the network', rulesOut('Atlantis', ['Atlantis']), 'not in Atlantis'],
+  ]) {
+    const fixture = withLocations(discoveryFixture({ candidates: people, turns: financeShown(people), responses: [
+      clarify({ named_subject: 'finance', ...reading }), everyone(people), { kind: 'real' }, { kind: 'real' },
+    ] }), ['London', 'Paris']);
+    const result = await (await run(fixture, { action: 'chat', thread_id: 'thread', query, lang: 'en' })).json();
+    assert.ok(!(result.understood?.exclude || []).some((word) => ['paris', 'london'].includes(word)), label);
+    // Whenever people were ranked, nobody had been taken out first.
+    for (const sent of fixture.calls.map((_, at) => payload(fixture, at)).filter((sent) => sent.candidates)) {
+      assert.deepEqual(sent.candidates.map((candidate) => candidate.id).sort(), ['lon', 'par'], label);
+    }
+  }
+});
+
+test('an exclusion in the opening request survives the question that follows', async () => {
+  const people = [inCity('out', 'London'), inCity('kept', 'Paris')];
+  const fixture = withLocations(discoveryFixture({ candidates: people, responses: [
+    clarify({ named_subject: 'finance', named_location: 'London', ...rulesOut('London', ['London']) }),
+    clarify({ named_subject: 'Financial modelling', ...rulesOut('London', ['London']) }), everyone(people),
+    clarify({ ...rulesOut('London', ['London']) }), everyone(people),
+  ] }), ['London', 'Paris']);
+  const asked = await chat(fixture, 'someone in finance, not in London');
+  assert.ok(asked.clarification, 'a broad request is still narrowed first');
+  const result = await say(fixture, 'Financial modelling', asked.thread_id);
+  assert.deepEqual(result.matches.map((match) => match.location), ['Paris']);
+  // "More options" afterwards must not bring London back either.
+  const more = await say(fixture, 'more options', asked.thread_id);
+  assert.ok((more.matches || []).every((match) => match.location !== 'London'));
+  assert.ok(fixture.calls.map((_, at) => payload(fixture, at)).filter((sent) => sent.candidates).every((sent) => sent.candidates.every((candidate) => candidate.id !== 'out')));
+});
+
+test('an exclusion ends when the place is asked for or "anywhere" is said', async () => {
+  const people = [inCity('lon', 'London'), inCity('par', 'Paris')];
+  for (const [query, expected] of [['actually in London is fine', ['London']], ['anywhere is fine', ['London', 'Paris']]]) {
+    const turns = [
+      { role: 'user', content: 'someone in finance' },
+      { role: 'assistant', kind: 'matches', framed: true, content: 'Good news.', search_request: 'finance', department: 'Finance', location: '', matches: [] },
+      { role: 'user', content: 'not in London' },
+      { role: 'assistant', kind: 'matches', framed: true, content: 'Here.', search_request: 'finance', department: 'Finance', location: '', matches: [{ id: 'par', name: 'Paris Person', location: 'Paris' }] },
+    ];
+    const fixture = withLocations(discoveryFixture({ candidates: people, turns, responses: [
+      clarify({ named_subject: 'finance', named_location: query.includes('London') ? 'London' : '' }), everyone(people), { kind: 'real' }, { kind: 'real' },
+    ] }), ['London', 'Paris']);
+    const result = await (await run(fixture, { action: 'chat', thread_id: 'thread', query: `finance, ${query}`, lang: 'en' })).json();
+    assert.ok(!result.understood.exclude.includes('london'), query);
+    const shown = (result.matches || []).map((match) => match.location);
+    assert.ok(shown.every((city) => expected.includes(city)), `${query}: ${shown}`);
+    if (expected.length === 1) assert.equal(String(result.understood.location).toLowerCase(), 'london', query);
+  }
+});
+
+test('a country left out removes the cities it covers', async () => {
+  const people = [inCity('out', 'Paris'), inCity('kept', 'London')];
+  const fixture = withLocations(discoveryFixture({ candidates: people, turns: financeShown(people), responses: [
+    clarify({ named_subject: 'finance', named_location: 'France', ...rulesOut('France', ['Paris']) }), everyone(people), { kind: 'real' }, { kind: 'real' },
+  ] }), ['Paris', 'London']);
+  const result = await (await run(fixture, { action: 'chat', thread_id: 'thread', query: 'pas en France', lang: 'fr' })).json();
+  assert.deepEqual(result.matches.map((match) => match.location), ['London']);
+});
+
+test('a complaint that also names where to look searches there', async () => {
+  const people = [inCity('lon', 'London'), inCity('par', 'Paris')];
+  const fixture = withLocations(discoveryFixture({ candidates: people, turns: financeShown(people), responses: [
+    clarify({ named_subject: 'finance', named_location: 'Paris' }), everyone(people), { kind: 'real' }, { kind: 'real' },
+  ] }), ['London', 'Paris']);
+  const result = await (await run(fixture, { action: 'chat', thread_id: 'thread', query: "They aren't in London; actually, find someone in finance in Paris.", lang: 'en' })).json();
+  assert.ok(result.matches.length > 0);
+  assert.ok(result.matches.every((match) => match.location === 'Paris'), JSON.stringify(result.matches.map((match) => match.location)));
+});
+
+test('a complaint about the people shown is still a request for that place', async () => {
+  const people = [inCity('lon', 'London'), inCity('par', 'Paris')];
+  for (const [query, lang] of [['they are not in London', 'en'], ["none of them are in London", 'en'], ['ils ne sont pas à London', 'fr'], ['non sono a London', 'it']]) {
+    const fixture = withLocations(discoveryFixture({ candidates: people, turns: financeShown([people[1]]), responses: [
+      // Where the wording points at the people shown, a model that misreads it as ruling London out is overruled.
+      clarify({ named_subject: 'finance', named_location: 'London', ...(/they|them|ils/.test(query) ? rulesOut('London', ['London']) : {}) }), everyone(people), { kind: 'real' }, { kind: 'real' },
+    ] }), ['London', 'Paris']);
+    const result = await (await run(fixture, { action: 'chat', thread_id: 'thread', query, lang })).json();
+    assert.deepEqual(result.understood.exclude, [], query);
+    assert.equal(String(result.understood.location).toLowerCase(), 'london', query);
+    assert.ok(result.matches.every((match) => match.location === 'London'), query);
+  }
+});

@@ -9,6 +9,9 @@ import './index.css';
 
 const CHUNK_RELOAD_KEY = 'ment:chunk-reload';
 
+// Scrolling the page over a focused number field must not change its value.
+document.addEventListener('wheel', () => { if (document.activeElement?.type === 'number') document.activeElement.blur(); }, { passive: true });
+
 window.addEventListener('vite:preloadError', (event) => {
   event.preventDefault();
   if (sessionStorage.getItem(CHUNK_RELOAD_KEY)) {

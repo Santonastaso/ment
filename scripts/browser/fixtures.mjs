@@ -4,7 +4,12 @@ const user = { id: 'viewer', name: 'Viewer Student', email: 'student@example.tes
 const peer = { id: 'peer', name: 'Peer Mentor', department: 'Finance', job_title: 'Financial Analyst', skills: ['Financial modelling'] };
 
 // Only the network boundary is replaced. Router, auth gates, layout and screens are real.
-function fixtureApi(state) {
+// Failures are thrown as the app's own ApiError, so a test sees what production sees:
+//   failNext / failPut / failGet = path   uncertain (500), nothing saved
+//   failAfterCommit = path                uncertain (500), but the write went through
+//   refuseNext = { path, code }           refused (400), nothing saved
+function fixtureApi(state, ApiError) {
+  const dropped = () => new ApiError('TypeError: Failed to fetch', 500);
   const payload = session => {
     const latest = state.messages[`/sessions/${session.id}/messages`]?.at(-1);
     return { ...session, isMentor: session.mentor_id === state.user.id, isMentee: session.mentee_id === state.user.id,
@@ -16,10 +21,11 @@ function fixtureApi(state) {
       state.heldLoadStartedAt.push(Date.now());
       await new Promise(resolve => state.pendingLoads.push(resolve));
     }
-    if (method === 'post' && state.failNext === path) { state.failNext = null; throw new Error('Fixture network failure'); }
-    if (method === 'put' && state.failPut === path) { state.failPut = null; throw new Error('Fixture network failure'); }
+    if (state.refuseNext?.path === path) { const { code } = state.refuseNext; state.refuseNext = null; throw new ApiError(code, 400); }
+    if (method === 'post' && state.failNext === path) { state.failNext = null; throw dropped(); }
+    if (method === 'put' && state.failPut === path) { state.failPut = null; throw dropped(); }
     if (method === 'get') {
-      if (state.failGet === path) throw new Error('Fixture history load failed');
+      if (state.failGet === path) throw dropped();
       if (path === '/users/me') return state.profile || { ...state.user, skills: [], career: [] };
       if (path === '/users/me/skill-evidence') return [];
       if (path === '/users/me/capacity') return state.capacity || {};
@@ -69,6 +75,15 @@ function fixtureApi(state) {
         } };
       }
       if (path === '/profile/ingest/1/accept') return { ok: true };
+      if (path === '/users/me/skills/batch') {
+        // skillSave = { delay, fail }: a slow save, and one that ends in a dropped connection.
+        if (state.skillSave?.delay) await new Promise(resolve => setTimeout(resolve, state.skillSave.delay));
+        if (state.skillSave?.fail) throw dropped();
+        const current = state.profile || { ...state.user, skills: [], career: [] };
+        state.profile = { ...current, skills: [...(current.skills || []).filter(skill => skill.type !== body.type),
+          ...body.skills.map((skill, index) => ({ id: skill.id || 100 + index, skill: skill.skill, type: body.type, example_project: skill.example_project || '' }))] };
+        return null;
+      }
       if (path === '/users/me/onboarding') {
         state.profile = { ...state.user, ...body, skills: [
           ...(body.can_teach || []).map(skill => ({ ...skill, type: 'can_teach' })),
@@ -83,9 +98,18 @@ function fixtureApi(state) {
       }
       if (path === '/discovery/draft') return { thread_id: 'thread', draft: 'Hi Peer, I would appreciate your advice on financial modelling.' };
       if (path === '/sessions') {
-        const row = { ...body, id: 3, status: 'pending', mentor: state.peer, mentee: state.user, mentee_id: state.user.id, request_expires_at: new Date(Date.now() + 7 * 86400000).toISOString() };
-        state.sessions.push(row);
-        state.messages['/sessions/3/messages'] = [{ id: 1, sender_id: state.user.id, kind: 'request', body: body.message, created_at: new Date().toISOString() }];
+        // As the database does: the same identifier returns the request it
+        // already made, and refuses to stand for different content.
+        const same = (a, b) => ['mentor_id', 'title', 'message', 'pre_session_question', 'follow_up_intent'].every(key => a[key] === b[key]);
+        let row = state.sessions.find(session => session.idempotency_key && session.idempotency_key === body.idempotency_key);
+        if (row && !same(row, body)) throw new ApiError('idempotency_conflict', 400);
+        if (!row) {
+          const id = Math.max(2, ...state.sessions.map(session => session.id)) + 1;
+          row = { ...body, id, status: 'pending', mentor: state.peer, mentee: state.user, mentee_id: state.user.id, request_expires_at: new Date(Date.now() + 7 * 86400000).toISOString() };
+          state.sessions.push(row);
+          state.messages[`/sessions/${id}/messages`] = [{ id: 1, sender_id: state.user.id, kind: 'request', body: body.message, created_at: new Date().toISOString() }];
+        }
+        if (state.failAfterCommit === path) { state.failAfterCommit = null; throw dropped(); }
         return payload(row);
       }
       if (path === '/groups') { const row = { ...body, id: 2, joined: true, is_owner: true, member_count: 1 }; state.groups.push(row); state.groupMembers[row.id] = [{ user_id: state.user.id, role: 'owner' }]; return row; }
@@ -101,7 +125,7 @@ function fixtureApi(state) {
         if (state.failAfterCommit === path) {
           state.failAfterCommit = null;
           send();
-          throw new Error('Fixture response lost after commit');
+          throw dropped();
         }
         return state.delaySends ? new Promise(resolve => state.pending.push(() => resolve(send()))) : send();
       }
@@ -157,6 +181,11 @@ export const test = base.extend({
     await page.route('**/*', async route => {
       const url = new URL(route.request().url());
       if (url.origin === 'https://fonts.googleapis.com') return route.fulfill({ contentType: 'text/css', body: '' });
+      // The public skills taxonomy: one known suggestion, so choosing it can be tested.
+      if (url.origin === 'https://ec.europa.eu') {
+        const results = (url.searchParams.get('text') || '').startsWith('lead') ? [{ title: 'leadership', uri: 'esco:leadership', preferredLabel: { en: 'leadership' } }] : [];
+        return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ _embedded: { results } }) });
+      }
       if (url.origin !== baseURL) { externalRequests.push(url.origin); return route.abort(); }
       if (url.pathname === '/src/main.jsx') {
         const response = await route.fetch();
@@ -232,7 +261,8 @@ export const test = base.extend({
         }};
       ` });
       if (url.pathname === '/src/api/index.js') return route.fulfill({ contentType: 'text/javascript', body: `
-        export default (${fixtureApi.toString()})(window.fixture);
+        import { ApiError } from '/src/lib/apiError.mjs';
+        export default (${fixtureApi.toString()})(window.fixture, ApiError);
         export const invokeUserFunction=async()=>({data:{providers:[],connections:[]}});
       ` });
       await route.continue();

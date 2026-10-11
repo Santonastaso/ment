@@ -6,7 +6,7 @@ import { PageShell } from '../components/PageShell.jsx';
 import { DEFAULT_PAGE_SIZE, PAGE_SIZES, pageSizeFrom, serverPageCap } from '../lib/directory.mjs';
 import PageHeader from '../components/PageHeader.jsx';
 import { Surface, SurfaceBody } from '../components/Surface.jsx';
-import { Button } from '@/components/ui/button';
+import { Button, ButtonLink } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -31,7 +31,6 @@ export default function Explorer() {
   const sort = searchParams.get('sort') === 'name' ? 'name' : 'relevance';
   const page = Number.isSafeInteger(Number(searchParams.get('page'))) && Number(searchParams.get('page')) > 0 ? Number(searchParams.get('page')) : 1;
   const pageSize = pageSizeFrom(searchParams.get('size'));
-  const requestKey = JSON.stringify([query, persona, program, cohort, location, language, sort, page, pageSize]);
 
   const [inputValue, setInputValue] = useState(query);
   const [dirError, setDirError] = useState(false);
@@ -44,6 +43,7 @@ export default function Explorer() {
   // size chosen afterwards.
   const [serverCap, setServerCap] = useState(null);
   const size = serverCap ? Math.min(pageSize, serverCap) : pageSize;
+  const requestKey = JSON.stringify([query, persona, program, cohort, location, language, sort, page, size]);
   const [requestingMentor, setRequestingMentor] = useState(null);
 
   function updateParams(mutate) {
@@ -255,11 +255,11 @@ function PersonCard({ person, onRequest }) {
       </span>
 
       <span className="person-row-actions">
-        <Button variant="ghost" size="sm" className="person-row-link" render={<Link to={`/profile/${person.id}`} />}>{t('explorer.viewProfile')}</Button>
+        <ButtonLink size="sm" className="person-row-link" to={`/profile/${person.id}`}>{t('explorer.viewProfile')}</ButtonLink>
         {person.session_id ? (
-          <Button variant="ghost" size="sm" render={<Link to={sessionPath({ id: person.session_id, route_token: person.session_token })} />}>
+          <ButtonLink size="sm" to={sessionPath({ id: person.session_id, route_token: person.session_token })}>
             {t('explorer.openChat')}
-          </Button>
+          </ButtonLink>
         ) : (
           <Button type="button" variant="ghost" size="sm" onClick={onRequest}>{t('explorer.requestSession')}</Button>
         )}

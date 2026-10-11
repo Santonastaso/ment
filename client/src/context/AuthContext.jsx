@@ -144,8 +144,15 @@ export function AuthProvider({ children }) {
   const refreshUnreadCounts = useCallback(async () => {
     if (!session?.user?.id) { setUnreadCounts({ sessions: 0, groups: 0, sessionMessages: {}, groupMessages: {} }); return; }
     try {
-      const { data, error } = await supabase.rpc('my_unread_message_counts');
+      // Row security shows a join request to its sender and to the group's
+      // owner, so the pending ones that are not mine are the ones I must answer.
+      const [{ data, error }, requests] = await Promise.all([
+        supabase.rpc('my_unread_message_counts'),
+        supabase.from('group_join_requests').select('group_id', { count: 'exact', head: true })
+          .eq('status', 'pending').gt('expires_at', new Date().toISOString()).neq('user_id', session.user.id),
+      ]);
       if (!error && data) setUnreadCounts({
+        groupRequests: requests.count || 0,
         sessions: data.sessions || 0,
         groups: data.groups || 0,
         sessionMessages: data.session_unread || {},
@@ -167,6 +174,7 @@ export function AuthProvider({ children }) {
     const channel = supabase.channel(`unread-messages:${session.user.id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'session_messages' }, refreshUnreadCounts)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_messages' }, refreshUnreadCounts)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'group_join_requests' }, refreshUnreadCounts)
       .subscribe();
     window.addEventListener('focus', refreshUnreadCounts);
     return () => {

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { importedMonth, importedYear, monthYearValue, parseMonthYear } from '../client/src/lib/monthYear.mjs';
 import { DEFAULT_PAGE_SIZE, PAGE_SIZES, clampDirectoryLimit, pageSizeFrom, serverPageCap } from '../client/src/lib/directory.mjs';
 import { focusSuggestions, readableSkills } from '../client/src/lib/reflection.mjs';
+import { ApiError } from '../client/src/lib/apiError.mjs';
 
 test('a year without a month stays a year without a month', () => {
   // What a CV import returns for "2020": the year as text and no month.
@@ -70,4 +71,16 @@ test('older check-ins keep every suggestion but lead with two', () => {
   assert.deepEqual(focusSuggestions(['a', 'b']), { shown: ['a', 'b'], more: [] });
   assert.deepEqual(focusSuggestions(null), { shown: [], more: [] });
   assert.deepEqual(readableSkills(['team_work', 'team work', '  ', null]), ['team work']);
+});
+
+test('every data-layer failure carries a status and a code', () => {
+  // Callers branch on these two fields; the browser fixture throws this same class.
+  const refused = new ApiError('mentor_at_capacity', 400);
+  assert.equal(refused.response.status, 400);
+  assert.equal(refused.response.data.error, 'mentor_at_capacity');
+  assert.ok(refused instanceof Error);
+  // With no status the outcome is uncertain, never a refusal.
+  const dropped = new ApiError('TypeError: Failed to fetch');
+  assert.equal(dropped.response.status, 500);
+  assert.equal(dropped.response.data.error, 'TypeError: Failed to fetch');
 });

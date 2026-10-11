@@ -36,33 +36,6 @@ function StatCard({ label, value, sub }) {
 }
 
 // Horizontal bar list for KPI breakdowns (most requested/shared skills, etc).
-function KpiBars({ title, items, valueKey = 'count', labelKey = 'skill', emptyLabel, suffix }) {
-  const max = Math.max(1, ...items.map((i) => Number(i[valueKey]) || 0));
-  return (
-    <div>
-      <p className="mb-2 text-sm font-medium text-foreground">{title}</p>
-      {items.length === 0 ? (
-        <p className="text-xs text-muted-foreground italic">{emptyLabel}</p>
-      ) : (
-        <div className="space-y-1.5">
-          {items.map((it, idx) => {
-            const v = Number(it[valueKey]) || 0;
-            return (
-              <div key={idx} className="flex items-center gap-2">
-                <span className="w-40 shrink-0 truncate text-xs text-foreground" title={it[labelKey]}>{it[labelKey]}</span>
-                <div className="h-3 flex-1 rounded-full bg-muted">
-                  <div className="h-3 rounded-full bg-primary" style={{ width: `${(v / max) * 100}%` }} />
-                </div>
-                <span className="w-10 shrink-0 text-right text-xs tabular-nums text-muted-foreground">{v}{suffix || ''}</span>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
 async function downloadBlob(apiPath, filename) {
   const res = await api.get(apiPath, { responseType: 'blob' });
   const url = URL.createObjectURL(res.data);

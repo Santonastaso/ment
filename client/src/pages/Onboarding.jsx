@@ -13,6 +13,7 @@ import LanguageSwitcher from '../i18n/LanguageSwitcher.jsx';
 import { Button } from '../components/ui/button.jsx';
 import { CITY_OPTIONS, normalizeCity } from '../../../shared/cities.mjs';
 import { monthYearValue, parseMonthYear } from '../lib/monthYear.mjs';
+import { Dropdown } from '../components/DirectoryFilter.jsx';
 
 function SuggestedPill() {
   const { t } = useT();
@@ -50,8 +51,6 @@ export default function Onboarding({ returnTo }) {
   const [weeklyLimit, setWeeklyLimit] = useState(2);
   const [monthlyLimit, setMonthlyLimit] = useState(5);
   const [acceptsRequests, setAcceptsRequests] = useState(true);
-  // The saved profile, kept while the availability save is retried.
-  const [savedProfile, setSavedProfile] = useState(null);
 
   // Step 2 — Can teach: array of { skill, example_project }
   const [canTeach, setCanTeach] = useState([]);
@@ -167,9 +166,17 @@ export default function Onboarding({ returnTo }) {
         can_teach: canTeach,
         wants_to_learn: wantsToLearn,
       };
-      // A retry after a failed availability save must not submit the profile twice.
-      let profile = savedProfile;
-      if (!profile) {
+      // Availability goes first. Completing onboarding redirects away at once
+      // (the profile update arrives live), so nothing may still be unsaved then.
+      const weekly = Math.max(1, Math.min(50, Number(weeklyLimit) || 1));
+      const monthly = Math.max(weekly, Math.min(200, Number(monthlyLimit) || weekly));
+      try {
+        await api.put('/users/me', { weekly_meeting_limit: weekly, monthly_meeting_limit: monthly, mentorship_paused: !acceptsRequests });
+      } catch {
+        setError(t('onboarding.error.availabilitySave'));
+        setStep(4);
+        return;
+      }
       if (draftId) {
         await api.post(`/profile/ingest/${draftId}/accept`, { accepted_json: accepted });
       }
@@ -186,21 +193,7 @@ export default function Onboarding({ returnTo }) {
         linkedin_url: linkedinUrl,
         linkedin_headline: null,
       });
-      profile = res.data;
-      setSavedProfile(profile);
-      }
-      const weekly = Math.max(1, Math.min(50, Number(weeklyLimit) || 1));
-      const monthly = Math.max(weekly, Math.min(200, Number(monthlyLimit) || weekly));
-      // Nothing is shown as saved, and nobody leaves this step, until the
-      // server has accepted the choice.
-      try {
-        await api.put('/users/me', { weekly_meeting_limit: weekly, monthly_meeting_limit: monthly, mentorship_paused: !acceptsRequests });
-      } catch {
-        setError(t('onboarding.error.availabilitySave'));
-        setStep(4);
-        return;
-      }
-      updateUser({ ...profile, weekly_meeting_limit: weekly, monthly_meeting_limit: monthly, mentorship_paused: !acceptsRequests });
+      updateUser({ ...res.data, weekly_meeting_limit: weekly, monthly_meeting_limit: monthly, mentorship_paused: !acceptsRequests });
       navigate(returnTo || '/');
     } catch (e) {
       setError(t(onboardingErrorKey(e)));
@@ -321,7 +314,7 @@ export default function Onboarding({ returnTo }) {
                 </div>
                 <div className="sm:col-span-2">
                   <label className="label">{t('onboarding.fields.location')}{suggested.has('location') && <SuggestedPill source={classifierSource} />} <span className="font-normal text-muted-foreground">{t('onboarding.fields.locationHint')}</span></label>
-                  <select className="input" aria-label={t('onboarding.fields.location')} value={locationChoice} onChange={event => {
+                  <Dropdown aria-label={t('onboarding.fields.location')} value={locationChoice} onChange={event => {
                     const choice = event.target.value;
                     setLocationChoice(choice);
                     if (choice === '__other') {
@@ -331,7 +324,7 @@ export default function Onboarding({ returnTo }) {
                     <option value="">{t('onboarding.fields.locationPlaceholder')}</option>
                     {CITY_OPTIONS.map(city => <option key={city} value={city}>{city}</option>)}
                     <option value="__other">{t('onboarding.fields.locationOther')}</option>
-                  </select>
+                  </Dropdown>
                   {locationChoice === '__other' && <input className="input mt-2" aria-label={t('onboarding.fields.locationOther')} value={location} onChange={event => setLocation(event.target.value)} onBlur={event => setLocation(normalizeCity(event.target.value))} placeholder={t('onboarding.fields.locationOtherPlaceholder')} />}
                 </div>
                 <div className="sm:col-span-2">
@@ -423,7 +416,7 @@ export default function Onboarding({ returnTo }) {
 
           <div className="flex justify-between pt-2">
             {step > 0 ? (
-              <Button onClick={() => { setError(''); setStep(s => s - 1); }} variant="outline" disabled={saving || uploading || !!savedProfile}>{t('onboarding.nav.back')}</Button>
+              <Button onClick={() => { setError(''); setStep(s => s - 1); }} variant="outline" disabled={saving || uploading}>{t('onboarding.nav.back')}</Button>
             ) : <div />}
 
             {step === 0 ? (

@@ -10,6 +10,7 @@ import SessionRequestModal from '../components/SessionRequestModal.jsx';
 import CareerEntryFields, { DEPARTMENTS } from '../components/CareerEntryFields.jsx';
 import ProfileReflection from '../components/ProfileReflection.jsx';
 import { PageShell } from '../components/PageShell.jsx';
+import { useConfirm } from '../components/ui/confirm.jsx';
 import { importedMonth, importedYear, monthYearValue, parseMonthYear } from '../lib/monthYear.mjs';
 import PageHeader from '../components/PageHeader.jsx';
 import PageTabs from '../components/PageTabs.jsx';
@@ -128,6 +129,7 @@ export default function Profile() {
   const [toast, setToast] = useState('');
   const [reflectionDraft, setReflectionDraft] = useState({ support_needed: '', managed_well: '' });
   const [reflectionOpen, setReflectionOpen] = useState(false);
+  const [confirm, confirmDialog] = useConfirm();
   // Arriving from a finished meeting opens the check-in straight away.
   useEffect(() => {
     if (!isOwnProfile || searchParams.get('checkin') !== '1') return;
@@ -263,7 +265,7 @@ export default function Profile() {
 
   async function handleDeleteSkillFromBubble(entry) {
     if (!entry?.id) return;
-    if (!confirm(t('profile.confirmRemoveSkill', { skill: entry.skill }))) return;
+    if (!(await confirm(t('profile.confirmRemoveSkill', { skill: entry.skill })))) return;
     try {
       await api.delete(`/users/me/skills/${entry.id}`);
       await refreshProfile();
@@ -420,7 +422,7 @@ export default function Profile() {
   }
 
   async function handleDeleteCareer(id) {
-    if (careerBusy || !window.confirm(t('profile.career.confirmRemove'))) return;
+    if (careerBusy || !(await confirm(t('profile.career.confirmRemove')))) return;
     setCareerBusy(true);
     try {
       await api.delete(`/users/me/career/${id}`);
@@ -497,7 +499,6 @@ export default function Profile() {
 
   const skills = profile.skills || [];
   const teachSkills = skills.filter(s => s.type === 'can_teach');
-  const learnSkills = skills.filter(s => s.type === 'wants_to_learn');
   const teachEditorValue = teachSkills.map(s => ({ id: s.id, skill: s.skill, example_project: s.example_project || '' }));
 
   const firstName = profile.name?.split(' ')[0];
@@ -928,6 +929,7 @@ export default function Profile() {
       </div>
       </div>
 
+      {confirmDialog}
       {showModal && (
         <SessionRequestModal
           mentor={profile}

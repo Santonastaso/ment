@@ -3,16 +3,22 @@ import { Select } from '@base-ui/react/select';
 import { Check, ChevronDown } from 'lucide-react';
 import { buttonVariants } from './ui/button.jsx';
 
-export default function DirectoryFilter({ label, value, onChange, options, renderValue, multiple = false, disabled = false }) {
+/** Drop-in for a native <select>: same value, onChange(event) and <option> children, with the app's own list. */
+export function Dropdown({ value, onChange, children, disabled, id, 'aria-label': label }) {
+  const options = React.Children.toArray(children).map(({ props }) => ({ value: String(props.value ?? props.children), label: props.children }));
+  return <DirectoryFilter id={id} label={label} placeholder={options[0]?.label} value={String(value ?? '')} disabled={disabled} options={options} onChange={next => onChange({ target: { value: next } })} />;
+}
+
+export default function DirectoryFilter({ label, placeholder = label, value, onChange, options, renderValue, multiple = false, disabled = false, id }) {
   return <Select.Root multiple={multiple} value={value} onValueChange={onChange} items={options} disabled={disabled}>
-    <Select.Trigger className={buttonVariants({ variant: 'ghost', className: 'filter-control directory-filter w-full min-w-0 justify-between px-3 font-normal' })} aria-label={label}>
-      <Select.Value className="min-w-0 truncate" placeholder={label}>
+    <Select.Trigger className={buttonVariants({ variant: 'ghost', className: 'filter-control directory-filter w-full min-w-0 justify-between px-3 font-normal' })} aria-label={label} id={id}>
+      <Select.Value className="min-w-0 truncate" placeholder={placeholder}>
         {selected => {
           // With nothing chosen the chip names what it filters ("Programme"),
           // not the catch-all option ("Tous les…"), which truncated to nothing.
-          if (multiple ? !selected?.length : !selected) return label;
+          if (multiple ? !selected?.length : !selected) return placeholder;
           if (renderValue) return typeof renderValue === 'function' ? renderValue(selected) : renderValue;
-          return options.find(option => option.value === selected)?.label ?? label;
+          return options.find(option => option.value === selected)?.label ?? placeholder;
         }}
       </Select.Value>
       <Select.Icon><ChevronDown size={16} aria-hidden="true" /></Select.Icon>

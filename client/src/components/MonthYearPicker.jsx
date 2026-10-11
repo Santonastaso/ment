@@ -1,5 +1,6 @@
 import React from 'react';
 import { useT } from '../i18n/index.jsx';
+import { Dropdown } from './DirectoryFilter.jsx';
 
 // Unambiguous month/year picker — two dropdowns instead of <input type="month">
 // because that native control renders very differently across browsers and
@@ -31,9 +32,8 @@ export default function MonthYearPicker({ value = '', onChange, allowEmpty = tru
   }
 
   return (
-    <div className="flex gap-2">
-      <select
-        className="input text-sm flex-1"
+    <div className="grid grid-cols-2 gap-2">
+      <Dropdown
         value={month || ''}
         onChange={e => update(year, e.target.value)}
         aria-label={t('components.monthYear.monthLabel')}
@@ -42,9 +42,8 @@ export default function MonthYearPicker({ value = '', onChange, allowEmpty = tru
         {MONTH_VALUES.map(v => (
           <option key={v} value={v}>{t(`components.monthYear.month${v}`)}</option>
         ))}
-      </select>
-      <select
-        className="input text-sm flex-1"
+      </Dropdown>
+      <Dropdown
         value={year || ''}
         onChange={e => update(e.target.value, month)}
         aria-label={t('components.monthYear.yearLabel')}
@@ -53,7 +52,7 @@ export default function MonthYearPicker({ value = '', onChange, allowEmpty = tru
         {buildYearOptions().map(y => (
           <option key={y} value={y}>{y}</option>
         ))}
-      </select>
+      </Dropdown>
     </div>
   );
 }

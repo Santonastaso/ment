@@ -5,17 +5,11 @@
 // `supabase` directly from `client/src/lib/supabase.js`.
 
 import { supabase } from '../lib/supabase.js';
+import { ApiError } from '../lib/apiError.mjs';
 import { clampDirectoryLimit } from '../lib/directory.mjs';
 import { browserLanguage } from '../lib/esco.js';
 import { getLang } from '../i18n/index.jsx';
 import { firstPersonize } from '../lib/utils.js';
-
-class ApiError extends Error {
-  constructor(message, status = 500) {
-    super(message);
-    this.response = { status, data: { error: message } };
-  }
-}
 
 function ok(data, status = 200) {
   return { data, status };
@@ -524,7 +518,8 @@ async function get(url) {
       .eq('id', viewer.id)
       .single();
     const pendingFromAdmin = !!profile?.pending_checkin;
-    const dueFromTime = lastDays === null || lastDays >= 4;
+    // Weekly means a week, as the email reminder already assumes.
+    const dueFromTime = lastDays === null || lastDays >= 7;
 
     return ok({
       entries: (rows || []).map((r) => ({
