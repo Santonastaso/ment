@@ -106,6 +106,8 @@ function fixtureApi(state, ApiError) {
         const same = (a, b) => ['mentor_id', 'title', 'message', 'pre_session_question', 'follow_up_intent'].every(key => a[key] === b[key]);
         let row = state.sessions.find(session => session.idempotency_key && session.idempotency_key === body.idempotency_key);
         if (row && !same(row, body)) throw new ApiError('idempotency_conflict', 400);
+        // A search carries one request: another one sent with the same search is refused.
+        if (body.thread_id && state.threadSession != null && state.threadSession !== row?.id) throw new ApiError('thread_already_linked', 400);
         if (!row) {
           const id = Math.max(2, ...state.sessions.map(session => session.id)) + 1;
           row = { ...body, outbound_message: body.message, id, status: 'pending', mentor: state.peer, mentee: state.user, mentee_id: state.user.id, request_expires_at: new Date(Date.now() + 7 * 86400000).toISOString() };

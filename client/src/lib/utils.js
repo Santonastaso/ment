@@ -11,7 +11,8 @@ export function formatChatClock(value) {
 // The one date style outside the chat timeline: "9 Oct", with the year only
 // when it is not the current one, and a 24-hour clock when the time matters.
 export function formatDay(value, lang) {
-  const date = value instanceof Date ? value : new Date(value);
+  // A date without a time is that calendar day wherever the reader is, not midnight UTC (the day before, west of it).
+  const date = value instanceof Date ? value : new Date(/^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00` : value);
   if (Number.isNaN(date.getTime())) return '';
   const options = { day: 'numeric', month: 'short' };
   if (date.getFullYear() !== new Date().getFullYear()) options.year = 'numeric';

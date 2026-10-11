@@ -1641,6 +1641,24 @@ test('a Home request that was saved but whose answer was lost is not sent twice'
   expect(posts[1].idempotency_key).toBe(posts[0].idempotency_key);
 });
 
+test('a second request from the same conversation is sent, not refused', async ({ page }) => {
+  const invite = await draftHomeInvite(page);
+  await invite.send.click();
+  await expect(page.getByRole('link', { name: 'Open chat', exact: true })).toBeVisible();
+  // The chat stays open after sending: ask again there and write to someone from the new results.
+  const composer = page.getByRole('textbox', { name: 'Describe who could help' });
+  await composer.fill('Financial modelling');
+  await composer.press('Enter');
+  await page.getByRole('button', { name: 'Choose Peer Mentor' }).last().click();
+  await invite.draft.fill('A second request.');
+  await invite.send.click();
+  await expect.poll(invite.created).toBe(2);
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  const posts = await invite.posts();
+  // The search belongs to the first request; the second goes on its own.
+  expect(posts.map(post => post.thread_id)).toEqual(['thread', undefined]);
+});
+
 test('reopening a search shows the message that was sent, not the draft before it was edited', async ({ page }) => {
   const invite = await draftHomeInvite(page);
   const generated = await invite.draft.inputValue();

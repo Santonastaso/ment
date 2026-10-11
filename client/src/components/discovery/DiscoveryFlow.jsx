@@ -192,6 +192,9 @@ export default function DiscoveryFlow() {
   const [sentSessionToken, setSentSessionToken] = useState('');
   // Where a request reopened from history stands now (declined, completed...).
   const [sentStatus, setSentStatus] = useState('');
+  // A search is linked to the first request sent from it. Later requests
+  // from the same conversation are sent on their own, not refused.
+  const [linkedThread, setLinkedThread] = useState(null);
   const threadEndRef = useRef(null);
   const composerInputRef = useRef(null);
   // A request whose answer never arrived may already be saved, so it is
@@ -348,13 +351,14 @@ export default function DiscoveryFlow() {
     if (!selected || !draft.trim() || !requestTitle.trim() || sending) return;
     setSending(true); setError('');
     try {
-      const payload = pendingRequest || { mentor_id: selected.person.id, title: requestTitle.trim().slice(0, 120), pre_session_question: submittedQuery, message: draft.trim(), duration_minutes: 60, follow_up_intent: requestIntent, idempotency_key: crypto.randomUUID(), ...(threadId ? { thread_id: threadId } : {}) };
+      const payload = pendingRequest || { mentor_id: selected.person.id, title: requestTitle.trim().slice(0, 120), pre_session_question: submittedQuery, message: draft.trim(), duration_minutes: 60, follow_up_intent: requestIntent, idempotency_key: crypto.randomUUID(), ...(threadId && threadId !== linkedThread ? { thread_id: threadId } : {}) };
       setPendingRequest(payload);
       const response = await api.post('/sessions', payload);
       setPendingRequest(null);
       setSessionId(response.data.id);
       setSentSessionToken(response.data.route_token || '');
       setSentStatus('');
+      if (payload.thread_id) setLinkedThread(payload.thread_id);
       setStage('sent');
       refreshHistory().catch(() => {});
     } catch (requestError) {
@@ -363,6 +367,8 @@ export default function DiscoveryFlow() {
       // connection included, so the status is what tells them apart.
       const status = requestError.response?.status;
       if (status >= 400 && status < 500) setPendingRequest(null);
+      // The search already has its request (an earlier send whose answer was lost): the next try goes without it.
+      if (requestError.response?.data?.error === 'thread_already_linked') setLinkedThread(threadId);
       setError(errorMessage(requestError, t, copy.error));
     }
     finally { setSending(false); }
@@ -395,6 +401,7 @@ export default function DiscoveryFlow() {
       // A search records the request it produced. Nothing is inferred from
       // who else the user has a request with, and a request that has since
       // been declined or completed is still the one this search sent.
+      setLinkedThread(data.session_id ? id : null);
       if (data.session_id && lastAssistant.kind === 'draft' && lastAssistant.person) {
         const { data: sessions } = await api.get('/sessions');
         const sentSession = (sessions || []).find(session => session.id === data.session_id);

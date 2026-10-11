@@ -105,3 +105,12 @@ test('a failure is shown as a sentence, never as a code or the browser error', (
     assert.ok(logged.some(line => line.includes('"code":"some_new_rule","status":400')) && logged.every(line => !line.includes('boom')));
   } finally { console.warn = warn; }
 });
+
+test('a date without a time is the same day for a reader west of UTC', async () => {
+  const zone = process.env.TZ;
+  process.env.TZ = 'America/Los_Angeles';
+  try {
+    const { formatDay } = await import('../client/src/lib/utils.js');
+    assert.match(formatDay(`${new Date().getFullYear() + 1}-03-09`, 'en-GB'), /^9 Mar /);
+  } finally { if (zone === undefined) delete process.env.TZ; else process.env.TZ = zone; }
+});
