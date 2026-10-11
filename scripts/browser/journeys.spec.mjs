@@ -1608,6 +1608,8 @@ test('a Home request that failed without an answer is retried unchanged', async 
   const invite = await draftHomeInvite(page);
   await page.evaluate(() => { window.fixture.failNext = '/sessions'; });
   await invite.send.click();
+  // A dropped connection is described in words, never as the browser's own error text.
+  await expect(page.getByRole('alert')).toHaveText('We could not complete that request. Please try again.');
   // The first attempt may have been saved, so it cannot be reworded before the retry.
   await expect(invite.draft).toBeDisabled();
   await expect(invite.title).toBeDisabled();
@@ -1639,8 +1641,14 @@ test('a Home request that was saved but whose answer was lost is not sent twice'
 
 test('a Home request the server refused can be edited and sent as a new one', async ({ page }) => {
   const invite = await draftHomeInvite(page);
-  await page.evaluate(() => { window.fixture.refuseNext = { path: '/sessions', code: 'mentor_at_capacity' }; });
+  // A refusal the app has no sentence for shows the general message, not the code.
+  await page.evaluate(() => { window.fixture.refuseNext = { path: '/sessions', code: 'some_new_rule' }; });
   await invite.send.click();
+  await expect(page.getByRole('alert')).toHaveText('We could not complete that request. Please try again.');
+  // A known refusal says what happened.
+  await page.evaluate(() => { window.fixture.refuseNext = { path: '/sessions', code: 'recipient_weekly_limit' }; });
+  await invite.send.click();
+  await expect(page.getByRole('alert')).toHaveText('This person has reached their limit for this week. Try again next week.');
   // Nothing was saved, so the wording is the user's to change.
   await expect(invite.draft).toBeEnabled();
   await expect(invite.title).toBeEnabled();
@@ -1649,8 +1657,8 @@ test('a Home request the server refused can be edited and sent as a new one', as
   await invite.send.click();
   await expect(page.getByRole('link', { name: 'Open chat', exact: true })).toBeVisible();
   const posts = await invite.posts();
-  expect(posts[1].message).toBe('Second wording.');
-  expect(posts[1].idempotency_key).not.toBe(posts[0].idempotency_key);
+  expect(posts[2].message).toBe('Second wording.');
+  expect(new Set(posts.map(post => post.idempotency_key)).size).toBe(3);
   expect(await invite.created()).toBe(1);
 });
 

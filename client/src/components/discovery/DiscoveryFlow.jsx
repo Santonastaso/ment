@@ -1,3 +1,4 @@
+import { errorMessage } from '../../lib/errors.mjs';
 import { formatDay } from '../../lib/utils.js';
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
@@ -364,7 +365,7 @@ export default function DiscoveryFlow() {
       // connection included, so the status is what tells them apart.
       const status = requestError.response?.status;
       if (status >= 400 && status < 500) setPendingRequest(null);
-      setError(requestError.response?.data?.error || copy.error);
+      setError(errorMessage(requestError, t, copy.error));
     }
     finally { setSending(false); }
   }

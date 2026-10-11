@@ -1,4 +1,5 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
+import { errorMessage } from '../lib/errors.mjs';
 import { Link, useSearchParams } from 'react-router-dom';
 import api from '../api/index.js';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -212,7 +213,7 @@ export default function AdminDashboard() {
       setRequestSettings(res.data);
       setNotice({ variant: 'default', title: t('admin.pm.capacitySaved'), message: t('admin.pm.capacitySavedHelp') });
     } catch (e) {
-      setNotice({ variant: 'destructive', title: t('admin.notice.actionFailedTitle'), message: e.response?.data?.error || t('admin.common.tryAgain') });
+      setNotice({ variant: 'destructive', title: t('admin.notice.actionFailedTitle'), message: errorMessage(e, t, t('admin.common.tryAgain')) });
     } finally {
       setSavingRequestSettings(false);
     }
@@ -230,7 +231,7 @@ export default function AdminDashboard() {
       setNotice({ variant: 'default', title: t('admin.pm.targetRecorded'), message: t('admin.pm.targetRecordedHelp', { name: userRecord.name }) });
       loadKpis();
     } catch (e) {
-      setNotice({ variant: 'destructive', title: t('admin.notice.actionFailedTitle'), message: e.response?.data?.error || t('admin.common.tryAgain') });
+      setNotice({ variant: 'destructive', title: t('admin.notice.actionFailedTitle'), message: errorMessage(e, t, t('admin.common.tryAgain')) });
     } finally {
       setOutreachSavingId(null);
     }
@@ -251,7 +252,7 @@ export default function AdminDashboard() {
       setNotice({ variant: 'default', title: t('admin.pm.targetRecorded'), message: t('admin.pm.externalTargetRecordedHelp') });
       loadKpis();
     } catch (e) {
-      setNotice({ variant: 'destructive', title: t('admin.notice.actionFailedTitle'), message: e.response?.data?.error || t('admin.common.tryAgain') });
+      setNotice({ variant: 'destructive', title: t('admin.notice.actionFailedTitle'), message: errorMessage(e, t, t('admin.common.tryAgain')) });
     } finally {
       setOutreachTargetSaving(false);
     }
@@ -293,7 +294,7 @@ export default function AdminDashboard() {
       setUploadResult(res.data);
       loadStats();
     } catch (e) {
-      setUploadError(e.response?.data?.error || t('admin.import.uploadFailed'));
+      setUploadError(errorMessage(e, t, t('admin.import.uploadFailed')));
     } finally {
       setUploading(false);
     }
@@ -309,7 +310,7 @@ export default function AdminDashboard() {
       setNotice({
         variant: 'destructive',
         title: t('admin.notice.matchingFailedTitle'),
-        message: e.response?.data?.error || t('admin.notice.matchingFailedMsg'),
+        message: errorMessage(e, t, t('admin.notice.matchingFailedMsg')),
       });
     } finally {
       setRematching(false);
@@ -373,7 +374,7 @@ export default function AdminDashboard() {
       setNotice({
         variant: 'destructive',
         title: t('admin.notice.managerUpdateFailTitle'),
-        message: e.response?.data?.error || t('admin.common.tryAgain'),
+        message: errorMessage(e, t, t('admin.common.tryAgain')),
       });
     }
   }
@@ -387,7 +388,7 @@ export default function AdminDashboard() {
       setNotice({
         variant: 'destructive',
         title: t('admin.notice.roleUpdateFailTitle'),
-        message: e.response?.data?.error || t('admin.common.tryAgain'),
+        message: errorMessage(e, t, t('admin.common.tryAgain')),
       });
     }
   }
@@ -402,7 +403,7 @@ export default function AdminDashboard() {
       setNotice({
         variant: 'destructive',
         title: t('admin.notice.actionFailedTitle'),
-        message: e.response?.data?.error || t('admin.notice.somethingWrong'),
+        message: errorMessage(e, t, t('admin.notice.somethingWrong')),
       });
     }
   }

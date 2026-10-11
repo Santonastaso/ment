@@ -1,3 +1,4 @@
+import { errorMessage } from '../lib/errors.mjs';
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Check, ChevronLeft, ChevronsLeft, ChevronsRight, CircleCheck, CircleX, Info, ListFilter, MessageCircle, MessageSquareText, Send, UserRound, UsersRound } from 'lucide-react';
@@ -296,7 +297,7 @@ export default function Conversations() {
       if (selectedGroupId) await loadGroupMessages(selectedGroupId, oldest);
       else await loadMessages(selectedId, oldest);
     }
-    catch (requestError) { setError(requestError.response?.data?.error || t('conversations.error')); }
+    catch (requestError) { setError(errorMessage(requestError, t, t('conversations.error'))); }
     finally { setLoadingOlder(false); }
   }
 
@@ -321,7 +322,7 @@ export default function Conversations() {
         else if (nextGroups[0]) navigate(groupPath(nextGroups[0]), { replace: true });
         else if (selectedId || selectedGroupId) setParams({}, { replace: true });
       })
-      .catch((requestError) => { if (!cancelled) setError(requestError.response?.data?.error || t('conversations.error')); })
+      .catch((requestError) => { if (!cancelled) setError(errorMessage(requestError, t, t('conversations.error'))); })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
@@ -330,7 +331,7 @@ export default function Conversations() {
 
   useEffect(() => {
     const refreshGroups = () => loadGroups().catch((requestError) => {
-      setError(requestError.response?.data?.error || t('conversations.error'));
+      setError(errorMessage(requestError, t, t('conversations.error')));
     });
     const channel = supabase.channel('conversation-group-list')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'groups' }, refreshGroups)
@@ -346,7 +347,7 @@ export default function Conversations() {
 
   useEffect(() => {
     const refreshSessions = () => loadSessions().catch((requestError) => {
-      setError(requestError.response?.data?.error || t('conversations.error'));
+      setError(errorMessage(requestError, t, t('conversations.error')));
     });
     const channel = supabase.channel('conversation-session-list')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions' }, refreshSessions)
@@ -387,7 +388,7 @@ export default function Conversations() {
         })
         .catch((requestError) => {
           if (!cancelled) {
-            setError(requestError.response?.data?.error || t('conversations.error'));
+            setError(errorMessage(requestError, t, t('conversations.error')));
             if (initial) setLoadedThreadKey(`group:${selectedGroupId}`);
           }
         });
@@ -423,7 +424,7 @@ export default function Conversations() {
         await refreshUnreadCounts();
       } catch (requestError) {
         if (!cancelled) {
-          setError(requestError.response?.data?.error || t('conversations.error'));
+          setError(errorMessage(requestError, t, t('conversations.error')));
           if (initial) setLoadedThreadKey(`session:${selectedId}`);
         }
       }
@@ -511,7 +512,7 @@ export default function Conversations() {
       await mutateSession({ status: 'cancelled' });
       setWithdrawOpen(false);
     }
-    catch (requestError) { setError(requestError.response?.data?.error || t('conversations.error')); }
+    catch (requestError) { setError(errorMessage(requestError, t, t('conversations.error'))); }
     finally { setWithdrawing(false); }
   }
 
@@ -537,7 +538,7 @@ export default function Conversations() {
       if (selected) loadSessions().catch(() => {});
       if (selectedGroup) loadGroups().catch(() => {});
     } catch (requestError) {
-      if (activeThreadRef.current === key) setError(requestError.response?.data?.error || t('conversations.error'));
+      if (activeThreadRef.current === key) setError(errorMessage(requestError, t, t('conversations.error')));
     } finally {
       pendingSends.current.delete(key);
       setSendingThreads(items => { const next = { ...items }; delete next[key]; return next; });
@@ -552,7 +553,7 @@ export default function Conversations() {
       await mutateSession({ scheduled_at: new Date(scheduledAt).toISOString() });
       setScheduleOpen(false);
     } catch (requestError) {
-      setError(requestError.response?.data?.error || t('conversations.error'));
+      setError(errorMessage(requestError, t, t('conversations.error')));
     } finally { setSavingSchedule(false); }
   }
 

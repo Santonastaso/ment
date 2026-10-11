@@ -4,6 +4,8 @@ import { importedMonth, importedYear, monthYearValue, parseMonthYear } from '../
 import { DEFAULT_PAGE_SIZE, PAGE_SIZES, clampDirectoryLimit, pageSizeFrom, serverPageCap } from '../client/src/lib/directory.mjs';
 import { focusSuggestions, readableSkills } from '../client/src/lib/reflection.mjs';
 import { ApiError } from '../client/src/lib/apiError.mjs';
+import { errorMessage } from '../client/src/lib/errors.mjs';
+import { readFileSync } from 'node:fs';
 
 test('a year without a month stays a year without a month', () => {
   // What a CV import returns for "2020": the year as text and no month.
@@ -83,4 +85,23 @@ test('every data-layer failure carries a status and a code', () => {
   const dropped = new ApiError('TypeError: Failed to fetch');
   assert.equal(dropped.response.status, 500);
   assert.equal(dropped.response.data.error, 'TypeError: Failed to fetch');
+});
+
+test('a failure is shown as a sentence, never as a code or the browser error', () => {
+  const warn = console.warn; const logged = []; console.warn = (...args) => logged.push(JSON.stringify(args));
+  try {
+    for (const language of ['en', 'fr', 'it']) {
+      const catalog = JSON.parse(readFileSync(new URL(`../client/src/i18n/locales/${language}/errors.json`, import.meta.url), 'utf8'));
+      const t = key => catalog[key] ?? key; // as the app's t(): the key itself when there is no translation
+      assert.equal(errorMessage(new ApiError('pair_cooldown', 400), t, 'fallback'), catalog['errors.pair_cooldown']);
+      assert.equal(errorMessage(new ApiError('some_new_rule', 400), t, 'fallback'), 'fallback');
+      assert.equal(errorMessage(new ApiError('TypeError: Failed to fetch', 500), t, 'fallback'), 'fallback');
+      assert.equal(errorMessage(new Error('boom'), t, 'fallback'), 'fallback');
+      assert.equal(errorMessage(undefined, t, 'fallback'), 'fallback');
+    }
+    // The code and status stay on the error for retry logic, and are all that is logged.
+    const refused = new ApiError('pair_cooldown', 400);
+    assert.deepEqual([refused.response.status, refused.response.data.error], [400, 'pair_cooldown']);
+    assert.ok(logged.some(line => line.includes('"code":"some_new_rule","status":400')) && logged.every(line => !line.includes('boom')));
+  } finally { console.warn = warn; }
 });
