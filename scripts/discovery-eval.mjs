@@ -6,7 +6,19 @@ if (!(process.env.MISTRAL_API || process.env.MISTRAL_API_KEY) || !process.env.MI
   throw new Error('Live evaluation requires MISTRAL_API (or MISTRAL_API_KEY) and MISTRAL_MODEL. No calls were made.');
 }
 const run = await discoveryHandler();
+// Which places to leave out is read by the model, so it is checked against the model: finance people, one per city.
+const inCities = cities => cities.map(city => ({ id: city, name: `${city} Person`, job_title: 'Financial Analyst', department: 'Finance', program: 'MBA', skills: ['Financial modelling'], location: city }));
+const shown = (...cities) => ({ role: 'assistant', kind: 'matches', framed: true, content: 'Here are some people.', search_request: 'finance', department: 'Finance', location: '', matches: inCities(cities).map(({ id, name, location }) => ({ id, name, location })) });
+const asked = { role: 'user', content: 'someone in finance' };
+const only = (...cities) => result => { const got = result.matches.map(match => match.location); assert.ok(got.length > 0 && got.every(city => cities.includes(city)), got.join(', ')); };
 const cases = [
+  { name: 'not in London leaves London out', cities: ['London', 'Paris'], turns: [asked, shown('London', 'Paris')], body: { query: 'not in London please', lang: 'en' }, check: only('Paris') },
+  { name: 'a country leaves out its cities (French)', cities: ['Lyon', 'Paris', 'Berlin'], turns: [asked, shown('Lyon', 'Paris', 'Berlin')], body: { query: 'pas en France', lang: 'fr' }, check: only('Berlin') },
+  { name: 'not in the UK (Italian)', cities: ['Leeds', 'Milan'], turns: [asked, shown('Leeds', 'Milan')], body: { query: 'non nel Regno Unito', lang: 'it' }, check: only('Milan') },
+  { name: 'an exclusion holds on a later turn', cities: ['London', 'Paris', 'Milan'], turns: [asked, shown('London'), { role: 'user', content: 'not in London' }, shown('Paris')], body: { query: 'more options', lang: 'en' }, check: only('Paris', 'Milan') },
+  { name: 'an exclusion ends when the place is asked for', cities: ['London', 'Paris'], turns: [asked, shown('London'), { role: 'user', content: 'not in London' }, shown('Paris')], body: { query: 'actually London is fine, show me London', lang: 'en' }, check: only('London') },
+  { name: 'a complaint is a request for the place', cities: ['London', 'Paris'], turns: [asked, shown('Paris')], body: { query: 'they are not in London', lang: 'en' }, check: only('London') },
+  { name: 'an ordinary "not" rules out no place', cities: ['London', 'Paris'], turns: [asked, shown('London')], body: { query: 'more options, not the same person', lang: 'en' }, check: result => assert.deepEqual((result.understood?.exclude || []).filter(word => ['london', 'paris'].includes(word)), []) },
   { name: 'broad field asks one short question', body: { query: 'finance', lang: 'en' }, check: result => assert.ok(result.clarification && result.clarification.split(/\s+/).length <= 20) },
   { name: 'French clarification', body: { query: 'finance', lang: 'fr' }, check: result => assert.match(result.clarification, /vous|quel|souhait|cherch|besoin|voulez|pr[eé]f[eé]r/i) },
   { name: 'Italian clarification', body: { query: 'finance', lang: 'it' }, check: result => assert.match(result.clarification, /vuoi|quale|cerchi|prefer|ti |vorre|interess|hai /i) },
@@ -17,7 +29,11 @@ const cases = [
 ];
 let failures = 0;
 for (const scenario of cases) {
-  const fixture = discoveryFixture({ live: true, turns: scenario.turns });
+  const fixture = discoveryFixture({ live: true, turns: scenario.turns, ...(scenario.cities ? { candidates: inCities(scenario.cities) } : {}) });
+  if (scenario.cities) {
+    const rpc = fixture.sb.rpc;
+    fixture.sb.rpc = async (name, args) => { const result = await rpc(name, args); if (name === 'discovery_network_coverage') result.data.locations = scenario.cities; return result; };
+  }
   try {
     const response = await run(fixture, { action: 'chat', ...scenario.body });
     assert.equal(response.status, 200, 'Provider request must succeed');

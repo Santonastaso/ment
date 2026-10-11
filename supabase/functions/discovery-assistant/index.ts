@@ -3,8 +3,7 @@ import { recordAiRun } from '../_shared/ai-telemetry.ts';
 import { aiErrorResponse, mistralJson } from '../_shared/mistral.ts';
 import { enforceRateLimit } from '../_shared/rate-limit.ts';
 import { canHelpWithCareerGoal, hasGroundedExpertise } from '../_shared/discovery-guards.mjs';
-import { atPlace, COUNTRY_NAMES, countryIn, isCountry } from './places.ts';
-import { COUNTRY_EXCLUSION_NAMES, outsideExcludedPlaces } from './location-exclusions.ts';
+import { atPlace, countryIn, isCountry } from './places.ts';
 import { departmentChoices, frameChat, frameExhausted, frameNarrow, frameNoMatch, frameOpenAgain, frameRefineNone, frameSmallTalk, frameNudge, frameSamePeople, frameSomeRepeated, frameRejectedNone, framePrivacy, frameDirectory, framePerson, exploreChoice, frameWhichFirst, narrowChoices, ownWordsInvite, scopeChoices, type Choice, frameResults, namesARole, NO_GAP, type Gap, frameConflict, conflictChoices, frameScope, frameBroad } from './framing.ts';
 import { keepsFacts, repeats, sameOpening, VOICE_PROMPT, withoutRepeats } from './voice.ts';
 import { NO_PARTS, narrowStepwise, negatedWords, readParts, withoutExcluded, type Filter, type Parts } from './request.ts';
@@ -87,6 +86,8 @@ type ClarificationResult = {
   // wrong often enough that London kept producing a pointless question.
   named_subject?: string;
   named_location?: string;
+  ruled_out_places?: string[];
+  exclude_locations?: string[];
   matching_terms?: string[];
   nearest_terms?: string[];
   subject_label?: string;
@@ -537,7 +538,7 @@ async function classifyPlace(place: string): Promise<'real' | 'fictional' | 'not
 // said about the people just shown, complains that the place was ignored: it
 // is searched as the earlier request in that place. A bare "not in London"
 // leaves London out. Only wording that refers to the people shown is a
-// complaint; everything else is an exclusion (see excludedPlaces).
+// complaint; everything else is an exclusion, which the model reports.
 const PLACE_COMPLAINT = /\b(?:they|these|those|them|ils|elles|ces\s+(?:gens|personnes|profils)|loro|questi|queste)\b[^.!?;]*?(?:\bnot\b|\p{L}n['’]t\b|\bne\s+\p{L}+\s+pas\b|\bn['’]\p{L}+\s+pas\b|\bnon\s+\p{L}+)|\b(?:none\s+of\s+(?:them|these|those)|nobody|no\s+one|aucun(?:e)?\s+(?:d['’]entre\s+eux\s+)?n|personne\s+n|nessuno)\b/iu;
 // The request the people on screen answered: what the user asked, else what was searched.
 function earlierRequest(priorTurns: Array<Record<string, unknown>>) {
@@ -564,37 +565,6 @@ function placeComplaint(message: string, priorTurns: Array<Record<string, unknow
   return wordsOf(earlier).some((word) => placeWords.has(word)) ? earlier : `${earlier} (${place})`;
 }
 
-// "not in London", "pas à Paris", "non a Milano", "except New York": places to
-// leave out. The words after the cue are matched against known place names,
-// longest first, so a name of several words is read whole.
-const LEAVE_OUT_CUE = "(?:not|except|excluding|without|outside|pas|sauf|sans|hors|non|tranne|senza|fuori)\\s+(?:(?:in|at|from|of|à|a|au|aux|en|dans|de|ad|da|di)\\s+)?(?:the\\s+|la\\s+|le\\s+|les\\s+|l['’]|il\\s+|lo\\s+)?";
-function excludedPlaces(message: string, known: string[] = []) {
-  const lower = message.toLowerCase();
-  const names = [...new Set([...known.map((place) => place.toLowerCase()), ...COUNTRY_NAMES, ...COUNTRY_EXCLUSION_NAMES, ...Object.keys(REGION_CITIES),
-    ...WORLD_CITIES, ...Object.values(REGION_CITIES).flat().map((city) => city.toLowerCase())])]
-    // Two letters are too easily an ordinary word ("pas eu le temps", "not in my field"); "uk" is the one such name people type.
-    .filter((name) => name.length > 2 || name === 'uk').sort((a, b) => b.length - a.length);
-  const found: string[] = [];
-  for (const name of names) {
-    if (found.some((longer) => longer.includes(name))) continue;
-    if (new RegExp(`(^|[^\\p{L}])${LEAVE_OUT_CUE}${escapeRegex(name)}([^\\p{L}]|$)`, 'u').test(lower)) found.push(name);
-  }
-  return found;
-}
-// An exclusion holds for the rest of the conversation: it must survive the
-// question the assistant asks next and any later "more options". It ends
-// when the user says "anywhere" or names that place as one they want.
-function leaveOutAcross(messages: string[], known: string[] = []) {
-  let out: string[] = [];
-  for (const message of messages) {
-    if (ANYWHERE.test(message)) out = [];
-    const lower = message.toLowerCase();
-    const excluded = PLACE_COMPLAINT.test(message) ? [] : excludedPlaces(message, known);
-    const named = (place: string) => new RegExp(`(^|[^\\p{L}])${escapeRegex(place)}([^\\p{L}]|$)`, 'u').test(lower);
-    out = [...new Set([...out.filter((place) => !named(place)), ...excluded])];
-  }
-  return out;
-}
 // Nothing but the exclusion: "not in London please" refines the people shown.
 function onlyLeavesOut(message: string, places: string[]) {
   const placeWords = new Set(places.flatMap((place) => wordsOf(place)));
@@ -845,7 +815,6 @@ Deno.serve(async (req) => {
       for (const match of turn.matches as Array<{ id?: string }>) if (match?.id) seenBefore.add(String(match.id));
     }
     const placePushback = placeComplaint(spoken, priorTurns);
-    const saidSoFar = [...priorTurns.filter((turn) => turn.role === 'user').map((turn) => cleanText(turn.content, 2000)), spoken];
     // With results on screen and nothing else said, the exclusion refines
     // the search those results answered instead of starting a new one.
     let bareLeaveOut = false;
@@ -861,11 +830,6 @@ Deno.serve(async (req) => {
     try {
       const coverage = await networkCoverage(ctx, caller.organization_id);
       const vocabulary = vocabularyOf(coverage);
-      // Exclusions are read once the network's own cities are known.
-      const coveredPlaces = Array.isArray((coverage as { locations?: string[] })?.locations) ? (coverage as { locations: string[] }).locations : [];
-      leaveOut = leaveOutAcross(saidSoFar, coveredPlaces);
-      const leftOutNow = placePushback ? [] : excludedPlaces(spoken, coveredPlaces);
-      bareLeaveOut = leftOutNow.length > 0 && onlyLeavesOut(spoken, leftOutNow) && Boolean(earlierRequest(priorTurns));
       // Latest message first, so an abandoned topic cannot leak in; the full
       // history only when the latest carries no subject ("either works").
       const userTurns = conversation.filter((turn) => turn.role === 'user').map((turn) => turn.content);
@@ -908,7 +872,9 @@ Do not broaden explicit professions or domains into adjacent ones. For example, 
 "named_subject": the field, role or skill they asked for, copied as they wrote it, one or two words. Empty when they named none, as in "I need help" or "someone senior".
 "matching_terms": terms copied exactly from the coverage that mean the same thing as named_subject. You are given "lexical_hits", the coverage terms that share a word with the request. Keep the ones that genuinely mean the same, drop the ones that only share a word, and add any coverage term that means the same despite different wording. "HR" and "Human Resources" mean the same; "pilot" and "pilot programme management" only share a word. Empty when nothing in the coverage means the same.
 "nearest_terms": only when matching_terms is empty, up to three coverage terms closest in meaning, copied exactly, such that someone carrying them could still credibly help. Empty when the request is outside this network's world entirely, such as a painter or a nurse.
-"named_location": the city, country or region the user named, copied exactly as they wrote it, or empty. Copy it even when you believe nobody is there; the application does that check. Words that only look like places ("in realtà", "this is not what I want") are not places.
+"named_location": the city, country or region the user wants people in, copied exactly as they wrote it, or empty. Never a place they ruled out. Copy it even when you believe nobody is there; the application does that check. Words that only look like places ("in realtà", "this is not what I want") are not places.
+"ruled_out_places": every place the user does NOT want people in ("not in London", "pas en France", "tranne Milano", "outside the UK"), each copied exactly as they wrote it. Read every turn: a place ruled out earlier stays ruled out until the user asks for it or says anywhere is fine. Saying of the people shown that they are not somewhere ("they are not in China") is a complaint that they wanted that place, not a ruling out. [] when none.
+"exclude_locations": every entry of coverage.locations that lies in a place listed in ruled_out_places, copied exactly from the coverage: the city itself, or each listed city inside a ruled-out country or region. [] when none.
 "subject_label": a short, natural phrase in the reply language that completes the sentence "I couldn't find ___ here", describing what the user is looking for in their own terms -- for example "anyone in construction" or "a CFO who is still a student". At most eight words. Never add a place, language or detail they did not give. Empty when they named nothing.
 "parts": the request split into what they want ONE person to be. Copy each value from the user's own words, in their language:
   "role": the job or title they asked for, or empty.
@@ -922,7 +888,7 @@ Do not broaden explicit professions or domains into adjacent ones. For example, 
 The language the user writes in is never a place: French words do not mean France.
 Every term you return is checked against the coverage and anything not found there is discarded, so copy exactly and never invent one. The examples in these instructions illustrate shape only: never reuse their wording or their subject in anything you return.
 
-Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one concise question or empty string","search_request":"concise grounded request or empty string","no_match_reason":"one plain sentence, or empty string","named_subject":"as written, or empty string","matching_terms":["exact coverage term"],"nearest_terms":["exact coverage term"],"named_location":"as written, or empty string","subject_label":"short phrase, or empty string","parts":{"role":"","seniority":"","field":"","department":"","company":"","skills":[],"exclude":[],"conflict":[]}}.`,
+Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one concise question or empty string","search_request":"concise grounded request or empty string","no_match_reason":"one plain sentence, or empty string","named_subject":"as written, or empty string","matching_terms":["exact coverage term"],"nearest_terms":["exact coverage term"],"named_location":"as written, or empty string","ruled_out_places":["as written"],"exclude_locations":["exact coverage location"],"subject_label":"short phrase, or empty string","parts":{"role":"","seniority":"","field":"","department":"","company":"","skills":[],"exclude":[],"conflict":[]}}.`,
         user: JSON.stringify({ conversation, coverage, answered: hasClarified, lexical_hits: hits }),
         temperature: 0.1,
         maxTokens: 800,
@@ -962,9 +928,21 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
       parts = readParts(result.value?.parts, {
         latest: userTurns.at(-1) || '', userText: userTurns.join(' '), departments: departmentList, ignore: LOOKUP_STOPWORDS,
       });
-      // A left-out place is ruled out like any other excluded word, so it is
-      // not read back as the subject or as the place wanted.
-      if (leaveOut.length) parts = { ...parts, exclude: [...new Set([...parts.exclude, ...leaveOut])] };
+      // Which places to leave out is the model's reading: negation, geography
+      // and three languages are what it is good at. It is held to two checks:
+      // a ruled-out place must be in the user's own words, and a location to
+      // drop must be one this network has.
+      const saidLower = userTurns.join(' ').toLowerCase();
+      const listed = (value: unknown) => (Array.isArray(value) ? value.map((item) => cleanText(item, 80).toLowerCase()).filter(Boolean) : []);
+      const ruledOut = PLACE_COMPLAINT.test(spoken) ? [] : listed(result.value?.ruled_out_places).filter((place) => saidLower.includes(place));
+      const dropped = new Set(ruledOut.length ? listed(result.value?.exclude_locations) : []);
+      const coveredPlaces: string[] = Array.isArray((coverage as { locations?: string[] })?.locations) ? (coverage as { locations: string[] }).locations : [];
+      leaveOut = coveredPlaces.filter((place) => dropped.has(place.toLowerCase()) || ruledOut.includes(place.toLowerCase()));
+      // With results on screen and nothing else said, it refines that search.
+      const ruledNow = ruledOut.filter((place) => spoken.toLowerCase().includes(place));
+      bareLeaveOut = ruledNow.length > 0 && onlyLeavesOut(spoken, ruledNow) && Boolean(earlierRequest(priorTurns));
+      // A ruled-out place is not read back as the subject or as the place wanted.
+      if (ruledOut.length) parts = { ...parts, exclude: [...new Set([...parts.exclude, ...ruledOut])] };
       if (parts.exclude.length) {
         latestHits = lexicalHits(withoutExcluded(userTurns.at(-1) || '', parts.exclude), vocabulary);
         hits = latestHits.length || !answeringOurQuestion ? latestHits : lexicalHits(withoutExcluded(userTurns.join(' '), parts.exclude), vocabulary);
@@ -995,8 +973,8 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
       // A well-known fictional place is recognised in any case ("wakanda").
       const fictionalNamed = fictionalPlaceIn(latestOriginal);
       const extractedPlace = ANYWHERE.test(latestOriginal) ? ''
-        : fictionalNamed || (placeHere(extractedLocation) && !isVocabulary && plausiblePlace(extractedLocation) && !leaveOut.includes(extractedLocation.toLowerCase()) ? extractedLocation : '')
-          || regionIn(withoutExcluded(latestOriginal, leaveOut)) || countryIn(withoutExcluded(latestOriginal, leaveOut));
+        : fictionalNamed || (placeHere(extractedLocation) && !isVocabulary && plausiblePlace(extractedLocation) && !ruledOut.includes(extractedLocation.toLowerCase()) ? extractedLocation : '')
+          || regionIn(withoutExcluded(latestOriginal, ruledOut)) || countryIn(withoutExcluded(latestOriginal, ruledOut));
       // Any other place we cannot vouch for gets one direct question. Asked as
       // a field among many, the model let "Gotham city" through as real; asked
       // on its own, it answers reliably.
@@ -1418,13 +1396,13 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
 
   if (excludeIds.size) candidates = candidates.filter((candidate) => !excludeIds.has(candidate.id));
   if (leaveOut.length) {
-    // A country or region stands for the cities it covers.
-    const out = new Set(leaveOut.flatMap((place) => [place, ...(REGION_CITIES[place] || []).map((city) => city.toLowerCase())]));
-    candidates = candidates.filter(candidate => outsideExcludedPlaces(cleanText(candidate.location, 80), leaveOut, REGION_CITIES));
+    const out = new Set(leaveOut.map((place) => place.toLowerCase()));
+    const elsewhere = (location: unknown) => !out.has(cleanText(location, 80).toLowerCase());
+    candidates = candidates.filter((candidate) => elsewhere(candidate.location));
     // Neither a place carried over from the earlier search nor the people
     // already shown may bring the left-out place back.
-    if (out.has(namedLocationFilter.toLowerCase())) { namedLocationFilter = ''; locationCities = []; }
-    refineFallback = refineFallback.filter(match => outsideExcludedPlaces(cleanText(match.location, 80), leaveOut, REGION_CITIES));
+    if (out.has(namedLocationFilter.toLowerCase()) || (locationCities.length > 0 && locationCities.every((city) => out.has(city.toLowerCase())))) { namedLocationFilter = ''; locationCities = []; }
+    refineFallback = refineFallback.filter((match) => elsewhere(match.location));
   }
   const networkCandidates = candidates;
 
