@@ -22,6 +22,7 @@
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
     "@playwright/test": "1.63.0",
+    "cities.json": "1.1.65",
     "supabase": "2.119.0"
   }
 }
