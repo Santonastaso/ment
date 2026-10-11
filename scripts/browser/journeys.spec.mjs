@@ -1405,11 +1405,13 @@ test('a failed availability save keeps the user on onboarding until it succeeds'
   await page.evaluate(() => { window.fixture.failPut = '/users/me'; });
   await page.getByRole('button', { name: 'Finish & see my matches' }).click();
   // The failure is said aloud, nothing is shown as saved and nobody leaves the step.
-  await expect(page.getByText('Your profile is saved, but your availability could not be saved. Try again.')).toBeVisible();
+  await expect(page.getByText('Your availability could not be saved. Try again.')).toBeVisible();
+  // Onboarding is not completed behind the user's back: the profile is not submitted yet.
+  expect(await page.evaluate(() => window.fixture.calls.some(call => call.path === '/users/me/onboarding'))).toBe(false);
   await expect(page).toHaveURL(/\/onboarding$/);
   await expect(availability).toBeVisible();
   await expect(page.getByTestId('onboarding-accepts-requests')).not.toBeChecked();
-  // Trying again saves the choice without submitting the profile a second time.
+  // Trying again saves the choice, then the profile, once.
   await page.getByRole('button', { name: 'Finish & see my matches' }).click();
   await expect(page).toHaveURL('http://127.0.0.1:3010/');
   const calls = await page.evaluate(() => window.fixture.calls.filter(call => call.path === '/users/me/onboarding' || (call.method === 'put' && call.path === '/users/me')));
@@ -1464,6 +1466,7 @@ test('Explorer page size drives the request, the page count and the boundaries',
   await choose(50);
   await expect(rows).toHaveCount(50);
   await expect(pagination).toContainText('1/5');
+  await expect(next).toBeEnabled();
   await choose(25);
   await expect(rows).toHaveCount(25);
   await expect(page).not.toHaveURL(/size=/);
@@ -1477,6 +1480,10 @@ test('Explorer page size drives the request, the page count and the boundaries',
   await next.click();
   await expect(pagination).toContainText('Showing 51–100 of 230');
   expect(await lastRequest()).toContain('limit=50&offset=50');
+  // Choosing the size the server already serves must not leave the list stuck loading.
+  await choose(50);
+  await expect(page.locator('.directory-results')).toHaveAttribute('aria-busy', 'false');
+  await expect(next).toBeEnabled();
   // Once the cap is known, no later page is first asked for at the wrong offset.
   const cappedRequests = await page.evaluate(from => window.fixture.calls.slice(from).map(call => call.path).filter(path => path.startsWith('/directory?')), callsBeforeCap);
   expect(cappedRequests.filter(path => path.includes('limit=100'))).toHaveLength(1);
@@ -1574,4 +1581,28 @@ test('leaving a group asks in the app, not in a browser box', async ({ page }) =
   await expect(dialog).toBeHidden();
   expect(nativeDialogs).toBe(0);
   expect(await page.evaluate(() => window.fixture.calls.some(call => call.method === 'delete'))).toBe(false);
+});
+
+test('a Home request whose answer was lost is retried unchanged', async ({ page }) => {
+  await page.goto('/');
+  const composer = page.getByRole('textbox', { name: 'Describe who could help' });
+  await composer.fill('finance');
+  await composer.press('Enter');
+  await expect(page.getByText('Which finance skill would you like help with?')).toBeVisible();
+  await composer.fill('Financial modelling');
+  await composer.press('Enter');
+  await page.getByRole('button', { name: 'Choose Peer Mentor' }).click();
+  const draft = page.getByRole('textbox', { name: 'Suggested draft' });
+  await draft.fill('First wording.');
+  await page.evaluate(() => { window.fixture.failNext = '/sessions'; });
+  const send = page.getByRole('button', { name: 'Send request', exact: true });
+  await send.click();
+  // The first attempt may have been saved, so it cannot be reworded before the retry.
+  await expect(draft).toBeDisabled();
+  await expect(page.locator('.discovery-draft').getByRole('textbox', { name: 'Request title' })).toBeDisabled();
+  await send.click();
+  await expect(page.getByRole('link', { name: 'Open chat', exact: true })).toBeVisible();
+  const posts = await page.evaluate(() => window.fixture.calls.filter(call => call.method === 'post' && call.path === '/sessions').map(call => call.body));
+  expect(posts).toHaveLength(2);
+  expect(posts[1]).toEqual(posts[0]);
 });

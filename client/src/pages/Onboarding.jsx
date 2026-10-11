@@ -51,8 +51,6 @@ export default function Onboarding({ returnTo }) {
   const [weeklyLimit, setWeeklyLimit] = useState(2);
   const [monthlyLimit, setMonthlyLimit] = useState(5);
   const [acceptsRequests, setAcceptsRequests] = useState(true);
-  // The saved profile, kept while the availability save is retried.
-  const [savedProfile, setSavedProfile] = useState(null);
 
   // Step 2 — Can teach: array of { skill, example_project }
   const [canTeach, setCanTeach] = useState([]);
@@ -168,9 +166,17 @@ export default function Onboarding({ returnTo }) {
         can_teach: canTeach,
         wants_to_learn: wantsToLearn,
       };
-      // A retry after a failed availability save must not submit the profile twice.
-      let profile = savedProfile;
-      if (!profile) {
+      // Availability goes first. Completing onboarding redirects away at once
+      // (the profile update arrives live), so nothing may still be unsaved then.
+      const weekly = Math.max(1, Math.min(50, Number(weeklyLimit) || 1));
+      const monthly = Math.max(weekly, Math.min(200, Number(monthlyLimit) || weekly));
+      try {
+        await api.put('/users/me', { weekly_meeting_limit: weekly, monthly_meeting_limit: monthly, mentorship_paused: !acceptsRequests });
+      } catch {
+        setError(t('onboarding.error.availabilitySave'));
+        setStep(4);
+        return;
+      }
       if (draftId) {
         await api.post(`/profile/ingest/${draftId}/accept`, { accepted_json: accepted });
       }
@@ -187,21 +193,7 @@ export default function Onboarding({ returnTo }) {
         linkedin_url: linkedinUrl,
         linkedin_headline: null,
       });
-      profile = res.data;
-      setSavedProfile(profile);
-      }
-      const weekly = Math.max(1, Math.min(50, Number(weeklyLimit) || 1));
-      const monthly = Math.max(weekly, Math.min(200, Number(monthlyLimit) || weekly));
-      // Nothing is shown as saved, and nobody leaves this step, until the
-      // server has accepted the choice.
-      try {
-        await api.put('/users/me', { weekly_meeting_limit: weekly, monthly_meeting_limit: monthly, mentorship_paused: !acceptsRequests });
-      } catch {
-        setError(t('onboarding.error.availabilitySave'));
-        setStep(4);
-        return;
-      }
-      updateUser({ ...profile, weekly_meeting_limit: weekly, monthly_meeting_limit: monthly, mentorship_paused: !acceptsRequests });
+      updateUser({ ...res.data, weekly_meeting_limit: weekly, monthly_meeting_limit: monthly, mentorship_paused: !acceptsRequests });
       navigate(returnTo || '/');
     } catch (e) {
       setError(t(onboardingErrorKey(e)));
@@ -424,7 +416,7 @@ export default function Onboarding({ returnTo }) {
 
           <div className="flex justify-between pt-2">
             {step > 0 ? (
-              <Button onClick={() => { setError(''); setStep(s => s - 1); }} variant="outline" disabled={saving || uploading || !!savedProfile}>{t('onboarding.nav.back')}</Button>
+              <Button onClick={() => { setError(''); setStep(s => s - 1); }} variant="outline" disabled={saving || uploading}>{t('onboarding.nav.back')}</Button>
             ) : <div />}
 
             {step === 0 ? (

@@ -31,7 +31,6 @@ export default function Explorer() {
   const sort = searchParams.get('sort') === 'name' ? 'name' : 'relevance';
   const page = Number.isSafeInteger(Number(searchParams.get('page'))) && Number(searchParams.get('page')) > 0 ? Number(searchParams.get('page')) : 1;
   const pageSize = pageSizeFrom(searchParams.get('size'));
-  const requestKey = JSON.stringify([query, persona, program, cohort, location, language, sort, page, pageSize]);
 
   const [inputValue, setInputValue] = useState(query);
   const [dirError, setDirError] = useState(false);
@@ -44,6 +43,7 @@ export default function Explorer() {
   // size chosen afterwards.
   const [serverCap, setServerCap] = useState(null);
   const size = serverCap ? Math.min(pageSize, serverCap) : pageSize;
+  const requestKey = JSON.stringify([query, persona, program, cohort, location, language, sort, page, size]);
   const [requestingMentor, setRequestingMentor] = useState(null);
 
   function updateParams(mutate) {

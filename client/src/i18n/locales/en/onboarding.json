@@ -52,7 +52,7 @@
   "onboarding.error.busy": "This is taking longer than usual. Please try again in a moment.",
   "onboarding.error.nameRequired": "Enter your full name before finishing.",
   "onboarding.error.workExperienceRequired": "Add a role and department for your first work experience.",
-  "onboarding.error.availabilitySave": "Your profile is saved, but your availability could not be saved. Try again.",
+  "onboarding.error.availabilitySave": "Your availability could not be saved. Try again.",
   "onboarding.import.unavailable": "Document import is temporarily unavailable. You can enter your details manually.",
   "onboarding.error.generic": "Could not save your profile. Your entries are still here. Please try again.",
   "onboarding.nav.back": "Back",

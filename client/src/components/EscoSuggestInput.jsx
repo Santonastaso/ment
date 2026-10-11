@@ -121,7 +121,6 @@ export default function EscoSuggestInput({
   function selectEsco(item) {
     if (!item) return;
     onCommitEsco?.(item);
-    onChange('');
     setOpen(false);
     setSuggestions([]);
     setHighlight(-1);
@@ -137,7 +136,6 @@ export default function EscoSuggestInput({
     if (exact) selectEsco(exact);
     else {
       onCommitCustom?.(raw);
-      onChange('');
       setOpen(false);
       setSuggestions([]);
       setHighlight(-1);
