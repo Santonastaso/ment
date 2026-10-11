@@ -139,6 +139,8 @@ jobs:
           export MENT_PEER_PASSWORD='local-peer-fixture-2026'
           python3 scripts/seed_local_rls.py
           python3 scripts/rls_smoke_test.py
+          # Writes requests, so it runs here only, never in the production check below.
+          python3 scripts/request_api_contract_test.py
       - name: Stop local services
         if: always()
         run: supabase stop --no-backup
