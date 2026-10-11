@@ -17,6 +17,7 @@
   "nav.messages": "Messages",
   "nav.groups": "Groupes",
   "nav.unreadConversations": "{count} conversations non lues",
+  "nav.groupRequests": "{count} demandes d'adhésion",
   "nav.unreadGroups": "{count} groupes avec des messages non lus",
   "nav.myProfile": "Mon profil",
   "nav.admin": "Administration",

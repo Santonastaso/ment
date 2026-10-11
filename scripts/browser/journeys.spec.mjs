@@ -1549,3 +1549,12 @@ test('the landing page carries no unexplained folio labels', async ({ page }) =>
   await expect(page.getByText(/MENT \/ 0\d/)).toHaveCount(0);
   await expect(page.locator('.landing-hero-index, .landing-preview-folio')).toHaveCount(0);
 });
+
+test('pending join requests show on Groups in the sidebar', async ({ page }) => {
+  await page.goto('/');
+  const badge = page.getByTestId('nav-groups-requests-badge');
+  await expect(badge).toHaveCount(0);
+  await page.evaluate(() => { window.fixture.unread.groupRequests = 2; window.fixture.setUser({ ...window.fixture.user }); });
+  await expect(badge).toHaveText('2');
+  await expect(badge).toHaveAccessibleName('2 join requests');
+});

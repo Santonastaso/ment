@@ -21,6 +21,7 @@
   "nav.platformOps": "Operazioni piattaforma",
   "nav.groups": "Gruppi",
   "nav.unreadConversations": "{count} conversazioni non lette",
+  "nav.groupRequests": "{count} richieste di adesione",
   "nav.unreadGroups": "{count} gruppi con messaggi non letti",
   "common.notFound.title": "Pagina non trovata",
   "common.notFound.description": "Il link potrebbe non essere aggiornato oppure la pagina è stata spostata.",
