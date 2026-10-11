@@ -1,4 +1,5 @@
 ﻿import React, { useState, useEffect } from 'react';
+import { errorMessage } from '../lib/errors.mjs';
 import api from '../api/index.js';
 import { useT } from '../i18n/index.jsx';
 import { PageShell } from '../components/PageShell.jsx';
@@ -80,7 +81,7 @@ export default function AdminOps() {
       setNotice({
         variant: 'destructive',
         title: t('admin.notice.orgCreateFailTitle'),
-        message: e.response?.data?.error || t('admin.common.tryAgain'),
+        message: errorMessage(e, t, t('admin.common.tryAgain')),
       });
     } finally {
       setCreatingOrg(false);
@@ -125,7 +126,7 @@ export default function AdminOps() {
       setNotice({
         variant: 'destructive',
         title: t('admin.notice.requestUpdateFailTitle'),
-        message: e.response?.data?.error || t('admin.common.tryAgain'),
+        message: errorMessage(e, t, t('admin.common.tryAgain')),
       });
     } finally {
       setUpdatingRequestId(null);

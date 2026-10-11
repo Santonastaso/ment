@@ -1,3 +1,4 @@
+import { errorMessage } from '../lib/errors.mjs';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
 import { Share2, RefreshCw, Building2, Languages, GraduationCap, Info } from 'lucide-react';
@@ -87,7 +88,7 @@ export default function KnowledgeGraph() {
       setGraph(res.data);
     } catch (e) {
       if (id !== reqId.current) return;
-      setError(e.response?.data?.error || t('graph.error.loadFailed'));
+      setError(errorMessage(e, t, t('graph.error.loadFailed')));
       setGraph(null);
     } finally {
       if (id === reqId.current) setLoading(false);

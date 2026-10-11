@@ -370,7 +370,7 @@ async function get(url) {
   if (url === '/discovery/threads/latest') {
     const { data, error } = await supabase
       .from('discovery_threads')
-      .select('id,title,intent,turns,selected_person_id,archived,created_at,updated_at')
+      .select('id,title,intent,turns,selected_person_id,session_id,archived,created_at,updated_at')
       .eq('user_id', viewer.id)
       .eq('archived', false)
       .order('updated_at', { ascending: false })
@@ -384,7 +384,7 @@ async function get(url) {
     const params = new URLSearchParams(url.split('?')[1] || '');
     const limit = Math.min(30, Math.max(1, Number(params.get('limit')) || 10));
     const { data, error } = await supabase.from('discovery_threads')
-      .select('id,title,turns,selected_person_id,archived,created_at,updated_at')
+      .select('id,title,turns,selected_person_id,session_id,archived,created_at,updated_at')
       .eq('user_id', viewer.id)
       .order('updated_at', { ascending: false })
       .limit(limit);
@@ -395,7 +395,7 @@ async function get(url) {
   if (/^\/discovery\/threads\/[0-9a-f-]+$/i.test(url)) {
     const id = url.split('/')[3];
     const { data, error } = await supabase.from('discovery_threads')
-      .select('id,title,intent,turns,selected_person_id,archived,created_at,updated_at')
+      .select('id,title,intent,turns,selected_person_id,session_id,archived,created_at,updated_at')
       .eq('id', id).eq('user_id', viewer.id).single();
     if (error) throw new ApiError(error.message);
     return ok(data);
@@ -812,6 +812,8 @@ async function post(url, body = {}, opts = {}) {
       p_topics: body.topics ?? null,
       p_idempotency_key: body.idempotency_key || crypto.randomUUID(),
       p_follow_up_intent: body.follow_up_intent || 'one_off',
+      // The saved search this request comes from; the server links the two in the same transaction.
+      ...(body.thread_id ? { p_thread_id: body.thread_id } : {}),
     });
     if (error) throw new ApiError(error.message, error.code === 'P0001' || error.code === '23514' ? 400 : 500);
     return ok(await enrichSession(data, viewer.id), 201);
@@ -1073,7 +1075,7 @@ async function put(url, body = {}) {
       .update(changes)
       .eq('id', id)
       .eq('user_id', viewer.id)
-      .select('id,title,intent,turns,selected_person_id,archived,created_at,updated_at')
+      .select('id,title,intent,turns,selected_person_id,session_id,archived,created_at,updated_at')
       .single();
     if (error) throw new ApiError(error.message);
     return ok(data);

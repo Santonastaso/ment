@@ -1,3 +1,4 @@
+import { errorMessage } from '../lib/errors.mjs';
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Check, Pencil } from 'lucide-react';
@@ -41,7 +42,7 @@ export default function MeetingFeedback({ session, onSaved, compact = false }) {
       await onSaved();
       if (firstCompletion) setOfferCheckIn(true); else setOpen(false);
     } catch (err) {
-      setError(err.response?.data?.error || t('conversations.error'));
+      setError(errorMessage(err, t, t('conversations.error')));
     } finally { setSaving(false); }
   }
 

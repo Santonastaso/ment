@@ -102,15 +102,62 @@ for (const ns of namespaces) {
   for (const k of Object.keys(reference)) allKeys.add(k);
 }
 const usedKeys = collectUsedKeys(path.join(ROOT, 'client/src'));
-// Dynamic keys (template literals like `tier${x}`) aren't captured by the regex;
-// ignore anything that doesn't literally exist as a t('...') string.
+// Keys built at run time, e.g. t(`profile.tab.${key}`), where * stands for the
+// built part. Every such template must be declared here with each value it can
+// take, so a new template or a missing member fails instead of showing a raw key.
+const FAMILIES = {
+  'admin.ai.*': 'feature status model latency date',
+  'admin.ai.feature.*': 'discovery_match discovery_draft profile_ingest reflection',
+  'admin.import.mode.*': 'insert upsert update',
+  'admin.pm.delivery.*': 'demo queued sent failed',
+  'admin.tab.*': 'overview kpis ai people privacy audit feedback',
+  'admin.users.role.*': 'student alumnus admin',
+  'components.ics.*.*': 'add|google add|microsoft connect|google connect|microsoft',
+  'components.monthYear.month*': '01 02 03 04 05 06 07 08 09 10 11 12',
+  'components.sessionRequest.day*': '1 3 7',
+  'conversations.status.*': 'pending scheduled completed declined cancelled expired',
+  'graph.filter.*': 'persona cohort skill',
+  'graph.kind.*': 'skill person',
+  'groups.joinStatus.*': 'pending accepted declined withdrawn expired',
+  'legal.*.title': 'terms privacy',
+  'legal.*.intro': 'terms privacy',
+  'legal.*.*.title': 'terms|1 terms|2 terms|3 terms|4 terms|5 privacy|1 privacy|2 privacy|3 privacy|4 privacy|5 privacy|6 privacy|7',
+  'legal.*.*.body': 'terms|1 terms|2 terms|3 terms|4 terms|5 privacy|1 privacy|2 privacy|3 privacy|4 privacy|5 privacy|6 privacy|7',
+  'onboarding.persona.*': 'student alumnus',
+  'profile.availability.*': 'weekly monthly',
+  'profile.availability.*Limit': 'weekly monthly',
+  'profile.persona.*': 'student alumnus',
+  'profile.reflection.continue.*': 'yes unsure no',
+  'profile.tab.*': 'overview skills availability experience meetings reflections',
+};
+function collectTemplates(dir, out = new Set()) {
+  for (const f of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, f.name);
+    if (f.isDirectory()) collectTemplates(p, out);
+    else if (/\.(jsx?|mjs|tsx?)$/.test(f.name)) {
+      for (const m of fs.readFileSync(p, 'utf8').matchAll(/\bt\(\s*`([^`]*)`/g)) out.add(m[1].replace(/\$\{(?:[^{}]|\{[^{}]*\})*\}/g, '*'));
+    }
+  }
+  return out;
+}
+const undeclared = [...collectTemplates(path.join(ROOT, 'client/src'))].filter(template => !(template in FAMILIES)).sort();
+for (const [template, members] of Object.entries(FAMILIES)) {
+  for (const member of members.split(' ')) {
+    const parts = member.split('|');
+    usedKeys.add(template.replace(/\*/g, () => parts.shift()));
+  }
+}
 const dangling = [...usedKeys].filter(k => !allKeys.has(k)).sort();
 
-let usageGaps = 0;
+let usageGaps = undeclared.length;
+if (undeclared.length) {
+  console.log(`\nKeys built at run time with no declared family (${undeclared.length}):`);
+  for (const template of undeclared) console.log(`  - ${template}`);
+}
 if (dangling.length) {
   console.log(`\nKeys used in source but missing from ALL en catalogs (${dangling.length}):`);
   for (const k of dangling) console.log(`  - ${k}`);
-  usageGaps = dangling.length;
+  usageGaps += dangling.length;
 }
 
 let formatGaps = 0;

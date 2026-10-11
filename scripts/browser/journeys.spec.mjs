@@ -1608,6 +1608,8 @@ test('a Home request that failed without an answer is retried unchanged', async 
   const invite = await draftHomeInvite(page);
   await page.evaluate(() => { window.fixture.failNext = '/sessions'; });
   await invite.send.click();
+  // A dropped connection is described in words, never as the browser's own error text.
+  await expect(page.getByRole('alert')).toHaveText('We could not complete that request. Please try again.');
   // The first attempt may have been saved, so it cannot be reworded before the retry.
   await expect(invite.draft).toBeDisabled();
   await expect(invite.title).toBeDisabled();
@@ -1619,6 +1621,10 @@ test('a Home request that failed without an answer is retried unchanged', async 
   expect(posts).toHaveLength(2);
   expect(posts[1]).toEqual(posts[0]);
   expect(await invite.created()).toBe(1);
+  // The request names the search it came from; the server links them, so no
+  // second call is made that could fail and leave the search looking unsent.
+  expect(posts[0].thread_id).toBe('thread');
+  expect(await page.evaluate(() => window.fixture.calls.some(call => call.method === 'put' && call.path === '/discovery/threads/thread' && call.body?.archived === true))).toBe(false);
 });
 
 test('a Home request that was saved but whose answer was lost is not sent twice', async ({ page }) => {
@@ -1635,10 +1641,48 @@ test('a Home request that was saved but whose answer was lost is not sent twice'
   expect(posts[1].idempotency_key).toBe(posts[0].idempotency_key);
 });
 
+test('a second request from the same conversation is sent, not refused', async ({ page }) => {
+  const invite = await draftHomeInvite(page);
+  await invite.send.click();
+  await expect(page.getByRole('link', { name: 'Open chat', exact: true })).toBeVisible();
+  // The chat stays open after sending: ask again there and write to someone from the new results.
+  const composer = page.getByRole('textbox', { name: 'Describe who could help' });
+  await composer.fill('Financial modelling');
+  await composer.press('Enter');
+  await page.getByRole('button', { name: 'Choose Peer Mentor' }).last().click();
+  await invite.draft.fill('A second request.');
+  await invite.send.click();
+  await expect.poll(invite.created).toBe(2);
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  const posts = await invite.posts();
+  // The search belongs to the first request; the second goes on its own.
+  expect(posts.map(post => post.thread_id)).toEqual(['thread', undefined]);
+});
+
+test('reopening a search shows the message that was sent, not the draft before it was edited', async ({ page }) => {
+  const invite = await draftHomeInvite(page);
+  const generated = await invite.draft.inputValue();
+  await invite.draft.fill('My own wording, edited before sending.');
+  await invite.send.click();
+  await expect(page.getByRole('link', { name: 'Open chat', exact: true })).toBeVisible();
+  // The saved search still holds the generated draft; the request holds what was sent.
+  await page.evaluate(() => { window.fixture.threadDraft = true; history.pushState({}, '', '/?thread=thread'); dispatchEvent(new PopStateEvent('popstate')); });
+  const reopened = page.getByRole('textbox', { name: 'Suggested draft' });
+  await expect(reopened).toHaveValue('My own wording, edited before sending.');
+  expect(generated).not.toBe('My own wording, edited before sending.');
+  await expect(page.getByText('Request sent to Peer.')).toBeVisible();
+});
+
 test('a Home request the server refused can be edited and sent as a new one', async ({ page }) => {
   const invite = await draftHomeInvite(page);
-  await page.evaluate(() => { window.fixture.refuseNext = { path: '/sessions', code: 'mentor_at_capacity' }; });
+  // A refusal the app has no sentence for shows the general message, not the code.
+  await page.evaluate(() => { window.fixture.refuseNext = { path: '/sessions', code: 'some_new_rule' }; });
   await invite.send.click();
+  await expect(page.getByRole('alert')).toHaveText('We could not complete that request. Please try again.');
+  // A known refusal says what happened.
+  await page.evaluate(() => { window.fixture.refuseNext = { path: '/sessions', code: 'recipient_weekly_limit' }; });
+  await invite.send.click();
+  await expect(page.getByRole('alert')).toHaveText('This person has reached their limit for this week. Try again next week.');
   // Nothing was saved, so the wording is the user's to change.
   await expect(invite.draft).toBeEnabled();
   await expect(invite.title).toBeEnabled();
@@ -1647,8 +1691,8 @@ test('a Home request the server refused can be edited and sent as a new one', as
   await invite.send.click();
   await expect(page.getByRole('link', { name: 'Open chat', exact: true })).toBeVisible();
   const posts = await invite.posts();
-  expect(posts[1].message).toBe('Second wording.');
-  expect(posts[1].idempotency_key).not.toBe(posts[0].idempotency_key);
+  expect(posts[2].message).toBe('Second wording.');
+  expect(new Set(posts.map(post => post.idempotency_key)).size).toBe(3);
   expect(await invite.created()).toBe(1);
 });
 
@@ -1681,4 +1725,125 @@ test('choosing a skill suggestion saves it once, whether the save is fast, slow 
     expect(made, label).toHaveLength(1);
     expect(made[0], label).toEqual(['leadership']);
   }
+});
+
+test('a reopened search is "sent" only when it carries its own request', async ({ page }) => {
+  const request = status => ({ id: 9, status, title: 'Another request', outbound_message: 'The wording I actually sent.', mentor_id: 'peer', mentee_id: 'viewer', route_token: 'tok9',
+    mentor: { id: 'peer', name: 'Peer Mentor' }, mentee: { id: 'viewer', name: 'Viewer Student' } });
+  // The fixture is rebuilt on every load, so state is set first and the search opened in-app.
+  const reopen = async (flags, session) => {
+    await page.goto('/');
+    await page.evaluate(([extra, row]) => {
+      Object.assign(window.fixture, extra);
+      window.fixture.sessions.push(row);
+      history.pushState({}, '', '/?thread=thread');
+      dispatchEvent(new PopStateEvent('popstate'));
+    }, [flags, session]);
+  };
+  const draft = page.getByRole('textbox', { name: 'Suggested draft' });
+
+  // Drafted, never sent, while another request with the same person is open: still a draft.
+  await reopen({ threadDraft: true }, request('pending'));
+  await expect(draft).toHaveValue('Hi Peer, a drafted invite.');
+  await expect(draft).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Send request', exact: true })).toBeVisible();
+  await expect(page.getByText('Request sent to Peer.')).toHaveCount(0);
+
+  // Sent from this search and since declined: still sent, with its own chat and where it stands.
+  await reopen({ threadDraft: true, threadSession: 9 }, request('declined'));
+  await expect(page.getByText('Request sent to Peer.')).toBeVisible();
+  await expect(page.locator('.discovery-confirmation')).toContainText('Declined');
+  await expect(page.getByRole('link', { name: 'Open chat', exact: true })).toHaveAttribute('href', '/c/tok9');
+  await expect(draft).toBeDisabled();
+  // The message shown is the one sent, not the draft it started from.
+  await expect(draft).toHaveValue('The wording I actually sent.');
+});
+
+// In-app navigation: the fixture is rebuilt on a full page load.
+const visit = (page, path) => page.evaluate(to => { history.pushState({}, '', to); dispatchEvent(new PopStateEvent('popstate')); }, path);
+
+test('a slow profile answer does not replace the profile opened after it', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => { window.fixture.holdLoads = ['/users/peer']; });
+  await visit(page, '/profile/peer');
+  await expect.poll(() => page.evaluate(() => window.fixture.pendingLoads.length)).toBeGreaterThan(0);
+  // Same route, another person: the page is reused, so only the load itself can tell them apart.
+  await visit(page, '/profile/viewer');
+  await expect(page.locator('main')).toContainText('Viewer Student');
+  // The first profile's answer arrives only now, after the user has moved on.
+  await page.evaluate(() => { window.fixture.holdLoads = []; window.fixture.pendingLoads.splice(0).forEach(resolve => resolve()); });
+  await page.waitForTimeout(400);
+  await expect(page.locator('main')).toContainText('Viewer Student');
+  await expect(page.locator('main')).not.toContainText('Peer Mentor');
+});
+
+test('a department a CV import brings in is kept as written, never turned into "Other"', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => {
+    window.fixture.ingestProposed = { job_title: 'Researcher', department: '', bio: 'Built useful systems.', can_teach: [], wants_to_learn: [],
+      career_history: [{ role_title: 'Researcher', department: 'Research & Development' }, { role_title: 'Analyst', department: 'finance' }] };
+    window.fixture.setUser({ ...window.fixture.user, onboarding_complete: false });
+  });
+  await page.getByRole('checkbox').check();
+  await page.locator('input[type="file"]').setInputFiles({ name: 'resume.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 synthetic CV') });
+  await expect(page.getByRole('heading', { name: /Your background/i })).toBeVisible();
+  // Shown as its own choice, and still there in the list next to the standard ones.
+  const first = page.getByLabel('Department *').first();
+  await expect(first).toContainText('Research & Development');
+  await first.click();
+  await expect(page.getByRole('option', { name: 'Research & Development', exact: true })).toBeVisible();
+  await expect(page.getByRole('option', { name: 'Other', exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.getByRole('button', { name: 'Finish' }).click();
+  await expect.poll(() => page.evaluate(() => window.fixture.calls.find(call => call.path === '/users/me/onboarding')?.body.career.map(entry => entry.department)))
+    .toEqual(['Research & Development', 'Finance']);
+});
+
+async function finishOnboarding(page) {
+  await expect(page).toHaveURL(/\/onboarding$/);
+  await page.getByRole('button', { name: /^Skip/ }).click();
+  await page.getByRole('textbox', { name: 'Role title *' }).fill('Analyst');
+  await page.getByLabel('Department *').click();
+  await page.getByRole('option', { name: 'Finance', exact: true }).click();
+  for (let step = 0; step < 3; step++) await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.getByRole('button', { name: /^Finish/ }).click();
+}
+
+test('an alumnus who finishes onboarding lands in Messages', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => window.fixture.setUser({ ...window.fixture.user, role: 'alumnus', onboarding_complete: false }));
+  await finishOnboarding(page);
+  await expect(page).toHaveURL(/\/conversations$/);
+});
+
+test('finishing onboarding returns the user to the page they were headed for', async ({ page }) => {
+  await page.goto('/');
+  await visit(page, '/explorer');
+  await page.evaluate(() => window.fixture.setUser({ ...window.fixture.user, role: 'alumnus', onboarding_complete: false }));
+  await finishOnboarding(page);
+  await expect(page).toHaveURL(/\/explorer$/);
+});
+
+test('Groups keeps its list on screen while it refreshes', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('nav').getByRole('link', { name: 'Groups' }).click();
+  const group = page.locator('main article.person-row');
+  await expect(group).toContainText('Test Group');
+  await page.evaluate(() => { window.fixture.holdLoads = ['/groups']; window.dispatchEvent(new Event('focus')); });
+  await expect.poll(() => page.evaluate(() => window.fixture.pendingLoads.length)).toBeGreaterThan(0);
+  // The reload is in flight: the list stays and no skeleton takes its place.
+  await expect(group).toContainText('Test Group');
+  await expect(page.locator('main [role="status"]')).toHaveCount(0);
+  await page.evaluate(() => { window.fixture.holdLoads = []; window.fixture.pendingLoads.splice(0).forEach(resolve => resolve()); });
+});
+
+test('a paused mentor shows a readable return date', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => Object.assign(window.fixture.peer, { mentorship_available: false, mentorship_unavailable_until: `${new Date().getFullYear() + 1}-03-09` }));
+  await visit(page, '/profile/peer');
+  // Day and month order follow the reader's language; the raw 2027-03-09 never shows.
+  await expect(page.getByText(/^Not available for new requests until (9 Mar|Mar 9),? \d{4}$/)).toBeVisible();
 });

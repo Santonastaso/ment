@@ -1,4 +1,5 @@
 ﻿import React, { useEffect, useRef, useState } from 'react';
+import { errorMessage } from '../lib/errors.mjs';
 import api from '../api/index.js';
 import { useModalA11y } from '../lib/useModalA11y.js';
 import { useT } from '../i18n/index.jsx';
@@ -46,7 +47,7 @@ export default function HelpFeedbackModal({ onClose }) {
       setSentAt(Date.now());
       setMessage('');
     } catch (e) {
-      setError(e?.response?.data?.error || t('components.help.errorSend'));
+      setError(errorMessage(e, t, t('components.help.errorSend')));
     } finally {
       setBusy(false);
       inFlight.current = false;

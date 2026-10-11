@@ -35,6 +35,7 @@
   "admin.tab.users": "Utenti",
   "admin.tab.people": "Persone",
   "admin.tab.privacy": "Privacy",
+  "admin.tab.audit": "Registro attività",
   "admin.tab.feedback": "Feedback",
   "admin.tab.organizations": "Organizzazioni",
   "admin.tab.accessRequests": "Richieste di accesso",

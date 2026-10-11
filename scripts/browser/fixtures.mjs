@@ -42,10 +42,13 @@ function fixtureApi(state, ApiError) {
         return { people: people.slice(offset, offset + limit), total: people.length, ...(state.directoryCap ? {} : { limit }), facets: { languages: ['fr', 'it'] } };
       }
       // A saved conversation and a peer profile, for the view-profile round trip.
-      if (path === '/discovery/threads/thread') return { id: 'thread', turns: [
+      // threadDraft adds an invite drafted for the peer; threadSession is the request the search produced, if any.
+      if (path === '/discovery/threads/thread') return { id: 'thread', session_id: state.threadSession ?? null, turns: [
         { role: 'user', content: 'Financial modelling' },
         { role: 'assistant', kind: 'matches', framed: true, content: 'I found someone who could be a great fit.', search_request: 'Financial modelling',
           matches: [{ ...state.peer, expertise: ['Financial modelling'], reasons: ['Teaches financial modelling.'] }] },
+        ...(state.threadDraft ? [{ role: 'assistant', kind: 'draft', content: 'Hi Peer, a drafted invite.', search_request: 'Financial modelling',
+          person: { ...state.peer, expertise: ['Financial modelling'], reasons: [] } }] : []),
       ] };
       if (path === `/users/${state.peer.id}`) return { ...state.peer, skills: [], career: [] };
       if (path.startsWith('/discovery/threads')) return [];
@@ -103,12 +106,16 @@ function fixtureApi(state, ApiError) {
         const same = (a, b) => ['mentor_id', 'title', 'message', 'pre_session_question', 'follow_up_intent'].every(key => a[key] === b[key]);
         let row = state.sessions.find(session => session.idempotency_key && session.idempotency_key === body.idempotency_key);
         if (row && !same(row, body)) throw new ApiError('idempotency_conflict', 400);
+        // A search carries one request: another one sent with the same search is refused.
+        if (body.thread_id && state.threadSession != null && state.threadSession !== row?.id) throw new ApiError('thread_already_linked', 400);
         if (!row) {
           const id = Math.max(2, ...state.sessions.map(session => session.id)) + 1;
-          row = { ...body, id, status: 'pending', mentor: state.peer, mentee: state.user, mentee_id: state.user.id, request_expires_at: new Date(Date.now() + 7 * 86400000).toISOString() };
+          row = { ...body, outbound_message: body.message, id, status: 'pending', mentor: state.peer, mentee: state.user, mentee_id: state.user.id, request_expires_at: new Date(Date.now() + 7 * 86400000).toISOString() };
           state.sessions.push(row);
           state.messages[`/sessions/${id}/messages`] = [{ id: 1, sender_id: state.user.id, kind: 'request', body: body.message, created_at: new Date().toISOString() }];
         }
+        // As the server does: the search is linked in the same step that makes the request.
+        if (body.thread_id) state.threadSession = row.id;
         if (state.failAfterCommit === path) { state.failAfterCommit = null; throw dropped(); }
         return payload(row);
       }

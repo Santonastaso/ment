@@ -7,7 +7,8 @@ import SkillCloud, { SkillCloudFilters } from '../components/SkillCloud.jsx';
 import { Field } from '../components/ui/field.jsx';
 import SessionRequestModal from '../components/SessionRequestModal.jsx';
 
-import CareerEntryFields, { DEPARTMENTS } from '../components/CareerEntryFields.jsx';
+import CareerEntryFields, { department, departmentOptions } from '../components/CareerEntryFields.jsx';
+import { formatDay } from '../lib/utils.js';
 import ProfileReflection from '../components/ProfileReflection.jsx';
 import { PageShell } from '../components/PageShell.jsx';
 import { useConfirm } from '../components/ui/confirm.jsx';
@@ -92,7 +93,7 @@ export default function Profile() {
   const { id } = useParams();
   const { user: currentUser, updateUser } = useAuth();
   const navigate = useNavigate();
-  const { t } = useT();
+  const { t, lang } = useT();
 
   const isOwnProfile = !id || (currentUser?.id != null && id === currentUser.id);
   const targetId = isOwnProfile ? currentUser?.id : id;
@@ -384,12 +385,12 @@ export default function Profile() {
     const career = proposed.career_history?.length
       ? proposed.career_history.map(entry => ({
           role: entry.role || entry.role_title || proposed.job_title || profile.current_role || '',
-          department: entry.department || proposed.department || profile.department || '',
+          department: department(entry.department || proposed.department || profile.department),
           company: entry.company || '', description: entry.description || '',
           start_year: importedYear(entry.start_year), start_month: importedMonth(entry.start_month),
           end_year: importedYear(entry.end_year), end_month: importedMonth(entry.end_month),
         }))
-      : profile.career?.length ? profile.career : [{ role: proposed.job_title || profile.current_role || '', department: proposed.department || profile.department || '' }];
+      : profile.career?.length ? profile.career : [{ role: proposed.job_title || profile.current_role || '', department: department(proposed.department || profile.department) }];
     const primary = career[0] || {};
     const skills = profile.skills || [];
     const payload = {
@@ -594,7 +595,7 @@ export default function Profile() {
           {!isOwnProfile && profile.mentorship_available === false && (
             <p className="mt-2 inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium border-[var(--border)] bg-[var(--status-waiting-bg)] text-[var(--status-waiting-fg)]">
               {profile.mentorship_unavailable_until && new Date(profile.mentorship_unavailable_until) > new Date()
-                ? t('profile.mentoring.pausedUntil', { date: profile.mentorship_unavailable_until })
+                ? t('profile.mentoring.pausedUntil', { date: formatDay(profile.mentorship_unavailable_until, lang) })
                 : t('profile.mentoring.notAccepting')}
             </p>
           )}
@@ -611,7 +612,7 @@ export default function Profile() {
                 value={form.department}
                 onChange={e => setForm(f => ({ ...f, department: e.target.value }))}
               >
-                {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                {departmentOptions(form.department).map(d => <option key={d} value={d}>{d}</option>)}
               </Field>
               {/* Program is assigned by the school, so it is shown but not offered. */}
               <Field

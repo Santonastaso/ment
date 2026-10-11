@@ -1,3 +1,4 @@
+import { errorMessage } from '../../lib/errors.mjs';
 import { formatDay } from '../../lib/utils.js';
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
@@ -9,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button, ButtonLink } from '../ui/button.jsx';
 import { Skeleton } from '../ui/skeleton.jsx';
 import DirectoryFilter from '../DirectoryFilter.jsx';
-import { CONVERSATION_FILTERS, conversationState, requestText, resumableSearch } from '../../lib/conversations.mjs';
+import { CONVERSATION_FILTERS, conversationState, requestText, resumableSearch, isExpired } from '../../lib/conversations.mjs';
 import { sessionPath } from '../../lib/conversationLinks.mjs';
 import { homeCopy } from '../demo/homeCopy.js';
 
@@ -189,6 +190,11 @@ export default function DiscoveryFlow() {
   const [deleteTargetId, setDeleteTargetId] = useState(null);
   const [matchFeedback, setMatchFeedback] = useState(null);
   const [sentSessionToken, setSentSessionToken] = useState('');
+  // Where a request reopened from history stands now (declined, completed...).
+  const [sentStatus, setSentStatus] = useState('');
+  // A search is linked to the first request sent from it. Later requests
+  // from the same conversation are sent on their own, not refused.
+  const [linkedThread, setLinkedThread] = useState(null);
   const threadEndRef = useRef(null);
   const composerInputRef = useRef(null);
   // A request whose answer never arrived may already be saved, so it is
@@ -345,14 +351,15 @@ export default function DiscoveryFlow() {
     if (!selected || !draft.trim() || !requestTitle.trim() || sending) return;
     setSending(true); setError('');
     try {
-      const payload = pendingRequest || { mentor_id: selected.person.id, title: requestTitle.trim().slice(0, 120), pre_session_question: submittedQuery, message: draft.trim(), duration_minutes: 60, follow_up_intent: requestIntent, idempotency_key: crypto.randomUUID() };
+      const payload = pendingRequest || { mentor_id: selected.person.id, title: requestTitle.trim().slice(0, 120), pre_session_question: submittedQuery, message: draft.trim(), duration_minutes: 60, follow_up_intent: requestIntent, idempotency_key: crypto.randomUUID(), ...(threadId && threadId !== linkedThread ? { thread_id: threadId } : {}) };
       setPendingRequest(payload);
       const response = await api.post('/sessions', payload);
       setPendingRequest(null);
       setSessionId(response.data.id);
       setSentSessionToken(response.data.route_token || '');
+      setSentStatus('');
+      if (payload.thread_id) setLinkedThread(payload.thread_id);
       setStage('sent');
-      if (threadId) await api.put(`/discovery/threads/${threadId}`, { archived: true, selected_person_id: selected.person.id }).catch(() => {});
       refreshHistory().catch(() => {});
     } catch (requestError) {
       // Only a refusal (4xx) is known to have saved nothing, so only then may
@@ -360,7 +367,9 @@ export default function DiscoveryFlow() {
       // connection included, so the status is what tells them apart.
       const status = requestError.response?.status;
       if (status >= 400 && status < 500) setPendingRequest(null);
-      setError(requestError.response?.data?.error || copy.error);
+      // The search already has its request (an earlier send whose answer was lost): the next try goes without it.
+      if (requestError.response?.data?.error === 'thread_already_linked') setLinkedThread(threadId);
+      setError(errorMessage(requestError, t, copy.error));
     }
     finally { setSending(false); }
   }
@@ -389,16 +398,18 @@ export default function DiscoveryFlow() {
         return;
       }
       setTurns(visibleTurns(data.turns));
-      if (lastAssistant.kind === 'draft' && lastAssistant.person) {
+      // A search records the request it produced. Nothing is inferred from
+      // who else the user has a request with, and a request that has since
+      // been declined or completed is still the one this search sent.
+      setLinkedThread(data.session_id ? id : null);
+      if (data.session_id && lastAssistant.kind === 'draft' && lastAssistant.person) {
         const { data: sessions } = await api.get('/sessions');
-        const sentSession = (sessions || []).find(session =>
-          session.mentee_id === user?.id &&
-          session.mentor_id === lastAssistant.person.id &&
-          ['pending', 'scheduled'].includes(session.status),
-        );
+        const sentSession = (sessions || []).find(session => session.id === data.session_id);
         if (sentSession) {
+          setSentStatus(isExpired(sentSession) ? 'expired' : sentSession.status);
           setSelected({ person: lastAssistant.person, expertise: lastAssistant.person.expertise || [], background: lastAssistant.person.background || '', reasons: lastAssistant.person.reasons || [] });
-          setDraft(lastAssistant.content || '');
+          // What was sent, which the user may have reworded after it was drafted.
+          setDraft(sentSession.outbound_message || lastAssistant.content || '');
           setRequestTitle(sentSession.title || '');
           setSubmittedQuery(requestText(lastAssistant.search_request, lastUser.content));
           setSessionId(sentSession.id);
@@ -450,7 +461,7 @@ export default function DiscoveryFlow() {
     flowVersion.current += 1;
     const currentThread = threadId;
     setConnectionCategory(null);
-    setStage('ask'); setQuery(''); setSubmittedQuery(''); setTurns([]); setMatches([]); setSelected(null); setDraft(''); setRequestTitle(''); setRequestIntent('one_off'); setSending(false); setError(''); setSessionId(null); setSentSessionToken(''); setThreadId(null); setMatchFeedback(null); setPendingRequest(null);
+    setStage('ask'); setQuery(''); setSubmittedQuery(''); setTurns([]); setMatches([]); setSelected(null); setDraft(''); setRequestTitle(''); setRequestIntent('one_off'); setSending(false); setError(''); setSessionId(null); setSentSessionToken(''); setSentStatus(''); setThreadId(null); setMatchFeedback(null); setPendingRequest(null);
     if (currentThread) api.put(`/discovery/threads/${currentThread}`, { archived: true }).then(refreshHistory).catch(() => {});
   }
 
@@ -634,7 +645,7 @@ export default function DiscoveryFlow() {
               </div>
             ) : (
               <>
-                <div className="discovery-confirmation"><Check /><div><strong>{text(copy, 'sent', { name: selected.person.name.split(' ')[0] })}</strong><p>{copy.sentSubline}</p></div></div>
+                <div className="discovery-confirmation"><Check /><div><strong>{text(copy, 'sent', { name: selected.person.name.split(' ')[0] })}</strong><p>{sentStatus && sentStatus !== 'pending' ? t(`conversations.status.${sentStatus}`) : copy.sentSubline}</p></div></div>
                 {sessionId && <ButtonLink className="mt-4" to={sessionPath({ id: sessionId, route_token: sentSessionToken })}>{copy.openChat}</ButtonLink>}
                 <Button type="button" variant="ghost" onClick={reset}>{copy.again}</Button>
               </>
