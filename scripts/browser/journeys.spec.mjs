@@ -238,9 +238,10 @@ test('profile overview shows saved skills before the first session and CV can up
   await page.locator('.app-sidebar').getByRole('link', { name: 'My profile' }).click();
   await expect(page.getByText('Architecture', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Edit profile' }).click();
+  await page.getByRole('button', { name: 'Update from CV' }).click();
   await expect(page.getByText('Choose CV file', { exact: true })).toBeVisible();
   await expect(page.locator('input[type="file"]')).toHaveClass(/sr-only/);
-  await page.getByRole('checkbox').check();
+  await page.getByRole('dialog').getByRole('checkbox').check();
   await page.locator('input[type="file"]').setInputFiles({ name: 'updated.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 synthetic CV') });
   await expect(page.getByRole('button', { name: 'Apply CV suggestions' })).toBeVisible();
   await page.getByRole('button', { name: 'Apply CV suggestions' }).click();
@@ -1857,8 +1858,11 @@ test('a CV uploaded on the Experience tab is reviewed and edited before anything
       career_history: [{ role_title: 'Analyst', department: 'Finance', company: 'Acme', start_year: '2022' }, { role_title: 'Intern', department: 'Finance', company: 'Beta' }] };
   });
   const saves = () => page.evaluate(() => window.fixture.calls.filter(call => call.path === '/users/me/onboarding').map(call => call.body));
+  // One button on the page; consent, upload and review live in the pop-up.
   const uploadCv = async () => {
-    await page.getByRole('checkbox').check();
+    await expect(page.locator('input[type="file"]')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Update from CV' }).click();
+    await page.getByRole('dialog').getByRole('checkbox').check();
     await page.locator('input[type="file"]').setInputFiles({ name: 'cv.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 synthetic CV') });
   };
   await visit(page, '/profile?tab=experience');

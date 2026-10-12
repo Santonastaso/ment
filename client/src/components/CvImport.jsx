@@ -2,18 +2,21 @@ import React, { useId, useState } from 'react';
 import api from '../api/index.js';
 import { useT } from '../i18n/index.jsx';
 import { Button } from './ui/button.jsx';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog.jsx';
 import { Field } from './ui/field.jsx';
 import CareerEntryFields, { department } from './CareerEntryFields.jsx';
 import TeachSkillsEditor from './TeachSkillsEditor.jsx';
 import SkillTagInput from './SkillTagInput.jsx';
 import { monthYearValue, parseMonthYear } from '../lib/monthYear.mjs';
 
-// Update a profile from a CV. Nothing is saved on upload: what the file
-// suggests is laid out in the same editable fields as onboarding, next to a
-// note of what it would replace, and only "Apply" writes it.
+// Update a profile from a CV: one button on the page, everything else in a
+// pop-up. Nothing is saved on upload: what the file suggests is laid out in the
+// same editable fields as onboarding, next to a note of what it would replace,
+// and only "Apply" writes it.
 export default function CvImport({ profile, onApplied }) {
   const { t } = useT();
   const inputId = useId();
+  const [open, setOpen] = useState(false);
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -21,6 +24,8 @@ export default function CvImport({ profile, onApplied }) {
   const [review, setReview] = useState(null);
   const current = profile.skills || [];
   const change = (field, value) => setReview(now => ({ ...now, [field]: value }));
+  // Closing the pop-up drops whatever was not applied.
+  const close = () => { setOpen(false); setDraft(null); setReview(null); setError(''); };
 
   async function upload(file) {
     if (!file || busy) return;
@@ -76,7 +81,7 @@ export default function CvImport({ profile, onApplied }) {
     try {
       await api.post(`/profile/ingest/${draft.draft_id}/accept`, { accepted_json: { ...draft.proposed, ...payload } });
       const response = await api.post('/users/me/onboarding', payload);
-      setDraft(null); setReview(null);
+      close();
       await onApplied(response.data);
     } catch {
       setError(t('onboarding.import.unavailable'));
@@ -84,8 +89,12 @@ export default function CvImport({ profile, onApplied }) {
   }
 
   const was = value => (value ? <p className="text-xs text-muted-foreground">{t('profile.cv.current', { value })}</p> : null);
-  return (
-    <div className="space-y-2">
+  return (<>
+    <Button type="button" variant="outline" onClick={() => setOpen(true)}>{t('profile.cv.open')}</Button>
+    <Dialog open={open} onOpenChange={next => { if (!next && !busy) close(); }}>
+    <DialogContent className={review ? 'sm:max-w-3xl' : 'sm:max-w-md'} showCloseButton={!busy}>
+      <DialogHeader><DialogTitle>{review ? t('profile.cv.reviewTitle') : t('profile.cv.open')}</DialogTitle><DialogDescription>{review ? t('onboarding.import.reviewNotice') : t('onboarding.import.desc')}</DialogDescription></DialogHeader>
+      {!review && <>
       <label className="flex items-start gap-2 text-sm text-muted-foreground">
         <input type="checkbox" className="mt-0.5" checked={consent} onChange={event => setConsent(event.target.checked)} />
         <span>{t('onboarding.import.consent')}</span>
@@ -95,9 +104,9 @@ export default function CvImport({ profile, onApplied }) {
         <span className="rounded-[var(--control-radius)] bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">{busy && !review ? t('onboarding.import.reading') : t('onboarding.import.browse')}</span>
         {!busy && <span className="text-xs text-muted-foreground">{t('onboarding.import.hint')}</span>}
       </label>
+      </>}
       {review && (
-        <div className="space-y-5 rounded-xl border border-[var(--border-subtle)] p-4" data-testid="cv-review">
-          <div><h3 className="text-section font-semibold">{t('profile.cv.reviewTitle')}</h3><p className="text-sm text-muted-foreground">{t('onboarding.import.reviewNotice')}</p></div>
+        <div className="space-y-5" data-testid="cv-review">
           <section className="space-y-3">
             <h4 className="text-sm font-semibold">{t('onboarding.career.workExperience')}</h4>
             {review.career ? <>
@@ -127,11 +136,12 @@ export default function CvImport({ profile, onApplied }) {
           </section>
           <div className="flex flex-wrap gap-2">
             <Button type="button" onClick={apply} disabled={busy}>{t('profile.btn.applyCv')}</Button>
-            <Button type="button" variant="ghost" disabled={busy} onClick={() => { setDraft(null); setReview(null); setError(''); }}>{t('profile.cv.discard')}</Button>
+            <Button type="button" variant="ghost" disabled={busy} onClick={close}>{t('profile.cv.discard')}</Button>
           </div>
         </div>
       )}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-    </div>
-  );
+    </DialogContent>
+    </Dialog>
+  </>);
 }

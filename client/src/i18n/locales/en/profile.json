@@ -123,6 +123,7 @@
   "profile.notifyEmail.usingLogin": "Currently using your sign-in address, {email}.",
   "profile.notifyEmail.invalid": "That does not look like an email address.",
   "profile.notifyEmail.saved": "Notification email updated.",
+  "profile.cv.open": "Update from CV",
   "profile.cv.reviewTitle": "Review before saving",
   "profile.cv.replacesExperience": "Applying replaces the experience on your profile ({count} today) with the entries below. Edit or remove any of them first.",
   "profile.cv.noExperience": "No experience was found in this file. The experience on your profile stays as it is.",

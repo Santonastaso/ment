@@ -123,6 +123,7 @@
   "profile.notifyEmail.usingLogin": "Al momento usiamo il tuo indirizzo di accesso, {email}.",
   "profile.notifyEmail.invalid": "Questo non sembra un indirizzo email.",
   "profile.notifyEmail.saved": "Email per le notifiche aggiornata.",
+  "profile.cv.open": "Aggiorna dal CV",
   "profile.cv.reviewTitle": "Controlla prima di salvare",
   "profile.cv.replacesExperience": "Applicando, le esperienze del tuo profilo ({count} oggi) vengono sostituite da quelle qui sotto. Prima puoi modificarle o rimuoverle.",
   "profile.cv.noExperience": "Nessuna esperienza trovata in questo file. Quelle del tuo profilo restano invariate.",

@@ -748,6 +748,8 @@ export default function Profile() {
           title={t('profile.career.title')}
           action={
             isOwnProfile ? (
+              <div className="flex items-center gap-2">
+              <CvImport profile={profile} onApplied={cvApplied} />
               <Button
                 type="button"
                 variant={showAddCareer ? 'outline' : 'default'}
@@ -759,12 +761,11 @@ export default function Profile() {
               >
                 {showAddCareer ? <X className="size-5" /> : <Plus className="size-5" />}
               </Button>
+              </div>
             ) : null
           }
         />
         <SurfaceBody className="pt-5">
-
-        {isOwnProfile && <div className="mb-5"><CvImport profile={profile} onApplied={cvApplied} /></div>}
 
         {isOwnProfile && showAddCareer && (
           <div className="career-entry-form mb-5">

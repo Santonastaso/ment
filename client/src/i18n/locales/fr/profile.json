@@ -123,6 +123,7 @@
   "profile.notifyEmail.usingLogin": "Nous utilisons actuellement votre adresse de connexion, {email}.",
   "profile.notifyEmail.invalid": "Cela ne ressemble pas à une adresse e-mail.",
   "profile.notifyEmail.saved": "E-mail de notification mis à jour.",
+  "profile.cv.open": "Mettre à jour depuis un CV",
   "profile.cv.reviewTitle": "Vérifiez avant d’enregistrer",
   "profile.cv.replacesExperience": "En appliquant, les expériences de votre profil ({count} aujourd’hui) sont remplacées par celles ci-dessous. Modifiez-les ou supprimez-en d’abord.",
   "profile.cv.noExperience": "Aucune expérience trouvée dans ce fichier. Celles de votre profil restent inchangées.",
