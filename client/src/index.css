@@ -459,7 +459,7 @@ input[type="checkbox"], input[type="radio"] { width: 16px; height: 16px; flex-sh
 .discovery-meta-row { --connection-control-size: 34px; display: flex; flex: 1 1 14rem; align-items: flex-start; gap: 1rem; }
 .discovery-home-skeleton { min-height: 34px; }
 .discovery-home-skeleton [data-slot="skeleton"] { flex: 0 0 var(--connection-control-size); }
-.discovery-recent-row { position: relative; display: flex; flex: 0 0 auto; order: 2; min-height: var(--connection-control-size); align-items: flex-start; margin: 0 4px 0 16px; }
+.discovery-recent-row { position: relative; display: flex; flex: 0 0 auto; order: 2; min-height: var(--connection-control-size); align-items: flex-start; margin: 0 4px 0 8px; }
 .discovery-recent-row:only-child { margin-left: auto; }
 .discovery-history { color: var(--ment-muted); font-size: var(--type-label); line-height: 20px; }
 .discovery-history summary { position: relative; display: flex; width: var(--connection-control-size); height: var(--connection-control-size); align-items: center; justify-content: center; cursor: pointer; color: var(--muted-foreground); font-size: var(--type-small); line-height: 16px; font-weight: var(--font-weight-medium); }
@@ -606,7 +606,7 @@ a.person-row-name:hover { color: var(--primary-text); text-decoration: underline
 .discovery-connections { display: grid; min-width: 0; flex: 1; gap: 18px; }
 /* Every column is as wide as the longest label ("Programmées"), so the circles
    sit at one even spacing and no label runs into its neighbour. */
-.discovery-connection-bubbles { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; align-items: start; gap: 12px; margin-inline: 8px; justify-self: end; }
+.discovery-connection-bubbles { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; align-items: start; gap: 4px; margin-inline: 8px; justify-self: end; }
 .discovery-connection-bubble { display: flex; width: auto; min-width: var(--connection-control-size); height: auto; flex-direction: column; align-items: center; justify-content: flex-start; gap: 6px; border: 0; border-radius: var(--item-radius); background: transparent; padding: 0; text-align: center; }
 .discovery-connection-bubble:hover, .discovery-connection-bubble[aria-expanded="true"] { background: transparent; }
 .discovery-connection-bubble span { color: var(--muted-foreground); font-size: var(--type-micro); font-weight: var(--font-weight-medium); line-height: 16px; white-space: nowrap; }
@@ -792,7 +792,7 @@ a.person-row-name:hover { color: var(--primary-text); text-decoration: underline
 @keyframes discoveryAppear { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes discoveryMatchReveal { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes discoveryAgentPulse { 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--primary) 14%, transparent); } }
-@media (max-width: 700px) { .discovery-flow { padding-inline: 1rem; } .discovery-page-title { margin-inline: -1rem; } .discovery-ask-block { padding-top: 22vh; } .discovery-meta-row { gap: 12px; } .discovery-connection-bubbles { gap: 8px; } .discovery-connection-cards { grid-template-columns: 1fr; } .person-row { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "avatar identity" ". detail" ". meta" ". actions"; gap: .5rem .65rem; padding: 14px 10px; } .person-row-actions { justify-content: flex-start; padding-top: .15rem; } .discovery-user-bubble { max-width: 88%; } .discovery-actions { align-items: flex-start; flex-direction: column; } .discovery-action-controls { width: 100%; } .discovery-assistant-message { grid-template-columns: 28px minmax(0, 1fr); gap: .55rem; } .discovery-agent-mark { width: 28px; height: 28px; } }
+@media (max-width: 700px) { .discovery-flow { padding-inline: 1rem; } .discovery-page-title { margin-inline: -1rem; } .discovery-ask-block { padding-top: 22vh; } .discovery-meta-row { gap: 12px; } .discovery-connection-cards { grid-template-columns: 1fr; } .person-row { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "avatar identity" ". detail" ". meta" ". actions"; gap: .5rem .65rem; padding: 14px 10px; } .person-row-actions { justify-content: flex-start; padding-top: .15rem; } .discovery-user-bubble { max-width: 88%; } .discovery-actions { align-items: flex-start; flex-direction: column; } .discovery-action-controls { width: 100%; } .discovery-assistant-message { grid-template-columns: 28px minmax(0, 1fr); gap: .55rem; } .discovery-agent-mark { width: 28px; height: 28px; } }
 @media (max-width: 700px) {
   .profile-identity-row { flex-direction: column; gap: 1rem; }
   .profile-identity-row > .shrink-0 { width: 100%; justify-content: flex-start; flex-wrap: wrap; }
