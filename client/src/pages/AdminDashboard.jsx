@@ -716,7 +716,7 @@ export default function AdminDashboard() {
             </div>
 
             <div
-              className={`cursor-pointer rounded border-2 border-dashed p-10 text-center transition-colors ${dragOver ? 'border-primary bg-[#f0f7fc]' : 'border-[#dddddd] hover:border-primary hover:bg-[#f8f8f8]'}`}
+              className={`cursor-pointer rounded border-2 border-dashed p-10 text-center transition-colors ${dragOver ? 'border-primary bg-accent' : 'border-border hover:border-primary hover:bg-[#f7f7fb]'}`}
               onClick={() => fileRef.current?.click()}
               onDragOver={e => { e.preventDefault(); setDragOver(true); }}
               onDragLeave={() => setDragOver(false)}
@@ -1039,7 +1039,7 @@ export default function AdminDashboard() {
 }
 
 function SessionBox({ count, label, tone }) {
-  const dot = { yellow: 'bg-amber-500', blue: 'bg-blue-500', green: 'bg-emerald-500' }[tone] || 'bg-zinc-400';
+  const dot = { yellow: 'bg-[#ff6b57]', blue: 'bg-[#5a5870]', green: 'bg-[#2fbf9e]' }[tone] || 'bg-[#b9b6cf]';
   return (
     <div className="rounded-lg border border-[var(--border)] p-3 text-center">
       <p className="text-xl font-medium tabular-nums tracking-[-0.01em]">{count}</p>

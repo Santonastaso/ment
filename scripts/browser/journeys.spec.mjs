@@ -367,7 +367,7 @@ test('Groups, Explorer and Profile share one page frame', async ({ page }) => {
     expect(frame.right).toBeCloseTo(groups.right, 0);
     expect(frame.headerTop).toBeCloseTo(groups.headerTop, 0);
     expect(frame.headerHeight).toBeCloseTo(68, 0);
-    expect(frame.border).toBe('1px solid rgb(203, 199, 190)');
+    expect(frame.border).toBe('1px solid rgb(212, 209, 232)');
     expect(frame.radius).toBe('24px');
     expect(frame.background).toBe(groups.background);
     expect(frame.panels).toBe(0);
@@ -453,12 +453,16 @@ test('buttons and fields on a page share one height', async ({ page }) => {
     expect(heights.length).toBeGreaterThan(0);
     expect([...new Set(heights)], route).toEqual([40]);
   }
-  // A link to someone's profile is a button like the action beside it.
+  // A link to someone's profile is a button shaped like the action beside it;
+  // the main action is the filled one.
   await page.goto('/explorer');
   const profile = page.locator('.directory-results .person-row-link').first();
   const action = page.locator('.directory-results .person-row-actions > :last-child').first();
-  const look = locator => locator.evaluate(element => { const style = getComputedStyle(element); return [style.backgroundColor, style.borderTopColor, style.fontSize, style.fontWeight]; });
+  const look = locator => locator.evaluate(element => { const style = getComputedStyle(element); return [style.fontSize, style.fontWeight, element.getBoundingClientRect().height]; });
   expect(await look(profile)).toEqual(await look(action));
+  const fill = locator => locator.evaluate(element => getComputedStyle(element).backgroundColor);
+  expect(await fill(action)).toBe('rgb(30, 27, 58)');
+  expect(await fill(profile)).toBe('rgb(255, 255, 255)');
 });
 
 test('Profile tabs are underline tabs in the header row', async ({ page }) => {
@@ -486,18 +490,26 @@ test('quiet controls keep a visible edge and avatars share one style', async ({ 
   await page.goto('/explorer');
   await expect(page.locator('.directory-pagination')).toBeVisible();
   for (const control of [
-    page.getByRole('button', { name: 'Request a session' }).first(),
+    page.locator('.directory-results .person-row-link').first(),
     page.locator('.directory-filter').first(),
     page.locator('.directory-search-panel input').first(),
-  ]) expect(await edge(control)).toBe('1px solid rgb(203, 199, 190)');
+  ]) expect(await edge(control)).toBe('1px solid rgb(212, 209, 232)');
   expect(await edge(page.getByRole('button', { name: 'Search', exact: true }))).toContain('rgba(0, 0, 0, 0)');
-  const avatar = await fill(page.locator('.person-row [data-slot="avatar-fallback"]').first());
-  expect(avatar).toBe('rgb(226, 223, 215)');
-  expect(await fill(page.locator('.app-sidebar [data-slot="avatar-fallback"]').first())).toBe(avatar);
+  // Initials sit on one of four brand tints, always in Ink, and the same
+  // person keeps the same tint wherever they appear.
+  const tints = ['rgb(231, 229, 245)', 'rgb(255, 227, 222)', 'rgb(217, 244, 236)', 'rgb(227, 226, 234)'];
+  const ink = locator => locator.evaluate(element => getComputedStyle(element).color);
+  const avatar = page.locator('.person-row [data-slot="avatar-fallback"]').first();
+  expect(tints).toContain(await fill(avatar));
+  expect(await ink(avatar)).toBe('rgb(30, 27, 58)');
+  const own = page.locator('.app-sidebar [data-slot="avatar-fallback"]').first();
+  const ownTint = await fill(own);
+  expect(tints).toContain(ownTint);
+  expect(await ink(own)).toBe('rgb(30, 27, 58)');
   await page.goto('/groups');
-  expect(await fill(page.locator('.group-row-mark').first())).toBe(avatar);
+  expect(await fill(page.locator('.group-row-mark').first())).toBe('rgb(231, 229, 245)');
   await page.goto('/profile');
-  expect(await fill(page.getByRole('tabpanel').locator('[data-slot="avatar-fallback"]').first())).toBe(avatar);
+  expect(await fill(page.getByRole('tabpanel').locator('[data-slot="avatar-fallback"]').first())).toBe(ownTint);
 });
 
 test('dates use one format with the year only outside the current one', async ({ page }) => {
@@ -691,7 +703,7 @@ test('Profile tabs support keyboard navigation and history', async ({ page }) =>
 test('Profile skill filters share the navigation pill geometry', async ({ page }) => {
   await page.goto('/profile');
   await page.getByTestId('profile-tab-skills').click();
-  expect(await page.locator(':root').evaluate(element => getComputedStyle(element).getPropertyValue('--background').trim())).toBe('#fafaf9');
+  expect(await page.locator(':root').evaluate(element => getComputedStyle(element).getPropertyValue('--background').trim())).toBe('#f7f7fb');
   const skillsType = await page.getByRole('heading', { name: 'What you can teach' }).evaluate(element => {
     const style = getComputedStyle(element);
     return { family: style.fontFamily, size: style.fontSize, weight: style.fontWeight };
@@ -707,8 +719,8 @@ test('Profile skill filters share the navigation pill geometry', async ({ page }
   expect(await page.locator(':root').evaluate(element => getComputedStyle(element).getPropertyValue('--panel-radius').trim())).toBe('24px');
   await expect(skillPanels).toHaveCount(2);
   const [teaching, learning] = await skillPanels.all();
-  expect(await teaching.locator('h3').evaluate(element => getComputedStyle(element).color)).toBe('rgb(32, 30, 27)');
-  expect(await learning.locator('h3').evaluate(element => getComputedStyle(element).color)).toBe('rgb(32, 30, 27)');
+  expect(await teaching.locator('h3').evaluate(element => getComputedStyle(element).color)).toBe('rgb(30, 27, 58)');
+  expect(await learning.locator('h3').evaluate(element => getComputedStyle(element).color)).toBe('rgb(30, 27, 58)');
   // Both sections belong to the shared Profile surface; only a divider separates them.
   expect(await teaching.evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
   expect(await learning.evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgba(0, 0, 0, 0)');

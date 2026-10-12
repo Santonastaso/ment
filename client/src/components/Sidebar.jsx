@@ -30,7 +30,7 @@ export default function Sidebar({ collapsed = false, onNavigate, onToggle }) {
     <div className="flex h-full w-full flex-col px-2.5 pb-2.5 pt-4">
       <div className="relative mb-1.5 flex h-[var(--workspace-top-row)] shrink-0 items-center">
         <button type="button" onClick={onToggle} className="grid size-11 shrink-0 place-items-center rounded-full outline-none hover:bg-[var(--sidebar-accent)] focus-visible:ring-3 focus-visible:ring-[var(--sidebar-ring)]" aria-label={collapsed ? 'Open sidebar' : 'Close sidebar'} title={collapsed ? 'Open sidebar' : 'Close sidebar'}>
-          <span className="grid size-8 place-items-center rounded-full bg-primary text-xs font-bold text-white">M</span>
+          <span className="grid size-8 place-items-center rounded-full bg-[var(--ink)] text-xs font-bold text-[var(--coral)] ring-1 ring-white/25">M</span>
         </button>
         <Link to={user?.is_admin ? '/admin' : '/'} onClick={onNavigate} tabIndex={collapsed ? -1 : undefined} aria-hidden={collapsed} className={cn('sidebar-brand-label pl-1 text-section-large font-semibold tracking-[-0.025em] text-foreground', collapsed && 'is-hidden')}>
           MENT
@@ -65,7 +65,7 @@ export default function Sidebar({ collapsed = false, onNavigate, onToggle }) {
                 'relative flex h-[var(--navigation-row-height)] items-center rounded-[var(--control-radius)] text-sm font-normal outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]',
                 'sidebar-nav-link gap-3 px-3',
                 active
-                  ? 'bg-[var(--sidebar-accent)] text-foreground'
+                  ? 'is-active bg-[var(--sidebar-accent)] text-foreground'
                   : 'text-[var(--sidebar-foreground)] hover:bg-[var(--sidebar-accent)]'
               )}
               aria-label={collapsed ? item.label : undefined}

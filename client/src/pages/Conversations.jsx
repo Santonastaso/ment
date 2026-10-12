@@ -22,6 +22,16 @@ import TimeSlotSelect from '../components/TimeSlotSelect.jsx';
 import { groupPath, sessionPath } from '../lib/conversationLinks.mjs';
 import { beginPendingMessage, finishPendingMessage, pendingDrafts, pendingMessage } from '../lib/pendingMessage.mjs';
 
+// A person's circle carries the state of the conversation, in the same
+// colours as the Home counters: Needs you, Waiting, Scheduled, Past.
+const STATE_FILL = {
+  needs: 'var(--status-attention-bg)',
+  waiting: 'var(--status-waiting-bg)',
+  scheduled: 'var(--status-scheduled-bg)',
+  past: 'var(--status-closed-bg)',
+  closed: 'var(--status-closed-bg)',
+};
+
 function initials(name = '') {
   return name.split(' ').map((part) => part[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || '?';
 }
@@ -624,7 +634,7 @@ export default function Conversations() {
             const unreadCount = unreadCounts.sessionMessages[session.id] || 0;
             return (
             <button key={session.id} type="button" onClick={() => selectThread('session', session.id)} className={cn('conversation-list-item', session.id === selectedId && 'is-active')}>
-              <Avatar className="size-9"><AvatarFallback>{initials(peer?.name)}</AvatarFallback></Avatar>
+              <Avatar className="size-9"><AvatarFallback style={{ backgroundColor: STATE_FILL[state] }}>{initials(peer?.name)}</AvatarFallback></Avatar>
               <span className="min-w-0">
                 {/* Who, what state, when — the scannable line. */}
                 <span className="conversation-list-top">
@@ -675,7 +685,7 @@ export default function Conversations() {
               <div className="conversation-header-actions"><Button type="button" variant="ghost" size="icon" onClick={openGroupOverview} aria-label={t('groups.info')} title={t('groups.info')} aria-haspopup="dialog"><Info aria-hidden="true" /></Button></div>
             </header> : <header className="conversation-header">
               <button className="conversation-back" type="button" onClick={closeThread} aria-label={t('common.close')}><ChevronLeft /></button>
-              <Avatar className="size-9"><AvatarFallback>{initials(person?.name)}</AvatarFallback></Avatar>
+              <Avatar className="size-9"><AvatarFallback style={{ backgroundColor: STATE_FILL[rowState(selected)] }}>{initials(person?.name)}</AvatarFallback></Avatar>
               <div className="conversation-header-person"><strong>{person?.name}</strong><span>{selected.status === 'pending' && !isExpired(selected) && selected.isMentee ? t('conversations.requestSent') : stateLabel(selected, rowState(selected), t)}</span></div>
               <div className="conversation-header-actions">
                 {(selected.status === 'scheduled' || selected.status === 'completed') && <MeetingFeedback key={selected.id} session={selected} onSaved={loadSessions} compact />}
@@ -729,7 +739,7 @@ export default function Conversations() {
 
             <form className="conversation-composer" onSubmit={sendMessage}>
               <textarea ref={composerRef} rows={1} value={draft} onChange={(event) => setDrafts(items => ({ ...items, [threadKey]: event.target.value }))} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.form.requestSubmit(); } }} placeholder={t('conversations.messagePlaceholder')} maxLength={6000} aria-label={t('conversations.messagePlaceholder')} />
-              <Button type="submit" size="icon" disabled={!draft.trim() || sending} aria-label={t('conversations.send')}><Send /></Button>
+              <Button type="submit" size="icon" className="send-spark" disabled={!draft.trim() || sending} aria-label={t('conversations.send')}><Send /></Button>
             </form>
           </>
         )}
