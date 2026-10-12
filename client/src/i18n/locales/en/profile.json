@@ -32,7 +32,7 @@
   "profile.btn.applyCv": "Apply CV suggestions",
   "profile.btn.applyCv": "Apply CV suggestions",
   "profile.btn.currentlyUnavailable": "Currently unavailable",
-  "profile.btn.requestSession": "Request a session",
+  "profile.btn.requestSession": "Request session",
   "profile.btn.openChat": "Open chat",
   "profile.mentoring.pausedUntil": "Not available for new requests until {date}",
   "profile.mentoring.notAccepting": "Not accepting new requests right now",

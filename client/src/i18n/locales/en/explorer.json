@@ -26,7 +26,7 @@
   "explorer.next": "Next",
   "explorer.directoryEmptyTitle": "Nobody here yet",
   "explorer.directoryEmptyBody": "As classmates complete onboarding they'll appear in this directory.",
-  "explorer.requestSession": "Request a session",
+  "explorer.requestSession": "Request session",
   "explorer.openChat": "Open chat",
   "explorer.clearFilters": "Clear filters",
   "explorer.directoryError": "The directory could not load. Your filters are still here.",
