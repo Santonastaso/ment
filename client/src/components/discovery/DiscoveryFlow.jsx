@@ -13,6 +13,7 @@ import DirectoryFilter from '../DirectoryFilter.jsx';
 import { CONVERSATION_FILTERS, conversationState, requestText, resumableSearch, isExpired } from '../../lib/conversations.mjs';
 import { sessionPath } from '../../lib/conversationLinks.mjs';
 import { homeCopy } from '../demo/homeCopy.js';
+import { avatarTint } from '../../lib/avatarTint.js';
 
 const COPY = {
   en: {
@@ -116,7 +117,7 @@ function MatchCard({ match, index, selected, onSelect, copy, style, profileHref,
 
   return (
     <article role="radio" aria-checked={selected} style={style} className={`person-row discovery-match-card ${selected ? 'is-selected' : ''}`}>
-      <span className="discovery-avatar person-row-avatar">
+      <span className="discovery-avatar person-row-avatar" style={{ backgroundColor: avatarTint(person.name) }}>
         {initials(person.name)}
         {selected && <span className="discovery-selected-mark"><Check /></span>}
       </span>
@@ -136,7 +137,7 @@ function MatchCard({ match, index, selected, onSelect, copy, style, profileHref,
             onViewProfile(person.id);
           }}
         >{copy.viewProfile}</ButtonLink>
-        <Button variant={selected ? 'default' : 'ghost'} size="sm"
+        <Button variant="default" size="sm" className={selected ? 'is-chosen' : undefined}
           type="button"
           aria-label={`${copy.choose} ${person.name}`}
           onClick={() => onSelect(match)}
@@ -466,7 +467,7 @@ export default function DiscoveryFlow() {
   }
 
   function composer() {
-    return <form className="discovery-composer" onSubmit={submit}><textarea ref={composerInputRef} value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} maxLength={2000} rows={1} placeholder={copy.placeholder} aria-label={copy.placeholder} disabled={stage === 'matching' || stage === 'drafting' || sending} /><Button size="icon" type="submit" disabled={!query.trim() || stage === 'matching' || stage === 'drafting' || sending} aria-label={t('conversations.send')}><ArrowUp /></Button></form>;
+    return <form className="discovery-composer" onSubmit={submit}><textarea ref={composerInputRef} value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} maxLength={2000} rows={1} placeholder={copy.placeholder} aria-label={copy.placeholder} disabled={stage === 'matching' || stage === 'drafting' || sending} /><Button size="icon" type="submit" className="send-spark" disabled={!query.trim() || stage === 'matching' || stage === 'drafting' || sending} aria-label={t('conversations.send')}><ArrowUp /></Button></form>;
   }
 
   const firstName = user?.name?.split(' ')[0] || '';
@@ -556,7 +557,7 @@ export default function DiscoveryFlow() {
                       const peer = session.mentor_id === user?.id ? session.mentee : session.mentor;
                       const href = session.route_token ? sessionPath(session) : `/conversations?filter=${connectionCategory}&session=${session.id}`;
                       return <Link key={session.id} className="discovery-connection-card" to={href} aria-label={`${copy.openChat}: ${peer?.name || ''}`}>
-                        <span className="discovery-avatar" aria-hidden="true">{initials(peer?.name)}</span>
+                        <span className="discovery-avatar" aria-hidden="true" style={{ backgroundColor: avatarTint(peer?.name) }}>{initials(peer?.name)}</span>
                         <span><strong>{peer?.name}</strong><small>{requestText(session.title, t('conversations.requestTitle'))}</small></span>
                         <ArrowUpRight aria-hidden="true" />
                       </Link>;
@@ -617,7 +618,7 @@ export default function DiscoveryFlow() {
           <div className="discovery-message-body">
             <p>{copy.intro}</p>
             <div className="discovery-to-row">
-              <span className="discovery-avatar size-10">{initials(selected.person.name)}</span>
+              <span className="discovery-avatar size-10" style={{ backgroundColor: avatarTint(selected.person.name) }}>{initials(selected.person.name)}</span>
               <span>
                 <span className="discovery-micro">{copy.to}</span>
                 <strong>{selected.person.name}</strong>
