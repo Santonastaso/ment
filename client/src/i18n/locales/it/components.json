@@ -16,7 +16,7 @@
   "components.popup.done": "Fatto",
   "components.sessionRequest.errorFocusQuestion": "Aggiungi qualche parola su ciò di cui vuoi parlare, o scegli un argomento.",
   "components.sessionRequest.errorGeneric": "Qualcosa è andato storto. Riprova.",
-  "components.sessionRequest.title": "Richiedi una sessione",
+  "components.sessionRequest.title": "Richiedi sessione",
   "components.sessionRequest.step1Label": "Su cosa vorresti concentrarti?",
   "components.sessionRequest.step1NoSkills": "{name} non ha ancora indicato argomenti: vai avanti e descrivi ciò di cui vuoi parlare.",
   "components.sessionRequest.step1SelectedOne": "{count} argomento selezionato.",

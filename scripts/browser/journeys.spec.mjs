@@ -305,7 +305,7 @@ test('Messages rail moves smoothly and compact menus remain usable', async ({ pa
   await page.waitForTimeout(100);
   const movingWidth = await rail.evaluate(element => element.getBoundingClientRect().width);
   expect(movingWidth).toBeGreaterThan(64);
-  expect(movingWidth).toBeLessThan(340);
+  expect(movingWidth).toBeLessThan(400);
   await expect.poll(() => rail.evaluate(element => Math.round(element.getBoundingClientRect().width))).toBe(64);
   const compact = page.getByRole('group', { name: 'Messages' });
   expect(Math.abs(await centerY(compact.getByRole('button', { name: 'Filter conversations' })) - await centerY(sidebar.getByRole('link', { name: 'Home' })))).toBeLessThan(3);
@@ -321,7 +321,7 @@ test('Messages rail moves smoothly and compact menus remain usable', async ({ pa
   await compact.getByRole('button', { name: 'Filter conversations' }).click();
   await expect(page.locator('.conversation-list-content.menu-filters')).toBeVisible();
   await page.getByRole('button', { name: 'Show message list' }).click();
-  await expect.poll(() => rail.evaluate(element => Math.round(element.getBoundingClientRect().width))).toBe(340);
+  await expect.poll(() => rail.evaluate(element => Math.round(element.getBoundingClientRect().width))).toBe(400);
   await expect(page.getByRole('heading', { name: 'Messages' })).toBeVisible();
   await page.emulateMedia({ reducedMotion: 'reduce' });
   expect(await rail.evaluate(element => getComputedStyle(element.parentElement).transitionDuration)).toBe('0s');
@@ -609,8 +609,8 @@ test('Explorer keeps its clear action for active search and sort', async ({ page
 
 test('a proposed time is checked again before sending a request', async ({ page }) => {
   await page.goto('/explorer');
-  await page.getByRole('button', { name: 'Request a session' }).first().click();
-  const dialog = page.getByRole('dialog', { name: 'Request a session' });
+  await page.getByRole('button', { name: 'Request session' }).first().click();
+  const dialog = page.getByRole('dialog', { name: 'Request session' });
   await expect(dialog.getByText('1 / 4')).toBeVisible();
   await expect(dialog.getByText('Availability and request limits are checked again when you send.')).toHaveCount(0);
   await expect(dialog.getByText(/Pick one or more topics from .*strengths/)).toHaveCount(0);
@@ -1168,6 +1168,10 @@ test('all profile sections remain reachable in the narrow tab strip', async ({ p
   const pause = page.getByTestId('toggle-availability');
   await expect(availabilityStatus).toBeVisible();
   await expect(pause).toBeVisible();
+  // A switch, on while available; where notifications go sits below the capacity limits.
+  await expect(pause).toHaveAttribute('role', 'switch');
+  await expect(pause).toHaveAttribute('aria-checked', 'true');
+  expect(await page.evaluate(() => !!(document.querySelector('[data-testid="save-availability"]').compareDocumentPosition(document.querySelector('input[type="email"]')) & Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true);
   expect(await availabilityStatus.evaluate(element => {
     const status = element.getBoundingClientRect();
     const button = document.querySelector('[data-testid="toggle-availability"]').getBoundingClientRect();
@@ -1216,7 +1220,7 @@ test('a closed request offers a fresh request from the chat', async ({ page }) =
   await page.goto('/conversations?session=1');
   await page.evaluate(() => { window.fixture.sessions[0].status = 'cancelled'; window.dispatchEvent(new Event('focus')); });
   await page.getByRole('button', { name: 'Request another session' }).click();
-  const dialog = page.getByRole('dialog', { name: 'Request a session' });
+  const dialog = page.getByRole('dialog', { name: 'Request session' });
   await expect(dialog).toBeVisible();
 });
 

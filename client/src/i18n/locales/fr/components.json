@@ -16,7 +16,7 @@
   "components.popup.done": "Terminé",
   "components.sessionRequest.errorFocusQuestion": "Ajoutez quelques mots sur le sujet de l'échange, ou choisissez un sujet.",
   "components.sessionRequest.errorGeneric": "Une erreur s'est produite. Réessayez.",
-  "components.sessionRequest.title": "Demander un échange",
+  "components.sessionRequest.title": "Demande d’échange",
   "components.sessionRequest.step1Label": "Sur quoi souhaitez-vous échanger ?",
   "components.sessionRequest.step1NoSkills": "{name} n'a pas encore indiqué de sujets. Passez à l'étape suivante et décrivez le sujet souhaité.",
   "components.sessionRequest.step1SelectedOne": "{count} sujet sélectionné.",

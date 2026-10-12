@@ -307,7 +307,19 @@ input[type="checkbox"], input[type="radio"] { width: 16px; height: 16px; flex-sh
 .app-modal-panel { flex-shrink: 1; border-radius: var(--dialog-radius); }
 .app-modal-panel > :is(.session-modal-scroll, .overflow-y-auto) { min-height: 0; }
 
+/* Available / paused: the thumb slides with a little overshoot and squashes while pressed. */
+.availability-switch { position: relative; flex: 0 0 auto; width: 52px; height: 30px; border-radius: 999px; background: var(--control-surface-hover); cursor: pointer; transition: background-color 220ms var(--motion-ease); }
+.availability-switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 999px; background: #fff; box-shadow: 0 1px 3px rgb(0 0 0 / .25); transition: translate 320ms cubic-bezier(.34, 1.56, .64, 1), width 160ms var(--motion-ease); }
+.availability-switch[aria-checked="true"] { background: var(--primary); }
+.availability-switch[aria-checked="true"]::after { translate: 22px; }
+.availability-switch:not(:disabled):active { scale: 1; }
+.availability-switch:not(:disabled):active::after { width: 30px; }
+.availability-switch[aria-checked="true"]:not(:disabled):active::after { translate: 16px; }
+.availability-switch:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.availability-switch:disabled { cursor: progress; opacity: .7; }
+
 @media (prefers-reduced-motion: reduce) {
+  .availability-switch, .availability-switch::after { transition: none; }
   :root { --motion-page: 0ms; --motion-content: 0ms; --motion-tab: 0ms; --motion-panel: 0ms; --motion-control: 0ms; }
   .page-transition, .profile-tab-content, .profile-tab-content.profile-tab-enter-forward, .profile-tab-content.profile-tab-enter-backward, .capacity-fill, .directory-results, .directory-results[data-loading="true"]::before, .admin-tab-content, .conversation-thread, .onboarding-step-content, .session-step-content, .user-menu-panel, .session-request-backdrop, .session-request-modal { animation: none; }
   .directory-results { transition: none; }
@@ -360,12 +372,12 @@ input[type="checkbox"], input[type="radio"] { width: 16px; height: 16px; flex-sh
 .profile-skill-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 155px), 1fr)); gap: 9px; }
 .profile-skill-tile {
   display: flex; width: 100%; min-width: 0; min-height: 70px; flex-direction: column; align-items: flex-start; justify-content: center;
-  border: 1px solid var(--border-subtle); border-radius: var(--panel-radius); background: var(--card);
+  border: 1px solid transparent; border-radius: var(--panel-radius); background: var(--control-surface);
   padding: 10px 12px; text-align: left; overflow-wrap: anywhere;
   transition: background-color var(--motion-control) var(--motion-ease), border-color var(--motion-control) var(--motion-ease), transform var(--motion-control) var(--motion-ease);
 }
 .profile-skill-tile.is-learning { min-height: 52px; }
-.profile-skill-tile:hover { border-color: var(--border); background: var(--background); transform: translateY(-2px); }
+.profile-skill-tile:hover { background: var(--control-surface-hover); transform: translateY(-2px); }
 .profile-skill-tile:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .profile-skill-tile > span { min-width: 0; }
 .profile-skill-example { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-height: 1.3; margin-top: 3px; }
@@ -421,9 +433,10 @@ input[type="checkbox"], input[type="radio"] { width: 16px; height: 16px; flex-sh
 .skill-cloud-detail .person-row-identity { min-height: 0; }
 
 /* Discovery mirrors the calm reading rhythm of a familiar conversation tool. */
-/* Pinned like every other page title; the negative margin keeps it from
-   pushing the greeting down. */
-.discovery-page-title { position: sticky; top: var(--page-top-pad); z-index: 3; display: flex; height: var(--workspace-top-row); align-items: center; margin: var(--page-top-pad) -1.5rem calc(-1 * (var(--page-top-pad) + var(--workspace-top-row))); padding-left: 32px; background: var(--background); font-size: var(--font-size-page-title); line-height: 28px; font-weight: var(--font-weight-semibold); letter-spacing: -.02em; }
+/* Pinned like every other page title, starting where their centred 960px column
+   starts (the percentage is of the flow's content box, 3rem narrower than the
+   page); the negative margin keeps it from pushing the greeting down. */
+.discovery-page-title { position: sticky; top: var(--page-top-pad); z-index: 3; display: flex; height: var(--workspace-top-row); align-items: center; margin: var(--page-top-pad) -1.5rem calc(-1 * (var(--page-top-pad) + var(--workspace-top-row))); padding-left: max(32px, calc((100% + 3rem - 960px) / 2)); background: var(--background); font-size: var(--font-size-page-title); line-height: 28px; font-weight: var(--font-weight-semibold); letter-spacing: -.02em; }
 .discovery-page-title::before { content: ''; position: absolute; inset: auto 0 100%; height: var(--page-top-pad); background: var(--background); }
 .discovery-flow { position: relative; min-height: 100vh; background: var(--background); color: var(--foreground); padding: 0 1.5rem 3rem; }
 .discovery-flow.is-conversation { display: grid; height: 100vh; min-height: 0; grid-template-rows: minmax(0, 1fr) auto; padding: 0 1.5rem; }
@@ -447,7 +460,7 @@ input[type="checkbox"], input[type="radio"] { width: 16px; height: 16px; flex-sh
 .discovery-meta-row { --connection-control-size: 34px; display: flex; flex: 1 1 14rem; align-items: flex-start; gap: 1rem; }
 .discovery-home-skeleton { min-height: 34px; }
 .discovery-home-skeleton [data-slot="skeleton"] { flex: 0 0 var(--connection-control-size); }
-.discovery-recent-row { position: relative; display: flex; flex: 0 0 auto; order: 2; min-height: var(--connection-control-size); align-items: flex-start; margin: 0 4px 0 -12px; }
+.discovery-recent-row { position: relative; display: flex; flex: 0 0 auto; order: 2; min-height: var(--connection-control-size); align-items: flex-start; margin: 0 4px 0 8px; }
 .discovery-recent-row:only-child { margin-left: auto; }
 .discovery-history { color: var(--ment-muted); font-size: var(--type-label); line-height: 20px; }
 .discovery-history summary { position: relative; display: flex; width: var(--connection-control-size); height: var(--connection-control-size); align-items: center; justify-content: center; cursor: pointer; color: var(--muted-foreground); font-size: var(--type-small); line-height: 16px; font-weight: var(--font-weight-medium); }
@@ -555,7 +568,9 @@ a.person-row-name:hover { color: var(--primary-text); text-decoration: underline
 /* Row actions: one quiet text link, one filled control. */
 .quiet-link { border: 0; background: transparent; color: var(--muted-foreground); padding: .4rem .55rem; font-size: var(--type-small); line-height: 16px; font-weight: var(--font-weight-semibold); white-space: nowrap; }
 .quiet-link:hover { color: var(--foreground); }
-.directory-results .person-row:not(.person-row-skeleton) .person-row-actions { display: grid; width: 300px; max-width: 100%; grid-template-columns: max-content minmax(0, 1fr); }
+/* One width for every row so the buttons line up: just enough for the longest pair of labels (wider in French). */
+.directory-results .person-row:not(.person-row-skeleton) .person-row-actions { display: grid; width: 272px; max-width: 100%; grid-template-columns: max-content minmax(0, 1fr); }
+@media (min-width: 701px) { :lang(fr) .directory-results .person-row:not(.person-row-skeleton) .person-row-actions { width: 296px; } }
 .directory-results .person-row:not(.person-row-skeleton) .person-row-actions > :first-child { justify-self: end; }
 .directory-results .person-row:not(.person-row-skeleton) .person-row-actions > :last-child { width: 100%; min-width: 0; white-space: nowrap; }
 /* A group has no avatar, so the mark keeps the row's left edge aligned. */
@@ -592,9 +607,9 @@ a.person-row-name:hover { color: var(--primary-text); text-decoration: underline
 .discovery-confirmation strong { display: block; }
 .discovery-confirmation p { margin: .15rem 0 0; color: var(--muted-foreground); font-size: var(--type-body); line-height: 20px; }
 .discovery-connections { display: grid; min-width: 0; flex: 1; gap: 18px; }
-/* Each column is as wide as its label, so longer words ("Programmées") push
-   their neighbours along instead of running into them. */
-.discovery-connection-bubbles { display: flex; align-items: flex-start; gap: 12px; margin-inline: 8px; justify-self: end; }
+/* Every column is as wide as the longest label ("Programmées"), so the circles
+   sit at one even spacing and no label runs into its neighbour. */
+.discovery-connection-bubbles { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; align-items: start; gap: 4px; margin-inline: 8px; justify-self: end; }
 .discovery-connection-bubble { display: flex; width: auto; min-width: var(--connection-control-size); height: auto; flex-direction: column; align-items: center; justify-content: flex-start; gap: 6px; border: 0; border-radius: var(--item-radius); background: transparent; padding: 0; text-align: center; }
 .discovery-connection-bubble:hover, .discovery-connection-bubble[aria-expanded="true"] { background: transparent; }
 .discovery-connection-bubble span { color: var(--muted-foreground); font-size: var(--type-micro); font-weight: var(--font-weight-medium); line-height: 16px; white-space: nowrap; }
@@ -656,7 +671,7 @@ a.person-row-name:hover { color: var(--primary-text); text-decoration: underline
 .profile-overview-header-body { min-width: 0; }
 .profile-identity-row { min-width: 0; }
 
-.conversations-shell { display: grid; grid-template-columns: 340px minmax(0, 1fr); height: 100vh; min-height: 0; background: var(--background); transition: grid-template-columns var(--motion-panel) var(--motion-round); }
+.conversations-shell { display: grid; grid-template-columns: 400px minmax(0, 1fr); height: 100vh; min-height: 0; background: var(--background); transition: grid-template-columns var(--motion-panel) var(--motion-round); }
 .conversation-list { position: relative; z-index: 4; display: flex; min-width: 0; min-height: 0; flex-direction: column; border-right: 1px solid var(--border-subtle); background: var(--surface); padding: 16px 16px 8px; }
 .conversation-list > header { position: relative; display: flex; height: var(--workspace-top-row); flex-shrink: 0; align-items: center; justify-content: flex-end; overflow: hidden; padding: 0 8px; }
 .conversation-list-heading { position: absolute; left: 16px; display: flex; min-width: 0; align-items: center; gap: 8px; white-space: nowrap; transition: opacity 160ms var(--motion-ease); }
@@ -780,7 +795,7 @@ a.person-row-name:hover { color: var(--primary-text); text-decoration: underline
 @keyframes discoveryAppear { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes discoveryMatchReveal { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes discoveryAgentPulse { 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--primary) 14%, transparent); } }
-@media (max-width: 700px) { .discovery-flow { padding-inline: 1rem; } .discovery-page-title { margin-inline: -1rem; } .discovery-ask-block { padding-top: 22vh; } .discovery-meta-row { gap: 12px; } .discovery-connection-bubbles { gap: 8px; } .discovery-connection-cards { grid-template-columns: 1fr; } .person-row { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "avatar identity" ". detail" ". meta" ". actions"; gap: .5rem .65rem; padding: 14px 10px; } .person-row-actions { justify-content: flex-start; padding-top: .15rem; } .discovery-user-bubble { max-width: 88%; } .discovery-actions { align-items: flex-start; flex-direction: column; } .discovery-action-controls { width: 100%; } .discovery-assistant-message { grid-template-columns: 28px minmax(0, 1fr); gap: .55rem; } .discovery-agent-mark { width: 28px; height: 28px; } }
+@media (max-width: 700px) { .discovery-flow { padding-inline: 1rem; } .discovery-page-title { margin-inline: -1rem; } .discovery-ask-block { padding-top: 22vh; } .discovery-meta-row { gap: 12px; } .discovery-connection-cards { grid-template-columns: 1fr; } .person-row { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "avatar identity" ". detail" ". meta" ". actions"; gap: .5rem .65rem; padding: 14px 10px; } .person-row-actions { justify-content: flex-start; padding-top: .15rem; } .discovery-user-bubble { max-width: 88%; } .discovery-actions { align-items: flex-start; flex-direction: column; } .discovery-action-controls { width: 100%; } .discovery-assistant-message { grid-template-columns: 28px minmax(0, 1fr); gap: .55rem; } .discovery-agent-mark { width: 28px; height: 28px; } }
 @media (max-width: 700px) {
   .profile-identity-row { flex-direction: column; gap: 1rem; }
   .profile-identity-row > .shrink-0 { width: 100%; justify-content: flex-start; flex-wrap: wrap; }

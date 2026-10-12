@@ -685,22 +685,36 @@ export default function Profile() {
                   ? t('profile.availability.paused')
                   : t('profile.availability.available')}
               </p>
-              <Button
+              <button
                 type="button"
-                size="sm"
+                role="switch"
+                className="availability-switch"
                 data-testid="toggle-availability"
-                variant={profile.mentorship_paused ? 'default' : 'outline'}
+                aria-checked={!profile.mentorship_paused}
+                aria-label={profile.mentorship_paused ? t('profile.availability.resume') : t('profile.availability.pause')}
                 disabled={availabilitySaving}
                 onClick={() => setAvailability({ paused: !profile.mentorship_paused })}
-              >
-                {profile.mentorship_paused ? t('profile.availability.resume') : t('profile.availability.pause')}
-              </Button>
+              />
             </div>
             {capacityError && <p role="alert" className="mb-4 text-sm text-destructive">{capacityError}</p>}
-
+            {capacity && <div className="mt-6 grid gap-x-8 gap-y-6 border-t border-[var(--border-subtle)] pt-6 sm:grid-cols-2">
+              {[
+                { period: 'weekly', limit: capacityDraft.weekly_limit, booked: capacity.weekly_booked, max: 50 },
+                { period: 'monthly', limit: capacityDraft.monthly_limit, booked: capacity.monthly_booked, max: 200 },
+              ].map(item => (
+                <section key={item.period}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div><h3 className="text-section font-semibold">{t(`profile.availability.${item.period}`)}</h3><p className="mt-0.5 text-xs text-muted-foreground">{t('profile.availability.booked', { booked: item.booked, limit: item.limit })}</p></div>
+                    <input type="number" min="1" max={item.max} className="input w-20 text-center" aria-label={t(`profile.availability.${item.period}Limit`)} value={item.limit} disabled={availabilitySaving} onChange={event => setCapacityDraft(previous => ({ ...previous, [`${item.period}_limit`]: event.target.value }))} />
+                  </div>
+                  <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-[var(--control-surface)]"><div data-testid={`capacity-fill-${item.period}`} className="capacity-fill h-full rounded-full bg-primary" style={{ width: `${Math.min(100, (item.booked / Math.max(1, Number(item.limit))) * 100)}%` }} /></div>
+                </section>
+              ))}
+            </div>}
+            {capacity && <div className="mt-4 flex justify-end"><Button type="button" data-testid="save-availability" onClick={saveCapacity} disabled={availabilitySaving || Number(capacityDraft.monthly_limit) < Number(capacityDraft.weekly_limit)}>{availabilitySaving ? t('profile.btn.saving') : t('profile.availability.saveCapacity')}</Button></div>}
             {/* Where notifications go. Blank means the address you sign in
                 with, which is what most people want. */}
-            <section className="border-t border-[var(--border-subtle)] pt-6">
+            <section className="mt-6 border-t border-[var(--border-subtle)] pt-6">
               <h3 className="text-section font-semibold">{t('profile.notifyEmail.title')}</h3>
               <p className="mt-0.5 text-xs text-muted-foreground">{t('profile.notifyEmail.help')}</p>
               <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -723,21 +737,6 @@ export default function Profile() {
                 <p className="mt-2 text-xs text-muted-foreground">{t('profile.notifyEmail.usingLogin', { email: profile.email })}</p>
               )}
             </section>
-            {capacity && <div className="mt-6 grid gap-x-8 gap-y-6 border-t border-[var(--border-subtle)] pt-6 sm:grid-cols-2">
-              {[
-                { period: 'weekly', limit: capacityDraft.weekly_limit, booked: capacity.weekly_booked, max: 50 },
-                { period: 'monthly', limit: capacityDraft.monthly_limit, booked: capacity.monthly_booked, max: 200 },
-              ].map(item => (
-                <section key={item.period}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div><h3 className="text-section font-semibold">{t(`profile.availability.${item.period}`)}</h3><p className="mt-0.5 text-xs text-muted-foreground">{t('profile.availability.booked', { booked: item.booked, limit: item.limit })}</p></div>
-                    <input type="number" min="1" max={item.max} className="input w-20 text-center" aria-label={t(`profile.availability.${item.period}Limit`)} value={item.limit} disabled={availabilitySaving} onChange={event => setCapacityDraft(previous => ({ ...previous, [`${item.period}_limit`]: event.target.value }))} />
-                  </div>
-                  <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-[var(--control-surface)]"><div data-testid={`capacity-fill-${item.period}`} className="capacity-fill h-full rounded-full bg-primary" style={{ width: `${Math.min(100, (item.booked / Math.max(1, Number(item.limit))) * 100)}%` }} /></div>
-                </section>
-              ))}
-            </div>}
-            {capacity && <div className="mt-4 flex justify-end"><Button type="button" data-testid="save-availability" onClick={saveCapacity} disabled={availabilitySaving || Number(capacityDraft.monthly_limit) < Number(capacityDraft.weekly_limit)}>{availabilitySaving ? t('profile.btn.saving') : t('profile.availability.saveCapacity')}</Button></div>}
           </SurfaceBody>
         </Surface>
       )}

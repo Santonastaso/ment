@@ -18,7 +18,7 @@
 
   "components.sessionRequest.errorFocusQuestion": "Add a few words about what you'd like to talk about, or pick a topic.",
   "components.sessionRequest.errorGeneric": "Something went wrong. Please try again.",
-  "components.sessionRequest.title": "Request a session",
+  "components.sessionRequest.title": "Request session",
   "components.sessionRequest.step1Label": "What would you like to focus on?",
   "components.sessionRequest.step1NoSkills": "{name} hasn't listed any topics yet. Skip ahead and describe what you want to discuss.",
   "components.sessionRequest.step1SelectedOne": "{count} topic selected.",
