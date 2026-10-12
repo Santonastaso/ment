@@ -7,12 +7,13 @@ import SkillCloud, { SkillCloudFilters } from '../components/SkillCloud.jsx';
 import { Field } from '../components/ui/field.jsx';
 import SessionRequestModal from '../components/SessionRequestModal.jsx';
 
-import CareerEntryFields, { department, departmentOptions } from '../components/CareerEntryFields.jsx';
+import CareerEntryFields, { departmentOptions } from '../components/CareerEntryFields.jsx';
+import CvImport from '../components/CvImport.jsx';
 import { formatDay } from '../lib/utils.js';
 import ProfileReflection from '../components/ProfileReflection.jsx';
 import { PageShell } from '../components/PageShell.jsx';
 import { useConfirm } from '../components/ui/confirm.jsx';
-import { importedMonth, importedYear, monthYearValue, parseMonthYear } from '../lib/monthYear.mjs';
+import { monthYearValue, parseMonthYear } from '../lib/monthYear.mjs';
 import PageHeader from '../components/PageHeader.jsx';
 import PageTabs from '../components/PageTabs.jsx';
 import { Surface, SurfaceBody, SurfaceHeader } from '../components/Surface.jsx';
@@ -121,10 +122,6 @@ export default function Profile() {
   const [loadError, setLoadError] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [editing, setEditing] = useState(false);
-  const [cvConsent, setCvConsent] = useState(false);
-  const [cvBusy, setCvBusy] = useState(false);
-  const [cvDraft, setCvDraft] = useState(null);
-  const [cvError, setCvError] = useState('');
   const [saving, setSaving] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [toast, setToast] = useState('');
@@ -361,79 +358,11 @@ export default function Profile() {
     }
   }
 
-  async function handleCvUpload(file) {
-    if (!file || cvBusy) return;
-    if (!cvConsent) { setCvError(t('onboarding.import.consentRequired')); return; }
-    if (file.size > 10 * 1024 * 1024 || !/\.(pdf|docx)$/i.test(file.name)) { setCvError(t('onboarding.import.error')); return; }
-    setCvBusy(true);
-    setCvError('');
-    const data = new FormData();
-    data.append('file', file);
-    try {
-      const response = await api.post('/profile/ingest', data, { headers: { 'Content-Type': 'multipart/form-data' } });
-      setCvDraft(response.data);
-    } catch {
-      setCvError(t('onboarding.import.unavailable'));
-    } finally {
-      setCvBusy(false);
-    }
-  }
-
-  async function applyCvDraft() {
-    if (!cvDraft || cvBusy) return;
-    const proposed = cvDraft.proposed || {};
-    const career = proposed.career_history?.length
-      ? proposed.career_history.map(entry => ({
-          role: entry.role || entry.role_title || proposed.job_title || profile.current_role || '',
-          department: department(entry.department || proposed.department || profile.department),
-          company: entry.company || '', description: entry.description || '',
-          start_year: importedYear(entry.start_year), start_month: importedMonth(entry.start_month),
-          end_year: importedYear(entry.end_year), end_month: importedMonth(entry.end_month),
-        }))
-      : profile.career?.length ? profile.career : [{ role: proposed.job_title || profile.current_role || '', department: department(proposed.department || profile.department) }];
-    const primary = career[0] || {};
-    const skills = profile.skills || [];
-    const payload = {
-      name: profile.name, department: primary.department || profile.department,
-      current_role: primary.role || primary.role_title || profile.current_role,
-      seniority: profile.seniority, shadow_role_response: profile.shadow_role_response,
-      location: proposed.location || profile.location || '', bio: proposed.bio || profile.bio || '',
-      career,
-      can_teach: proposed.can_teach?.length ? proposed.can_teach : skills.filter(skill => skill.type === 'can_teach'),
-      wants_to_learn: proposed.wants_to_learn?.length ? proposed.wants_to_learn : skills.filter(skill => skill.type === 'wants_to_learn').map(skill => skill.skill),
-      program: profile.program || '', cohort_year: profile.cohort_year || null,
-      persona: profile.role, linkedin_url: profile.linkedin_url || null,
-      linkedin_headline: profile.linkedin_headline || null,
-    };
-    setCvBusy(true);
-    setCvError('');
-    try {
-      await api.post(`/profile/ingest/${cvDraft.draft_id}/accept`, { accepted_json: { ...proposed, ...payload } });
-      const response = await api.post('/users/me/onboarding', payload);
-      updateUser(response.data);
-      await refreshProfile();
-      setCvDraft(null);
-      setEditing(false);
-      showToast(t('profile.toast.profileUpdated'));
-    } catch {
-      setCvError(t('onboarding.import.unavailable'));
-    } finally {
-      setCvBusy(false);
-    }
-  }
-
-  async function handleDeleteCareer(id) {
-    if (careerBusy || !(await confirm(t('profile.career.confirmRemove')))) return;
-    setCareerBusy(true);
-    try {
-      await api.delete(`/users/me/career/${id}`);
-      setProfile(prev => ({ ...prev, career: prev.career.filter(c => c.id !== id) }));
-      showToast(t('profile.toast.entryRemoved'));
-    } catch {
-      showToast(t('profile.toast.careerSaveError'));
-    } finally {
-      setCareerBusy(false);
-    }
+  async function cvApplied(saved) {
+    updateUser(saved);
+    await refreshProfile();
+    setEditing(false);
+    showToast(t('profile.toast.profileUpdated'));
   }
 
   function startEditCareer(entry) {
@@ -647,19 +576,7 @@ export default function Profile() {
                 onChange={e => setForm(f => ({ ...f, bio: e.target.value }))}
                 className="sm:col-span-2 lg:col-span-3"
               />
-              <div className="space-y-2 sm:col-span-2 lg:col-span-3">
-                <label className="flex items-start gap-2 text-sm text-muted-foreground">
-                  <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-[var(--primary)]" checked={cvConsent} onChange={event => setCvConsent(event.target.checked)} />
-                  <span>{t('onboarding.import.consent')}</span>
-                </label>
-                <input id="profile-cv-upload" className="peer sr-only" aria-label={t('onboarding.import.browse')} type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" disabled={cvBusy || !cvConsent} onChange={event => { handleCvUpload(event.target.files?.[0]); event.target.value = ''; }} />
-                <label htmlFor="profile-cv-upload" className={`flex min-h-28 flex-col items-center justify-center gap-2 rounded-xl border border-[var(--input)] bg-muted/40 px-4 py-3 text-center peer-focus-visible:ring-2 peer-focus-visible:ring-ring ${cvBusy || !cvConsent ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:bg-muted'}`}>
-                  <span className="rounded-[var(--control-radius)] bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">{cvBusy ? t('onboarding.import.reading') : t('onboarding.import.browse')}</span>
-                  {!cvBusy && <span className="text-xs text-muted-foreground">{t('onboarding.import.hint')}</span>}
-                </label>
-                {cvError && <p role="alert" className="text-sm text-destructive">{cvError}</p>}
-                {cvDraft && <div className="flex flex-wrap items-center gap-2"><p className="text-sm text-muted-foreground">{t('onboarding.import.reviewNotice')}</p><Button type="button" onClick={applyCvDraft} disabled={cvBusy}>{t('profile.btn.applyCv')}</Button></div>}
-              </div>
+              <div className="sm:col-span-2 lg:col-span-3"><CvImport profile={profile} onApplied={cvApplied} /></div>
             </div>
           ) : <div className="space-y-1">{headlineSummary && <p className="text-sm text-muted-foreground">{headlineSummary}</p>}{profile.bio && <p className="text-sm text-muted-foreground">{profile.bio}</p>}</div>}
         </SurfaceBody>
@@ -831,6 +748,8 @@ export default function Profile() {
           title={t('profile.career.title')}
           action={
             isOwnProfile ? (
+              <div className="flex items-center gap-2">
+              <CvImport profile={profile} onApplied={cvApplied} />
               <Button
                 type="button"
                 variant={showAddCareer ? 'outline' : 'default'}
@@ -842,6 +761,7 @@ export default function Profile() {
               >
                 {showAddCareer ? <X className="size-5" /> : <Plus className="size-5" />}
               </Button>
+              </div>
             ) : null
           }
         />

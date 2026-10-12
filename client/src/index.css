@@ -440,10 +440,15 @@ input[type="checkbox"], input[type="radio"] { width: 16px; height: 16px; flex-sh
 .discovery-conversation-toolbar svg { width: 16px; height: 16px; stroke-width: 2.1; }
 .discovery-header-fade { position: sticky; top: 49px; z-index: 2; height: 18px; margin-bottom: -18px; background: linear-gradient(var(--background), transparent); pointer-events: none; }
 .discovery-ask-block { max-width: 760px; padding-top: clamp(10rem, 30vh, 20rem); }
-.discovery-meta-row { --connection-control-size: 34px; display: flex; align-items: flex-start; gap: 1rem; margin-top: .75rem; }
+/* Under the search bar: example prompts on the left, history and the connection counts on the right. */
+.discovery-home-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 1rem; margin-top: .75rem; }
+.discovery-examples { display: grid; justify-items: start; gap: .4rem; }
+.discovery-examples .discovery-suggestion { text-align: left; }
+.discovery-meta-row { --connection-control-size: 34px; display: flex; flex: 1 1 14rem; align-items: flex-start; gap: 1rem; }
 .discovery-home-skeleton { min-height: 34px; }
 .discovery-home-skeleton [data-slot="skeleton"] { flex: 0 0 var(--connection-control-size); }
-.discovery-recent-row { position: relative; display: flex; flex: 0 0 auto; min-height: var(--connection-control-size); align-items: flex-start; margin-left: 2px; }
+.discovery-recent-row { position: relative; display: flex; flex: 0 0 auto; order: 2; min-height: var(--connection-control-size); align-items: flex-start; margin: 0 4px 0 -12px; }
+.discovery-recent-row:only-child { margin-left: auto; }
 .discovery-history { color: var(--ment-muted); font-size: var(--type-label); line-height: 20px; }
 .discovery-history summary { position: relative; display: flex; width: var(--connection-control-size); height: var(--connection-control-size); align-items: center; justify-content: center; cursor: pointer; color: var(--muted-foreground); font-size: var(--type-small); line-height: 16px; font-weight: var(--font-weight-medium); }
 .discovery-history summary > span:last-child { position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%); font-size: var(--type-micro); line-height: 16px; white-space: nowrap; }
@@ -453,7 +458,7 @@ input[type="checkbox"], input[type="radio"] { width: 16px; height: 16px; flex-sh
 .discovery-history summary:hover, .discovery-history[open] summary { color: var(--ment-ink); }
 .discovery-history-mark { display: grid; width: var(--connection-control-size); height: var(--connection-control-size); place-items: center; border-radius: 50%; background: var(--control-surface); }
 .discovery-history summary svg { width: 16px; height: 16px; }
-.discovery-history-list { position: absolute; left: 0; top: calc(100% + 26px); z-index: 5; width: min(24rem, calc(100vw - 2rem)); max-height: min(340px, 40vh); overflow-y: auto; border: 1px solid var(--border-subtle); border-radius: var(--dialog-radius); background: var(--card); box-shadow: var(--shadow-overlay); padding: 8px; }
+.discovery-history-list { position: absolute; right: 0; top: calc(100% + 26px); z-index: 5; width: min(24rem, calc(100vw - 2rem)); max-height: min(340px, 40vh); overflow-y: auto; border: 1px solid var(--border-subtle); border-radius: var(--dialog-radius); background: var(--card); box-shadow: var(--shadow-overlay); padding: 8px; }
 .discovery-history-row { display: flex; min-width: 0; align-items: center; gap: 2px; border-radius: var(--control-radius); }
 .discovery-history-row:hover, .discovery-history-row:focus-within { background: var(--control-surface); }
 .discovery-history-open { display: flex; min-width: 0; flex: 1; align-items: center; gap: 10px; padding: 9px 8px 9px 12px; text-align: left; }

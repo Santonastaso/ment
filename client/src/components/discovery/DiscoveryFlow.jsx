@@ -18,7 +18,7 @@ import { avatarTint } from '../../lib/avatarTint.js';
 const COPY = {
   en: {
     history: 'History',
-    greeting: 'Hey {name}, would you like to meet today?', placeholder: 'Describe who could help', resume: 'Resume search',
+    greeting: 'Hey {name}, would you like to meet today?', placeholder: 'Describe who could help', examples: ['Someone to help me prepare for consulting interviews', 'A finance professional who has worked in M&A', 'Alumni working in marketing in Paris'], resume: 'Resume search',
     finding: 'Having a look', chooseLead: 'Here are the people who fit.', chooseBold: 'Pick one and I will write the message.',
     why: 'Why this match', choose: 'Choose', selected: 'Selected', different: 'Ask for different people', browse: 'browse the full directory', notRight: 'Not quite right?', or: 'or',
     to: 'To', intro: "Here's a suggested intro. Edit anything, then send when it feels like you.", suggested: 'Suggested draft', send: 'Send request', regenerate: 'Regenerate',
@@ -26,7 +26,7 @@ const COPY = {
   },
   it: {
     history: 'Cronologia',
-    greeting: 'Ehi {name}, ti va di incontrare qualcuno oggi?', placeholder: 'Descrivi chi potrebbe aiutarti', resume: 'Riprendi la ricerca',
+    greeting: 'Ehi {name}, ti va di incontrare qualcuno oggi?', placeholder: 'Descrivi chi potrebbe aiutarti', examples: ['Qualcuno che mi aiuti a preparare i colloqui in consulenza', 'Un professionista della finanza con esperienza in M&A', 'Alumni che lavorano nel marketing a Parigi'], resume: 'Riprendi la ricerca',
     finding: 'Do un’occhiata', chooseLead: 'Ecco le persone adatte.', chooseBold: 'Scegline una e scrivo io il messaggio.',
     why: 'Perché è adatto', choose: 'Scegli', selected: 'Scelto', different: 'Mostra altre persone', browse: 'sfoglia la directory', notRight: 'Non è quello che cercavi?', or: 'oppure',
     to: 'A', intro: 'Ecco un messaggio proposto. Modifica tutto quello che vuoi, poi invialo quando ti sembra giusto.', suggested: 'Messaggio proposto', send: 'Invia richiesta', regenerate: 'Rigenera',
@@ -34,7 +34,7 @@ const COPY = {
   },
   fr: {
     history: 'Historique',
-    greeting: 'Salut {name}, on fait une rencontre aujourd’hui ?', placeholder: 'Décrivez qui pourrait vous aider', resume: 'Reprendre la recherche',
+    greeting: 'Salut {name}, on fait une rencontre aujourd’hui ?', placeholder: 'Décrivez qui pourrait vous aider', examples: ['Quelqu’un pour m’aider à préparer des entretiens en conseil', 'Un professionnel de la finance passé par le M&A', 'Des alumni qui travaillent en marketing à Paris'], resume: 'Reprendre la recherche',
     finding: 'Je regarde', chooseLead: 'Voici les personnes qui conviennent.', chooseBold: 'Choisissez-en une et j’écris le message.',
     why: 'Pourquoi ce profil', choose: 'Choisir', selected: 'Sélectionné', different: 'Voir d’autres personnes', browse: 'parcourir l’annuaire', notRight: 'Pas tout à fait ?', or: 'ou',
     to: 'À', intro: 'Voici un message proposé. Modifiez ce que vous voulez, puis envoyez-le lorsqu’il vous convient.', suggested: 'Message proposé', send: 'Envoyer la demande', regenerate: 'Régénérer',
@@ -501,6 +501,8 @@ export default function DiscoveryFlow() {
       <div className="discovery-ask-block">
         <h1 className="discovery-greeting-scene">{copy.greeting.replace('{name}', firstName)}</h1>
         {composer()}
+        <div className="discovery-home-row">
+        {!selectedConnectionFilter && <div className="discovery-examples">{copy.examples.map(example => <button type="button" key={example} className="discovery-suggestion" onClick={() => findMatches(example)}>{example}</button>)}</div>}
         {(!historyReady || !connectionsReady) ? (
           <div className="discovery-meta-row discovery-home-skeleton" role="status" aria-label={t('common.loading')}>
             <div className="discovery-recent-row"><Skeleton className="size-[var(--connection-control-size)] rounded-full" /></div>
@@ -568,6 +570,7 @@ export default function DiscoveryFlow() {
             )}
           </div>
         )}
+        </div>
         {historyError && <p role="alert">{historyError}</p>}
         {error && <p className="discovery-error" role="alert">{error}</p>}
       </div>
