@@ -261,7 +261,7 @@ function PersonCard({ person, onRequest }) {
             {t('explorer.openChat')}
           </ButtonLink>
         ) : (
-          <Button type="button" variant="ghost" size="sm" onClick={onRequest}>{t('explorer.requestSession')}</Button>
+          <Button type="button" variant="default" size="sm" onClick={onRequest}>{t('explorer.requestSession')}</Button>
         )}
       </span>
 

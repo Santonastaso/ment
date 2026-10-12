@@ -17,21 +17,21 @@ import { pmTranslate } from '../components/admin/adminPm.js';
 const GRAPH_HEIGHT = 600;
 
 const DEPT_COLORS = {
-  Engineering: '#6366f1',
-  Finance: '#10b981',
-  Marketing: '#f59e0b',
-  Operations: '#06b6d4',
-  Product: '#ec4899',
-  Design: '#8b5cf6',
-  Sales: '#ef4444',
-  HR: '#14b8a6',
+  Engineering: '#1e1b3a',
+  Finance: '#2fbf9e',
+  Marketing: '#ff6b57',
+  Operations: '#5a5870',
+  Product: '#c93f2d',
+  Design: '#8e89c4',
+  Sales: '#ff9d8f',
+  HR: '#1f7f69',
 };
 
 const EDGE_COLORS = {
-  can_teach: '#22c55e',
-  wants_to_learn: '#f59e0b',
-  session: '#3b82f6',
-  connection: '#a855f7',
+  can_teach: '#2fbf9e',
+  wants_to_learn: '#ff6b57',
+  session: '#5a5870',
+  connection: '#8e89c4',
 };
 
 // Person->person edges backed by actual interactions (0026).
@@ -501,7 +501,7 @@ export default function KnowledgeGraph() {
                 const r = (isPerson ? 4 + Math.min(deg, 8) * 0.7 : 3 + Math.min(deg, 6) * 0.5);
                 const dim = neighbours && !neighbours.has(node.id);
                 ctx.globalAlpha = dim ? 0.15 : 1;
-                ctx.fillStyle = isPerson ? deptColor(node.department) : '#64748b';
+                ctx.fillStyle = isPerson ? deptColor(node.department) : '#5a5870';
                 ctx.beginPath();
                 if (isPerson) {
                   ctx.arc(node.x, node.y, r, 0, 2 * Math.PI);
@@ -522,7 +522,7 @@ export default function KnowledgeGraph() {
                   const fontSize = Math.max(9, (isPerson ? 11 : 9) / Math.sqrt(globalScale));
                   ctx.font = `${isPerson ? '600' : '400'} ${fontSize}px sans-serif`;
                   ctx.textBaseline = 'middle';
-                  ctx.fillStyle = '#0f172a';
+                  ctx.fillStyle = '#1e1b3a';
                   ctx.fillText(node.label, node.x + r + 2, node.y);
                 }
                 ctx.globalAlpha = 1;

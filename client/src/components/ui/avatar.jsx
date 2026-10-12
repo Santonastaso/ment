@@ -4,6 +4,7 @@ import * as React from "react"
 import { Avatar as AvatarPrimitive } from "@base-ui/react/avatar"
 
 import { cn } from "@/lib/utils"
+import { avatarTint } from '@/lib/avatarTint';
 
 function Avatar({
   className,
@@ -36,16 +37,21 @@ function AvatarImage({
 
 function AvatarFallback({
   className,
+  style,
+  children,
   ...props
 }) {
+  // Initials get a tint picked from them; icons keep the plain fill.
+  const tint = typeof children === 'string' && children.trim() ? { backgroundColor: avatarTint(children) } : null;
   return (
     <AvatarPrimitive.Fallback
       data-slot="avatar-fallback"
+      style={tint ? { ...tint, ...style } : style}
       className={cn(
-        "flex size-full items-center justify-center rounded-full bg-accent text-sm font-semibold text-[var(--primary-hover)] group-data-[size=sm]/avatar:text-xs",
+        "flex size-full items-center justify-center rounded-full bg-accent text-sm font-semibold text-[var(--ink)] group-data-[size=sm]/avatar:text-xs",
         className
       )}
-      {...props} />
+      {...props}>{children}</AvatarPrimitive.Fallback>
   );
 }
 

@@ -56,7 +56,7 @@ export default function Login() {
   return (
     <div className="auth-shell flex min-h-screen flex-col items-center justify-center bg-background p-6">
       <Link to="/welcome" className="mb-8 flex items-center gap-2" aria-label="MENT home">
-        <span className="flex size-10 items-center justify-center rounded-full bg-primary text-base font-bold text-primary-foreground">M</span>
+        <span className="flex size-10 items-center justify-center rounded-full bg-primary text-base font-bold text-[var(--coral)]">M</span>
         <span className="text-xl font-semibold">MENT</span>
       </Link>
       <div className="w-full max-w-[360px]">

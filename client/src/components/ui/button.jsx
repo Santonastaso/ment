@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 
 import { cn } from "@/lib/utils"
 
-const quietButton = "border-[var(--border)] bg-[var(--control-surface)] text-foreground hover:bg-[var(--control-surface-hover)] aria-expanded:bg-[var(--control-surface-hover)] aria-expanded:text-foreground";
+const quietButton = "border-[var(--border)] bg-[var(--field)] text-foreground hover:bg-[var(--control-surface)] aria-expanded:bg-[var(--control-surface-hover)] aria-expanded:text-foreground";
 const primaryButton = "border-transparent bg-primary text-primary-foreground hover:bg-[var(--primary-hover)]";
 
 const buttonVariants = cva(

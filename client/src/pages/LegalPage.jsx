@@ -8,7 +8,7 @@ export default function LegalPage({ type }) {
     <div className="min-h-screen bg-background">
       <header className="border-b border-[var(--border)]">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
-          <Link to="/welcome" className="flex items-center gap-2"><span className="grid size-8 place-items-center rounded-full bg-primary text-xs font-bold text-white">M</span><strong>MENT</strong></Link>
+          <Link to="/welcome" className="flex items-center gap-2"><span className="grid size-8 place-items-center rounded-full bg-primary text-xs font-bold text-[var(--coral)]">M</span><strong>MENT</strong></Link>
           <Link to="/welcome" className="text-sm text-muted-foreground hover:text-foreground">{t('legal.back')}</Link>
         </div>
       </header>
