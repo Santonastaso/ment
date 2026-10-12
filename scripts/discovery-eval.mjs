@@ -12,13 +12,13 @@ const shown = (...cities) => ({ role: 'assistant', kind: 'matches', framed: true
 const asked = { role: 'user', content: 'someone in finance' };
 const only = (...cities) => result => { const got = result.matches.map(match => match.location); assert.ok(got.length > 0 && got.every(city => cities.includes(city)), got.join(', ')); };
 const cases = [
-  { name: 'not in London leaves London out', cities: ['London', 'Paris'], turns: [asked, shown('London', 'Paris')], body: { query: 'not in London please', lang: 'en' }, check: only('Paris') },
-  { name: 'a country leaves out its cities (French)', cities: ['Lyon', 'Paris', 'Berlin'], turns: [asked, shown('Lyon', 'Paris', 'Berlin')], body: { query: 'pas en France', lang: 'fr' }, check: only('Berlin') },
-  { name: 'not in the UK (Italian)', cities: ['Leeds', 'Milan'], turns: [asked, shown('Leeds', 'Milan')], body: { query: 'non nel Regno Unito', lang: 'it' }, check: only('Milan') },
-  { name: 'an exclusion holds on a later turn', cities: ['London', 'Paris', 'Milan'], turns: [asked, shown('London'), { role: 'user', content: 'not in London' }, shown('Paris')], body: { query: 'more options', lang: 'en' }, check: only('Paris', 'Milan') },
-  { name: 'an exclusion ends when the place is asked for', cities: ['London', 'Paris'], turns: [asked, shown('London'), { role: 'user', content: 'not in London' }, shown('Paris')], body: { query: 'actually London is fine, show me London', lang: 'en' }, check: only('London') },
-  { name: 'a complaint is a request for the place', cities: ['London', 'Paris'], turns: [asked, shown('Paris')], body: { query: 'they are not in London', lang: 'en' }, check: only('London') },
-  { name: 'an ordinary "not" rules out no place', cities: ['London', 'Paris'], turns: [asked, shown('London')], body: { query: 'more options, not the same person', lang: 'en' }, check: result => assert.deepEqual((result.understood?.exclude || []).filter(word => ['london', 'paris'].includes(word)), []) },
+  { name: 'not in London leaves London out', cities: ['London', 'Paris'], turns: [asked, shown('London', 'Paris')], body: { query: 'not in London please', lang: 'en', thread_id: 'thread' }, check: only('Paris') },
+  { name: 'a country leaves out its cities (French)', cities: ['Lyon', 'Paris', 'Berlin'], turns: [asked, shown('Lyon', 'Paris', 'Berlin')], body: { query: 'pas en France', lang: 'fr', thread_id: 'thread' }, check: only('Berlin') },
+  { name: 'not in the UK (Italian)', cities: ['Leeds', 'Milan'], turns: [asked, shown('Leeds', 'Milan')], body: { query: 'non nel Regno Unito', lang: 'it', thread_id: 'thread' }, check: only('Milan') },
+  { name: 'an exclusion holds on a later turn', cities: ['London', 'Paris', 'Milan'], turns: [asked, shown('London'), { role: 'user', content: 'not in London' }, shown('Paris')], body: { query: 'more options', lang: 'en', thread_id: 'thread' }, check: only('Paris', 'Milan') },
+  { name: 'an exclusion ends when the place is asked for', cities: ['London', 'Paris'], turns: [asked, shown('London'), { role: 'user', content: 'not in London' }, shown('Paris')], body: { query: 'actually London is fine, show me London', lang: 'en', thread_id: 'thread' }, check: only('London') },
+  { name: 'a complaint is a request for the place', cities: ['London', 'Paris'], turns: [asked, shown('Paris')], body: { query: 'they are not in London', lang: 'en', thread_id: 'thread' }, check: only('London') },
+  { name: 'an ordinary "not" rules out no place', cities: ['London', 'Paris'], turns: [asked, shown('London')], body: { query: 'more options, not the same person', lang: 'en', thread_id: 'thread' }, check: result => assert.deepEqual((result.understood?.exclude || []).filter(word => ['london', 'paris'].includes(word)), []) },
   { name: 'broad field asks one short question', body: { query: 'finance', lang: 'en' }, check: result => assert.ok(result.clarification && result.clarification.split(/\s+/).length <= 20) },
   { name: 'French clarification', body: { query: 'finance', lang: 'fr' }, check: result => assert.match(result.clarification, /vous|quel|souhait|cherch|besoin|voulez|pr[eé]f[eé]r/i) },
   { name: 'Italian clarification', body: { query: 'finance', lang: 'it' }, check: result => assert.match(result.clarification, /vuoi|quale|cerchi|prefer|ti |vorre|interess|hai /i) },
@@ -40,9 +40,9 @@ for (const scenario of cases) {
     const result = await response.json();
     scenario.check(result);
     console.log(`PASS: ${scenario.name} (${fixture.calls.length} provider calls)`);
-  } catch {
+  } catch (error) {
     failures += 1;
-    console.error(`FAIL: ${scenario.name}`);
+    console.error(`FAIL: ${scenario.name}: ${error.message}`);
   }
 }
 console.log(`${cases.length - failures}/${cases.length} live AI evaluations passed`);
