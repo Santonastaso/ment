@@ -1168,6 +1168,10 @@ test('all profile sections remain reachable in the narrow tab strip', async ({ p
   const pause = page.getByTestId('toggle-availability');
   await expect(availabilityStatus).toBeVisible();
   await expect(pause).toBeVisible();
+  // A switch, on while available; where notifications go sits below the capacity limits.
+  await expect(pause).toHaveAttribute('role', 'switch');
+  await expect(pause).toHaveAttribute('aria-checked', 'true');
+  expect(await page.evaluate(() => !!(document.querySelector('[data-testid="save-availability"]').compareDocumentPosition(document.querySelector('input[type="email"]')) & Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true);
   expect(await availabilityStatus.evaluate(element => {
     const status = element.getBoundingClientRect();
     const button = document.querySelector('[data-testid="toggle-availability"]').getBoundingClientRect();
