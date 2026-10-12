@@ -459,7 +459,7 @@ input[type="checkbox"], input[type="radio"] { width: 16px; height: 16px; flex-sh
 .discovery-meta-row { --connection-control-size: 34px; display: flex; flex: 1 1 14rem; align-items: flex-start; gap: 1rem; }
 .discovery-home-skeleton { min-height: 34px; }
 .discovery-home-skeleton [data-slot="skeleton"] { flex: 0 0 var(--connection-control-size); }
-.discovery-recent-row { position: relative; display: flex; flex: 0 0 auto; order: 2; min-height: var(--connection-control-size); align-items: flex-start; margin: 0 4px 0 -12px; }
+.discovery-recent-row { position: relative; display: flex; flex: 0 0 auto; order: 2; min-height: var(--connection-control-size); align-items: flex-start; margin: 0 4px 0 16px; }
 .discovery-recent-row:only-child { margin-left: auto; }
 .discovery-history { color: var(--ment-muted); font-size: var(--type-label); line-height: 20px; }
 .discovery-history summary { position: relative; display: flex; width: var(--connection-control-size); height: var(--connection-control-size); align-items: center; justify-content: center; cursor: pointer; color: var(--muted-foreground); font-size: var(--type-small); line-height: 16px; font-weight: var(--font-weight-medium); }
@@ -604,9 +604,9 @@ a.person-row-name:hover { color: var(--primary-text); text-decoration: underline
 .discovery-confirmation strong { display: block; }
 .discovery-confirmation p { margin: .15rem 0 0; color: var(--muted-foreground); font-size: var(--type-body); line-height: 20px; }
 .discovery-connections { display: grid; min-width: 0; flex: 1; gap: 18px; }
-/* Each column is as wide as its label, so longer words ("Programmées") push
-   their neighbours along instead of running into them. */
-.discovery-connection-bubbles { display: flex; align-items: flex-start; gap: 12px; margin-inline: 8px; justify-self: end; }
+/* Every column is as wide as the longest label ("Programmées"), so the circles
+   sit at one even spacing and no label runs into its neighbour. */
+.discovery-connection-bubbles { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; align-items: start; gap: 12px; margin-inline: 8px; justify-self: end; }
 .discovery-connection-bubble { display: flex; width: auto; min-width: var(--connection-control-size); height: auto; flex-direction: column; align-items: center; justify-content: flex-start; gap: 6px; border: 0; border-radius: var(--item-radius); background: transparent; padding: 0; text-align: center; }
 .discovery-connection-bubble:hover, .discovery-connection-bubble[aria-expanded="true"] { background: transparent; }
 .discovery-connection-bubble span { color: var(--muted-foreground); font-size: var(--type-micro); font-weight: var(--font-weight-medium); line-height: 16px; white-space: nowrap; }
