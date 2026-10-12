@@ -1847,3 +1847,45 @@ test('a paused mentor shows a readable return date', async ({ page }) => {
   // Day and month order follow the reader's language; the raw 2027-03-09 never shows.
   await expect(page.getByText(/^Not available for new requests until (9 Mar|Mar 9),? \d{4}$/)).toBeVisible();
 });
+
+test('a CV uploaded on the Experience tab is reviewed and edited before anything is saved', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => {
+    window.fixture.profile = { ...window.fixture.user, department: 'Engineering', current_role: 'Engineer', bio: 'My old bio.', location: 'Paris',
+      career: [{ id: 1, role: 'Engineer', department: 'Engineering' }], skills: [{ id: 5, skill: 'Architecture', type: 'can_teach', example_project: '' }], skillProgress: [] };
+    window.fixture.ingestProposed = { job_title: 'Analyst', department: 'Finance', bio: 'A new bio from the CV.', location: 'Paris', can_teach: [], wants_to_learn: ['Negotiation'],
+      career_history: [{ role_title: 'Analyst', department: 'Finance', company: 'Acme', start_year: '2022' }, { role_title: 'Intern', department: 'Finance', company: 'Beta' }] };
+  });
+  const saves = () => page.evaluate(() => window.fixture.calls.filter(call => call.path === '/users/me/onboarding').map(call => call.body));
+  const uploadCv = async () => {
+    await page.getByRole('checkbox').check();
+    await page.locator('input[type="file"]').setInputFiles({ name: 'cv.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 synthetic CV') });
+  };
+  await visit(page, '/profile?tab=experience');
+  await uploadCv();
+  const review = page.getByTestId('cv-review');
+  // What the file suggests is shown, with what it would replace, and nothing is saved yet.
+  await expect(review).toContainText('Applying replaces the experience on your profile (1 today)');
+  await expect(review).toContainText('On your profile now: My old bio.');
+  await expect(review.getByRole('textbox', { name: 'Role title *' })).toHaveCount(2);
+  expect(await saves()).toEqual([]);
+  // Discarding leaves the profile alone.
+  await review.getByRole('button', { name: 'Discard', exact: true }).click();
+  await expect(review).toHaveCount(0);
+  expect(await saves()).toEqual([]);
+
+  // Second time: edit one entry, drop the other, change the bio, then apply.
+  await uploadCv();
+  await review.getByRole('textbox', { name: 'Role title *' }).first().fill('Senior Analyst');
+  await review.getByRole('button', { name: 'Remove', exact: true }).last().click();
+  await review.getByRole('textbox', { name: 'Short bio' }).fill('My edited bio.');
+  await review.getByRole('button', { name: 'Apply CV suggestions' }).click();
+  await expect.poll(async () => (await saves()).length).toBe(1);
+  const [saved] = await saves();
+  expect(saved.career.map(entry => [entry.role, entry.company, entry.start_year])).toEqual([['Senior Analyst', 'Acme', 2022]]);
+  expect(saved.bio).toBe('My edited bio.');
+  expect(saved.wants_to_learn).toEqual(['Negotiation']);
+  // The file named no teaching skills, so the ones on the profile are kept.
+  expect(saved.can_teach.map(skill => skill.skill)).toEqual(['Architecture']);
+  await expect(review).toHaveCount(0);
+});

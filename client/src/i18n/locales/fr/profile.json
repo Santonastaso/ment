@@ -122,5 +122,12 @@
   "profile.notifyEmail.label": "E-mail pour les notifications",
   "profile.notifyEmail.usingLogin": "Nous utilisons actuellement votre adresse de connexion, {email}.",
   "profile.notifyEmail.invalid": "Cela ne ressemble pas à une adresse e-mail.",
-  "profile.notifyEmail.saved": "E-mail de notification mis à jour."
+  "profile.notifyEmail.saved": "E-mail de notification mis à jour.",
+  "profile.cv.reviewTitle": "Vérifiez avant d’enregistrer",
+  "profile.cv.replacesExperience": "En appliquant, les expériences de votre profil ({count} aujourd’hui) sont remplacées par celles ci-dessous. Modifiez-les ou supprimez-en d’abord.",
+  "profile.cv.noExperience": "Aucune expérience trouvée dans ce fichier. Celles de votre profil restent inchangées.",
+  "profile.cv.replacesSkills": "En appliquant, les compétences de votre profil sont remplacées par les listes ci-dessous.",
+  "profile.cv.current": "Actuellement sur votre profil : {value}",
+  "profile.cv.entryIncomplete": "Chaque expérience doit avoir un poste et un département. Complétez ou supprimez celle qui est incomplète.",
+  "profile.cv.discard": "Abandonner"
 }
