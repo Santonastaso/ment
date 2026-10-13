@@ -1,48 +1,66 @@
 import { errorMessage } from '../lib/errors.mjs';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
-import { Share2, RefreshCw, Building2, Languages, GraduationCap, Info } from 'lucide-react';
+import { Share2, RefreshCw, Search, Plus, Minus, Scan, X, Expand, Shrink } from 'lucide-react';
 import api from '../api/index.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useT } from '../i18n/index.jsx';
 import { languageName } from '../lib/languages.js';
 import { PageShell } from '../components/PageShell.jsx';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { pmTranslate } from '../components/admin/adminPm.js';
 
-const GRAPH_HEIGHT = 600;
+const GRAPH_HEIGHT = 640;
 
-const DEPT_COLORS = {
-  Engineering: '#1e1b3a',
-  Finance: '#2fbf9e',
-  Marketing: '#ff6b57',
-  Operations: '#5a5870',
-  Product: '#c93f2d',
-  Design: '#8e89c4',
-  Sales: '#ff9d8f',
-  HR: '#1f7f69',
-};
+// The largest departments get the brand palette, in order; the long tail
+// shares one quiet colour, so the picture reads at a glance instead of as a
+// rainbow of near-identical greens.
+const DEPARTMENT_PALETTE = ['#1e1b3a', '#ff6b57', '#2fbf9e', '#5a5870', '#8e89c4', '#1f7f69', '#c93f2d', '#ff9d8f'];
+const OTHER_DEPARTMENT = '#c9c6dc';
+const SKILL_COLOR = '#8e89c4';
 
+// Links are quiet until something is in focus; then the focused node's links
+// take their meaning colour.
 const EDGE_COLORS = {
   can_teach: '#2fbf9e',
   wants_to_learn: '#ff6b57',
-  session: '#5a5870',
+  session: '#1e1b3a',
   connection: '#8e89c4',
+  peer: '#5a5870',
 };
+const QUIET_LINK = 'rgba(90, 88, 112, 0.14)';
+const FADED_LINK = 'rgba(90, 88, 112, 0.04)';
+const REAL_LINK = 'rgba(30, 27, 58, 0.55)';
 
 // Person->person edges backed by actual interactions (0026).
 const REAL_LINK_TYPES = new Set(['session', 'connection']);
+const endId = end => (typeof end === 'object' ? end.id : end);
 
-function deptColor(dept) {
-  if (DEPT_COLORS[dept]) return DEPT_COLORS[dept];
-  // Stable fallback hue for unknown departments.
-  let h = 0;
-  for (let i = 0; i < (dept || '').length; i++) h = (h * 31 + dept.charCodeAt(i)) % 360;
-  return `hsl(${h} 65% 55%)`;
+// Keeps nodes from sitting on top of each other.
+function collideForce(radius) {
+  let nodes = [];
+  function force() {
+    for (let i = 0; i < nodes.length; i++) {
+      const a = nodes[i];
+      for (let j = i + 1; j < nodes.length; j++) {
+        const b = nodes[j];
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const min = radius(a) + radius(b) + 2;
+        const dist = Math.hypot(dx, dy) || 0.01;
+        if (dist < min) {
+          const push = (min - dist) / dist / 2;
+          a.x -= dx * push; a.y -= dy * push;
+          b.x += dx * push; b.y += dy * push;
+        }
+      }
+    }
+  }
+  force.initialize = next => { nodes = next; };
+  return force;
 }
 
 export default function KnowledgeGraph() {
@@ -68,8 +86,13 @@ export default function KnowledgeGraph() {
   const [skill, setSkill] = useState('');
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState(null);
+  const [departmentFocus, setDepartmentFocus] = useState('');
   const autoFit = useRef(true);
   const [graphWidth, setGraphWidth] = useState(900);
+  // Full screen: the panels and the graph together, the graph as tall as the screen.
+  const [fullScreen, setFullScreen] = useState(false);
+  const [graphHeight, setGraphHeight] = useState(GRAPH_HEIGHT);
+  const shellRef = useRef(null);
 
   const reqId = useRef(0);
   const fgRef = useRef(null);
@@ -126,21 +149,22 @@ export default function KnowledgeGraph() {
   }, [nodes]);
 
   const kindById = useMemo(() => new Map(nodes.map((n) => [n.id, n.kind])), [nodes]);
+  const nodeById = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
 
   // Build the force-graph dataset for the active view. New object identities are
   // produced only when the underlying data or the view changes, so the
-  // simulation isn't reheated on every render.
-  const graphData = useMemo(() => {
-    // Real-connection overlay (0026): completed sessions + accepted
-    // connections between people, thickness = interaction count.
+  // simulation isn't reheated on every render. Nodes with no link at all are
+  // left out: scattered single dots read as noise, and the count is shown.
+  const { graphData, hiddenCount } = useMemo(() => {
     const realLinks = showReal
       ? visibleEdges
           .filter((e) => REAL_LINK_TYPES.has(e.type))
           .map((e) => ({ source: e.source, target: e.target, value: e.weight || 1, type: e.type }))
       : [];
+    let candidateNodes;
+    let links;
     if (view === 'people') {
-      const people = visibleNodes.filter((n) => n.kind === 'person');
-      // skill id -> people who touch it (teach or learn)
+      candidateNodes = visibleNodes.filter((n) => n.kind === 'person');
       const bySkill = new Map();
       for (const e of visibleEdges) {
         if (REAL_LINK_TYPES.has(e.type)) continue;
@@ -159,20 +183,24 @@ export default function KnowledgeGraph() {
           }
         }
       }
-      const links = [...pairValue.entries()].map(([key, value]) => {
+      links = [...[...pairValue.entries()].map(([key, value]) => {
         const [source, target] = key.split('|');
         return { source, target, value, type: 'peer' };
-      });
-      return { nodes: people.map((n) => ({ ...n })), links: [...links, ...realLinks] };
-    }
-    return {
-      nodes: visibleNodes.map((n) => ({ ...n })),
-      links: [
+      }), ...realLinks];
+    } else {
+      candidateNodes = visibleNodes;
+      links = [
         ...visibleEdges
           .filter((e) => !REAL_LINK_TYPES.has(e.type))
           .map((e) => ({ source: e.source, target: e.target, type: e.type, value: 1 })),
         ...realLinks,
-      ],
+      ];
+    }
+    const linked = new Set(links.flatMap(l => [l.source, l.target]));
+    const kept = candidateNodes.filter(n => linked.has(n.id));
+    return {
+      graphData: { nodes: kept.map((n) => ({ ...n })), links },
+      hiddenCount: candidateNodes.filter(n => n.kind === 'person' && !linked.has(n.id)).length,
     };
   }, [visibleNodes, visibleEdges, view, kindById, showReal]);
 
@@ -180,50 +208,169 @@ export default function KnowledgeGraph() {
   const degree = useMemo(() => {
     const d = new Map();
     for (const l of graphData.links) {
-      const s = typeof l.source === 'object' ? l.source.id : l.source;
-      const tt = typeof l.target === 'object' ? l.target.id : l.target;
+      const s = endId(l.source);
+      const tt = endId(l.target);
       d.set(s, (d.get(s) || 0) + 1);
       d.set(tt, (d.get(tt) || 0) + 1);
     }
     return d;
   }, [graphData]);
+  const radius = useCallback((node) => {
+    const deg = degree.get(node.id) || 0;
+    return node.kind === 'person' ? 4 + Math.min(Math.sqrt(deg) * 1.6, 9) : 3 + Math.min(Math.sqrt(deg) * 1.1, 6);
+  }, [degree]);
 
-  // Neighbour set for hover highlighting, derived from the active links.
-  const neighbours = useMemo(() => {
-    if (!hovered) return null;
-    const set = new Set([hovered]);
+  // Departments by size; the largest take the palette.
+  const departmentList = useMemo(() => {
+    const counts = new Map();
+    for (const n of graphData.nodes) if (n.kind === 'person' && n.department) counts.set(n.department, (counts.get(n.department) || 0) + 1);
+    return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([name, count], index) => ({ name, count, color: DEPARTMENT_PALETTE[index] || OTHER_DEPARTMENT }));
+  }, [graphData]);
+  const departmentColor = useMemo(() => new Map(departmentList.map(d => [d.name, d.color])), [departmentList]);
+
+  // What is in focus: the hovered node, else the selected one; plus a
+  // department, when one is picked in the list.
+  const focusId = (hovered && kindById.get(hovered) === 'skill' ? hovered : null) || selectedId;
+  const focusSet = useMemo(() => {
+    if (!focusId && !departmentFocus) return null;
+    const set = new Set();
+    const seeds = focusId ? [focusId] : graphData.nodes.filter(n => n.department === departmentFocus).map(n => n.id);
+    for (const id of seeds) set.add(id);
     for (const l of graphData.links) {
-      const s = typeof l.source === 'object' ? l.source.id : l.source;
-      const tt = typeof l.target === 'object' ? l.target.id : l.target;
-      if (s === hovered) set.add(tt);
-      if (tt === hovered) set.add(s);
+      const s = endId(l.source);
+      const tt = endId(l.target);
+      if (seeds.includes(s)) set.add(tt);
+      if (seeds.includes(tt)) set.add(s);
     }
     return set;
-  }, [hovered, graphData]);
+  }, [focusId, departmentFocus, graphData]);
 
-  const peopleCount = visibleNodes.filter((n) => n.kind === 'person').length;
-  const skillCount = visibleNodes.filter((n) => n.kind === 'skill').length;
+  // Labels: the best-connected nodes always, everything else on zoom or focus.
+  const labelled = useMemo(() => {
+    const ranked = [...graphData.nodes].sort((a, b) => (degree.get(b.id) || 0) - (degree.get(a.id) || 0));
+    return new Set([
+      ...ranked.filter(n => n.kind === 'person').slice(0, 6).map(n => n.id),
+      ...ranked.filter(n => n.kind === 'skill').slice(0, 4).map(n => n.id),
+    ]);
+  }, [graphData, degree]);
+
+  // Per-node facts for the details panel and the insights.
+  const relations = useMemo(() => {
+    const map = new Map();
+    const add = (id, key, other) => {
+      if (!map.has(id)) map.set(id, { teaches: [], learns: [], taughtBy: [], wantedBy: [], met: [] });
+      map.get(id)[key].push(other);
+    };
+    for (const e of visibleEdges) {
+      if (REAL_LINK_TYPES.has(e.type)) { add(e.source, 'met', e.target); add(e.target, 'met', e.source); continue; }
+      const personId = kindById.get(e.source) === 'person' ? e.source : e.target;
+      const skillId = personId === e.source ? e.target : e.source;
+      if (e.type === 'can_teach') { add(personId, 'teaches', skillId); add(skillId, 'taughtBy', personId); }
+      if (e.type === 'wants_to_learn') { add(personId, 'learns', skillId); add(skillId, 'wantedBy', personId); }
+    }
+    return map;
+  }, [visibleEdges, kindById]);
+  const skillGaps = useMemo(() => [...relations.entries()]
+    .filter(([id, r]) => kindById.get(id) === 'skill' && r.wantedBy.length > 0)
+    .map(([id, r]) => ({ id, label: nodeById.get(id)?.label || id, wanted: r.wantedBy.length, taught: r.taughtBy.length }))
+    .sort((a, b) => (b.wanted - b.taught) - (a.wanted - a.taught) || b.wanted - a.wanted)
+    .slice(0, 8), [relations, kindById, nodeById]);
+  // Privacy: the admin view shows departments and trends, never individuals.
+  // Departments smaller than the reporting minimum are pooled, so a count can
+  // never point at one person.
+  const MIN_GROUP = 5;
+  const departmentSize = useMemo(() => {
+    const counts = new Map();
+    for (const n of nodes) if (n.kind === 'person') counts.set(n.department || '', (counts.get(n.department || '') || 0) + 1);
+    return counts;
+  }, [nodes]);
+  const groupOf = useCallback((id) => {
+    const department = nodeById.get(id)?.department || '';
+    return department && (departmentSize.get(department) || 0) >= MIN_GROUP ? department : t('graph.otherDepartments');
+  }, [nodeById, departmentSize, t]);
+  const byGroup = useCallback((ids) => {
+    const counts = new Map();
+    for (const id of new Set(ids)) counts.set(groupOf(id), (counts.get(groupOf(id)) || 0) + 1);
+    return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  }, [groupOf]);
+  // Which departments actually meet: real sessions and accepted connections.
+  const departmentPairs = useMemo(() => {
+    const counts = new Map();
+    for (const e of visibleEdges) {
+      if (!REAL_LINK_TYPES.has(e.type)) continue;
+      const [a, b] = [groupOf(e.source), groupOf(e.target)].sort((x, y) => x.localeCompare(y));
+      const key = `${a}\u0000${b}`;
+      counts.set(key, (counts.get(key) || 0) + (e.weight || 1));
+    }
+    return [...counts.entries()].map(([key, count]) => { const [a, b] = key.split('\u0000'); return { a, b, count }; })
+      .sort((x, y) => y.count - x.count).slice(0, 8);
+  }, [visibleEdges, groupOf]);
+
+  const peopleCount = graphData.nodes.filter((n) => n.kind === 'person').length;
+  const skillCount = graphData.nodes.filter((n) => n.kind === 'skill').length;
   const realLinkCount = visibleEdges.filter((e) => REAL_LINK_TYPES.has(e.type)).length;
-  const selected = graphData.nodes.find(n => n.id === selectedId);
-  const listNodes = graphData.nodes.filter(n => (n.label || '').toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
-  function focusNode(node) {
-    setSelectedId(node.id);
-    setHovered(node.id);
+  const selected = selectedId && kindById.get(selectedId) === 'skill' ? nodeById.get(selectedId) : null;
+  const needle = query.trim().toLocaleLowerCase();
+  const searchResults = needle
+    ? [...departmentList.filter(d => d.name.toLocaleLowerCase().includes(needle)).map(d => ({ id: `department:${d.name}`, kind: 'department', label: d.name, color: d.color })),
+      ...graphData.nodes.filter(n => n.kind === 'skill' && (n.label || '').toLocaleLowerCase().includes(needle))].slice(0, 8)
+    : [];
+  const pickResult = (result) => {
+    if (result.kind === 'department') { setSelectedId(null); setDepartmentFocus(result.label); } else focusNode(result.id);
+    setQuery('');
+  };
+
+  function focusNode(id) {
+    const node = graphData.nodes.find(n => n.id === id);
+    if (!node) return;
+    setSelectedId(id);
+    setDepartmentFocus('');
     autoFit.current = false;
+    // Picked from the lists under the graph: bring the graph into view.
+    containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     if (Number.isFinite(node.x) && Number.isFinite(node.y)) {
-      fgRef.current?.centerAt(node.x, node.y, 400);
-      fgRef.current?.zoom(2.5, 400);
+      fgRef.current?.centerAt(node.x, node.y, 500);
+      fgRef.current?.zoom(2.4, 500);
     }
   }
+  function clearFocus() { setSelectedId(null); setHovered(null); setDepartmentFocus(''); }
   function resetGraph() {
     setCompany(''); setLanguage(''); setProgram(''); setPersona(''); setCohort(''); setSkill('');
-    setQuery(''); setSelectedId(null); setHovered(null); setShowReal(true);
+    setQuery(''); clearFocus(); setShowReal(true);
     for (const node of graphData.nodes) { delete node.fx; delete node.fy; }
     autoFit.current = true;
     fgRef.current?.d3ReheatSimulation();
-    fgRef.current?.zoomToFit(400, 40);
+    fitView();
   }
+  const zoomBy = factor => { const fg = fgRef.current; if (fg) fg.zoom(fg.zoom() * factor, 300); };
+  // Fit frames the connected core: a few small clusters at the edge otherwise
+  // shrink the whole picture to a dot in the middle.
+  const fitView = (ms = 500) => {
+    const core = node => (degree.get(node.id) || 0) >= 2;
+    fgRef.current?.zoomToFit(ms, 50, graphData.nodes.some(core) ? core : undefined);
+  };
+  const toggleFullScreen = () => {
+    if (document.fullscreenElement) document.exitFullscreen?.();
+    else shellRef.current?.requestFullscreen?.();
+  };
+  useEffect(() => {
+    const onChange = () => {
+      const active = document.fullscreenElement === shellRef.current;
+      setFullScreen(active);
+      setGraphHeight(active ? Math.max(GRAPH_HEIGHT, window.innerHeight - 32) : GRAPH_HEIGHT);
+      setTimeout(() => fitView(400), 150);
+    };
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
+  });
+
   useEffect(() => { autoFit.current = true; setSelectedId(null); setHovered(null); }, [graphData]);
+  useEffect(() => {
+    const onKey = event => { if (event.key === 'Escape') clearFocus(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   // Measure the container so the canvas fills available width.
   useEffect(() => {
     const el = containerRef.current;
@@ -235,125 +382,44 @@ export default function KnowledgeGraph() {
     return () => ro.disconnect();
   }, [loading, view]);
 
-  // Configure d3 forces: stronger repulsion so clusters breathe, and link
-  // distance that carries meaning in the people view (more shared skills =>
-  // closer together).
+  // Forces: moderate repulsion, short links, and no overlapping nodes. In the
+  // people view more shared skills pull people closer.
   useEffect(() => {
     const fg = fgRef.current;
     if (!fg) return;
-    fg.d3Force('charge')?.strength(-180);
+    fg.d3Force('charge')?.strength(-70).distanceMax(320);
     const link = fg.d3Force('link');
-    if (link) {
-      link.distance((l) => (view === 'people' ? Math.max(24, 110 / ((l.value || 1) + 0.5)) : 46));
-    }
+    if (link) link.distance((l) => (view === 'people' ? Math.max(28, 110 / ((l.value || 1) + 0.5)) : 38));
+    fg.d3Force('collide', collideForce(radius));
     fg.d3ReheatSimulation?.();
-  }, [graphData, view]);
+  }, [graphData, view, radius]);
 
-  const departments = useMemo(() => {
-    const set = new Set();
-    for (const n of visibleNodes) if (n.kind === 'person' && n.department) set.add(n.department);
-    return [...set].sort();
-  }, [visibleNodes]);
+  const selectFilter = (id, value, onChange, options, allLabel, extra = {}) => (
+    <select id={id} value={value} onChange={e => onChange(e.target.value)} className="filter-control kg-select" {...extra}>
+      {allLabel !== null && <option value="">{allLabel}</option>}
+      {options.map(option => <option key={option.value ?? option} value={option.value ?? option}>{option.label ?? option}</option>)}
+    </select>
+  );
+  // Who teaches or wants a skill, as department counts.
+  const groupChips = (ids, empty) => {
+    const groups = byGroup(ids);
+    return groups.length
+      ? <ul className="kg-chips">{groups.map(([name, count]) => <li key={name}><span>{name} · {count}</span></li>)}</ul>
+      : <p className="kg-muted">{empty}</p>;
+  };
 
   return (
-    <PageShell
+    <PageShell className="admin-page kg-page"
       title={t('graph.pageTitle')}
       description={t('graph.pageDescription')}
+      action={<div className="kg-header-actions">
+        <div className="kg-segmented" role="group" aria-label={t('graph.view.label')}>
+          <button type="button" data-testid="kg-view-bipartite" aria-pressed={view === 'bipartite'} onClick={() => setView('bipartite')} data-control-radius-exempt>{t('graph.view.bipartite')}</button>
+          <button type="button" data-testid="kg-view-people" aria-pressed={view === 'people'} onClick={() => setView('people')} data-control-radius-exempt>{t('graph.view.people')}</button>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => loadGraph(company, language)} data-testid="kg-refresh"><RefreshCw className="size-4" /> {t('graph.refresh')}</Button>
+      </div>}
     >
-      {/* Filters */}
-      <div className="flex flex-wrap items-end gap-4 rounded-xl border border-border bg-card p-4">
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="kg-company" className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-            <Building2 className="size-4" /> {t('graph.filter.company')}
-          </label>
-          <select
-            id="kg-company"
-            data-testid="kg-filter-company"
-            value={isPlatform ? company : (organizations[0]?.id || '')}
-            disabled={!isPlatform}
-            onChange={(e) => setCompany(e.target.value)}
-            className={cn(
-              'filter-control min-w-[12rem] border px-3 text-sm',
-              'focus-visible:border-ring focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
-              !isPlatform && 'cursor-not-allowed opacity-70'
-            )}
-          >
-            {isPlatform && <option value="">{t('graph.filter.allOrganizations')}</option>}
-            {organizations.map((o) => (
-              <option key={o.id} value={o.id}>{o.name}</option>
-            ))}
-          </select>
-          {!isPlatform && (
-            <span className="text-caption text-muted-foreground">{t('graph.filter.locked')}</span>
-          )}
-        </div>
-
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="kg-language" className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-            <Languages className="size-4" /> {t('graph.filter.language')}
-          </label>
-          <select
-            id="kg-language"
-            data-testid="kg-filter-language"
-            value={language}
-            onChange={(e) => setLanguage(e.target.value)}
-            className={cn(
-              'filter-control min-w-[12rem] border px-3 text-sm',
-              'focus-visible:border-ring focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50'
-            )}
-          >
-            <option value="">{t('graph.filter.allLanguages')}</option>
-            {languages.map((l) => (
-              <option key={l} value={l}>{languageName(l, lang)}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="kg-program" className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-            <GraduationCap className="size-4" /> {t('graph.filter.program')}
-          </label>
-          <select
-            id="kg-program"
-            data-testid="kg-filter-program"
-            value={program}
-            onChange={(e) => setProgram(e.target.value)}
-            className={cn(
-              'filter-control min-w-[12rem] border px-3 text-sm',
-              'focus-visible:border-ring focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50'
-            )}
-          >
-            <option value="">{t('graph.filter.allPrograms')}</option>
-            {programs.map((p) => (
-              <option key={p} value={p}>{p}</option>
-            ))}
-          </select>
-        </div>
-
-        {[
-          ['persona', persona, setPersona, [...new Set(nodes.filter(n => n.kind === 'person').map(n => n.persona ?? n.role).filter(Boolean))].sort()],
-          ['cohort', cohort, setCohort, [...new Set(nodes.filter(n => n.kind === 'person').map(n => String(n.cohort_year ?? n.cohort ?? n.graduation_year ?? '')).filter(Boolean))].sort()],
-          ['skill', skill, setSkill, nodes.filter(n => n.kind === 'skill').map(n => ({ value: n.id, label: n.label }))],
-        ].map(([name, value, setter, options]) => (
-          <label key={name} className="flex min-w-0 flex-col gap-1.5 text-xs font-medium text-muted-foreground" htmlFor={`kg-${name}`}>
-            {t(`graph.filter.${name}`)}
-            <select id={`kg-${name}`} value={value} onChange={e => setter(e.target.value)} className="filter-control max-w-full border px-3 text-sm">
-              <option value="">{t('graph.filter.all')}</option>
-              {options.map(option => <option key={option.value ?? option} value={option.value ?? option}>{option.label ?? option}</option>)}
-            </select>
-          </label>
-        ))}
-        <Button variant="outline" className="filter-control" onClick={resetGraph}>{t('graph.reset')}</Button>
-        <Button
-          variant="outline"
-          className="filter-control"
-          onClick={() => loadGraph(company, language)}
-          data-testid="kg-refresh"
-        >
-          <RefreshCw className="size-4" /> {t('graph.refresh')}
-        </Button>
-      </div>
-
       {error && (
         <Alert variant="destructive">
           <AlertTitle>{t('graph.error.title')}</AlertTitle>
@@ -361,197 +427,206 @@ export default function KnowledgeGraph() {
         </Alert>
       )}
 
-      {loading ? (
-        <Skeleton className="h-[520px] w-full rounded-xl" />
-      ) : error ? null : graphData.nodes.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border py-20 text-center">
-          <Share2 className="size-10 text-muted-foreground" />
-          <p className="font-semibold">{t('graph.empty.title')}</p>
-          <p className="max-w-sm text-sm text-muted-foreground">
-            {t('graph.empty.description')}
-          </p>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-center gap-3">
-            <Button variant="outline" onClick={() => fgRef.current?.zoomToFit(400, 40)}>{t('graph.fit')}</Button>
-            <label htmlFor="kg-search" className="text-sm">{t('graph.search')}</label>
-            <input id="kg-search" type="search" value={query} onChange={e => setQuery(e.target.value)} className="h-9 rounded-lg border border-border bg-background px-3 text-sm" />
-          </div>
-          {/* View toggle */}
-          <div className="inline-flex w-fit overflow-hidden rounded-lg border border-border">
-            <button
-              type="button"
-              data-testid="kg-view-bipartite"
-              onClick={() => setView('bipartite')}
-              className={cn('px-3 py-1.5 text-xs font-medium transition-colors',
-                view === 'bipartite' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted')}
-            >
-              {t('graph.view.bipartite')}
-            </button>
-            <button
-              type="button"
-              data-testid="kg-view-people"
-              onClick={() => setView('people')}
-              className={cn('px-3 py-1.5 text-xs font-medium transition-colors',
-                view === 'people' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted')}
-            >
-              {t('graph.view.people')}
-            </button>
-          </div>
+      {/* The picture in four numbers. */}
+      <div className="kg-stats" data-testid="kg-node-count">
+        <div><span>{t('graph.stats.people')}</span><strong>{peopleCount}</strong></div>
+        <div><span>{t('graph.stats.skills')}</span><strong>{view === 'bipartite' ? skillCount : '—'}</strong></div>
+        <div data-testid="kg-real-count"><span>{t('graph.stats.real')}</span><strong>{realLinkCount}</strong></div>
+        <div className="is-gap"><span>{t('graph.stats.gap')}</span>{skillGaps[0]
+          ? <button type="button" onClick={() => focusNode(skillGaps[0].id)}><strong>{skillGaps[0].label}</strong><small>{t('graph.insights.gapCounts', { wanted: skillGaps[0].wanted, taught: skillGaps[0].taught })}</small></button>
+          : <strong>—</strong>}</div>
+      </div>
 
-          <label className="inline-flex w-fit cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted">
-            <input
-              type="checkbox"
-              className="accent-primary"
-              data-testid="kg-toggle-real"
-              checked={showReal}
-              onChange={(e) => setShowReal(e.target.checked)}
-            />
+      <div ref={shellRef} className={cn('kg-layout', selected && 'has-selection', fullScreen && 'is-full-screen')} style={{ '--kg-height': `${graphHeight}px` }}>
+        {/* Explore: search, filters, departments. */}
+        <aside className="kg-panel" aria-label={t('graph.panel.explore')}>
+          <div className="kg-search">
+            <Search className="size-4" aria-hidden="true" />
+            <input type="search" value={query} placeholder={t('graph.searchAggregate')} aria-label={t('graph.searchAggregate')}
+              onChange={e => setQuery(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && searchResults[0]) pickResult(searchResults[0]); }} />
+          </div>
+          {query.trim() && <ul className="kg-results" aria-label={t('graph.accessibleList')}>
+            {searchResults.length === 0 && <li className="kg-muted">{t('graph.noResults')}</li>}
+            {searchResults.map(n => <li key={n.id}><button type="button" onClick={() => pickResult(n)}>
+              <span className={cn('kg-mark', n.kind === 'skill' && 'is-skill')} style={n.kind === 'department' ? { background: n.color } : undefined} />
+              <span>{n.label}</span><small>{t(`graph.kind.${n.kind}`)}</small>
+            </button></li>)}
+          </ul>}
+
+          {departmentList.length > 0 && <>
+            <h3>{t('graph.panel.departments')}</h3>
+            <ul className="kg-departments">
+              {departmentList.map(d => <li key={d.name}>
+                <button type="button" aria-pressed={departmentFocus === d.name} onClick={() => { setSelectedId(null); setDepartmentFocus(departmentFocus === d.name ? '' : d.name); }}>
+                  <span className="kg-mark" style={{ background: d.color }} /><span>{d.name}</span><small>{d.count}</small>
+                </button>
+              </li>)}
+            </ul>
+          </>}
+          <h3>{t('graph.panel.filters')}</h3>
+          <div className="kg-filters">
+            <label htmlFor="kg-company">{t('graph.filter.company')}</label>
+            {selectFilter('kg-company', isPlatform ? company : (organizations[0]?.id || ''), setCompany,
+              organizations.map(o => ({ value: o.id, label: o.name })), isPlatform ? t('graph.filter.allOrganizations') : null,
+              { 'data-testid': 'kg-filter-company', disabled: !isPlatform })}
+            <label htmlFor="kg-language">{t('graph.filter.language')}</label>
+            {selectFilter('kg-language', language, setLanguage, languages.map(l => ({ value: l, label: languageName(l, lang) })), t('graph.filter.allLanguages'), { 'data-testid': 'kg-filter-language' })}
+            <label htmlFor="kg-program">{t('graph.filter.program')}</label>
+            {selectFilter('kg-program', program, setProgram, programs, t('graph.filter.allPrograms'), { 'data-testid': 'kg-filter-program' })}
+            <label htmlFor="kg-persona">{t('graph.filter.persona')}</label>
+            {selectFilter('kg-persona', persona, setPersona, [...new Set(nodes.filter(n => n.kind === 'person').map(n => n.persona ?? n.role).filter(Boolean))].sort(), t('graph.filter.all'))}
+            <label htmlFor="kg-cohort">{t('graph.filter.cohort')}</label>
+            {selectFilter('kg-cohort', cohort, setCohort, [...new Set(nodes.filter(n => n.kind === 'person').map(n => String(n.cohort_year ?? n.cohort ?? n.graduation_year ?? '')).filter(Boolean))].sort(), t('graph.filter.all'))}
+            <label htmlFor="kg-skill">{t('graph.filter.skill')}</label>
+            {selectFilter('kg-skill', skill, setSkill, nodes.filter(n => n.kind === 'skill').map(n => ({ value: n.id, label: n.label })).sort((a, b) => a.label.localeCompare(b.label)), t('graph.filter.all'))}
+          </div>
+          <label className="kg-toggle">
+            <input type="checkbox" data-testid="kg-toggle-real" checked={showReal} onChange={(e) => setShowReal(e.target.checked)} />
             {t('graph.view.realLinks')}
           </label>
+          <Button variant="outline" size="sm" className="w-full" onClick={resetGraph}>{t('graph.reset')}</Button>
 
-          {/* Counts + legend */}
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2" data-testid="kg-node-count">
-              <Badge variant="secondary">{t('graph.count.people', { count: peopleCount })}</Badge>
-              {view === 'bipartite' && <Badge variant="secondary">{t('graph.count.skills', { count: skillCount })}</Badge>}
-              <Badge variant="secondary">{t('graph.count.links', { count: graphData.links.length })}</Badge>
-              {showReal && realLinkCount > 0 && (
-                <Badge variant="secondary" data-testid="kg-real-count">
-                  {t('graph.count.realLinks', { count: realLinkCount })}
-                </Badge>
-              )}
-            </div>
-            <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-              {view === 'bipartite' ? (
-                <>
-                  <span className="flex items-center gap-1.5">
-                    <span className="inline-block h-0.5 w-5 rounded" style={{ background: EDGE_COLORS.can_teach }} /> {t('graph.legend.canTeach')}
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="inline-block h-0.5 w-5 rounded" style={{ background: EDGE_COLORS.wants_to_learn }} /> {t('graph.legend.wantsToLearn')}
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="inline-block size-2.5 rotate-45 rounded-[2px] bg-muted-foreground/60" /> {t('graph.legend.skill')}
-                  </span>
-                </>
-              ) : (
-                <span className="flex items-center gap-1.5">{t('graph.legend.peerLink')}</span>
-              )}
-              {showReal && (
-                <>
-                  <span className="flex items-center gap-1.5">
-                    <span className="inline-block h-0.5 w-5 rounded" style={{ background: EDGE_COLORS.session }} /> {t('graph.legend.session')}
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="inline-block h-0.5 w-5 rounded" style={{ background: EDGE_COLORS.connection }} /> {t('graph.legend.connection')}
-                  </span>
-                </>
-              )}
-            </div>
-          </div>
+        </aside>
 
-          {/* Department legend */}
-          {departments.length > 0 && (
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
-              {departments.map((d) => (
-                <span key={d} className="flex items-center gap-1.5">
-                  <span className="inline-block size-2.5 rounded-full" style={{ background: deptColor(d) }} />
-                  {d}
-                </span>
-              ))}
+        {/* The graph. */}
+        <section className="kg-stage">
+          {loading ? (
+            <Skeleton className="h-[640px] w-full rounded-[var(--panel-radius)]" />
+          ) : error ? null : graphData.nodes.length === 0 ? (
+            <div className="kg-empty">
+              <Share2 className="size-10 text-muted-foreground" />
+              <p className="font-semibold">{t('graph.empty.title')}</p>
+              <p className="max-w-sm text-sm text-muted-foreground">{t('graph.empty.description')}</p>
+            </div>
+          ) : (
+            <div ref={containerRef} data-testid="knowledge-graph-canvas" className="kg-canvas" style={{ height: graphHeight }}>
+              <ForceGraph2D
+                ref={fgRef}
+                width={graphWidth}
+                height={graphHeight}
+                graphData={graphData}
+                warmupTicks={40}
+                cooldownTicks={180}
+                onEngineStop={() => { if (autoFit.current) { fitView(); autoFit.current = false; } }}
+                nodeLabel={() => ''}
+                onNodeHover={(n) => setHovered(n ? n.id : null)}
+                onNodeClick={(n) => { if (n.kind === 'person') { setSelectedId(null); setDepartmentFocus(n.department || ''); } else focusNode(n.id); }}
+                onBackgroundClick={clearFocus}
+                onNodeDragEnd={(n) => { n.fx = n.x; n.fy = n.y; }}
+                linkColor={(l) => {
+                  const s = endId(l.source);
+                  const tt = endId(l.target);
+                  if (focusSet) {
+                    const touches = focusId ? (s === focusId || tt === focusId) : (focusSet.has(s) && focusSet.has(tt));
+                    return touches ? (EDGE_COLORS[l.type] || QUIET_LINK) : FADED_LINK;
+                  }
+                  return REAL_LINK_TYPES.has(l.type) ? REAL_LINK : QUIET_LINK;
+                }}
+                linkWidth={(l) => (REAL_LINK_TYPES.has(l.type) ? Math.min(1.5 + (l.value || 1) * 0.5, 4) : (focusSet ? 1.2 : 0.7))}
+                nodePointerAreaPaint={(node, color, ctx) => {
+                  ctx.fillStyle = color;
+                  ctx.beginPath();
+                  ctx.arc(node.x, node.y, radius(node) + 2, 0, 2 * Math.PI);
+                  ctx.fill();
+                }}
+                nodeCanvasObject={(node, ctx, globalScale) => {
+                  const r = radius(node);
+                  const isPerson = node.kind === 'person';
+                  const inFocus = !focusSet || focusSet.has(node.id);
+                  ctx.globalAlpha = inFocus ? 1 : 0.12;
+                  ctx.beginPath();
+                  if (isPerson) {
+                    ctx.arc(node.x, node.y, r, 0, 2 * Math.PI);
+                  } else {
+                    ctx.moveTo(node.x, node.y - r); ctx.lineTo(node.x + r, node.y);
+                    ctx.lineTo(node.x, node.y + r); ctx.lineTo(node.x - r, node.y); ctx.closePath();
+                  }
+                  ctx.fillStyle = isPerson ? (departmentColor.get(node.department) || OTHER_DEPARTMENT) : SKILL_COLOR;
+                  ctx.fill();
+                  ctx.lineWidth = 1.5 / globalScale;
+                  ctx.strokeStyle = '#ffffff';
+                  ctx.stroke();
+                  if (node.id === selectedId) {
+                    ctx.beginPath();
+                    ctx.arc(node.x, node.y, r + 3.5 / globalScale + 1, 0, 2 * Math.PI);
+                    ctx.lineWidth = 2 / globalScale;
+                    ctx.strokeStyle = '#ff6b57';
+                    ctx.stroke();
+                  }
+                  // Labels stay one size on screen, with a white halo.
+                  const showLabel = !isPerson && inFocus && (labelled.has(node.id) || globalScale > 2.2 || (focusSet && focusSet.has(node.id)));
+                  if (showLabel) {
+                    const fontSize = (isPerson ? 12 : 11) / globalScale;
+                    ctx.font = `${isPerson ? 600 : 500} ${fontSize}px 'Inter Variable', Inter, sans-serif`;
+                    ctx.textBaseline = 'middle';
+                    ctx.lineJoin = 'round';
+                    ctx.lineWidth = 3 / globalScale;
+                    ctx.strokeStyle = 'rgba(255,255,255,0.92)';
+                    ctx.strokeText(node.label, node.x + r + 4 / globalScale, node.y);
+                    ctx.fillStyle = isPerson ? '#1e1b3a' : '#5a5870';
+                    ctx.fillText(node.label, node.x + r + 4 / globalScale, node.y);
+                  }
+                  ctx.globalAlpha = 1;
+                }}
+              />
+              <div className="kg-zoom" role="group" aria-label={t('graph.zoom')}>
+                <button type="button" onClick={() => zoomBy(1.4)} aria-label={t('graph.zoomIn')} title={t('graph.zoomIn')}><Plus /></button>
+                <button type="button" onClick={() => zoomBy(1 / 1.4)} aria-label={t('graph.zoomOut')} title={t('graph.zoomOut')}><Minus /></button>
+                <button type="button" onClick={() => fitView()} aria-label={t('graph.fit')} title={t('graph.fit')}><Scan /></button>
+                <button type="button" onClick={toggleFullScreen} aria-pressed={fullScreen} aria-label={t(fullScreen ? 'graph.exitFullScreen' : 'graph.fullScreen')} title={t(fullScreen ? 'graph.exitFullScreen' : 'graph.fullScreen')}>{fullScreen ? <Shrink /> : <Expand />}</button>
+              </div>
+              <div className="kg-legend">
+                {view === 'bipartite' ? <>
+                  <span><i className="kg-line" style={{ background: EDGE_COLORS.can_teach }} />{t('graph.legend.canTeach')}</span>
+                  <span><i className="kg-line" style={{ background: EDGE_COLORS.wants_to_learn }} />{t('graph.legend.wantsToLearn')}</span>
+                  <span><i className="kg-mark is-skill" />{t('graph.legend.skill')}</span>
+                </> : <span>{t('graph.legend.peerLink')}</span>}
+                {showReal && <span><i className="kg-line is-thick" style={{ background: EDGE_COLORS.session }} />{t('graph.legend.real')}</span>}
+                <span className="kg-muted">{t('graph.legend.size')}</span>
+                {hiddenCount > 0 && <span className="kg-muted">{t('graph.hiddenPeople', { count: hiddenCount })}</span>}
+              </div>
+              {/* What is selected, as a card over the graph so the graph keeps its width. */}
+              {selected && selected.kind === 'skill' && <aside className="kg-detail-card" aria-label={t('graph.details')} aria-live="polite">
+                <div className="kg-detail-head">
+                  <span className={cn('kg-mark is-large', selected.kind === 'skill' && 'is-skill')} style={selected.kind === 'person' ? { background: departmentColor.get(selected.department) || OTHER_DEPARTMENT } : undefined} />
+                  <div><h2>{selected.label}</h2><p>{t('graph.kind.skill')}</p></div>
+                  <button type="button" className="kg-close" onClick={clearFocus} aria-label={t('graph.close')}><X /></button>
+                </div>
+                <h3>{t('graph.details.taughtBy', { count: new Set(relations.get(selected.id)?.taughtBy || []).size })}</h3>{groupChips(relations.get(selected.id)?.taughtBy || [], t('graph.details.nobody'))}
+                <h3>{t('graph.details.wantedBy', { count: new Set(relations.get(selected.id)?.wantedBy || []).size })}</h3>{groupChips(relations.get(selected.id)?.wantedBy || [], t('graph.details.nobody'))}
+              </aside>}
             </div>
           )}
+        </section>
 
-          <div
-            ref={containerRef}
-            data-testid="knowledge-graph-canvas"
-            className="overflow-hidden rounded-xl border border-border bg-card"
-            style={{ height: GRAPH_HEIGHT }}
-          >
-            <ForceGraph2D
-              ref={fgRef}
-              width={graphWidth}
-              height={GRAPH_HEIGHT}
-              graphData={graphData}
-              cooldownTicks={120}
-              onEngineStop={() => { if (autoFit.current) { fgRef.current?.zoomToFit(400, 40); autoFit.current = false; } }}
-              nodeRelSize={5}
-              nodeVal={(n) => 1 + Math.min(degree.get(n.id) || 0, 10)}
-              nodeLabel={(n) => (n.kind === 'person'
-                ? `${n.label}${n.department ? ` · ${n.department}` : ''}${n.program ? ` · ${n.program}` : ''}`
-                : n.label).replace(/[&<>"']/g, (char) => ({
-                  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-                })[char])}
-              onNodeHover={(n) => setHovered(n ? n.id : null)}
-              onNodeClick={focusNode}
-              onNodeDragEnd={(n) => { n.fx = n.x; n.fy = n.y; }}
-              linkColor={(l) => {
-                const s = typeof l.source === 'object' ? l.source.id : l.source;
-                const tt = typeof l.target === 'object' ? l.target.id : l.target;
-                const active = !neighbours || (neighbours.has(s) && neighbours.has(tt));
-                if (!active) return 'rgba(148,163,184,0.06)';
-                return EDGE_COLORS[l.type] || 'rgba(148,163,184,0.4)';
-              }}
-              linkWidth={(l) => Math.min(1 + (l.value || 1) * 0.6, 5)}
-              nodeCanvasObject={(node, ctx, globalScale) => {
-                const deg = degree.get(node.id) || 0;
-                const isPerson = node.kind === 'person';
-                const r = (isPerson ? 4 + Math.min(deg, 8) * 0.7 : 3 + Math.min(deg, 6) * 0.5);
-                const dim = neighbours && !neighbours.has(node.id);
-                ctx.globalAlpha = dim ? 0.15 : 1;
-                ctx.fillStyle = isPerson ? deptColor(node.department) : '#5a5870';
-                ctx.beginPath();
-                if (isPerson) {
-                  ctx.arc(node.x, node.y, r, 0, 2 * Math.PI);
-                  ctx.fill();
-                } else {
-                  // diamond for skills
-                  ctx.save();
-                  ctx.translate(node.x, node.y);
-                  ctx.rotate(Math.PI / 4);
-                  ctx.globalAlpha = (dim ? 0.15 : 0.6);
-                  ctx.fillRect(-r, -r, r * 2, r * 2);
-                  ctx.restore();
-                  ctx.globalAlpha = dim ? 0.15 : 1;
-                }
-                // Labels: people always; skills when zoomed in or hovered.
-                const showLabel = globalScale > 1.6 || graphData.nodes.length < 35 || (neighbours && neighbours.has(node.id));
-                if (showLabel) {
-                  const fontSize = Math.max(9, (isPerson ? 11 : 9) / Math.sqrt(globalScale));
-                  ctx.font = `${isPerson ? '600' : '400'} ${fontSize}px sans-serif`;
-                  ctx.textBaseline = 'middle';
-                  ctx.fillStyle = '#1e1b3a';
-                  ctx.fillText(node.label, node.x + r + 2, node.y);
-                }
-                ctx.globalAlpha = 1;
-              }}
-            />
-          </div>
+      </div>
 
-          {selected && <section className="rounded-xl border border-border p-4" aria-label={t('graph.details')} aria-live="polite">
-            <h2 className="font-semibold">{selected.label}</h2>
-            <p className="text-sm text-muted-foreground">{[selected.persona ?? selected.role, selected.program, selected.cohort_year ?? selected.cohort ?? selected.graduation_year, selected.department].filter(Boolean).join(' · ')}</p>
-            <p className="text-sm">{t('graph.count.links', { count: degree.get(selected.id) || 0 })}</p>
-            <ul className="mt-2 flex flex-wrap gap-2">{graphData.nodes.filter(n => n.id !== selected.id && graphData.links.some(l => {
-              const s = typeof l.source === 'object' ? l.source.id : l.source;
-              const target = typeof l.target === 'object' ? l.target.id : l.target;
-              return (s === selected.id && target === n.id) || (target === selected.id && s === n.id);
-            })).map(n => <li key={n.id}><Button variant="outline" size="sm" onClick={() => focusNode(n)}>{n.label}</Button></li>)}</ul>
-          </section>}
-          <details open={!!query} className="rounded-xl border border-border p-4">
-            <summary className="cursor-pointer font-medium">{t('graph.accessibleList')} ({listNodes.length})</summary>
-            {listNodes.length === 0 && <p className="mt-3 text-sm">{t('graph.empty.title')}</p>}
-            <ul className="mt-3 grid max-h-72 gap-2 overflow-auto sm:grid-cols-2 lg:grid-cols-3">
-              {listNodes.map(n => <li key={n.id}><Button variant="ghost" className="h-auto max-w-full whitespace-normal text-left" onClick={() => focusNode(n)} aria-pressed={n.id === selectedId}>{n.label} ({t(`graph.kind.${n.kind}`)})</Button></li>)}
-            </ul>
-          </details>
-          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Info className="size-4" /> {t('graph.hoverHint')}
-          </p>
-        </div>
-      )}
+      {/* Where to start: the biggest skill gaps and the best-connected people. */}
+      <div className="kg-insights">
+        <section className="kg-card" aria-label={t('graph.insights.gaps')}>
+          <h3>{t('graph.insights.gaps')}</h3>
+          {skillGaps.length ? <ol className="kg-ranked">{skillGaps.map(g => <li key={g.id}><button type="button" onClick={() => focusNode(g.id)}>
+            <span className="kg-ranked-label">{g.label}</span>
+            <span className="kg-bar" aria-hidden="true">
+              <i className="is-wanted" style={{ width: `${(g.wanted / Math.max(...skillGaps.map(x => x.wanted), 1)) * 100}%` }} />
+              <i className="is-taught" style={{ width: `${(g.taught / Math.max(...skillGaps.map(x => x.wanted), 1)) * 100}%` }} />
+            </span>
+            <small>{t('graph.insights.gapCounts', { wanted: g.wanted, taught: g.taught })}</small>
+          </button></li>)}</ol> : <p className="kg-muted">{t('graph.details.none')}</p>}
+        </section>
+        <section className="kg-card is-pairs" aria-label={t('graph.insights.pairs')}>
+          <h3>{t('graph.insights.pairs')}</h3>
+          {departmentPairs.length ? <ol className="kg-ranked">{departmentPairs.map(pair => <li key={`${pair.a}-${pair.b}`}><div className="kg-ranked-row">
+            <span className="kg-ranked-label">
+              <i className="kg-mark" style={{ background: departmentColor.get(pair.a) || OTHER_DEPARTMENT }} />{pair.a === pair.b ? t('graph.insights.within', { department: pair.a }) : `${pair.a} ↔ ${pair.b}`}
+            </span>
+            <span className="kg-bar" aria-hidden="true"><i className="is-links" style={{ width: `${(pair.count / departmentPairs[0].count) * 100}%` }} /></span>
+            <small>{t('graph.insights.pairCount', { count: pair.count })}</small>
+          </div></li>)}</ol> : <p className="kg-muted">{t('graph.insights.noPairs')}</p>}
+        </section>
+      </div>
+      <p className="kg-hint">{t('graph.hoverHint')}</p>
     </PageShell>
   );
 }

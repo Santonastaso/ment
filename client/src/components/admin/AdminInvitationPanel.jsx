@@ -37,7 +37,7 @@ export default function AdminInvitationPanel() {
 
   function update(field, value) { setForm((current) => ({ ...current, [field]: value })); }
 
-  return <section className="mb-6 rounded-2xl bg-muted/60 p-4">
+  return <section className="mb-6 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
     <div className="mb-4"><h3 className="font-semibold">Invite a member</h3><p className="text-sm text-muted-foreground">Create a single-use link with profile fields prefilled from ESSEC data.</p></div>
     <form className="grid gap-3 md:grid-cols-2 xl:grid-cols-4" onSubmit={submit}>
       <div><Label htmlFor="invite-email">Email</Label><Input id="invite-email" type="email" value={form.email} onChange={(event) => update('email', event.target.value)} required /></div>

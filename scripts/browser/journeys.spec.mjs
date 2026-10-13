@@ -1909,3 +1909,38 @@ test('a CV uploaded on the Experience tab is reviewed and edited before anything
   expect(saved.can_teach.map(skill => skill.skill)).toEqual(['Architecture']);
   await expect(review).toHaveCount(0);
 });
+
+test('admin pages share the member pages\' cards, tabs and avatars', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => sessionStorage.setItem('ment.fixture.auth', JSON.stringify({ id: 'admin', name: 'Org Admin', email: 'admin@example.test', role: 'admin', onboarding_complete: true, is_admin: true, admin_scope: 'org' })));
+  await page.goto('/admin');
+  const panel = page.locator('.admin-page [data-slot="card"]').first();
+  await expect(panel).toBeVisible();
+  expect(await panel.evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgb(255, 255, 255)');
+  expect(await page.getByTestId('admin-tab-overview').evaluate(element => getComputedStyle(element).borderRadius)).toBe('0px');
+  const initial = page.getByText('Peer Mentor').first().locator('xpath=../preceding-sibling::div[1]');
+  expect(await initial.evaluate(element => getComputedStyle(element).color)).toBe('rgb(30, 27, 58)');
+  await page.getByTestId('admin-tab-people').click();
+  await expect(page.getByRole('button', { name: 'Download template' })).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+});
+
+test('the knowledge graph opens on insights and explains a skill when it is picked', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => sessionStorage.setItem('ment.fixture.auth', JSON.stringify({ id: 'admin', name: 'Org Admin', email: 'admin@example.test', role: 'admin', onboarding_complete: true, is_admin: true, admin_scope: 'org' })));
+  await page.goto('/admin/graph');
+  await expect(page.locator('[data-testid="knowledge-graph-canvas"] canvas')).toBeVisible();
+  await expect(page.getByText('Most wanted skills')).toBeVisible();
+  const gap = page.locator('.kg-ranked button').first();
+  const skill = (await gap.locator('span').first().textContent()).trim();
+  await gap.click();
+  await expect(page.getByRole('heading', { level: 2, name: skill })).toBeVisible();
+  await expect(page.getByText(/^Taught by \(\d+\)$/)).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByText('Most wanted skills')).toBeVisible();
+  await page.getByTestId('kg-view-people').click();
+  await expect(page.getByTestId('kg-view-people')).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Full screen' }).click();
+  await expect.poll(() => page.evaluate(() => Boolean(document.fullscreenElement))).toBe(true);
+  await page.getByRole('button', { name: 'Exit full screen' }).click();
+  await expect.poll(() => page.evaluate(() => Boolean(document.fullscreenElement))).toBe(false);
+});

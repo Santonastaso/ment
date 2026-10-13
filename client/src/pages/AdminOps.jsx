@@ -134,7 +134,7 @@ export default function AdminOps() {
   }
 
   return (
-    <PageShell title={t('admin.ops.title')} description={t('admin.ops.description')}>
+    <PageShell className="admin-page" title={t('admin.ops.title')} description={t('admin.ops.description')}>
 
       {notice && (
         <Alert variant={notice.variant} className="relative pr-20">
@@ -163,7 +163,7 @@ export default function AdminOps() {
           }
         />
         <SurfaceBody className="space-y-5 pt-5">
-          <form onSubmit={handleCreateOrganization} className="flex flex-col gap-3 rounded-lg border border-[var(--border)] bg-muted/30 p-3 sm:flex-row sm:items-end">
+          <form onSubmit={handleCreateOrganization} className="flex flex-col gap-3 rounded-lg border border-[var(--border)] bg-[var(--card)] p-3 sm:flex-row sm:items-end">
             <div className="min-w-0 flex-1 space-y-2">
               <Label htmlFor="organization-name">{t('admin.orgs.createLabel')}</Label>
               <Input
