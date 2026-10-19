@@ -35,6 +35,8 @@ export default function CvImport({ profile, onApplied }) {
     const data = new FormData();
     data.append('file', file);
     try {
+      // The agreement is stored before the file leaves the browser.
+      await api.post('/users/me/consents', { purpose: 'ai_profile_import' });
       const { data: imported } = await api.post('/profile/ingest', data, { headers: { 'Content-Type': 'multipart/form-data' } });
       const proposed = imported.proposed || {};
       setDraft(imported);

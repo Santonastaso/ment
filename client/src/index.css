@@ -595,6 +595,8 @@ a.person-row-name:hover { color: var(--primary-text); text-decoration: underline
 .discovery-draft:focus-within:not(.is-sent) { border-color: var(--primary); background: var(--card); }
 .discovery-draft.is-sent { opacity: .7; cursor: default; }
 .discovery-draft-tag { display: inline-block; margin-bottom: .8rem; border-radius: 999px; background: var(--status-attention-bg); color: var(--status-attention-fg); padding: .25rem .5rem; font-size: var(--type-micro); line-height: 16px; font-weight: var(--font-weight-semibold); letter-spacing: .05em; text-transform: uppercase; }
+.discovery-ai-note { margin: .45rem 0 0; color: var(--muted-foreground); font-size: var(--type-micro); line-height: 16px; text-align: center; }
+.discovery-ai-note.is-draft { margin-top: .6rem; text-align: left; }
 .discovery-draft textarea { min-height: 210px; font-size: var(--type-body); line-height: 20px; }
 .discovery-draft-title { display: grid; gap: 4px; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
 .discovery-draft-title span { color: var(--muted-foreground); font-size: var(--type-caption); line-height: 16px; font-weight: var(--font-weight-semibold); }

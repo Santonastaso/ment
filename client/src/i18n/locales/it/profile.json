@@ -130,5 +130,10 @@
   "profile.cv.replacesSkills": "Applicando, le competenze del tuo profilo vengono sostituite dagli elenchi qui sotto.",
   "profile.cv.current": "Ora sul tuo profilo: {value}",
   "profile.cv.entryIncomplete": "Ogni esperienza richiede un ruolo e un dipartimento. Completa o rimuovi quella incompleta.",
-  "profile.cv.discard": "Scarta"
+  "profile.cv.discard": "Scarta",
+  "profile.data.title": "I tuoi dati",
+  "profile.data.help": "Scarica tutto ciò che MENT conserva su di te: profilo, competenze, esperienze, riflessioni, richieste, i messaggi che hai inviato e le tue ricerche. I messaggi e le note private delle altre persone non sono inclusi.",
+  "profile.data.download": "Scarica i miei dati",
+  "profile.data.preparing": "Preparazione…",
+  "profile.data.error": "Non siamo riusciti a preparare i tuoi dati. Riprova."
 }

@@ -116,6 +116,8 @@ export default function Onboarding() {
     form.append('file', file);
     form.append('kind', 'cv');
     try {
+      // The agreement is stored before the file leaves the browser.
+      await api.post('/users/me/consents', { purpose: 'ai_profile_import' });
       const res = await api.post('/profile/ingest', form, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });

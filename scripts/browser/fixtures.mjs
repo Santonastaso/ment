@@ -29,6 +29,7 @@ function fixtureApi(state, ApiError) {
       if (path === '/users/me') return state.profile || { ...state.user, skills: [], career: [] };
       if (path === '/users/me/skill-evidence') return [];
       if (path === '/users/me/capacity') return state.capacity || {};
+      if (path === '/users/me/export') return { format: 'ment-export-1', profile: state.user, consents: state.consents || [] };
       if (path === '/reflections') return { entries: state.reflections || [], dueForCheckIn: !!state.reflectionDue, lastEntryDays: state.reflectionDue ? 4 : null };
       if (path === '/sessions') return state.sessions.map(payload);
       if (path === '/groups') return state.groups.map(group => ({ ...group, latest_message: state.messages[`/groups/${group.id}/messages`]?.at(-1)?.body || null }));
@@ -60,6 +61,11 @@ function fixtureApi(state, ApiError) {
       }
     }
     if (method === 'post') {
+      if (path === '/users/me/consents') {
+        const row = { purpose: body.purpose, text_version: 'fixture', accepted_at: new Date().toISOString() };
+        state.consents = [...(state.consents || []), row];
+        return row;
+      }
       if (path === '/reflections') {
         const entry = { ...body, id: 1, created_at: new Date().toISOString(), extracted_gaps: [], extracted_strengths: [] };
         state.reflections = [entry];

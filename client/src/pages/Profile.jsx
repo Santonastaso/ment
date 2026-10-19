@@ -21,7 +21,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, MapPin, Plus, X } from 'lucide-react';
+import { ArrowLeft, Download, MapPin, Plus, X } from 'lucide-react';
 import api from '../api/index.js';
 import { useT } from '../i18n/index.jsx';
 import { sessionPath } from '../lib/conversationLinks.mjs';
@@ -141,6 +141,7 @@ export default function Profile() {
   const [notifyEmail, setNotifyEmail] = useState('');
   const [notifySaving, setNotifySaving] = useState(false);
   const [notifyError, setNotifyError] = useState('');
+  const [exporting, setExporting] = useState(false);
 
   // Edit form state
   const [form, setForm] = useState({});
@@ -214,6 +215,25 @@ export default function Profile() {
   function showToast(msg) {
     setToast(msg);
     setTimeout(() => setToast(''), 3000);
+  }
+
+  // GDPR access and portability: everything stored about the member, as one
+  // JSON file built by the database for the signed-in user only.
+  async function handleExportData() {
+    setExporting(true);
+    try {
+      const res = await api.get('/users/me/export');
+      const url = URL.createObjectURL(new Blob([JSON.stringify(res.data, null, 2)], { type: 'application/json' }));
+      const link = Object.assign(document.createElement('a'), { href: url, download: `ment-data-${new Date().toISOString().slice(0, 10)}.json` });
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+    } catch {
+      showToast(t('profile.data.error'));
+    } finally {
+      setExporting(false);
+    }
   }
 
   // Saved on its own rather than with the profile form: it lives on a
@@ -736,6 +756,13 @@ export default function Profile() {
               {!notifyEmail && profile.email && (
                 <p className="mt-2 text-xs text-muted-foreground">{t('profile.notifyEmail.usingLogin', { email: profile.email })}</p>
               )}
+            </section>
+            <section className="mt-6 border-t border-[var(--border-subtle)] pt-6">
+              <h3 className="text-section font-semibold">{t('profile.data.title')}</h3>
+              <p className="mt-0.5 text-xs text-muted-foreground">{t('profile.data.help')}</p>
+              <Button type="button" variant="outline" className="mt-3" data-testid="export-my-data" onClick={handleExportData} disabled={exporting}>
+                <Download />{exporting ? t('profile.data.preparing') : t('profile.data.download')}
+              </Button>
             </section>
           </SurfaceBody>
         </Surface>

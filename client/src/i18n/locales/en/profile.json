@@ -130,5 +130,10 @@
   "profile.cv.replacesSkills": "Applying replaces the skills on your profile with the lists below.",
   "profile.cv.current": "On your profile now: {value}",
   "profile.cv.entryIncomplete": "Each experience needs a role and a department. Complete or remove the unfinished one.",
-  "profile.cv.discard": "Discard"
+  "profile.cv.discard": "Discard",
+  "profile.data.title": "Your data",
+  "profile.data.help": "Download everything MENT stores about you: profile, skills, experience, reflections, requests, the messages you sent and your searches. Other people's messages and private notes are not included.",
+  "profile.data.download": "Download my data",
+  "profile.data.preparing": "Preparing…",
+  "profile.data.error": "We could not prepare your data. Please try again."
 }

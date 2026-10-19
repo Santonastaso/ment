@@ -130,5 +130,10 @@
   "profile.cv.replacesSkills": "En appliquant, les compétences de votre profil sont remplacées par les listes ci-dessous.",
   "profile.cv.current": "Actuellement sur votre profil : {value}",
   "profile.cv.entryIncomplete": "Chaque expérience doit avoir un poste et un département. Complétez ou supprimez celle qui est incomplète.",
-  "profile.cv.discard": "Abandonner"
+  "profile.cv.discard": "Abandonner",
+  "profile.data.title": "Vos données",
+  "profile.data.help": "Téléchargez tout ce que MENT conserve à votre sujet : profil, compétences, expériences, réflexions, demandes, les messages que vous avez envoyés et vos recherches. Les messages et notes privées des autres personnes ne sont pas inclus.",
+  "profile.data.download": "Télécharger mes données",
+  "profile.data.preparing": "Préparation…",
+  "profile.data.error": "Nous n’avons pas pu préparer vos données. Veuillez réessayer."
 }

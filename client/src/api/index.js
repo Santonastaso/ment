@@ -9,6 +9,7 @@ import { ApiError } from '../lib/apiError.mjs';
 import { clampDirectoryLimit } from '../lib/directory.mjs';
 import { browserLanguage } from '../lib/esco.js';
 import { getLang } from '../i18n/index.jsx';
+import { CONSENT_VERSIONS } from '../lib/consent.js';
 import { firstPersonize } from '../lib/utils.js';
 
 function ok(data, status = 200) {
@@ -414,6 +415,11 @@ async function get(url) {
     if (error) throw new ApiError(error.message);
     return ok(data);
   }
+  if (url === '/users/me/export') {
+    const { data, error } = await supabase.rpc('export_my_data');
+    if (error) throw new ApiError(error.message);
+    return ok(data);
+  }
   if (url === '/users/me/skill-evidence') {
     const { data, error } = await supabase.rpc('my_skill_evidence');
     if (error) throw new ApiError(error.message);
@@ -706,6 +712,16 @@ async function post(url, body = {}, opts = {}) {
     });
     if (error || data?.error) throw await edgeFunctionError(error, data, 'ai_request_failed');
     return ok(data);
+  }
+
+  if (url === '/users/me/consents') {
+    const { data, error } = await supabase.rpc('record_consent', {
+      p_purpose: body.purpose,
+      p_text_version: CONSENT_VERSIONS[body.purpose],
+      p_locale: getLang(),
+    });
+    if (error) throw new ApiError(error.message);
+    return ok(data, 201);
   }
 
   if (url === '/users/me/skills') {

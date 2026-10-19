@@ -161,9 +161,11 @@ test('CV import populates onboarding and can be saved', async ({ page }) => {
   await file.setInputFiles({ name: 'resume.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 synthetic CV') });
   await expect(page.getByRole('heading', { name: /Your background/i })).toBeVisible();
   expect(await page.evaluate(() => {
+    const paths = window.fixture.calls.map(item => item.path);
     const call = window.fixture.calls.find(item => item.path === '/profile/ingest');
-    return [call.body.get('kind'), call.body.get('file').name];
-  })).toEqual(['cv', 'resume.pdf']);
+    // The agreement is stored before the file is sent.
+    return [call.body.get('kind'), call.body.get('file').name, paths.indexOf('/users/me/consents') < paths.indexOf('/profile/ingest'), window.fixture.consents.map(row => row.purpose)];
+  })).toEqual(['cv', 'resume.pdf', true, ['ai_profile_import']]);
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
@@ -1908,4 +1910,14 @@ test('a CV uploaded on the Experience tab is reviewed and edited before anything
   // The file named no teaching skills, so the ones on the profile are kept.
   expect(saved.can_teach.map(skill => skill.skill)).toEqual(['Architecture']);
   await expect(review).toHaveCount(0);
+});
+
+test('members are told the chat is an AI, and can download their own data', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByTestId('discovery-ai-note')).toHaveText(/AI assistant and can make mistakes/);
+  await page.goto('/profile?tab=availability');
+  const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('export-my-data').click()]);
+  expect(download.suggestedFilename()).toMatch(/^ment-data-\d{4}-\d{2}-\d{2}\.json$/);
+  const exported = JSON.parse(await (await download.createReadStream()).toArray().then(parts => Buffer.concat(parts).toString('utf8')));
+  expect([exported.format, exported.profile.id]).toEqual(['ment-export-1', 'viewer']);
 });
