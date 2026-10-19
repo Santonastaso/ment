@@ -1917,9 +1917,9 @@ test('members are told the chat is an AI, and can download their own data', asyn
   await expect(page.getByTestId('discovery-ai-note')).toHaveText(/AI assistant and can make mistakes/);
   await page.goto('/profile?tab=availability');
   const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('export-my-data').click()]);
-  expect(download.suggestedFilename()).toMatch(/^ment-data-\d{4}-\d{2}-\d{2}\.json$/);
-  const exported = JSON.parse(await (await download.createReadStream()).toArray().then(parts => Buffer.concat(parts).toString('utf8')));
-  expect([exported.format, exported.profile.id]).toEqual(['ment-export-1', 'viewer']);
+  expect(download.suggestedFilename()).toMatch(/^ment-data-\d{4}-\d{2}-\d{2}\.csv$/);
+  const lines = (await (await download.createReadStream()).toArray().then(parts => Buffer.concat(parts).toString('utf8'))).split('\r\n');
+  expect(lines.slice(0, 3)).toEqual(['\uFEFFSection,Item,Field,Value', 'export,,format,ment-export-1', 'profile,,id,viewer']);
 });
 
 test('a member can switch AI off and delete their account', async ({ page }) => {

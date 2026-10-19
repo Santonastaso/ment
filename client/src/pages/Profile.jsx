@@ -5,6 +5,7 @@ import SkillTagInput from '../components/SkillTagInput.jsx';
 import TeachSkillsEditor from '../components/TeachSkillsEditor.jsx';
 import SkillCloud, { SkillCloudFilters } from '../components/SkillCloud.jsx';
 import { Field } from '../components/ui/field.jsx';
+import { exportToCsv } from '../lib/exportCsv.mjs';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog.jsx';
 import SessionRequestModal from '../components/SessionRequestModal.jsx';
 
@@ -224,13 +225,13 @@ export default function Profile() {
   }
 
   // GDPR access and portability: everything stored about the member, as one
-  // JSON file built by the database for the signed-in user only.
+  // CSV file, built by the database for the signed-in user only.
   async function handleExportData() {
     setExporting(true);
     try {
       const res = await api.get('/users/me/export');
-      const url = URL.createObjectURL(new Blob([JSON.stringify(res.data, null, 2)], { type: 'application/json' }));
-      const link = Object.assign(document.createElement('a'), { href: url, download: `ment-data-${new Date().toISOString().slice(0, 10)}.json` });
+      const url = URL.createObjectURL(new Blob([exportToCsv(res.data)], { type: 'text/csv;charset=utf-8' }));
+      const link = Object.assign(document.createElement('a'), { href: url, download: `ment-data-${new Date().toISOString().slice(0, 10)}.csv` });
       document.body.appendChild(link);
       link.click();
       link.remove();
