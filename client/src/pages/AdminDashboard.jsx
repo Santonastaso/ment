@@ -23,6 +23,7 @@ import AdminPmKpis from '../components/admin/AdminPmKpis.jsx';
 import AdminInvitationPanel from '../components/admin/AdminInvitationPanel.jsx';
 import AdminProvisionUserPanel from '../components/admin/AdminProvisionUserPanel.jsx';
 import AdminAiRuns from '../components/admin/AdminAiRuns.jsx';
+import { avatarTint } from '../lib/avatarTint.js';
 
 function StatCard({ label, value, sub }) {
   return (
@@ -429,7 +430,7 @@ export default function AdminDashboard() {
   const isPlatformAdmin = user?.admin_scope === 'platform';
 
   return (
-    <PageShell title={t('admin.pageTitle')} description={t('admin.pageDescription')}>
+    <PageShell className="admin-page" title={t('admin.pageTitle')} description={t('admin.pageDescription')}>
 
       {notice && (
         <Alert variant={notice.variant} className="relative pr-20">
@@ -454,6 +455,7 @@ export default function AdminDashboard() {
             type="button"
             onClick={() => setTab(key)}
             data-testid={`admin-tab-${key}`}
+            data-control-radius-exempt
             aria-current={tab === key ? 'page' : undefined}
             className={`-mb-px border-b-2 px-0.5 pb-2.5 pt-1 text-sm font-medium transition-colors ${
               tab === key
@@ -465,7 +467,7 @@ export default function AdminDashboard() {
           </button>
         ))}
         {isPlatformAdmin && (
-          <Link to="/admin/ops" data-testid="nav-platform-ops" className="-mb-px border-b-2 border-transparent px-0.5 pb-2.5 pt-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+          <Link to="/admin/ops" data-testid="nav-platform-ops" data-control-radius-exempt className="-mb-px border-b-2 border-transparent px-0.5 pb-2.5 pt-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
             {t('admin.ops.link')} →
           </Link>
         )}
@@ -530,7 +532,7 @@ export default function AdminDashboard() {
                         {(privacyStatus.hiddenFields || []).map(field => <li key={field}>{field}</li>)}
                       </ul>
                     </div>
-                    <div className="sm:col-span-2 rounded-lg border border-border bg-muted/30 p-3 space-y-3">
+                    <div className="sm:col-span-2 rounded-lg border border-border bg-[var(--card)] p-3 space-y-3">
                       <h3 className="text-sm font-semibold">{t('admin.pm.schoolControls')}</h3>
                       <div className="flex flex-wrap items-center gap-2">
                         <label htmlFor="admin-min-reports" className="text-xs text-muted-foreground">{t('admin.privacy.minReports')}</label>
@@ -551,7 +553,7 @@ export default function AdminDashboard() {
                         />
                       </div>
                     </div>
-                    <div className="sm:col-span-2 rounded-lg border border-border bg-muted/30 p-3">
+                    <div className="sm:col-span-2 rounded-lg border border-border bg-[var(--card)] p-3">
                       <h3 className="text-sm font-semibold">{t('admin.pm.capacityTitle')}</h3>
                       <p className="mt-1 text-xs text-muted-foreground">{t('admin.pm.capacityHelp')}</p>
                       {requestSettings && (
@@ -617,9 +619,9 @@ export default function AdminDashboard() {
                 />
                 <SurfaceBody className="pt-5">
                   <div className="grid grid-cols-3 gap-3">
-                    <SessionBox count={sessionsByStatus.pending || 0} label={t('admin.sessions.pending')} tone="yellow" />
-                    <SessionBox count={sessionsByStatus.scheduled || 0} label={t('admin.sessions.scheduled')} tone="blue" />
-                    <SessionBox count={sessionsByStatus.completed || 0} label={t('admin.sessions.completed')} tone="green" />
+                    <SessionBox count={sessionsByStatus.pending || 0} label={t('admin.sessions.pending')} tone="needs" />
+                    <SessionBox count={sessionsByStatus.scheduled || 0} label={t('admin.sessions.scheduled')} tone="scheduled" />
+                    <SessionBox count={sessionsByStatus.completed || 0} label={t('admin.sessions.completed')} tone="past" />
                   </div>
                 </SurfaceBody>
               </Surface>
@@ -633,7 +635,7 @@ export default function AdminDashboard() {
                       {stats.topMentors.map((m, i) => (
                         <div key={m.id} className="flex items-center gap-3">
                           <span className="w-5 text-sm font-medium tabular-nums text-muted-foreground">{i + 1}</span>
-                          <div className="flex size-8 items-center justify-center rounded-md bg-primary text-sm font-bold text-primary-foreground">
+                          <div className="flex size-8 items-center justify-center rounded-full text-sm font-semibold text-[var(--ink)]" style={{ backgroundColor: avatarTint(m.name) }}>
                             {m.name?.charAt(0)}
                           </div>
                           <div className="min-w-0 flex-1">
@@ -656,7 +658,7 @@ export default function AdminDashboard() {
                       {mostActiveUsers.map((u, i) => (
                         <div key={u.id} data-testid="most-active-users-row" className="flex items-center gap-3">
                           <span className="w-5 text-sm font-medium tabular-nums text-muted-foreground">{i + 1}</span>
-                          <div className="flex size-8 items-center justify-center rounded-md bg-primary text-sm font-bold text-primary-foreground">
+                          <div className="flex size-8 items-center justify-center rounded-full text-sm font-semibold text-[var(--ink)]" style={{ backgroundColor: avatarTint(u.name) }}>
                             {u.name?.charAt(0)}
                           </div>
                           <div className="min-w-0 flex-1">
@@ -711,7 +713,7 @@ export default function AdminDashboard() {
               title={t('admin.import.title')}
               description={t('admin.import.description')}
               action={
-                <Button type="button" variant="link" size="sm" className="h-auto px-0" onClick={() => downloadBlob('/admin/template', 'ment-import-template.csv')}>
+                <Button type="button" variant="outline" size="sm" onClick={() => downloadBlob('/admin/template', 'ment-import-template.csv')}>
                   {t('admin.import.downloadTemplate')}
                 </Button>
               }
@@ -802,7 +804,7 @@ export default function AdminDashboard() {
               </>
             }
             action={
-              <Button type="button" variant="link" size="sm" className="h-auto px-0" onClick={() => downloadBlob('/admin/audit/export', 'ment-audit-export.csv')}>
+              <Button type="button" variant="outline" size="sm" onClick={() => downloadBlob('/admin/audit/export', 'ment-audit-export.csv')}>
                 {t('admin.audit.exportCsv')}
               </Button>
             }
@@ -830,7 +832,7 @@ export default function AdminDashboard() {
           <SurfaceBody className="pt-5">
           <AdminProvisionUserPanel />
           <AdminInvitationPanel />
-          <form onSubmit={addExternalOutreachTarget} className="mb-5 flex flex-wrap items-end gap-3 rounded-lg border border-border bg-muted/30 p-3">
+          <form onSubmit={addExternalOutreachTarget} className="mb-5 flex flex-wrap items-end gap-3 rounded-lg border border-border bg-[var(--card)] p-3">
             <div className="min-w-56 flex-1">
               <Label htmlFor="outreach-email">{t('admin.pm.externalTargetEmail')}</Label>
               <Input id="outreach-email" type="email" required value={outreachTarget.email} onChange={(e) => setOutreachTarget((current) => ({ ...current, email: e.target.value }))} placeholder="alumni@example.edu" className="mt-1" />
@@ -921,7 +923,7 @@ export default function AdminDashboard() {
             action={
               <div className="flex flex-wrap items-center gap-2">
                 <select
-                  className="input filter-control min-w-32 text-sm"
+                  className="input filter-control w-44 text-sm"
                   value={feedbackFilter}
                   onChange={e => { setFeedbackFilter(e.target.value); loadFeedback(e.target.value); }}
                 >
@@ -967,7 +969,7 @@ export default function AdminDashboard() {
                         <p className="mt-2 whitespace-pre-wrap text-sm text-foreground">{item.message}</p>
                       </div>
                       <select
-                        className="input h-8 min-w-28 text-sm"
+                        className="input filter-control w-44 text-sm"
                         value={item.status}
                         disabled={updatingFeedbackId === item.id}
                         onChange={e => updateFeedbackStatus(item.id, e.target.value)}
@@ -1059,7 +1061,7 @@ export default function AdminDashboard() {
 }
 
 function SessionBox({ count, label, tone }) {
-  const dot = { yellow: 'bg-[#ff6b57]', blue: 'bg-[#5a5870]', green: 'bg-[#2fbf9e]' }[tone] || 'bg-[#b9b6cf]';
+  const dot = { needs: 'bg-[var(--coral)]', scheduled: 'bg-[var(--mint)]', past: 'bg-[var(--muted-foreground)]' }[tone] || 'bg-[#b9b6cf]';
   return (
     <div className="rounded-lg border border-[var(--border)] p-3 text-center">
       <p className="text-xl font-medium tabular-nums tracking-[-0.01em]">{count}</p>

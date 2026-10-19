@@ -964,3 +964,107 @@ a.person-row-name:hover { color: var(--primary-text); text-decoration: underline
   --foreground: #f7f7fb; --muted-foreground: #c9c6e0;
   background: var(--ink); color: #f7f7fb;
 }
+
+/* Admin pages follow the member pages: white panels with a lilac edge, so the
+   lilac is left for chips, code samples and selected states. */
+.admin-page [data-slot="card"] { background: var(--card); box-shadow: inset 0 0 0 1px var(--border); }
+.admin-page [data-slot="card"] [data-slot="card"] { background: var(--card); box-shadow: inset 0 0 0 1px var(--border-subtle); }
+
+/* ---- Knowledge graph: explore panel, stage, details ---- */
+.kg-header-actions { display: flex; align-items: center; gap: 8px; }
+.kg-segmented { display: inline-flex; border: 1px solid var(--border); border-radius: var(--control-radius); background: var(--field); padding: 3px; }
+.kg-segmented button { border: 0; border-radius: var(--control-radius); background: transparent; padding: 6px 14px; color: var(--muted-foreground); font-size: var(--type-label); font-weight: var(--font-weight-medium); }
+.kg-segmented button[aria-pressed="true"] { background: var(--ink); color: #ffffff; }
+
+.kg-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.kg-stats > div { display: flex; flex-direction: column; gap: 4px; min-width: 0; border: 1px solid var(--border); border-radius: var(--panel-radius); background: var(--card); padding: 14px 18px; }
+.kg-stats span { color: var(--muted-foreground); font-size: var(--type-caption); }
+.kg-stats strong { color: var(--foreground); font-size: 1.5rem; line-height: 1.2; font-weight: var(--font-weight-semibold); font-variant-numeric: tabular-nums; }
+.kg-stats .is-gap strong { font-size: 1.05rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kg-stats .is-gap button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; border: 0; background: transparent; padding: 0; text-align: left; }
+.kg-stats .is-gap small { color: var(--primary-text); font-size: var(--type-caption); }
+
+.kg-layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 16px; align-items: start; }
+.kg-panel { display: flex; flex-direction: column; gap: 10px; min-width: 0; max-height: var(--kg-height, 640px); overflow-y: auto; border: 1px solid var(--border); border-radius: var(--panel-radius); background: var(--card); padding: 16px; }
+.kg-panel h3 { margin: 8px 0 0; color: var(--muted-foreground); font-size: var(--type-caption); font-weight: var(--font-weight-semibold); letter-spacing: .06em; text-transform: uppercase; }
+.kg-panel h3:first-child { margin-top: 0; }
+.kg-muted { color: var(--muted-foreground); font-size: var(--type-caption); }
+
+.kg-search { display: flex; align-items: center; gap: 8px; border: 1px solid var(--border); border-radius: var(--control-radius); background: var(--field); padding: 0 12px; color: var(--muted-foreground); }
+.kg-search input { width: 100%; min-width: 0; height: 38px; border: 0; background: transparent; color: var(--foreground); font-size: var(--type-body); outline: none; }
+.kg-search:focus-within { border-color: var(--ink); }
+.kg-results { display: flex; flex-direction: column; gap: 2px; margin: -4px 0 0; padding: 0; list-style: none; }
+.kg-results button, .kg-departments button, .kg-ranked button { display: flex; width: 100%; align-items: center; gap: 8px; border: 0; border-radius: var(--item-radius); background: transparent; padding: 6px 8px; color: var(--foreground); font-size: var(--type-label); text-align: left; }
+.kg-results button:hover, .kg-departments button:hover, .kg-ranked button:hover { background: var(--control-surface); }
+.kg-results button > span:nth-child(2), .kg-departments button > span:nth-child(2) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kg-results small, .kg-departments small { color: var(--muted-foreground); font-size: var(--type-caption); }
+.kg-departments { display: flex; flex-direction: column; gap: 1px; margin: 0; padding: 0; list-style: none; }
+.kg-departments button[aria-pressed="true"] { background: var(--control-surface); font-weight: var(--font-weight-semibold); }
+
+.kg-filters { display: grid; gap: 4px; }
+.kg-filters label { margin-top: 4px; color: var(--muted-foreground); font-size: var(--type-caption); }
+.kg-select { width: 100%; border: 1px solid var(--border); padding: 0 12px; font-size: var(--type-label); }
+.kg-select:disabled { cursor: not-allowed; opacity: .7; }
+.kg-toggle { display: flex; align-items: center; gap: 8px; margin: 4px 0; color: var(--foreground); font-size: var(--type-label); cursor: pointer; }
+
+.kg-mark { display: inline-block; width: 10px; height: 10px; flex: 0 0 auto; border-radius: 50%; box-shadow: 0 0 0 1.5px #ffffff, 0 0 0 2.5px var(--border-subtle); }
+.kg-mark.is-skill { border-radius: 2px; background: #8e89c4; transform: rotate(45deg) scale(.85); box-shadow: none; }
+.kg-mark.is-large { width: 18px; height: 18px; }
+
+.kg-stage { min-width: 0; }
+.kg-canvas { position: relative; overflow: hidden; border: 1px solid var(--border); border-radius: var(--panel-radius);
+  background: radial-gradient(circle, #e2e0f1 1px, transparent 1.2px) 0 0 / 22px 22px, var(--card); }
+.kg-zoom { position: absolute; top: 12px; right: 12px; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border); border-radius: 12px; background: var(--card); }
+.kg-zoom button { display: grid; width: 34px; height: 34px; place-items: center; border: 0; border-radius: 0; background: transparent; color: var(--foreground); }
+.kg-zoom button + button { border-top: 1px solid var(--border-subtle); }
+.kg-zoom button:hover { background: var(--control-surface); }
+.kg-zoom svg { width: 16px; height: 16px; }
+.kg-legend { position: absolute; left: 12px; bottom: 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 14px; max-width: calc(100% - 24px); border: 1px solid var(--border-subtle); border-radius: var(--control-radius); background: rgba(255, 255, 255, .92); padding: 6px 14px; color: var(--foreground); font-size: var(--type-caption); }
+.kg-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.kg-line { display: inline-block; width: 18px; height: 2px; border-radius: 2px; }
+.kg-line.is-thick { height: 3px; }
+.kg-empty { display: flex; min-height: 640px; flex-direction: column; align-items: center; justify-content: center; gap: 12px; border: 1px dashed var(--border); border-radius: var(--panel-radius); background: var(--card); text-align: center; }
+
+.kg-detail-head { display: flex; align-items: flex-start; gap: 10px; }
+.kg-detail-head .kg-mark { margin-top: 5px; }
+.kg-detail-head > div { flex: 1; min-width: 0; }
+.kg-detail-head h2 { margin: 0; color: var(--foreground); font-size: var(--font-size-section-title); font-weight: var(--font-weight-semibold); }
+.kg-detail-head p { margin: 2px 0 0; color: var(--muted-foreground); font-size: var(--type-caption); }
+.kg-close { display: grid; width: 28px; height: 28px; flex: 0 0 auto; place-items: center; border: 0; background: transparent; color: var(--muted-foreground); }
+.kg-close:hover { background: var(--control-surface); color: var(--foreground); }
+.kg-close svg { width: 16px; height: 16px; }
+.kg-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.kg-chips button, .kg-chips span { display: inline-block; border: 0; border-radius: 999px; background: var(--control-surface); padding: 3px 10px; color: var(--foreground); font-size: var(--type-caption); line-height: 18px; }
+.kg-chips button:hover { background: var(--control-surface-hover); }
+.kg-ranked { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.kg-ranked button, .kg-ranked-row { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(80px, 1fr) auto; align-items: center; gap: 12px; padding: 8px 10px; }
+.kg-ranked-label { display: inline-flex; min-width: 0; align-items: center; gap: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kg-ranked small { color: var(--muted-foreground); font-size: var(--type-caption); white-space: nowrap; }
+.kg-bar { position: relative; display: block; height: 6px; overflow: hidden; border-radius: 999px; background: var(--surface); }
+.kg-bar i { position: absolute; top: 0; left: 0; height: 100%; border-radius: 999px; }
+.kg-bar .is-wanted { background: rgba(255, 107, 87, .45); }
+.kg-bar .is-taught { background: var(--mint); }
+.kg-bar .is-links { background: var(--ink); }
+.kg-insights { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.kg-card { min-width: 0; border: 1px solid var(--border); border-radius: var(--panel-radius); background: var(--card); padding: 18px 16px 12px; }
+.kg-card h3 { margin: 0 0 8px 10px; color: var(--muted-foreground); font-size: var(--type-caption); font-weight: var(--font-weight-semibold); letter-spacing: .06em; text-transform: uppercase; }
+.kg-hint { margin: 0; color: var(--muted-foreground); font-size: var(--type-caption); line-height: 16px; }
+.kg-detail-card { position: absolute; top: 12px; left: 12px; display: flex; flex-direction: column; gap: 10px; width: min(300px, calc(100% - 80px)); max-height: calc(100% - 90px); overflow-y: auto;
+  border: 1px solid var(--border); border-radius: 18px; background: rgba(255, 255, 255, .97); padding: 14px 16px; box-shadow: var(--shadow-overlay); }
+.kg-detail-card h3 { margin: 4px 0 0; color: var(--muted-foreground); font-size: var(--type-caption); font-weight: var(--font-weight-semibold); letter-spacing: .06em; text-transform: uppercase; }
+
+@media (max-width: 1200px) {
+  .kg-layout { grid-template-columns: 220px minmax(0, 1fr); }
+}
+@media (max-width: 800px) {
+  .kg-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kg-layout, .kg-insights { grid-template-columns: minmax(0, 1fr); }
+  .kg-panel { max-height: none; }
+}
+
+/* Full screen: the three columns fill the screen on the page background. */
+.kg-layout.is-full-screen { align-content: start; overflow: auto; background: var(--background); padding: 16px; }
+
+/* Department pairs are long: a wider, wrapping label column. */
+.kg-card.is-pairs .kg-ranked-row { grid-template-columns: minmax(0, 1.8fr) minmax(56px, .7fr) auto; }
+.kg-card.is-pairs .kg-ranked-label { white-space: normal; }

@@ -9,6 +9,31 @@ const peer = { id: 'peer', name: 'Peer Mentor', department: 'Finance', job_title
 //   failAfterCommit = path                uncertain (500), but the write went through
 //   refuseNext = { path, code }           refused (400), nothing saved
 function fixtureApi(state, ApiError) {
+  // A deterministic organisation big enough to judge the knowledge graph:
+  // ten departments, sixty people, two dozen skills, a few real sessions.
+  function sampleKnowledgeGraph() {
+    let seed = 7;
+    const rand = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    const departments = ['Finance', 'Marketing', 'Consulting', 'Operations', 'Strategy', 'Data & Analytics', 'Human Resources', 'Public Policy', 'Luxury & Retail', 'Sustainability'];
+    const skills = ['Financial modelling', 'Valuation', 'Brand strategy', 'SQL', 'Python', 'Negotiation', 'Public speaking', 'Supply chain', 'Market research', 'Pricing',
+      'M&A', 'Product management', 'UX research', 'Change management', 'Data visualisation', 'Fundraising', 'ESG reporting', 'Talent acquisition', 'Policy analysis', 'Retail merchandising',
+      'Project management', 'Excel', 'Storytelling', 'Growth marketing'].map((label, i) => ({ id: `s${i}`, kind: 'skill', label }));
+    const people = Array.from({ length: 60 }, (_, i) => ({ id: `p${i}`, kind: 'person', label: `Person ${i + 1}`,
+      department: departments[Math.min(departments.length - 1, Math.floor(rand() * rand() * departments.length * 1.6))],
+      persona: i % 3 ? 'student' : 'alumnus', program: i % 2 ? 'MiM' : 'Global BBA', cohort_year: 2018 + (i % 8) }));
+    const edges = [];
+    for (const person of people) {
+      if (rand() < 0.08) continue; // a few people have nothing yet
+      const home = departments.indexOf(person.department);
+      for (let k = 0; k < 2 + Math.floor(rand() * 3); k++) {
+        const skillIndex = Math.floor((home * 2.3 + rand() * 8) % skills.length);
+        edges.push({ source: person.id, target: skills[skillIndex].id, type: rand() < 0.55 ? 'can_teach' : 'wants_to_learn' });
+      }
+    }
+    for (let k = 0; k < 12; k++) edges.push({ source: `p${Math.floor(rand() * 60)}`, target: `p${Math.floor(rand() * 60)}`, type: k % 3 ? 'session' : 'connection', weight: 1 + Math.floor(rand() * 3) });
+    return { nodes: [...people, ...skills], edges: edges.filter(e => e.source !== e.target), meta: { organizations: [{ id: 'org', name: 'ESSEC' }], languages: ['en', 'fr'] } };
+  }
+
   const dropped = () => new ApiError('TypeError: Failed to fetch', 500);
   const payload = session => {
     const latest = state.messages[`/sessions/${session.id}/messages`]?.at(-1);
@@ -163,6 +188,30 @@ function fixtureApi(state, ApiError) {
         }
         return payload(session);
       }
+    }
+    // A small organisation for the admin screens, read only.
+    if (method === 'get' && path.startsWith('/admin/')) {
+      const [route] = path.split('?');
+      const admin = {
+        '/admin/stats': { totalUsers: 4, totalEmployees: 4, onboarded: 3, onboardedOf: 4, onboardingComplete: 3, onboardingRate: 75,
+          totalMatches: 5, sessionsRequested: 6, matchPairs: [], topMentors: [{ id: 'peer', name: 'Peer Mentor', department: 'Finance', session_count: 3 }],
+          deptActivity: [{ department: 'Finance', session_count: 4 }, { department: 'Marketing', session_count: 2 }],
+          sessionsByStatus: [{ status: 'pending', cnt: 2 }, { status: 'scheduled', cnt: 1 }, { status: 'completed', cnt: 2 }] },
+        '/admin/most-active-users': [{ id: 'peer', name: 'Peer Mentor', department: 'Finance', sessions: 3 }],
+        '/admin/users': { users: [
+          { id: 'peer', name: 'Peer Mentor', email: 'peer@example.test', role: 'alumnus', department: 'Finance', sessions: 3 },
+          { id: 'viewer', name: 'Viewer Student', email: 'student@example.test', role: 'student', department: 'Finance', sessions: 2 },
+          { id: 'left', name: 'Former Member', email: 'left@example.test', role: 'student', department: 'Marketing', sessions: 0, deactivated_at: '2026-09-01T00:00:00Z' },
+        ], total: 3 },
+        '/admin/audit': { entries: [{ id: 1, action: 'profile.update', actor: 'Peer Mentor', target_type: 'profile', target_id: 'peer', created_at: '2026-10-01T09:00:00Z', metadata: {} }], total: 1 },
+        '/admin/feedback': [{ id: 1, category: 'bug', status: 'open', message: 'The calendar invite opened twice.', user: { name: 'Viewer Student' }, created_at: '2026-10-02T10:00:00Z', delivery: 'sent' }],
+        '/admin/request-settings': { weekly: 3, pending: 2, cooldown: 7 },
+        '/admin/privacy-status': { peerVisibleFields: ['name', 'department', 'skills'], hiddenFields: ['email'], minTeamDashboardSize: 5 },
+        '/admin/kpis': null,
+        '/admin/ai-runs': [],
+        '/admin/knowledge-graph': sampleKnowledgeGraph(),
+      };
+      if (route in admin) return admin[route];
     }
     throw new Error(`Unmocked API: ${method} ${path}`);
   };
