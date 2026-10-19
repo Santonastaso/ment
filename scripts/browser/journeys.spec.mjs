@@ -1943,6 +1943,7 @@ test('a member can switch AI off and delete their account', async ({ page }) => 
   await confirm.click();
   await expect(page).toHaveURL(/\/login$/);
   expect(await page.evaluate(() => window.fixture.erased)).toBe(true);
+});
 
 test('admin pages share the member pages\' cards, tabs and avatars', async ({ page }) => {
   await page.goto('/');
