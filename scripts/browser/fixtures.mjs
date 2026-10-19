@@ -170,6 +170,7 @@ function fixtureApi(state, ApiError) {
       }
     }
     if (method === 'put') {
+      if (path === '/admin/retention') { state.retention = { ...body }; return state.retention; }
       if (path === '/users/me') {
         state.user = { ...state.user, ...body };
         if (state.profile) state.profile = { ...state.profile, ...body };
@@ -206,6 +207,7 @@ function fixtureApi(state, ApiError) {
         '/admin/audit': { entries: [{ id: 1, action: 'profile.update', actor: 'Peer Mentor', target_type: 'profile', target_id: 'peer', created_at: '2026-10-01T09:00:00Z', metadata: {} }], total: 1 },
         '/admin/feedback': [{ id: 1, category: 'bug', status: 'open', message: 'The calendar invite opened twice.', user: { name: 'Viewer Student' }, created_at: '2026-10-02T10:00:00Z', delivery: 'sent' }],
         '/admin/request-settings': { weekly: 3, pending: 2, cooldown: 7 },
+        '/admin/retention': state.retention || { conversation_days: null, search_days: null, reflection_days: null, audit_log_days: null, deactivated_account_days: null },
         '/admin/privacy-status': { peerVisibleFields: ['name', 'department', 'skills'], hiddenFields: ['email'], minTeamDashboardSize: 5 },
         '/admin/kpis': null,
         '/admin/ai-runs': [],

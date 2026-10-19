@@ -29,21 +29,21 @@ const SCHEMA = `
   create table skills(id bigserial primary key, user_id uuid, skill text, type text default 'can_teach');
   create table career_history(id bigserial primary key, user_id uuid, role_title text, company text, description text, start_year int, end_year int);
   create table profile_drafts(id bigserial primary key, user_id uuid);
-  create table reflection_logs(id bigserial primary key, user_id uuid);
+  create table reflection_logs(id bigserial primary key, user_id uuid, created_at timestamptz default now());
   create table mentorship_unavailable_periods(id bigserial primary key, user_id uuid);
   create table connections(id bigserial primary key, requester_id uuid, addressee_id uuid);
   create table match_scores(id bigserial primary key, user_a_id uuid, user_b_id uuid);
   create table sessions(id bigserial primary key, mentor_id uuid not null, mentee_id uuid not null, title text, status text,
     outbound_message text, pre_session_question text not null default '', reflection text not null default '', mentor_reflection text not null default '',
-    mentee_rating int, mentor_rating int, request_expires_at timestamptz);
-  create table session_messages(id bigserial primary key, session_id bigint, sender_id uuid, body text);
+    mentee_rating int, mentor_rating int, request_expires_at timestamptz, last_activity_at timestamptz default now());
+  create table session_messages(id bigserial primary key, session_id bigint, sender_id uuid, body text, created_at timestamptz default now());
   create table session_reads(session_id bigint, user_id uuid);
-  create table groups(id bigserial primary key, created_by uuid not null);
+  create table groups(id bigserial primary key, created_by uuid not null, organization_id uuid default '${org}');
   create table group_members(group_id bigint references groups(id) on delete cascade, user_id uuid, role text default 'member', created_at timestamptz default now());
   create table group_join_requests(group_id bigint, user_id uuid);
   create table group_reads(group_id bigint, user_id uuid);
-  create table group_messages(id bigserial primary key, group_id bigint, sender_id uuid, body text);
-  create table discovery_threads(id bigserial primary key, user_id uuid, selected_person_id uuid);
+  create table group_messages(id bigserial primary key, group_id bigint, sender_id uuid, body text, created_at timestamptz default now());
+  create table discovery_threads(id bigserial primary key, user_id uuid, selected_person_id uuid, updated_at timestamptz default now());
   create table discovery_feedback(id bigserial primary key, user_id uuid, profile_id uuid);
   create table feedback_messages(id bigserial primary key, user_id uuid);
   create table continuation_intents(id bigserial primary key, user_id uuid);
@@ -54,6 +54,9 @@ const SCHEMA = `
   create table notification_outbox(id bigserial primary key, user_id uuid);
   create table consent_records(id bigserial primary key, user_id uuid);
   create table ai_runs(id bigserial primary key, user_id uuid);
+  create table audit_logs(id bigserial primary key, actor_id uuid, action text, created_at timestamptz default now());
+  create function current_organization_id(uuid) returns uuid language sql stable as $$ select organization_id from profiles where id = $1 $$;
+  create function is_admin(uuid) returns boolean language sql stable as $$ select admin_scope <> 'none' from profiles where id = $1 $$;
   create table outreach_targets(id bigserial primary key, profile_id uuid, email text);
   create table invitations(id bigserial primary key, email text not null, profile_data jsonb, accepted_user_id uuid);
 `;
@@ -163,6 +166,64 @@ test('a member who opts out of AI is never sent to the model as a candidate', as
     // The member can switch it themselves; nothing else on the row opened up.
     assert.equal((await one("select has_column_privilege('authenticated', 'public.profiles', 'ai_opt_out', 'update') value")).value, true);
     assert.equal((await one("select has_column_privilege('authenticated', 'public.profiles', 'erased_at', 'update') value")).value, false);
+  } finally {
+    await db.close();
+  }
+});
+
+test('retention deletes nothing until periods are set, then only what is older than them', async () => {
+  const db = new PGlite();
+  const one = async (sql, args = []) => (await db.query(sql, args)).rows[0];
+  const count = async (table) => (await one(`select count(*)::int n from ${table}`)).n;
+  const old = "now() - interval '400 days'";
+  try {
+    await db.exec(SCHEMA);
+    await db.exec(`
+      insert into profiles(id, organization_id, name) values ('${leaver}', '${org}', 'Long Gone'), ('${mentor}', '${org}', 'Mentor'), ('${friend}', '${org}', 'Friend');
+      insert into profiles(id, organization_id, name, admin_scope) values ('${admin}', '${org}', 'Admin', 'org');
+      update profiles set deactivated_at = ${old} where id = '${leaver}';
+      update profiles set deactivated_at = now() - interval '5 days' where id = '${friend}';
+      insert into sessions(mentor_id, mentee_id, title, status, outbound_message, last_activity_at) values
+        ('${mentor}', '${friend}', 'Old', 'completed', 'old words', ${old}), ('${mentor}', '${friend}', 'New', 'completed', 'new words', now());
+      insert into session_messages(session_id, sender_id, body, created_at) values (1, '${mentor}', 'old', ${old}), (2, '${mentor}', 'new', now());
+      insert into groups(created_by) values ('${mentor}');
+      insert into group_messages(group_id, sender_id, body, created_at) values (1, '${mentor}', 'old', ${old}), (1, '${mentor}', 'new', now());
+      insert into discovery_threads(user_id, updated_at) values ('${mentor}', ${old}), ('${mentor}', now());
+      insert into reflection_logs(user_id, created_at) values ('${mentor}', ${old}), ('${mentor}', now());
+      insert into audit_logs(actor_id, action, created_at) values ('${mentor}', 'x', ${old}), ('${mentor}', 'x', now()), (null, 'system', ${old});
+    `);
+    await db.exec(await migration('20261019110000_0087_ai_opt_out_and_account_erasure.sql'));
+    await db.exec(await migration('20261019130000_0089_data_retention.sql'));
+    for (const role of ['anon', 'authenticated']) {
+      assert.equal((await one(`select has_function_privilege('${role}', 'public.run_data_retention()', 'execute') value`)).value, false);
+    }
+
+    // No periods: nothing goes.
+    const idle = (await one('select run_data_retention() value')).value;
+    assert.deepEqual(idle, { messages: 0, sessions_cleared: 0, searches: 0, reflections: 0, audit_logs: 0, erased_user_ids: [] });
+    assert.equal(await count('session_messages'), 2);
+
+    // An admin sets the periods for their own organisation; members cannot.
+    await db.query("select set_config('request.jwt.claim.sub', $1, false)", [mentor]);
+    await assert.rejects(db.query(`select admin_set_retention_settings('{"conversation_days": 365}')`), /admin_only/);
+    await db.query("select set_config('request.jwt.claim.sub', $1, false)", [admin]);
+    await assert.rejects(db.query(`select admin_set_retention_settings('{"conversation_days": 7}')`), /check/);
+    const saved = (await one(`select admin_set_retention_settings('{"conversation_days": 365, "search_days": "365", "reflection_days": 365, "audit_log_days": 365, "deactivated_account_days": 365}') value`)).value;
+    assert.equal(saved.conversation_days, 365);
+
+    const swept = (await one('select run_data_retention() value')).value;
+    assert.deepEqual(swept, { messages: 2, sessions_cleared: 1, searches: 1, reflections: 1, audit_logs: 1, erased_user_ids: [leaver] });
+    assert.deepEqual((await db.query('select body from session_messages')).rows.map(r => r.body), ['new']);
+    assert.deepEqual((await db.query('select body from group_messages')).rows.map(r => r.body), ['new']);
+    assert.deepEqual((await db.query('select outbound_message from sessions order by id')).rows.map(r => r.outbound_message), ['', 'new words']);
+    assert.equal(await count('discovery_threads'), 1);
+    assert.equal(await count('reflection_logs'), 1);
+    assert.equal(await count('audit_logs'), 2, 'recent entries and system entries stay');
+    // Deactivated long ago: erased. Deactivated last week: kept.
+    assert.equal((await one('select name from profiles where id = $1', [leaver])).name, 'Former member');
+    assert.equal((await one('select name from profiles where id = $1', [friend])).name, 'Friend');
+    // Running again finds nothing new.
+    assert.deepEqual((await one('select run_data_retention() value')).value.erased_user_ids, []);
   } finally {
     await db.close();
   }

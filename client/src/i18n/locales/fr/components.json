@@ -177,5 +177,7 @@
   "components.monthYear.month09": "sept.",
   "components.monthYear.month10": "oct.",
   "components.monthYear.month11": "nov.",
-  "components.monthYear.month12": "déc."
+  "components.monthYear.month12": "déc.",
+  "components.reflection.aiNote": "Une IA lit vos réponses pour suggérer des compétences. Elle peut se tromper, et rien n’est ajouté à votre profil sans votre choix.",
+  "components.reflection.aiOff": "Les suggestions de l’IA sont désactivées : vos réponses sont enregistrées sans suggestion de compétences."
 }

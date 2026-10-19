@@ -193,5 +193,7 @@
   "components.monthYear.month09": "Sep",
   "components.monthYear.month10": "Oct",
   "components.monthYear.month11": "Nov",
-  "components.monthYear.month12": "Dec"
+  "components.monthYear.month12": "Dec",
+  "components.reflection.aiNote": "An AI reads your answers to suggest skills. It can make mistakes, and nothing is added to your profile unless you choose it.",
+  "components.reflection.aiOff": "AI suggestions are off, so your answers are saved without skill suggestions."
 }

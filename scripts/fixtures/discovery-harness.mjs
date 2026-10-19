@@ -34,6 +34,33 @@ export async function discoveryHandler() {
 export const finance = { id: 'finance', name: 'Finance Mentor', job_title: 'Financial Analyst', department: 'Finance', program: 'Masters', skills: ['Financial modelling'], location: 'Paris' };
 export const directMatch = { outcome: 'matches', matches: [{ profile_id: finance.id, confidence: 0.9, reasons: ['Teaches financial modelling.'], matched_expertise: ['Financial modelling'] }] };
 
+// The matcher sees people under stand-in ids (c1, c2, ...) and never their
+// profile ids. The function keeps the order of the candidates it was given, so
+// the stand-ins are matched to them in order; this recovers who was offered.
+function offeredIds(sent, candidates) {
+  const same = (shown, person) => ['department', 'program', 'location', 'seniority', 'tenure_years'].every(field => (shown[field] ?? null) === (person[field] ?? null))
+    && (shown.job_title == null || shown.job_title === person.job_title)
+    && (shown.linkedin_headline == null || shown.linkedin_headline === person.linkedin_headline)
+    && (!shown.experience?.length || JSON.stringify(shown.experience) === JSON.stringify(person.experience || []));
+  const ids = [];
+  let next = 0;
+  for (const shown of sent) {
+    while (next < candidates.length && !same(shown, candidates[next])) next += 1;
+    ids.push(next < candidates.length ? candidates[next++].id : null);
+  }
+  return ids;
+}
+
+// A scripted answer naming a profile id is translated to the stand-in the
+// function gave that person, as a real model could only answer with that.
+function asModelSees(value, request) {
+  if (!request.offered || !Array.isArray(value?.matches)) return value;
+  const sent = JSON.parse(request.messages.at(-1).content).candidates;
+  const aliasOf = new Map(request.offered.map((id, index) => [id, sent[index].id]));
+  return { ...value, matches: value.matches.map(match => match && typeof match === 'object' && aliasOf.has(match.profile_id)
+    ? { ...match, profile_id: aliasOf.get(match.profile_id) } : match) };
+}
+
 export function discoveryFixture({ candidates = [finance], turns = [], responses = [], live = false, voice = false } = {}) {
   let thread = turns.length ? { id: 'thread', turns: structuredClone(turns) } : null;
   const context = {
@@ -42,11 +69,16 @@ export function discoveryFixture({ candidates = [finance], turns = [], responses
     async fetch(url, options) {
       if (url !== 'https://api.mistral.ai/v1/chat/completions') throw new Error('Unexpected provider');
       const request = JSON.parse(options.body);
+      const sent = JSON.parse(request.messages.at(-1)?.content || '{}')?.candidates;
+      // Not part of what is sent: lets a test name who was offered to the matcher.
+      if (Array.isArray(sent)) Object.defineProperty(request, 'offered', { value: offeredIds(sent, candidates), enumerable: false });
       context.calls.push(request);
       if (live) return globalThis.fetch(url, { ...options, signal: AbortSignal.timeout(30_000) });
-      const value = responses.shift();
+      const scripted = responses.shift();
+      // A function answers from what was actually sent.
+      const value = typeof scripted === 'function' ? scripted(request) : scripted;
       if (value === undefined) throw new Error('Unexpected model call');
-      return Response.json({ model: 'fixture-model', choices: [{ message: { content: JSON.stringify(value) } }] });
+      return Response.json({ model: 'fixture-model', choices: [{ message: { content: JSON.stringify(asModelSees(value, request)) } }] });
     },
     sb: {
       rpc: async (name, args) => {

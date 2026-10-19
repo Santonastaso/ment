@@ -81,3 +81,17 @@ export function jsonError(message: string, status = 400) {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 }
+
+// Close an erased member's login for good: the address is replaced, the
+// password is unknowable and the account is banned. Only the auth API can do
+// this, so it follows erase_account_data rather than living in the database.
+export async function closeErasedLogin(sb: SupabaseClient, userId: string, password: string) {
+  const { error } = await sb.auth.admin.updateUserById(userId, {
+    email: `erased-${userId}@erased.invalid`,
+    email_confirm: true,
+    password,
+    user_metadata: {},
+    ban_duration: '876000h', // about a hundred years
+  });
+  return error;
+}

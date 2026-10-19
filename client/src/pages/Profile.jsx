@@ -693,6 +693,7 @@ export default function Profile() {
           />
           <SurfaceBody className="pt-3 sm:px-4">
             <ProfileReflection
+              aiOff={!!profile.ai_opt_out}
               draft={reflectionDraft}
               onDraftChange={setReflectionDraft}
               onSkillsApplied={refreshProfile}
@@ -931,7 +932,7 @@ export default function Profile() {
             }
           />
           <SurfaceBody className="pt-5">
-            <ProfileReflection history draft={reflectionDraft} onDraftChange={setReflectionDraft} onSkillsApplied={refreshProfile} open={reflectionOpen} onOpenChange={setReflectionOpen} returnFocus={reflectionTriggerRef} />
+            <ProfileReflection history aiOff={!!profile.ai_opt_out} draft={reflectionDraft} onDraftChange={setReflectionDraft} onSkillsApplied={refreshProfile} open={reflectionOpen} onOpenChange={setReflectionOpen} returnFocus={reflectionTriggerRef} />
           </SurfaceBody>
         </Surface>
       )}

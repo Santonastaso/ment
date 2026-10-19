@@ -1,4 +1,5 @@
-﻿import React, { useState } from 'react';
+﻿import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import SkillTagInput from '../components/SkillTagInput.jsx';
 import TeachSkillsEditor from '../components/TeachSkillsEditor.jsx';
@@ -30,6 +31,7 @@ export default function Onboarding() {
   const [draftId, setDraftId] = useState(null);
   const [classifierSource, setClassifierSource] = useState('');
   const [aiConsent, setAiConsent] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [suggested, setSuggested] = useState(() => new Set());
 
   // Step 1 — Background
@@ -134,6 +136,7 @@ export default function Onboarding() {
 
   async function handleFinish() {
     if (saving) return;
+    if (!termsAccepted) { setError(t('onboarding.terms.required')); return; }
     if (!name.trim()) { setError(t('onboarding.error.nameRequired')); setStep(1); return; }
     if (!career[0]?.role.trim() || !career[0]?.department.trim()) {
       setError(t('onboarding.error.workExperienceRequired'));
@@ -166,6 +169,8 @@ export default function Onboarding() {
         can_teach: canTeach,
         wants_to_learn: wantsToLearn,
       };
+      // Which Terms and Privacy notice they accepted, and when (GDPR Art. 7).
+      await api.post('/users/me/consents', { purpose: 'terms_privacy' });
       // Availability goes first. Completing onboarding redirects away at once
       // (the profile update arrives live), so nothing may still be unsaved then.
       const weekly = Math.max(1, Math.min(50, Number(weeklyLimit) || 1));
@@ -409,6 +414,16 @@ export default function Onboarding() {
                   <input type="number" min="1" max="200" className="input mt-1" disabled={!acceptsRequests} aria-label={t('profile.availability.monthlyLimit')} value={monthlyLimit} onChange={e => setMonthlyLimit(e.target.value)} />
                 </label>
               </div>
+              <label className="flex items-start gap-2 border-t border-[var(--border-subtle)] pt-4 text-sm">
+                <input type="checkbox" className="mt-0.5" checked={termsAccepted} onChange={e => setTermsAccepted(e.target.checked)} data-testid="onboarding-accept-terms" />
+                <span>
+                  {t('onboarding.terms.before')}
+                  <Link to="/terms" target="_blank" rel="noreferrer" className="underline">{t('onboarding.terms.termsLink')}</Link>
+                  {t('onboarding.terms.middle')}
+                  <Link to="/privacy" target="_blank" rel="noreferrer" className="underline">{t('onboarding.terms.privacyLink')}</Link>
+                  {t('onboarding.terms.after')}
+                </span>
+              </label>
             </>
           )}
 

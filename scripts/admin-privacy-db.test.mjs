@@ -61,9 +61,10 @@ test('the admin dashboard gets departments and trends, never a named or traceabl
     assert.ok(persons.some(n => n.id === session.source) && persons.some(n => n.id === session.target));
     assert.ok(graph.edges.some(e => e.target === 's:valuation' && e.type === 'can_teach'));
     // A second call draws new ids, so an id cannot be followed across calls.
-    const again = (await one('select knowledge_graph() value')).value;
     const teacher = r => r.edges.find(e => e.type === 'can_teach').source;
-    assert.ok(teacher(graph) !== teacher(again) || graph.nodes.filter(n => n.kind === 'person').map(n => n.id).join() !== again.nodes.filter(n => n.kind === 'person').map(n => n.id).join());
+    const seen = new Set([teacher(graph)]);
+    for (let call = 0; call < 12; call += 1) seen.add(teacher((await one('select knowledge_graph() value')).value));
+    assert.ok(seen.size > 1, 'the same person gets different ids from call to call');
 
     const stats = (await one('select admin_stats() value')).value;
     assert.ok(!('topMentors' in stats));

@@ -567,6 +567,11 @@ async function get(url) {
     if (error) throw new ApiError(error.message);
     return ok(data || []);
   }
+  if (url === '/admin/retention') {
+    const { data, error } = await supabase.rpc('admin_retention_settings');
+    if (error) throw new ApiError(error.message);
+    return ok(data);
+  }
   if (url === '/admin/request-settings') {
     const { data, error } = await supabase.rpc('pm_request_settings', {
       p_weekly: null, p_pending: null, p_cooldown: null,
@@ -1260,6 +1265,11 @@ async function put(url, body = {}) {
     return ok(data);
   }
 
+  if (url === '/admin/retention') {
+    const { data, error } = await supabase.rpc('admin_set_retention_settings', { p_settings: body });
+    if (error) throw new ApiError(error.message);
+    return ok(data);
+  }
   if (url === '/admin/request-settings') {
     const { data, error } = await supabase.rpc('pm_request_settings', {
       p_weekly: body.weekly ?? null,

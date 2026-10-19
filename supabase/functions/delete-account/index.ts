@@ -5,10 +5,8 @@
 // scrubs the login so the address is gone and nobody can sign in again.
 
 import {
-  corsHeaders, generateTempPassword, jsonError, jsonOk, requireAdmin, requireUser,
+  closeErasedLogin, corsHeaders, generateTempPassword, jsonError, jsonOk, requireAdmin, requireUser,
 } from '../_shared/index.ts';
-
-const NEVER = '876000h'; // about a hundred years
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -42,13 +40,7 @@ Deno.serve(async (req) => {
     return jsonError('erase_failed', 500);
   }
 
-  const { error: loginError } = await ctx.sb.auth.admin.updateUserById(userId, {
-    email: `erased-${userId}@erased.invalid`,
-    email_confirm: true,
-    password: generateTempPassword() + generateTempPassword(),
-    user_metadata: {},
-    ban_duration: NEVER,
-  });
+  const loginError = await closeErasedLogin(ctx.sb, userId, generateTempPassword() + generateTempPassword());
   if (loginError) {
     // The data is already gone and the profile deactivated; an admin can run
     // the erase again to finish the login, since the database step repeats safely.

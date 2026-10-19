@@ -13,7 +13,7 @@
 create table public.consent_records (
   id bigserial primary key,
   user_id uuid not null references public.profiles(id) on delete cascade,
-  purpose text not null check (purpose in ('ai_profile_import')),
+  purpose text not null check (purpose in ('ai_profile_import', 'terms_privacy')),
   text_version text not null check (length(text_version) between 1 and 40),
   locale text not null default 'en' check (locale in ('en', 'it', 'fr')),
   accepted_at timestamptz not null default now()

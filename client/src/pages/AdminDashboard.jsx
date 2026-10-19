@@ -47,6 +47,8 @@ async function downloadBlob(apiPath, filename) {
   URL.revokeObjectURL(url);
 }
 
+const RETENTION_FIELDS = ['conversation_days', 'search_days', 'reflection_days', 'audit_log_days', 'deactivated_account_days'];
+
 export default function AdminDashboard() {
   const { user } = useAuth();
   const { t: translate } = useT();
@@ -61,6 +63,8 @@ export default function AdminDashboard() {
   const [privacyLoading, setPrivacyLoading] = useState(false);
   const [requestSettings, setRequestSettings] = useState(null);
   const [savingRequestSettings, setSavingRequestSettings] = useState(false);
+  const [retention, setRetention] = useState(null);
+  const [savingRetention, setSavingRetention] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [rematching, setRematching] = useState(false);
@@ -191,6 +195,36 @@ export default function AdminDashboard() {
     }
   }
 
+  // How long each kind of data is kept. Empty keeps it; the institution, as
+  // data controller, decides the periods (migration 0089).
+  async function loadRetention() {
+    try {
+      const res = await api.get('/admin/retention');
+      setRetention(Object.fromEntries(RETENTION_FIELDS.map(field => [field, res.data?.[field] ?? ''])));
+    } catch {
+      setRetention(null);
+    }
+  }
+
+  async function saveRetention() {
+    if (!retention) return;
+    const invalid = RETENTION_FIELDS.find(field => retention[field] !== '' && !(Number(retention[field]) >= 30 && Number(retention[field]) <= 3650 && Number.isInteger(Number(retention[field]))));
+    if (invalid) {
+      setNotice({ variant: 'destructive', title: t('admin.notice.actionFailedTitle'), message: t('admin.retention.invalid') });
+      return;
+    }
+    setSavingRetention(true);
+    try {
+      const res = await api.put('/admin/retention', Object.fromEntries(RETENTION_FIELDS.map(field => [field, retention[field] === '' ? null : Number(retention[field])])));
+      setRetention(Object.fromEntries(RETENTION_FIELDS.map(field => [field, res.data?.[field] ?? ''])));
+      setNotice({ variant: 'default', title: t('admin.retention.saved'), message: t('admin.retention.savedHelp') });
+    } catch (e) {
+      setNotice({ variant: 'destructive', title: t('admin.notice.actionFailedTitle'), message: errorMessage(e, t, t('admin.common.tryAgain')) });
+    } finally {
+      setSavingRetention(false);
+    }
+  }
+
   async function saveRequestSettings() {
     if (!requestSettings) return;
     setSavingRequestSettings(true);
@@ -261,7 +295,7 @@ export default function AdminDashboard() {
     }
   }
 
-  useEffect(() => { loadStats(); loadPrivacyStatus(); loadRequestSettings(); }, []);
+  useEffect(() => { loadStats(); loadPrivacyStatus(); loadRetention(); loadRequestSettings(); }, []);
   useEffect(() => {
     if (tab === 'kpis') loadKpis();
     if (tab === 'people') loadUsers();
@@ -576,6 +610,42 @@ export default function AdminDashboard() {
               ) : (
                 <p className="text-sm text-muted-foreground">{t('admin.privacy.unavailable')}</p>
               )}
+            </SurfaceBody>
+          </Surface>
+
+          <Surface data-testid="data-retention">
+            <SurfaceHeader title={t('admin.retention.title')} description={t('admin.retention.description')} />
+            <SurfaceBody className="pt-5">
+              {retention ? (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {RETENTION_FIELDS.map(field => (
+                    <label key={field} className="grid gap-1 text-sm">
+                      <span className="font-medium text-foreground">{t(`admin.retention.${field}`)}</span>
+                      <span className="text-xs text-muted-foreground">{t(`admin.retention.${field}Help`)}</span>
+                      <span className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min={30}
+                          max={3650}
+                          inputMode="numeric"
+                          placeholder={t('admin.retention.keep')}
+                          value={retention[field]}
+                          disabled={savingRetention}
+                          data-testid={`retention-${field}`}
+                          onChange={e => setRetention(current => ({ ...current, [field]: e.target.value }))}
+                          className="input h-9 w-32 text-sm"
+                        />
+                        <span className="text-xs text-muted-foreground">{t('admin.retention.days')}</span>
+                      </span>
+                    </label>
+                  ))}
+                  <div className="sm:col-span-2 flex justify-end">
+                    <Button type="button" size="sm" onClick={saveRetention} disabled={savingRetention} data-testid="save-retention">
+                      {savingRetention ? t('admin.common.saving') : t('admin.retention.save')}
+                    </Button>
+                  </div>
+                </div>
+              ) : <p className="text-sm text-muted-foreground">{t('admin.retention.unavailable')}</p>}
             </SurfaceBody>
           </Surface>
           </>

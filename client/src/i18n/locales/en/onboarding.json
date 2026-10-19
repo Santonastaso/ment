@@ -66,5 +66,11 @@
   "onboarding.persona.alumnus": "Alumnus",
   "onboarding.fields.program": "Program",
   "onboarding.fields.programPlaceholder": "e.g. MSc Management",
-  "onboarding.fields.cohortYear": "Class of (year)"
+  "onboarding.fields.cohortYear": "Class of (year)",
+  "onboarding.terms.before": "I accept the ",
+  "onboarding.terms.termsLink": "Terms of use",
+  "onboarding.terms.middle": " and have read the ",
+  "onboarding.terms.privacyLink": "Privacy notice",
+  "onboarding.terms.after": ".",
+  "onboarding.terms.required": "To finish, accept the Terms of use and confirm you have read the Privacy notice."
 }
