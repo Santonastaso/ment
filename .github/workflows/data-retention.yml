@@ -8,9 +8,13 @@ on:
     - cron: '40 3 * * *'
   workflow_dispatch:
 
+permissions: {}
+
 jobs:
   sweep:
-    if: github.event_name == 'workflow_dispatch' || vars.RETENTION_ENABLED == 'true'
+    # Manual dispatch is not an override for the kill switch. Restrict the
+    # production credentialed job to the default branch as well.
+    if: github.ref == 'refs/heads/main' && vars.RETENTION_ENABLED == 'true'
     runs-on: ubuntu-latest
     concurrency:
       group: data-retention-production

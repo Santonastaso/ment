@@ -35,7 +35,7 @@ const QUIET_LINK = 'rgba(90, 88, 112, 0.14)';
 const FADED_LINK = 'rgba(90, 88, 112, 0.04)';
 const REAL_LINK = 'rgba(30, 27, 58, 0.55)';
 
-// Person->person edges backed by actual interactions (0026).
+// Links backed by aggregate interaction counts (minimum five participants).
 const REAL_LINK_TYPES = new Set(['session', 'connection']);
 const endId = end => (typeof end === 'object' ? end.id : end);
 
@@ -75,14 +75,10 @@ export default function KnowledgeGraph() {
   const [company, setCompany] = useState('');
   const [language, setLanguage] = useState('');
   const [hovered, setHovered] = useState(null);
-  // 'bipartite' = people <-> skills; 'people' = people connected via shared
-  // skills (skills become invisible connectors).
+  // Both views contain department aggregates only; the second focuses on
+  // aggregate session/connection links between departments.
   const [view, setView] = useState('bipartite');
-  // "Real connections" overlay: completed sessions + accepted connections.
   const [showReal, setShowReal] = useState(true);
-  const [program, setProgram] = useState('');
-  const [persona, setPersona] = useState('');
-  const [cohort, setCohort] = useState('');
   const [skill, setSkill] = useState('');
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState(null);
@@ -126,73 +122,36 @@ export default function KnowledgeGraph() {
   const nodes = graph?.nodes || [];
   const edges = graph?.edges || [];
 
-  // Program filter (client-side): person nodes carry `program` (0026); an
-  // edge survives only if both endpoints stay in scope.
   const visibleNodes = useMemo(() => {
-    const linkedPeople = new Set(edges.filter(e => e.source === skill || e.target === skill).flatMap(e => [e.source, e.target]));
-    const people = nodes.filter(n => n.kind === 'person' && (!program || n.program === program)
-      && (!persona || (n.persona ?? n.role) === persona) && (!cohort || String(n.cohort_year ?? n.cohort ?? n.graduation_year ?? '') === cohort)
-      && (!skill || linkedPeople.has(n.id)));
-    const peopleIds = new Set(people.map(n => n.id));
-    const attached = new Set(edges.filter(e => peopleIds.has(e.source) || peopleIds.has(e.target)).flatMap(e => [e.source, e.target]));
-    return [...people, ...nodes.filter(n => n.kind === 'skill' && attached.has(n.id) && (!skill || n.id === skill))];
-  }, [nodes, edges, program, persona, cohort, skill]);
+    if (!skill) return nodes;
+    const related = new Set(edges.filter(e => e.source === skill || e.target === skill).flatMap(e => [e.source, e.target]));
+    related.add(skill);
+    return nodes.filter(n => related.has(n.id));
+  }, [nodes, edges, skill]);
   const visibleEdges = useMemo(() => {
     const keep = new Set(visibleNodes.map((n) => n.id));
     return edges.filter((e) => keep.has(e.source) && keep.has(e.target));
   }, [edges, visibleNodes]);
 
-  const programs = useMemo(() => {
-    const set = new Set();
-    for (const n of nodes) if (n.kind === 'person' && n.program) set.add(n.program);
-    return [...set].sort();
-  }, [nodes]);
-
   const kindById = useMemo(() => new Map(nodes.map((n) => [n.id, n.kind])), [nodes]);
   const nodeById = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
 
-  // Build the force-graph dataset for the active view. New object identities are
-  // produced only when the underlying data or the view changes, so the
-  // simulation isn't reheated on every render. Nodes with no link at all are
-  // left out: scattered single dots read as noise, and the count is shown.
-  const { graphData, hiddenCount } = useMemo(() => {
+  // The endpoint returns department and skill aggregates, never member nodes.
+  const { graphData } = useMemo(() => {
     const realLinks = showReal
       ? visibleEdges
           .filter((e) => REAL_LINK_TYPES.has(e.type))
-          .map((e) => ({ source: e.source, target: e.target, value: e.weight || 1, type: e.type }))
+          .map((e) => ({ source: e.source, target: e.target, value: e.count || 1, type: e.type }))
       : [];
-    let candidateNodes;
+    let candidateNodes = view === 'people' ? visibleNodes.filter(n => n.kind === 'department') : visibleNodes;
     let links;
     if (view === 'people') {
-      candidateNodes = visibleNodes.filter((n) => n.kind === 'person');
-      const bySkill = new Map();
-      for (const e of visibleEdges) {
-        if (REAL_LINK_TYPES.has(e.type)) continue;
-        const personId = kindById.get(e.source) === 'person' ? e.source : e.target;
-        const skillId = personId === e.source ? e.target : e.source;
-        if (!bySkill.has(skillId)) bySkill.set(skillId, []);
-        bySkill.get(skillId).push(personId);
-      }
-      const pairValue = new Map(); // "a|b" -> shared skill count
-      for (const arr of bySkill.values()) {
-        const uniq = [...new Set(arr)];
-        for (let i = 0; i < uniq.length; i++) {
-          for (let j = i + 1; j < uniq.length; j++) {
-            const key = uniq[i] < uniq[j] ? `${uniq[i]}|${uniq[j]}` : `${uniq[j]}|${uniq[i]}`;
-            pairValue.set(key, (pairValue.get(key) || 0) + 1);
-          }
-        }
-      }
-      links = [...[...pairValue.entries()].map(([key, value]) => {
-        const [source, target] = key.split('|');
-        return { source, target, value, type: 'peer' };
-      }), ...realLinks];
+      links = realLinks;
     } else {
-      candidateNodes = visibleNodes;
       links = [
         ...visibleEdges
           .filter((e) => !REAL_LINK_TYPES.has(e.type))
-          .map((e) => ({ source: e.source, target: e.target, type: e.type, value: 1 })),
+          .map((e) => ({ source: e.source, target: e.target, type: e.type, value: e.count || 1 })),
         ...realLinks,
       ];
     }
@@ -200,7 +159,6 @@ export default function KnowledgeGraph() {
     const kept = candidateNodes.filter(n => linked.has(n.id));
     return {
       graphData: { nodes: kept.map((n) => ({ ...n })), links },
-      hiddenCount: candidateNodes.filter(n => n.kind === 'person' && !linked.has(n.id)).length,
     };
   }, [visibleNodes, visibleEdges, view, kindById, showReal]);
 
@@ -217,15 +175,12 @@ export default function KnowledgeGraph() {
   }, [graphData]);
   const radius = useCallback((node) => {
     const deg = degree.get(node.id) || 0;
-    return node.kind === 'person' ? 4 + Math.min(Math.sqrt(deg) * 1.6, 9) : 3 + Math.min(Math.sqrt(deg) * 1.1, 6);
+    return node.kind === 'department' ? 5 + Math.min(Math.sqrt(deg) * 1.6, 9) : 4 + Math.min(Math.sqrt(deg) * 1.1, 6);
   }, [degree]);
 
-  // Departments by size; the largest take the palette.
   const departmentList = useMemo(() => {
-    const counts = new Map();
-    for (const n of graphData.nodes) if (n.kind === 'person' && n.department) counts.set(n.department, (counts.get(n.department) || 0) + 1);
-    return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-      .map(([name, count], index) => ({ name, count, color: DEPARTMENT_PALETTE[index] || OTHER_DEPARTMENT }));
+    return graphData.nodes.filter(n => n.kind === 'department').sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
+      .map((n, index) => ({ name: n.label, id: n.id, count: n.count, color: DEPARTMENT_PALETTE[index] || OTHER_DEPARTMENT }));
   }, [graphData]);
   const departmentColor = useMemo(() => new Map(departmentList.map(d => [d.name, d.color])), [departmentList]);
 
@@ -235,7 +190,7 @@ export default function KnowledgeGraph() {
   const focusSet = useMemo(() => {
     if (!focusId && !departmentFocus) return null;
     const set = new Set();
-    const seeds = focusId ? [focusId] : graphData.nodes.filter(n => n.department === departmentFocus).map(n => n.id);
+    const seeds = focusId ? [focusId] : graphData.nodes.filter(n => n.kind === 'department' && n.label === departmentFocus).map(n => n.id);
     for (const id of seeds) set.add(id);
     for (const l of graphData.links) {
       const s = endId(l.source);
@@ -250,64 +205,38 @@ export default function KnowledgeGraph() {
   const labelled = useMemo(() => {
     const ranked = [...graphData.nodes].sort((a, b) => (degree.get(b.id) || 0) - (degree.get(a.id) || 0));
     return new Set([
-      ...ranked.filter(n => n.kind === 'person').slice(0, 6).map(n => n.id),
+      ...ranked.filter(n => n.kind === 'department').slice(0, 6).map(n => n.id),
       ...ranked.filter(n => n.kind === 'skill').slice(0, 4).map(n => n.id),
     ]);
   }, [graphData, degree]);
 
-  // Per-node facts for the details panel and the insights.
+  // These are department-level counts only; no person IDs are available here.
   const relations = useMemo(() => {
     const map = new Map();
-    const add = (id, key, other) => {
-      if (!map.has(id)) map.set(id, { teaches: [], learns: [], taughtBy: [], wantedBy: [], met: [] });
-      map.get(id)[key].push(other);
+    const add = (id, key, item) => {
+      if (!map.has(id)) map.set(id, { taughtBy: [], wantedBy: [] });
+      map.get(id)[key].push(item);
     };
     for (const e of visibleEdges) {
-      if (REAL_LINK_TYPES.has(e.type)) { add(e.source, 'met', e.target); add(e.target, 'met', e.source); continue; }
-      const personId = kindById.get(e.source) === 'person' ? e.source : e.target;
-      const skillId = personId === e.source ? e.target : e.source;
-      if (e.type === 'can_teach') { add(personId, 'teaches', skillId); add(skillId, 'taughtBy', personId); }
-      if (e.type === 'wants_to_learn') { add(personId, 'learns', skillId); add(skillId, 'wantedBy', personId); }
+      if (e.type === 'can_teach') add(e.target, 'taughtBy', { department: nodeById.get(e.source)?.label, count: e.count });
+      if (e.type === 'wants_to_learn') add(e.target, 'wantedBy', { department: nodeById.get(e.source)?.label, count: e.count });
     }
     return map;
-  }, [visibleEdges, kindById]);
+  }, [visibleEdges, nodeById]);
   const skillGaps = useMemo(() => [...relations.entries()]
-    .filter(([id, r]) => kindById.get(id) === 'skill' && r.wantedBy.length > 0)
-    .map(([id, r]) => ({ id, label: nodeById.get(id)?.label || id, wanted: r.wantedBy.length, taught: r.taughtBy.length }))
+    .filter(([id, r]) => kindById.get(id) === 'skill' && r.wantedBy.length > 0 && r.taughtBy.length > 0)
+    .map(([id, r]) => ({ id, label: nodeById.get(id)?.label || id,
+      wanted: r.wantedBy.reduce((sum, row) => sum + row.count, 0),
+      taught: r.taughtBy.reduce((sum, row) => sum + row.count, 0) }))
     .sort((a, b) => (b.wanted - b.taught) - (a.wanted - a.taught) || b.wanted - a.wanted)
     .slice(0, 8), [relations, kindById, nodeById]);
-  // Privacy: the admin view shows departments and trends, never individuals.
-  // Departments smaller than the reporting minimum are pooled, so a count can
-  // never point at one person.
-  const MIN_GROUP = 5;
-  const departmentSize = useMemo(() => {
-    const counts = new Map();
-    for (const n of nodes) if (n.kind === 'person') counts.set(n.department || '', (counts.get(n.department || '') || 0) + 1);
-    return counts;
-  }, [nodes]);
-  const groupOf = useCallback((id) => {
-    const department = nodeById.get(id)?.department || '';
-    return department && (departmentSize.get(department) || 0) >= MIN_GROUP ? department : t('graph.otherDepartments');
-  }, [nodeById, departmentSize, t]);
-  const byGroup = useCallback((ids) => {
-    const counts = new Map();
-    for (const id of new Set(ids)) counts.set(groupOf(id), (counts.get(groupOf(id)) || 0) + 1);
-    return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-  }, [groupOf]);
-  // Which departments actually meet: real sessions and accepted connections.
   const departmentPairs = useMemo(() => {
-    const counts = new Map();
-    for (const e of visibleEdges) {
-      if (!REAL_LINK_TYPES.has(e.type)) continue;
-      const [a, b] = [groupOf(e.source), groupOf(e.target)].sort((x, y) => x.localeCompare(y));
-      const key = `${a}\u0000${b}`;
-      counts.set(key, (counts.get(key) || 0) + (e.weight || 1));
-    }
-    return [...counts.entries()].map(([key, count]) => { const [a, b] = key.split('\u0000'); return { a, b, count }; })
-      .sort((x, y) => y.count - x.count).slice(0, 8);
-  }, [visibleEdges, groupOf]);
+    return visibleEdges.filter(e => REAL_LINK_TYPES.has(e.type)).map(e => ({
+      a: nodeById.get(e.source)?.label, b: nodeById.get(e.target)?.label, count: e.count, type: e.type,
+    })).filter(e => e.a && e.b).sort((a, b) => b.count - a.count).slice(0, 8);
+  }, [visibleEdges, nodeById]);
 
-  const peopleCount = graphData.nodes.filter((n) => n.kind === 'person').length;
+  const peopleCount = nodes.filter(n => n.kind === 'department').reduce((sum, n) => sum + n.count, 0);
   const skillCount = graphData.nodes.filter((n) => n.kind === 'skill').length;
   const realLinkCount = visibleEdges.filter((e) => REAL_LINK_TYPES.has(e.type)).length;
   const selected = selectedId && kindById.get(selectedId) === 'skill' ? nodeById.get(selectedId) : null;
@@ -336,7 +265,7 @@ export default function KnowledgeGraph() {
   }
   function clearFocus() { setSelectedId(null); setHovered(null); setDepartmentFocus(''); }
   function resetGraph() {
-    setCompany(''); setLanguage(''); setProgram(''); setPersona(''); setCohort(''); setSkill('');
+    setCompany(''); setLanguage(''); setSkill('');
     setQuery(''); clearFocus(); setShowReal(true);
     for (const node of graphData.nodes) { delete node.fx; delete node.fy; }
     autoFit.current = true;
@@ -389,7 +318,7 @@ export default function KnowledgeGraph() {
     if (!fg) return;
     fg.d3Force('charge')?.strength(-70).distanceMax(320);
     const link = fg.d3Force('link');
-    if (link) link.distance((l) => (view === 'people' ? Math.max(28, 110 / ((l.value || 1) + 0.5)) : 38));
+    if (link) link.distance((l) => (view === 'people' ? 72 : 46));
     fg.d3Force('collide', collideForce(radius));
     fg.d3ReheatSimulation?.();
   }, [graphData, view, radius]);
@@ -400,11 +329,10 @@ export default function KnowledgeGraph() {
       {options.map(option => <option key={option.value ?? option} value={option.value ?? option}>{option.label ?? option}</option>)}
     </select>
   );
-  // Who teaches or wants a skill, as department counts.
-  const groupChips = (ids, empty) => {
-    const groups = byGroup(ids);
+  // Departments are present only when their aggregate count meets the minimum.
+  const groupChips = (groups, empty) => {
     return groups.length
-      ? <ul className="kg-chips">{groups.map(([name, count]) => <li key={name}><span>{name} · {count}</span></li>)}</ul>
+      ? <ul className="kg-chips">{groups.map(({ department, count }) => <li key={department}><span>{department} · {count}</span></li>)}</ul>
       : <p className="kg-muted">{empty}</p>;
   };
 
@@ -472,12 +400,6 @@ export default function KnowledgeGraph() {
               { 'data-testid': 'kg-filter-company', disabled: !isPlatform })}
             <label htmlFor="kg-language">{t('graph.filter.language')}</label>
             {selectFilter('kg-language', language, setLanguage, languages.map(l => ({ value: l, label: languageName(l, lang) })), t('graph.filter.allLanguages'), { 'data-testid': 'kg-filter-language' })}
-            <label htmlFor="kg-program">{t('graph.filter.program')}</label>
-            {selectFilter('kg-program', program, setProgram, programs, t('graph.filter.allPrograms'), { 'data-testid': 'kg-filter-program' })}
-            <label htmlFor="kg-persona">{t('graph.filter.persona')}</label>
-            {selectFilter('kg-persona', persona, setPersona, [...new Set(nodes.filter(n => n.kind === 'person').map(n => n.persona ?? n.role).filter(Boolean))].sort(), t('graph.filter.all'))}
-            <label htmlFor="kg-cohort">{t('graph.filter.cohort')}</label>
-            {selectFilter('kg-cohort', cohort, setCohort, [...new Set(nodes.filter(n => n.kind === 'person').map(n => String(n.cohort_year ?? n.cohort ?? n.graduation_year ?? '')).filter(Boolean))].sort(), t('graph.filter.all'))}
             <label htmlFor="kg-skill">{t('graph.filter.skill')}</label>
             {selectFilter('kg-skill', skill, setSkill, nodes.filter(n => n.kind === 'skill').map(n => ({ value: n.id, label: n.label })).sort((a, b) => a.label.localeCompare(b.label)), t('graph.filter.all'))}
           </div>
@@ -511,7 +433,7 @@ export default function KnowledgeGraph() {
                 onEngineStop={() => { if (autoFit.current) { fitView(); autoFit.current = false; } }}
                 nodeLabel={() => ''}
                 onNodeHover={(n) => setHovered(n ? n.id : null)}
-                onNodeClick={(n) => { if (n.kind === 'person') { setSelectedId(null); setDepartmentFocus(n.department || ''); } else focusNode(n.id); }}
+                onNodeClick={(n) => { if (n.kind === 'department') { setSelectedId(null); setDepartmentFocus(n.label); } else focusNode(n.id); }}
                 onBackgroundClick={clearFocus}
                 onNodeDragEnd={(n) => { n.fx = n.x; n.fy = n.y; }}
                 linkColor={(l) => {
@@ -532,17 +454,17 @@ export default function KnowledgeGraph() {
                 }}
                 nodeCanvasObject={(node, ctx, globalScale) => {
                   const r = radius(node);
-                  const isPerson = node.kind === 'person';
+                  const isDepartment = node.kind === 'department';
                   const inFocus = !focusSet || focusSet.has(node.id);
                   ctx.globalAlpha = inFocus ? 1 : 0.12;
                   ctx.beginPath();
-                  if (isPerson) {
+                  if (isDepartment) {
                     ctx.arc(node.x, node.y, r, 0, 2 * Math.PI);
                   } else {
                     ctx.moveTo(node.x, node.y - r); ctx.lineTo(node.x + r, node.y);
                     ctx.lineTo(node.x, node.y + r); ctx.lineTo(node.x - r, node.y); ctx.closePath();
                   }
-                  ctx.fillStyle = isPerson ? (departmentColor.get(node.department) || OTHER_DEPARTMENT) : SKILL_COLOR;
+                  ctx.fillStyle = isDepartment ? (departmentColor.get(node.label) || OTHER_DEPARTMENT) : SKILL_COLOR;
                   ctx.fill();
                   ctx.lineWidth = 1.5 / globalScale;
                   ctx.strokeStyle = '#ffffff';
@@ -555,16 +477,16 @@ export default function KnowledgeGraph() {
                     ctx.stroke();
                   }
                   // Labels stay one size on screen, with a white halo.
-                  const showLabel = !isPerson && inFocus && (labelled.has(node.id) || globalScale > 2.2 || (focusSet && focusSet.has(node.id)));
+                  const showLabel = inFocus && (labelled.has(node.id) || globalScale > 2.2 || (focusSet && focusSet.has(node.id)));
                   if (showLabel) {
-                    const fontSize = (isPerson ? 12 : 11) / globalScale;
-                    ctx.font = `${isPerson ? 600 : 500} ${fontSize}px 'Inter Variable', Inter, sans-serif`;
+                    const fontSize = (isDepartment ? 12 : 11) / globalScale;
+                    ctx.font = `${isDepartment ? 600 : 500} ${fontSize}px 'Inter Variable', Inter, sans-serif`;
                     ctx.textBaseline = 'middle';
                     ctx.lineJoin = 'round';
                     ctx.lineWidth = 3 / globalScale;
                     ctx.strokeStyle = 'rgba(255,255,255,0.92)';
                     ctx.strokeText(node.label, node.x + r + 4 / globalScale, node.y);
-                    ctx.fillStyle = isPerson ? '#1e1b3a' : '#5a5870';
+                    ctx.fillStyle = isDepartment ? '#1e1b3a' : '#5a5870';
                     ctx.fillText(node.label, node.x + r + 4 / globalScale, node.y);
                   }
                   ctx.globalAlpha = 1;
@@ -584,17 +506,16 @@ export default function KnowledgeGraph() {
                 </> : <span>{t('graph.legend.peerLink')}</span>}
                 {showReal && <span><i className="kg-line is-thick" style={{ background: EDGE_COLORS.session }} />{t('graph.legend.real')}</span>}
                 <span className="kg-muted">{t('graph.legend.size')}</span>
-                {hiddenCount > 0 && <span className="kg-muted">{t('graph.hiddenPeople', { count: hiddenCount })}</span>}
               </div>
               {/* What is selected, as a card over the graph so the graph keeps its width. */}
               {selected && selected.kind === 'skill' && <aside className="kg-detail-card" aria-label={t('graph.details')} aria-live="polite">
                 <div className="kg-detail-head">
-                  <span className={cn('kg-mark is-large', selected.kind === 'skill' && 'is-skill')} style={selected.kind === 'person' ? { background: departmentColor.get(selected.department) || OTHER_DEPARTMENT } : undefined} />
+                  <span className={cn('kg-mark is-large', selected.kind === 'skill' && 'is-skill')} />
                   <div><h2>{selected.label}</h2><p>{t('graph.kind.skill')}</p></div>
                   <button type="button" className="kg-close" onClick={clearFocus} aria-label={t('graph.close')}><X /></button>
                 </div>
-                <h3>{t('graph.details.taughtBy', { count: new Set(relations.get(selected.id)?.taughtBy || []).size })}</h3>{groupChips(relations.get(selected.id)?.taughtBy || [], t('graph.details.nobody'))}
-                <h3>{t('graph.details.wantedBy', { count: new Set(relations.get(selected.id)?.wantedBy || []).size })}</h3>{groupChips(relations.get(selected.id)?.wantedBy || [], t('graph.details.nobody'))}
+                <h3>{t('graph.details.taughtBy', { count: (relations.get(selected.id)?.taughtBy || []).reduce((sum, row) => sum + row.count, 0) })}</h3>{groupChips(relations.get(selected.id)?.taughtBy || [], t('graph.details.nobody'))}
+                <h3>{t('graph.details.wantedBy', { count: (relations.get(selected.id)?.wantedBy || []).reduce((sum, row) => sum + row.count, 0) })}</h3>{groupChips(relations.get(selected.id)?.wantedBy || [], t('graph.details.nobody'))}
               </aside>}
             </div>
           )}
@@ -617,7 +538,7 @@ export default function KnowledgeGraph() {
         </section>
         <section className="kg-card is-pairs" aria-label={t('graph.insights.pairs')}>
           <h3>{t('graph.insights.pairs')}</h3>
-          {departmentPairs.length ? <ol className="kg-ranked">{departmentPairs.map(pair => <li key={`${pair.a}-${pair.b}`}><div className="kg-ranked-row">
+          {departmentPairs.length ? <ol className="kg-ranked">{departmentPairs.map(pair => <li key={`${pair.a}-${pair.b}-${pair.type}`}><div className="kg-ranked-row">
             <span className="kg-ranked-label">
               <i className="kg-mark" style={{ background: departmentColor.get(pair.a) || OTHER_DEPARTMENT }} />{pair.a === pair.b ? t('graph.insights.within', { department: pair.a }) : `${pair.a} ↔ ${pair.b}`}
             </span>

@@ -49,6 +49,7 @@
   "admin.privacy.title": "Stato privacy / IA",
   "admin.privacy.description": "Impostazioni predefinite del pilota per visibilità tra pari, classificazione IA e funzioni di backend.",
   "admin.privacy.checking": "Verifica…",
+  "admin.privacy.suppressed": "Nascosto per tutelare la privacy",
   "admin.privacy.peerVisible": "Visibile ai pari",
   "admin.privacy.hidden": "Nascosto",
   "admin.privacy.modeInter": "Inter-azienda (PMI)",

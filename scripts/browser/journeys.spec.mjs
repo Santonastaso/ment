@@ -1968,9 +1968,9 @@ test('admin pages share the member pages\' cards and tabs, and show departments 
   expect(await page.getByTestId('admin-tab-overview').evaluate(element => getComputedStyle(element).borderRadius)).toBe('0px');
   // Departments only: no person is named or ranked on the overview.
   const rows = page.getByTestId('department-participation-row');
-  await expect(rows).toHaveCount(2);
-  await expect(rows.first()).toContainText('5 of 8 members active');
-  await expect(rows.nth(1)).toContainText('Other departments (under 5 people each)');
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText('Suppressed to protect privacy');
+  await expect(page.getByText('Other departments (under 5 people each)')).toHaveCount(0);
   await expect(page.getByText('Most active')).toHaveCount(0);
   await page.getByTestId('admin-tab-people').click();
   await expect(page.getByRole('button', { name: 'Download template' })).toHaveCSS('background-color', 'rgb(255, 255, 255)');

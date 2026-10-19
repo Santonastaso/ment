@@ -29,7 +29,7 @@ function StatCard({ label, value, sub }) {
     <Surface>
       <SurfaceBody className="py-4">
         <p className="text-sm text-muted-foreground">{label}</p>
-        <p className="mt-1 text-display font-medium tabular-nums tracking-[-0.01em]">{value}</p>
+        <p className="mt-1 text-display font-medium tabular-nums tracking-[-0.01em]">{value ?? '—'}</p>
         {sub && <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p>}
       </SurfaceBody>
     </Surface>
@@ -44,7 +44,7 @@ async function downloadBlob(apiPath, filename) {
   a.href = url;
   a.download = filename;
   a.click();
-  URL.revokeObjectURL(url);
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 const RETENTION_FIELDS = ['conversation_days', 'search_days', 'reflection_days', 'audit_log_days', 'deactivated_account_days'];
@@ -450,6 +450,9 @@ export default function AdminDashboard() {
 
   const sessionsByStatus = stats?.sessionsByStatus?.reduce((acc, r) => { acc[r.status] = r.cnt; return acc; }, {}) || {};
   const deptActivityMax = Math.max(...(stats?.deptActivity?.map(x => x.session_count || 0) ?? []), 1);
+  const visibleSessionStatuses = ['pending', 'scheduled', 'completed'].map(status => sessionsByStatus[status]);
+  const sessionsRequested = visibleSessionStatuses.every(Number.isInteger)
+    ? visibleSessionStatuses.reduce((sum, count) => sum + count, 0) : null;
   const isPlatformAdmin = user?.admin_scope === 'platform';
 
   return (
@@ -662,8 +665,9 @@ export default function AdminDashboard() {
             <>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <StatCard label={t('admin.stats.totalEmployees')} value={stats.totalUsers} />
-                <StatCard label={t('admin.stats.onboardingComplete')} value={`${stats.onboardingRate}%`} sub={t('admin.stats.onboardedOf', { onboarded: stats.onboarded, total: stats.totalUsers })} />
-                <StatCard label={t('admin.stats.sessionsRequested')} value={(sessionsByStatus.pending || 0) + (sessionsByStatus.scheduled || 0) + (sessionsByStatus.completed || 0)} />
+                <StatCard label={t('admin.stats.onboardingComplete')} value={stats.onboardingRate == null ? '—' : `${stats.onboardingRate}%`}
+                  sub={stats.onboardingRate == null ? t('admin.privacy.suppressed') : t('admin.stats.onboardedOf', { onboarded: stats.onboarded, total: stats.totalUsers })} />
+                <StatCard label={t('admin.stats.sessionsRequested')} value={sessionsRequested} />
                 <StatCard label={t('admin.stats.matchPairs')} value={stats.totalMatches} />
               </div>
 
@@ -678,9 +682,9 @@ export default function AdminDashboard() {
                 />
                 <SurfaceBody className="pt-5">
                   <div className="grid grid-cols-3 gap-3">
-                    <SessionBox count={sessionsByStatus.pending || 0} label={t('admin.sessions.pending')} tone="needs" />
-                    <SessionBox count={sessionsByStatus.scheduled || 0} label={t('admin.sessions.scheduled')} tone="scheduled" />
-                    <SessionBox count={sessionsByStatus.completed || 0} label={t('admin.sessions.completed')} tone="past" />
+                    <SessionBox count={sessionsByStatus.pending ?? null} label={t('admin.sessions.pending')} tone="needs" />
+                    <SessionBox count={sessionsByStatus.scheduled ?? null} label={t('admin.sessions.scheduled')} tone="scheduled" />
+                    <SessionBox count={sessionsByStatus.completed ?? null} label={t('admin.sessions.completed')} tone="past" />
                   </div>
                 </SurfaceBody>
               </Surface>
@@ -697,12 +701,12 @@ export default function AdminDashboard() {
                         <div key={d.department ?? ''} data-testid="department-participation-row">
                           <div className="mb-1 flex justify-between gap-2 text-sm">
                             <span className="font-medium text-foreground">{d.department ?? t('admin.dept.other')}</span>
-                            <span className="tabular-nums text-muted-foreground">{t('admin.participation.active', { active: d.active_members, members: d.members })}</span>
+                            <span className="tabular-nums text-muted-foreground">{d.active_members == null ? t('admin.privacy.suppressed') : t('admin.participation.active', { active: d.active_members, members: d.members })}</span>
                           </div>
                           <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                            <div className="h-full rounded-full bg-[var(--mint)]" style={{ width: `${d.members ? Math.round((d.active_members / d.members) * 100) : 0}%` }} />
+                            {d.active_members != null && <div className="h-full rounded-full bg-[var(--mint)]" style={{ width: `${d.members ? Math.round((d.active_members / d.members) * 100) : 0}%` }} />}
                           </div>
-                          <p className="mt-1 text-xs text-muted-foreground">{t('admin.participation.mentors', { count: d.mentors_active })}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">{d.mentors_active == null ? t('admin.privacy.suppressed') : t('admin.participation.mentors', { count: d.mentors_active })}</p>
                         </div>
                       ))}
                     </div>
@@ -720,15 +724,12 @@ export default function AdminDashboard() {
                           <div className="min-w-0 flex-1">
                             <div className="mb-1 flex justify-between gap-2 text-sm">
                               <span className="font-medium text-foreground">{d.department ?? t('admin.dept.other')}</span>
-                              <span className="tabular-nums text-muted-foreground">{t('admin.common.sessionsCount', { count: d.session_count })}</span>
+                              <span className="tabular-nums text-muted-foreground">{d.session_count == null ? t('admin.privacy.suppressed') : t('admin.common.sessionsCount', { count: d.session_count })}</span>
                             </div>
                             <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                              <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, (d.session_count / deptActivityMax) * 100)}%` }} />
+                              {d.session_count != null && <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, (d.session_count / deptActivityMax) * 100)}%` }} />}
                             </div>
                           </div>
-                          {d.session_count === 0 && (
-                            <span className="shrink-0 rounded-full border border-[var(--border)] px-2 py-0.5 text-xs text-muted-foreground">{t('admin.dept.siloRisk')}</span>
-                          )}
                         </div>
                       ))}
                     </div>
@@ -1101,7 +1102,7 @@ function SessionBox({ count, label, tone }) {
   const dot = { needs: 'bg-[var(--coral)]', scheduled: 'bg-[var(--mint)]', past: 'bg-[var(--muted-foreground)]' }[tone] || 'bg-[#b9b6cf]';
   return (
     <div className="rounded-lg border border-[var(--border)] p-3 text-center">
-      <p className="text-xl font-medium tabular-nums tracking-[-0.01em]">{count}</p>
+      <p className="text-xl font-medium tabular-nums tracking-[-0.01em]">{count ?? '—'}</p>
       <p className="mt-1 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
         <span className={`size-1.5 rounded-full ${dot}`} aria-hidden="true" />
         {label}

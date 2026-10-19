@@ -59,6 +59,7 @@
   "admin.privacy.title": "Privacy / AI status",
   "admin.privacy.description": "Current pilot defaults for peer visibility, AI classification, and backend functions.",
   "admin.privacy.checking": "Checking…",
+  "admin.privacy.suppressed": "Suppressed to protect privacy",
   "admin.privacy.peerVisible": "Peer-visible",
   "admin.privacy.hidden": "Hidden",
   "admin.privacy.modeInter": "Inter-company (PMI)",

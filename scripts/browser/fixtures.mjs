@@ -9,29 +9,21 @@ const peer = { id: 'peer', name: 'Peer Mentor', department: 'Finance', job_title
 //   failAfterCommit = path                uncertain (500), but the write went through
 //   refuseNext = { path, code }           refused (400), nothing saved
 function fixtureApi(state, ApiError) {
-  // A deterministic organisation big enough to judge the knowledge graph:
-  // ten departments, sixty people, two dozen skills, a few real sessions.
+  // Aggregated fixture data mirrors the privacy-safe RPC contract: there are
+  // no person nodes or person-level edges, and every released cell is >= 5.
   function sampleKnowledgeGraph() {
-    let seed = 7;
-    const rand = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
     const departments = ['Finance', 'Marketing', 'Consulting', 'Operations', 'Strategy', 'Data & Analytics', 'Human Resources', 'Public Policy', 'Luxury & Retail', 'Sustainability'];
-    const skills = ['Financial modelling', 'Valuation', 'Brand strategy', 'SQL', 'Python', 'Negotiation', 'Public speaking', 'Supply chain', 'Market research', 'Pricing',
-      'M&A', 'Product management', 'UX research', 'Change management', 'Data visualisation', 'Fundraising', 'ESG reporting', 'Talent acquisition', 'Policy analysis', 'Retail merchandising',
-      'Project management', 'Excel', 'Storytelling', 'Growth marketing'].map((label, i) => ({ id: `s${i}`, kind: 'skill', label }));
-    const people = Array.from({ length: 60 }, (_, i) => ({ id: `p${i}`, kind: 'person',
-      department: departments[Math.min(departments.length - 1, Math.floor(rand() * rand() * departments.length * 1.6))],
-      persona: i % 3 ? 'student' : 'alumnus', program: i % 2 ? 'MiM' : 'Global BBA', cohort_year: 2018 + (i % 8) }));
+    const departmentNodes = departments.map((label, index) => ({ id: `d:${index}`, kind: 'department', label, count: 6 }));
+    const skills = ['Financial modelling', 'Valuation', 'Brand strategy', 'SQL', 'Python', 'Negotiation', 'Public speaking', 'Supply chain']
+      .map((label, i) => ({ id: `s:${i}`, kind: 'skill', label, teachers: 8, learners: 7 }));
     const edges = [];
-    for (const person of people) {
-      if (rand() < 0.08) continue; // a few people have nothing yet
-      const home = departments.indexOf(person.department);
-      for (let k = 0; k < 2 + Math.floor(rand() * 3); k++) {
-        const skillIndex = Math.floor((home * 2.3 + rand() * 8) % skills.length);
-        edges.push({ source: person.id, target: skills[skillIndex].id, type: rand() < 0.55 ? 'can_teach' : 'wants_to_learn' });
-      }
-    }
-    for (let k = 0; k < 12; k++) edges.push({ source: `p${Math.floor(rand() * 60)}`, target: `p${Math.floor(rand() * 60)}`, type: k % 3 ? 'session' : 'connection', weight: 1 + Math.floor(rand() * 3) });
-    return { nodes: [...people, ...skills], edges: edges.filter(e => e.source !== e.target), meta: { organizations: [{ id: 'org', name: 'ESSEC' }], languages: ['en', 'fr'] } };
+    departmentNodes.forEach((department, index) => {
+      edges.push({ source: department.id, target: 's:1', type: index % 2 ? 'wants_to_learn' : 'can_teach', count: 6 });
+      if (index < skills.length) edges.push({ source: department.id, target: `s:${index}`, type: 'can_teach', count: 6 });
+      if (index > 0) edges.push({ source: 'd:0', target: department.id, type: 'session', count: 8 });
+    });
+    edges.push({ source: 'd:0', target: 'd:1', type: 'connection', count: 6 });
+    return { nodes: [...departmentNodes, ...skills], edges, meta: { organizations: [{ id: 'org', name: 'ESSEC' }], languages: ['en', 'fr'] } };
   }
 
   const dropped = () => new ApiError('TypeError: Failed to fetch', 500);
@@ -196,9 +188,9 @@ function fixtureApi(state, ApiError) {
       const admin = {
         '/admin/stats': { totalUsers: 4, totalEmployees: 4, onboarded: 3, onboardedOf: 4, onboardingComplete: 3, onboardingRate: 75,
           totalMatches: 5, sessionsRequested: 6, matchPairs: [],
-          departmentParticipation: [{ department: 'Finance', members: 8, active_members: 5, mentors_active: 2 }, { department: null, members: 3, active_members: 1, mentors_active: 0 }],
-          deptActivity: [{ department: 'Finance', session_count: 4 }, { department: 'Marketing', session_count: 2 }],
-          sessionsByStatus: [{ status: 'pending', cnt: 2 }, { status: 'scheduled', cnt: 1 }, { status: 'completed', cnt: 2 }] },
+          departmentParticipation: [{ department: 'Finance', members: 8, active_members: null, mentors_active: null }],
+          deptActivity: [{ department: 'Finance', session_count: null }],
+          sessionsByStatus: [{ status: 'pending', cnt: null }, { status: 'scheduled', cnt: null }, { status: 'completed', cnt: null }] },
         '/admin/users': { users: [
           { id: 'peer', name: 'Peer Mentor', email: 'peer@example.test', role: 'alumnus', department: 'Finance', sessions: 3 },
           { id: 'viewer', name: 'Viewer Student', email: 'student@example.test', role: 'student', department: 'Finance', sessions: 2 },

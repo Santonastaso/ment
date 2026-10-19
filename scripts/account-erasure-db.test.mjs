@@ -93,6 +93,8 @@ test('an erased account leaves nothing personal, and the other side keeps the co
       insert into invitations(email, profile_data, accepted_user_id) values ('me@example.test', '{"name":"Leaver Person"}', '${leaver}');
     `);
     await db.exec(await migration('20261019110000_0087_ai_opt_out_and_account_erasure.sql'));
+    await db.exec(await migration('20261019130000_0089_data_retention.sql'));
+    await db.exec(await migration('20261020110000_0091_retention_storage_cleanup_order.sql'));
 
     // Only the server may erase.
     for (const role of ['anon', 'authenticated']) {
@@ -102,6 +104,7 @@ test('an erased account leaves nothing personal, and the other side keeps the co
 
     const result = (await one('select erase_account_data($1) value', [leaver])).value;
     assert.deepEqual(result, { erased: true, cancelled_sessions: 1 });
+    assert.deepEqual((await one('select retention_auth_cleanup_candidates() value')).value, [leaver]);
 
     const profile = await one('select * from profiles where id = $1', [leaver]);
     assert.equal(profile.name, 'Former member');
@@ -135,6 +138,8 @@ test('an erased account leaves nothing personal, and the other side keeps the co
 
     // Running it again is harmless, so a retry after a partial failure is safe.
     assert.equal((await one('select erase_account_data($1) value', [leaver])).value.erased, true);
+    assert.equal((await one('select complete_account_auth_cleanup($1) value', [leaver])).value, true);
+    assert.deepEqual((await one('select retention_auth_cleanup_candidates() value')).value, []);
   } finally {
     await db.close();
   }
@@ -194,8 +199,13 @@ test('retention deletes nothing until periods are set, then only what is older t
     `);
     await db.exec(await migration('20261019110000_0087_ai_opt_out_and_account_erasure.sql'));
     await db.exec(await migration('20261019130000_0089_data_retention.sql'));
+    await db.exec(await migration('20261020110000_0091_retention_storage_cleanup_order.sql'));
     for (const role of ['anon', 'authenticated']) {
       assert.equal((await one(`select has_function_privilege('${role}', 'public.run_data_retention()', 'execute') value`)).value, false);
+      assert.equal((await one(`select has_function_privilege('${role}', 'public.retention_account_candidates()', 'execute') value`)).value, false);
+      assert.equal((await one(`select has_function_privilege('${role}', 'public.run_retention_account_erasure(uuid[])', 'execute') value`)).value, false);
+      assert.equal((await one(`select has_function_privilege('${role}', 'public.retention_auth_cleanup_candidates()', 'execute') value`)).value, false);
+      assert.equal((await one(`select has_function_privilege('${role}', 'public.complete_account_auth_cleanup(uuid)', 'execute') value`)).value, false);
     }
 
     // No periods: nothing goes.
@@ -211,19 +221,27 @@ test('retention deletes nothing until periods are set, then only what is older t
     const saved = (await one(`select admin_set_retention_settings('{"conversation_days": 365, "search_days": "365", "reflection_days": 365, "audit_log_days": 365, "deactivated_account_days": 365}') value`)).value;
     assert.equal(saved.conversation_days, 365);
 
+    const candidates = (await one('select retention_account_candidates() value')).value;
+    assert.deepEqual(candidates, [leaver]);
     const swept = (await one('select run_data_retention() value')).value;
-    assert.deepEqual(swept, { messages: 2, sessions_cleared: 1, searches: 1, reflections: 1, audit_logs: 1, erased_user_ids: [leaver] });
+    assert.deepEqual(swept, { messages: 2, sessions_cleared: 1, searches: 1, reflections: 1, audit_logs: 1, erased_user_ids: [] });
     assert.deepEqual((await db.query('select body from session_messages')).rows.map(r => r.body), ['new']);
     assert.deepEqual((await db.query('select body from group_messages')).rows.map(r => r.body), ['new']);
     assert.deepEqual((await db.query('select outbound_message from sessions order by id')).rows.map(r => r.outbound_message), ['', 'new words']);
     assert.equal(await count('discovery_threads'), 1);
     assert.equal(await count('reflection_logs'), 1);
     assert.equal(await count('audit_logs'), 2, 'recent entries and system entries stay');
+    // Account cleanup is finalized only after the Edge Function has removed
+    // Storage objects for the returned candidates.
+    assert.equal((await one('select name from profiles where id = $1', [leaver])).name, 'Long Gone');
+    assert.deepEqual((await one('select run_retention_account_erasure($1) value', [candidates])).value, [leaver]);
+    assert.deepEqual((await one('select retention_auth_cleanup_candidates() value')).value, [leaver]);
+    assert.equal((await one('select complete_account_auth_cleanup($1) value', [leaver])).value, true);
     // Deactivated long ago: erased. Deactivated last week: kept.
     assert.equal((await one('select name from profiles where id = $1', [leaver])).name, 'Former member');
     assert.equal((await one('select name from profiles where id = $1', [friend])).name, 'Friend');
     // Running again finds nothing new.
-    assert.deepEqual((await one('select run_data_retention() value')).value.erased_user_ids, []);
+    assert.deepEqual((await one('select retention_account_candidates() value')).value, []);
   } finally {
     await db.close();
   }

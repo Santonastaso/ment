@@ -8,7 +8,7 @@ const org = '00000000-0000-0000-0000-0000000000aa';
 const admin = '20000000-0000-0000-0000-000000000000';
 const id = n => `10000000-0000-0000-0000-${String(n).padStart(12, '0')}`;
 
-test('the admin dashboard gets departments and trends, never a named or traceable person', async () => {
+test('admin reporting contains only aggregates and suppresses every cell below five', async () => {
   const db = new PGlite();
   const one = async (sql, args = []) => (await db.query(sql, args)).rows[0];
   try {
@@ -44,37 +44,42 @@ test('the admin dashboard gets departments and trends, never a named or traceabl
     `);
     await db.exec(await migration('20261019120000_0088_admin_dashboard_without_names.sql'));
 
+    await db.exec(await migration('20261020100000_0090_aggregate_admin_reporting.sql'));
+    await db.exec(`
+      insert into skills(user_id, skill, type) values
+        ('${id(1)}', 'Valuation', 'can_teach'), ('${id(2)}', 'Valuation', 'can_teach'),
+        ('${id(3)}', 'Valuation', 'can_teach'), ('${id(4)}', 'Valuation', 'can_teach'),
+        ('${id(5)}', 'Valuation', 'can_teach'), ('${id(1)}', 'Valuation', 'wants_to_learn'),
+        ('${id(7)}', 'Valuation', 'wants_to_learn'), ('${id(8)}', 'Rare skill', 'can_teach'),
+        ('${id(1)}', 'Three-member skill', 'can_teach'), ('${id(1)}', 'Three-member skill', 'wants_to_learn'),
+        ('${id(2)}', 'Three-member skill', 'can_teach'), ('${id(2)}', 'Three-member skill', 'wants_to_learn'),
+        ('${id(3)}', 'Three-member skill', 'can_teach'), ('${id(3)}', 'Three-member skill', 'wants_to_learn');
+    `);
     const graph = (await one('select knowledge_graph() value')).value;
     const text = JSON.stringify(graph);
     for (const [pid, name] of people) {
       assert.ok(!text.includes(pid), 'no profile id');
       assert.ok(!text.includes(name), 'no name');
     }
-    for (const field of ['label', 'job_title', 'location', 'seniority']) {
-      assert.ok(graph.nodes.filter(n => n.kind === 'person').every(n => !(field in n)), field);
-    }
-    const persons = graph.nodes.filter(n => n.kind === 'person');
-    assert.equal(persons.length, 8);
-    assert.deepEqual([...new Set(persons.map(n => n.department))].sort(), ['Finance', null]);
-    // Edges still connect the right nodes inside one response.
-    const session = graph.edges.find(e => e.type === 'session');
-    assert.ok(persons.some(n => n.id === session.source) && persons.some(n => n.id === session.target));
-    assert.ok(graph.edges.some(e => e.target === 's:valuation' && e.type === 'can_teach'));
-    // A second call draws new ids, so an id cannot be followed across calls.
-    const teacher = r => r.edges.find(e => e.type === 'can_teach').source;
-    const seen = new Set([teacher(graph)]);
-    for (let call = 0; call < 12; call += 1) seen.add(teacher((await one('select knowledge_graph() value')).value));
-    assert.ok(seen.size > 1, 'the same person gets different ids from call to call');
+    assert.ok(graph.nodes.every(n => n.kind === 'department' || n.kind === 'skill'));
+    assert.deepEqual(graph.nodes.filter(n => n.kind === 'department').map(n => [n.label, n.count]), [['Finance', 6]]);
+    assert.ok(!graph.nodes.some(n => n.label === 'Rare skill'), 'a skill with fewer than five contributors is hidden');
+    assert.ok(!graph.nodes.some(n => n.label === 'Three-member skill'), 'two skill roles for one member do not count twice');
+    assert.deepEqual(graph.edges.map(e => [e.type, e.count]), [['can_teach', 5]]);
+    assert.ok(graph.edges.every(e => e.count >= 5));
+    assert.deepEqual(graph.meta.languages, ['en']);
 
     const stats = (await one('select admin_stats() value')).value;
     assert.ok(!('topMentors' in stats));
     assert.ok(!JSON.stringify(stats).includes('Person'));
     assert.deepEqual(stats.departmentParticipation, [
-      { department: 'Finance', members: 6, active_members: 2, mentors_active: 1 },
-      { department: null, members: 2, active_members: 1, mentors_active: 0 },
+      { department: 'Finance', members: 6, active_members: null, mentors_active: null },
     ]);
-    assert.deepEqual(stats.deptActivity.map(d => [d.department, d.session_count]).sort(), [['Finance', 1], [null, 1]].sort());
+    assert.deepEqual(stats.deptActivity, [{ department: 'Finance', session_count: null }]);
+    assert.deepEqual(stats.sessionsByStatus.map(s => s.cnt), [null, null]);
     assert.equal(stats.totalUsers, 8);
+    assert.equal(stats.onboarded, null, 'a zero-sized complementary cell is suppressed');
+    assert.equal(stats.onboardingRate, null, 'rate is suppressed when either side is below five');
     assert.equal((await one("select count(*)::int n from pg_proc where proname = 'most_active_users'")).n, 0);
   } finally {
     await db.close();

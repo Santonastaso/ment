@@ -7,6 +7,7 @@
 import {
   closeErasedLogin, corsHeaders, generateTempPassword, jsonError, jsonOk, requireAdmin, requireUser,
 } from '../_shared/index.ts';
+import { removeUserProfileUploads } from '../_shared/profile-uploads.mjs';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -33,6 +34,19 @@ Deno.serve(async (req) => {
     userId = ctx.user.id;
   }
 
+  // Do this before database erasure or login scrubbing: on failure, the caller
+  // can retry while still authenticated. The helper fails closed on list or
+  // remove errors instead of claiming the account was fully erased.
+  try {
+    await removeUserProfileUploads(ctx.sb.storage, userId);
+  } catch (error) {
+    console.error(JSON.stringify({
+      event: 'account_erase_failed', stage: 'profile_uploads',
+      code: error instanceof Error ? error.message : 'unknown',
+    }));
+    return jsonError('erase_failed', 500);
+  }
+
   const { error } = await ctx.sb.rpc('erase_account_data', { p_user_id: userId });
   if (error) {
     if (/admin_account/.test(error.message)) return jsonError('admin_account', 403);
@@ -45,6 +59,12 @@ Deno.serve(async (req) => {
     // The data is already gone and the profile deactivated; an admin can run
     // the erase again to finish the login, since the database step repeats safely.
     console.error(JSON.stringify({ event: 'account_erase_failed', stage: 'login', status: loginError.status || 0 }));
+    return jsonError('login_erase_failed', 500);
+  }
+
+  const { error: cleanupError } = await ctx.sb.rpc('complete_account_auth_cleanup', { p_user_id: userId });
+  if (cleanupError) {
+    console.error(JSON.stringify({ event: 'account_erase_failed', stage: 'auth_cleanup_queue', code: cleanupError.code || '' }));
     return jsonError('login_erase_failed', 500);
   }
 

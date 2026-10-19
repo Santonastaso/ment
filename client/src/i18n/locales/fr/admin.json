@@ -49,6 +49,7 @@
   "admin.privacy.title": "Confidentialité et état de l'IA",
   "admin.privacy.description": "Paramètres actuels du pilote pour la visibilité entre membres, l'analyse par IA et les fonctions serveur.",
   "admin.privacy.checking": "Vérification…",
+  "admin.privacy.suppressed": "Masqué pour protéger la confidentialité",
   "admin.privacy.peerVisible": "Visible par les pairs",
   "admin.privacy.hidden": "Masqué",
   "admin.privacy.modeInter": "Entre organisations (PMI)",
