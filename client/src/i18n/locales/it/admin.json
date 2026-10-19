@@ -227,5 +227,11 @@
   "admin.pm.externalTargetCohort": "Coorte / semestre",
   "admin.pm.addExternalTarget": "Aggiungi invitato",
   "admin.pm.externalTargetRecordedHelp": "L'invitato con sola email è ora incluso nel report di attivazione.",
-  "admin.pm.feedbackInbox": "Questa è la casella feedback della scuola. I messaggi restano qui per il power user; in questa demo non è configurato l'invio email esterno."
+  "admin.pm.feedbackInbox": "Questa è la casella feedback della scuola. I messaggi restano qui per il power user; in questa demo non è configurato l'invio email esterno.",
+  "admin.users.erase": "Cancella dati",
+  "admin.dialog.eraseTitle": "Cancellare i dati di questo membro?",
+  "admin.dialog.eraseDescription": "Profilo, competenze, esperienze, riflessioni, ricerche e messaggi inviati da {name} vengono eliminati e il suo accesso viene chiuso definitivamente. Le persone che ha incontrato conservano la propria parte delle conversazioni. L’operazione è irreversibile.",
+  "admin.dialog.eraseConfirm": "Cancella definitivamente",
+  "admin.notice.userErasedTitle": "Dati cancellati",
+  "admin.notice.userErasedMsg": "I dati di {name} sono stati cancellati."
 }

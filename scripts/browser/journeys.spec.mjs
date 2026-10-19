@@ -1921,3 +1921,26 @@ test('members are told the chat is an AI, and can download their own data', asyn
   const exported = JSON.parse(await (await download.createReadStream()).toArray().then(parts => Buffer.concat(parts).toString('utf8')));
   expect([exported.format, exported.profile.id]).toEqual(['ment-export-1', 'viewer']);
 });
+
+test('a member can switch AI off and delete their account', async ({ page }) => {
+  await page.goto('/profile?tab=availability');
+  const ai = page.getByTestId('toggle-ai');
+  await expect(ai).toHaveAttribute('aria-checked', 'true');
+  await ai.click();
+  await expect(ai).toHaveAttribute('aria-checked', 'false');
+  await expect(page.getByText(/never sent to the AI/)).toBeVisible();
+  expect(await page.evaluate(() => window.fixture.calls.find(call => call.method === 'put' && call.path === '/users/me')?.body)).toEqual({ ai_opt_out: true });
+  // Reading a CV needs AI, so the import is gone while it is off.
+  await page.getByText('Experience', { exact: true }).click();
+  await expect(page.getByRole('button', { name: '+ Add entry' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Update from CV' })).toHaveCount(0);
+
+  await page.getByText('Availability', { exact: true }).click();
+  await page.getByTestId('delete-account').click();
+  const confirm = page.getByTestId('delete-account-confirm');
+  await expect(confirm).toBeDisabled();
+  await page.getByTestId('delete-account-word').fill('delete');
+  await confirm.click();
+  await expect(page).toHaveURL(/\/login$/);
+  expect(await page.evaluate(() => window.fixture.erased)).toBe(true);
+});

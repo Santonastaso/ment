@@ -358,6 +358,22 @@ export default function AdminDashboard() {
     });
   }
 
+  // GDPR erasure on a member's request: their data goes, the other side of
+  // shared conversations stays. Irreversible, unlike deactivation.
+  function openEraseConfirm(user) {
+    setConfirmDialog({
+      title: t('admin.dialog.eraseTitle'),
+      description: t('admin.dialog.eraseDescription', { name: user.name }),
+      confirmLabel: t('admin.dialog.eraseConfirm'),
+      destructive: true,
+      onConfirm: async () => {
+        await api.post(`/admin/users/${user.id}/erase`);
+        loadUsers();
+        setNotice({ variant: 'default', title: t('admin.notice.userErasedTitle'), message: t('admin.notice.userErasedMsg', { name: user.name }) });
+      },
+    });
+  }
+
   function openSetManager(user) {
     setManagerEmailDraft(user.manager_email || '');
     setManagerDialog({ userId: user.id, userName: user.name });
@@ -875,6 +891,10 @@ export default function AdminDashboard() {
                             <Button type="button" variant="link" size="sm" className="h-auto px-0 text-xs" onClick={() => openResetPasswordConfirm(u)}>{t('admin.users.resetPassword')}</Button>
                             <Button type="button" variant="link" size="sm" className="h-auto px-0 text-xs text-destructive" onClick={() => openDeactivateConfirm(u)}>{t('admin.users.deactivate')}</Button>
                           </>
+                        )}
+                        {/* An erased login keeps only a placeholder address. */}
+                        {!u.email?.endsWith('@erased.invalid') && (
+                          <Button type="button" variant="link" size="sm" className="h-auto px-0 text-xs text-destructive" data-testid={`erase-user-${u.id}`} onClick={() => openEraseConfirm(u)}>{t('admin.users.erase')}</Button>
                         )}
                       </td>
                     </tr>

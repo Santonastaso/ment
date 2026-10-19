@@ -227,5 +227,11 @@
   "admin.pm.externalTargetCohort": "Cohort / term",
   "admin.pm.addExternalTarget": "Add invited target",
   "admin.pm.externalTargetRecordedHelp": "The email-only invitee is now included in activation reporting.",
-  "admin.pm.feedbackInbox": "This is the school's feedback inbox. Messages are retained here for the power user to review."
+  "admin.pm.feedbackInbox": "This is the school's feedback inbox. Messages are retained here for the power user to review.",
+  "admin.users.erase": "Erase data",
+  "admin.dialog.eraseTitle": "Erase this member's data?",
+  "admin.dialog.eraseDescription": "{name}'s profile, skills, experience, reflections, searches and the messages they sent are deleted, and their login is closed for good. People they met keep their own side of those conversations. This cannot be undone.",
+  "admin.dialog.eraseConfirm": "Erase permanently",
+  "admin.notice.userErasedTitle": "Data erased",
+  "admin.notice.userErasedMsg": "{name}'s data has been erased."
 }

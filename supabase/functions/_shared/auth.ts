@@ -45,6 +45,13 @@ export async function requireUser(req: Request) {
   return { user: data.user, sb };
 }
 
+// A member who opted out of AI (profiles.ai_opt_out) never has their data sent
+// to the model. Read failures count as opted out: refusing is the safe side.
+export async function aiOptedOut(sb: SupabaseClient, userId: string) {
+  const { data, error } = await sb.from('profiles').select('ai_opt_out').eq('id', userId).maybeSingle();
+  return Boolean(error || !data || data.ai_opt_out);
+}
+
 export async function requireAdmin(req: Request) {
   const ctx = await requireUser(req);
   const { data: profile } = await ctx.sb

@@ -61,6 +61,7 @@ function fixtureApi(state, ApiError) {
       }
     }
     if (method === 'post') {
+      if (path === '/users/me/delete') { state.erased = true; return { erased: true }; }
       if (path === '/users/me/consents') {
         const row = { purpose: body.purpose, text_version: 'fixture', accepted_at: new Date().toISOString() };
         state.consents = [...(state.consents || []), row];

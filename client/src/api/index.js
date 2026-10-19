@@ -1065,6 +1065,18 @@ async function post(url, body = {}, opts = {}) {
     return ok(data, 201);
   }
 
+  if (/^\/admin\/users\/[^/]+\/erase$/.test(url)) {
+    const { data, error } = await invokeUserFunction('delete-account', { user_id: url.split('/')[3] });
+    if (error || data?.error) throw await edgeFunctionError(error, data, 'erase_failed');
+    return ok(data);
+  }
+
+  if (url === '/users/me/delete') {
+    const { data, error } = await invokeUserFunction('delete-account', { confirm: 'DELETE' });
+    if (error || data?.error) throw await edgeFunctionError(error, data, 'erase_failed');
+    return ok(data);
+  }
+
   if (/^\/admin\/users\/[^/]+\/reset-password$/.test(url)) {
     const id = url.split('/')[3];
     const { data, error } = await supabase.functions.invoke('admin-reset-password', { body: { user_id: id } });
@@ -1115,6 +1127,8 @@ async function put(url, body = {}) {
       'weekly_meeting_limit', 'monthly_meeting_limit',
       // Optional monthly goal — feeds the soft nudge on the dashboard.
       'monthly_session_goal',
+      // Keeps the member's data away from the AI (GDPR Art. 21).
+      'ai_opt_out',
     ];
     const update = {};
     for (const k of allowed) if (Object.prototype.hasOwnProperty.call(body, k)) {

@@ -135,5 +135,20 @@
   "profile.data.help": "Scarica tutto ciò che MENT conserva su di te: profilo, competenze, esperienze, riflessioni, richieste, i messaggi che hai inviato e le tue ricerche. I messaggi e le note private delle altre persone non sono inclusi.",
   "profile.data.download": "Scarica i miei dati",
   "profile.data.preparing": "Preparazione…",
-  "profile.data.error": "Non siamo riusciti a preparare i tuoi dati. Riprova."
+  "profile.data.error": "Non siamo riusciti a preparare i tuoi dati. Riprova.",
+  "profile.ai.title": "Suggerimenti dell’IA",
+  "profile.ai.onHelp": "Attivi: l’assistente IA può suggerirti a chi cerca aiuto, leggere un CV che carichi e associare competenze alle tue riflessioni.",
+  "profile.ai.offHelp": "Disattivati: profilo, CV e riflessioni non vengono mai inviati all’IA e l’assistente non ti suggerisce. Le persone possono comunque trovarti in Esplora. Se usi tu la chat, ciò che scrivi e il tuo nome vengono comunque inviati per scrivere il messaggio.",
+  "profile.ai.onSaved": "Suggerimenti dell’IA attivati.",
+  "profile.ai.offSaved": "Suggerimenti dell’IA disattivati.",
+  "profile.delete.title": "Elimina il tuo account",
+  "profile.delete.help": "Elimina definitivamente profilo, competenze, esperienze, riflessioni, ricerche e i messaggi che hai inviato, e chiude il tuo accesso. Le persone che hai incontrato conservano la propria parte delle conversazioni.",
+  "profile.delete.button": "Elimina il mio account",
+  "profile.delete.confirmTitle": "Eliminare definitivamente il tuo account?",
+  "profile.delete.confirmBody": "L’operazione è irreversibile. Le richieste e gli incontri in corso vengono annullati e verrai disconnesso. Se vuoi una copia, scarica prima i tuoi dati.",
+  "profile.delete.word": "ELIMINA",
+  "profile.delete.typeWord": "Scrivi {word} per confermare",
+  "profile.delete.confirm": "Elimina definitivamente",
+  "profile.delete.deleting": "Eliminazione…",
+  "profile.delete.error": "Non siamo riusciti a eliminare il tuo account. Riprova o contatta l’amministratore MENT della tua scuola."
 }
