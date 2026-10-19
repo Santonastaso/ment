@@ -18,7 +18,7 @@ function fixtureApi(state, ApiError) {
     const skills = ['Financial modelling', 'Valuation', 'Brand strategy', 'SQL', 'Python', 'Negotiation', 'Public speaking', 'Supply chain', 'Market research', 'Pricing',
       'M&A', 'Product management', 'UX research', 'Change management', 'Data visualisation', 'Fundraising', 'ESG reporting', 'Talent acquisition', 'Policy analysis', 'Retail merchandising',
       'Project management', 'Excel', 'Storytelling', 'Growth marketing'].map((label, i) => ({ id: `s${i}`, kind: 'skill', label }));
-    const people = Array.from({ length: 60 }, (_, i) => ({ id: `p${i}`, kind: 'person', label: `Person ${i + 1}`,
+    const people = Array.from({ length: 60 }, (_, i) => ({ id: `p${i}`, kind: 'person',
       department: departments[Math.min(departments.length - 1, Math.floor(rand() * rand() * departments.length * 1.6))],
       persona: i % 3 ? 'student' : 'alumnus', program: i % 2 ? 'MiM' : 'Global BBA', cohort_year: 2018 + (i % 8) }));
     const edges = [];
@@ -194,10 +194,10 @@ function fixtureApi(state, ApiError) {
       const [route] = path.split('?');
       const admin = {
         '/admin/stats': { totalUsers: 4, totalEmployees: 4, onboarded: 3, onboardedOf: 4, onboardingComplete: 3, onboardingRate: 75,
-          totalMatches: 5, sessionsRequested: 6, matchPairs: [], topMentors: [{ id: 'peer', name: 'Peer Mentor', department: 'Finance', session_count: 3 }],
+          totalMatches: 5, sessionsRequested: 6, matchPairs: [],
+          departmentParticipation: [{ department: 'Finance', members: 8, active_members: 5, mentors_active: 2 }, { department: null, members: 3, active_members: 1, mentors_active: 0 }],
           deptActivity: [{ department: 'Finance', session_count: 4 }, { department: 'Marketing', session_count: 2 }],
           sessionsByStatus: [{ status: 'pending', cnt: 2 }, { status: 'scheduled', cnt: 1 }, { status: 'completed', cnt: 2 }] },
-        '/admin/most-active-users': [{ id: 'peer', name: 'Peer Mentor', department: 'Finance', sessions: 3 }],
         '/admin/users': { users: [
           { id: 'peer', name: 'Peer Mentor', email: 'peer@example.test', role: 'alumnus', department: 'Finance', sessions: 3 },
           { id: 'viewer', name: 'Viewer Student', email: 'student@example.test', role: 'student', department: 'Finance', sessions: 2 },

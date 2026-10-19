@@ -64,10 +64,6 @@
   "admin.sessions.pending": "In attesa",
   "admin.sessions.scheduled": "Programmate",
   "admin.sessions.completed": "Completate",
-  "admin.mentors.title": "Mentor più attivi",
-  "admin.mentors.empty": "Nessuna sessione completata finora.",
-  "admin.activeUsers.title": "Utenti più attivi",
-  "admin.activeUsers.empty": "Nessuna attività di sessione finora.",
   "admin.dept.title": "Attività per reparto",
   "admin.dept.siloRisk": "Rischio silo",
   "admin.dept.empty": "Ancora nessun dato.",
@@ -233,5 +229,9 @@
   "admin.dialog.eraseDescription": "Profilo, competenze, esperienze, riflessioni, ricerche e messaggi inviati da {name} vengono eliminati e il suo accesso viene chiuso definitivamente. Le persone che ha incontrato conservano la propria parte delle conversazioni. L’operazione è irreversibile.",
   "admin.dialog.eraseConfirm": "Cancella definitivamente",
   "admin.notice.userErasedTitle": "Dati cancellati",
-  "admin.notice.userErasedMsg": "I dati di {name} sono stati cancellati."
+  "admin.notice.userErasedMsg": "I dati di {name} sono stati cancellati.",
+  "admin.participation.title": "Partecipazione per dipartimento",
+  "admin.participation.active": "{active} membri attivi su {members}",
+  "admin.participation.mentors": "Mentor che hanno tenuto una sessione: {count}",
+  "admin.dept.other": "Altri dipartimenti (meno di 5 persone ciascuno)"
 }

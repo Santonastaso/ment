@@ -574,13 +574,6 @@ async function get(url) {
     if (error) throw new ApiError(error.message);
     return ok(data);
   }
-  if (url === '/admin/most-active-users' || url.startsWith('/admin/most-active-users?')) {
-    const params = new URLSearchParams(url.split('?')[1] || '');
-    const limit = Number(params.get('limit') || 10);
-    const { data, error } = await supabase.rpc('most_active_users', { p_limit: limit });
-    if (error) throw new ApiError(error.message);
-    return ok(data);
-  }
   if (url === '/admin/owner-stats') {
     const { data, error } = await supabase.rpc('platform_owner_stats');
     if (error) throw new ApiError(error.message);

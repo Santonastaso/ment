@@ -74,10 +74,6 @@
   "admin.sessions.pending": "Pending",
   "admin.sessions.scheduled": "Scheduled",
   "admin.sessions.completed": "Completed",
-  "admin.mentors.title": "Most active mentors",
-  "admin.mentors.empty": "No completed sessions yet.",
-  "admin.activeUsers.title": "Most active users",
-  "admin.activeUsers.empty": "No session activity yet.",
   "admin.dept.title": "Department activity",
   "admin.dept.siloRisk": "Silo risk",
   "admin.dept.empty": "No data yet.",
@@ -233,5 +229,9 @@
   "admin.dialog.eraseDescription": "{name}'s profile, skills, experience, reflections, searches and the messages they sent are deleted, and their login is closed for good. People they met keep their own side of those conversations. This cannot be undone.",
   "admin.dialog.eraseConfirm": "Erase permanently",
   "admin.notice.userErasedTitle": "Data erased",
-  "admin.notice.userErasedMsg": "{name}'s data has been erased."
+  "admin.notice.userErasedMsg": "{name}'s data has been erased.",
+  "admin.participation.title": "Participation by department",
+  "admin.participation.active": "{active} of {members} members active",
+  "admin.participation.mentors": "Mentors who gave a session: {count}",
+  "admin.dept.other": "Other departments (under 5 people each)"
 }

@@ -1945,7 +1945,7 @@ test('a member can switch AI off and delete their account', async ({ page }) => 
   expect(await page.evaluate(() => window.fixture.erased)).toBe(true);
 });
 
-test('admin pages share the member pages\' cards, tabs and avatars', async ({ page }) => {
+test('admin pages share the member pages\' cards and tabs, and show departments rather than people', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => sessionStorage.setItem('ment.fixture.auth', JSON.stringify({ id: 'admin', name: 'Org Admin', email: 'admin@example.test', role: 'admin', onboarding_complete: true, is_admin: true, admin_scope: 'org' })));
   await page.goto('/admin');
@@ -1953,8 +1953,12 @@ test('admin pages share the member pages\' cards, tabs and avatars', async ({ pa
   await expect(panel).toBeVisible();
   expect(await panel.evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgb(255, 255, 255)');
   expect(await page.getByTestId('admin-tab-overview').evaluate(element => getComputedStyle(element).borderRadius)).toBe('0px');
-  const initial = page.getByText('Peer Mentor').first().locator('xpath=../preceding-sibling::div[1]');
-  expect(await initial.evaluate(element => getComputedStyle(element).color)).toBe('rgb(30, 27, 58)');
+  // Departments only: no person is named or ranked on the overview.
+  const rows = page.getByTestId('department-participation-row');
+  await expect(rows).toHaveCount(2);
+  await expect(rows.first()).toContainText('5 of 8 members active');
+  await expect(rows.nth(1)).toContainText('Other departments (under 5 people each)');
+  await expect(page.getByText('Most active')).toHaveCount(0);
   await page.getByTestId('admin-tab-people').click();
   await expect(page.getByRole('button', { name: 'Download template' })).toHaveCSS('background-color', 'rgb(255, 255, 255)');
 });

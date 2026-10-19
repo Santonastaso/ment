@@ -64,10 +64,6 @@
   "admin.sessions.pending": "En attente",
   "admin.sessions.scheduled": "Programmés",
   "admin.sessions.completed": "Terminés",
-  "admin.mentors.title": "Mentors les plus actifs",
-  "admin.mentors.empty": "Aucun échange terminé pour le moment.",
-  "admin.activeUsers.title": "Membres les plus actifs",
-  "admin.activeUsers.empty": "Aucune activité d'échange pour le moment.",
   "admin.dept.title": "Activité par département",
   "admin.dept.siloRisk": "Risque de cloisonnement",
   "admin.dept.empty": "Pas encore de données.",
@@ -233,5 +229,9 @@
   "admin.dialog.eraseDescription": "Le profil, les compétences, les expériences, les réflexions, les recherches et les messages envoyés par {name} sont supprimés, et son accès est fermé définitivement. Les personnes rencontrées conservent leur part des conversations. Cette action est irréversible.",
   "admin.dialog.eraseConfirm": "Effacer définitivement",
   "admin.notice.userErasedTitle": "Données effacées",
-  "admin.notice.userErasedMsg": "Les données de {name} ont été effacées."
+  "admin.notice.userErasedMsg": "Les données de {name} ont été effacées.",
+  "admin.participation.title": "Participation par département",
+  "admin.participation.active": "{active} membres actifs sur {members}",
+  "admin.participation.mentors": "Mentors ayant animé une session : {count}",
+  "admin.dept.other": "Autres départements (moins de 5 personnes chacun)"
 }

@@ -23,7 +23,6 @@ import AdminPmKpis from '../components/admin/AdminPmKpis.jsx';
 import AdminInvitationPanel from '../components/admin/AdminInvitationPanel.jsx';
 import AdminProvisionUserPanel from '../components/admin/AdminProvisionUserPanel.jsx';
 import AdminAiRuns from '../components/admin/AdminAiRuns.jsx';
-import { avatarTint } from '../lib/avatarTint.js';
 
 function StatCard({ label, value, sub }) {
   return (
@@ -53,7 +52,6 @@ export default function AdminDashboard() {
   const { t: translate } = useT();
   const t = (key, vars) => pmTranslate(translate, key, vars);
   const [stats, setStats] = useState(null);
-  const [mostActiveUsers, setMostActiveUsers] = useState([]);
   const [feedback, setFeedback] = useState([]);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [feedbackFilter, setFeedbackFilter] = useState('');
@@ -123,15 +121,6 @@ export default function AdminDashboard() {
       setStats(res.data);
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function loadMostActiveUsers() {
-    try {
-      const res = await api.get('/admin/most-active-users?limit=10');
-      setMostActiveUsers(Array.isArray(res.data) ? res.data : []);
-    } catch {
-      setMostActiveUsers([]);
     }
   }
 
@@ -272,7 +261,7 @@ export default function AdminDashboard() {
     }
   }
 
-  useEffect(() => { loadStats(); loadMostActiveUsers(); loadPrivacyStatus(); loadRequestSettings(); }, []);
+  useEffect(() => { loadStats(); loadPrivacyStatus(); loadRequestSettings(); }, []);
   useEffect(() => {
     if (tab === 'kpis') loadKpis();
     if (tab === 'people') loadUsers();
@@ -627,49 +616,27 @@ export default function AdminDashboard() {
               </Surface>
 
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                <Surface>
-                  <SurfaceHeader title={t('admin.mentors.title')} />
+                {/* Departments, never people: the admin sees how each group takes
+                    part, pooled below five members so no one stands out. */}
+                <Surface data-testid="department-participation">
+                  <SurfaceHeader title={t('admin.participation.title')} />
                   <SurfaceBody className="pt-5">
-                  {stats.topMentors?.length > 0 ? (
+                  {stats.departmentParticipation?.length > 0 ? (
                     <div className="space-y-3">
-                      {stats.topMentors.map((m, i) => (
-                        <div key={m.id} className="flex items-center gap-3">
-                          <span className="w-5 text-sm font-medium tabular-nums text-muted-foreground">{i + 1}</span>
-                          <div className="flex size-8 items-center justify-center rounded-full text-sm font-semibold text-[var(--ink)]" style={{ backgroundColor: avatarTint(m.name) }}>
-                            {m.name?.charAt(0)}
+                      {stats.departmentParticipation.map(d => (
+                        <div key={d.department ?? ''} data-testid="department-participation-row">
+                          <div className="mb-1 flex justify-between gap-2 text-sm">
+                            <span className="font-medium text-foreground">{d.department ?? t('admin.dept.other')}</span>
+                            <span className="tabular-nums text-muted-foreground">{t('admin.participation.active', { active: d.active_members, members: d.members })}</span>
                           </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium text-foreground">{m.name}</p>
-                            <p className="text-xs text-muted-foreground">{m.department}</p>
+                          <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                            <div className="h-full rounded-full bg-[var(--mint)]" style={{ width: `${d.members ? Math.round((d.active_members / d.members) * 100) : 0}%` }} />
                           </div>
-                          <span className="shrink-0 text-sm font-medium tabular-nums text-muted-foreground">{t('admin.common.sessionsCount', { count: m.session_count })}</span>
+                          <p className="mt-1 text-xs text-muted-foreground">{t('admin.participation.mentors', { count: d.mentors_active })}</p>
                         </div>
                       ))}
                     </div>
-                  ) : <p className="text-sm text-muted-foreground">{t('admin.mentors.empty')}</p>}
-                  </SurfaceBody>
-                </Surface>
-
-                <Surface data-testid="most-active-users">
-                  <SurfaceHeader title={t('admin.activeUsers.title')} />
-                  <SurfaceBody className="pt-5">
-                  {mostActiveUsers.length > 0 ? (
-                    <div className="space-y-3">
-                      {mostActiveUsers.map((u, i) => (
-                        <div key={u.id} data-testid="most-active-users-row" className="flex items-center gap-3">
-                          <span className="w-5 text-sm font-medium tabular-nums text-muted-foreground">{i + 1}</span>
-                          <div className="flex size-8 items-center justify-center rounded-full text-sm font-semibold text-[var(--ink)]" style={{ backgroundColor: avatarTint(u.name) }}>
-                            {u.name?.charAt(0)}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium text-foreground">{u.name}</p>
-                            <p className="text-xs text-muted-foreground">{u.department}</p>
-                          </div>
-                          <span className="shrink-0 text-sm font-medium tabular-nums text-muted-foreground">{t('admin.common.sessionsCount', { count: u.sessions })}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : <p className="text-sm text-muted-foreground">{t('admin.activeUsers.empty')}</p>}
+                  ) : <p className="text-sm text-muted-foreground">{t('admin.dept.empty')}</p>}
                   </SurfaceBody>
                 </Surface>
 
@@ -679,10 +646,10 @@ export default function AdminDashboard() {
                   {stats.deptActivity?.length > 0 ? (
                     <div className="space-y-3">
                       {stats.deptActivity.map(d => (
-                        <div key={d.department} className="flex items-center gap-3">
+                        <div key={d.department ?? ''} className="flex items-center gap-3">
                           <div className="min-w-0 flex-1">
                             <div className="mb-1 flex justify-between gap-2 text-sm">
-                              <span className="font-medium text-foreground">{d.department}</span>
+                              <span className="font-medium text-foreground">{d.department ?? t('admin.dept.other')}</span>
                               <span className="tabular-nums text-muted-foreground">{t('admin.common.sessionsCount', { count: d.session_count })}</span>
                             </div>
                             <div className="h-1.5 overflow-hidden rounded-full bg-muted">
