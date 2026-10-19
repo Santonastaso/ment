@@ -45,7 +45,7 @@ export default function AdminAiRuns({ t }) {
             [t('admin.ai.runs'), runs.length],
             [t('admin.ai.failures'), failures],
             [t('admin.ai.avgLatency'), `${averageLatency} ms`],
-          ].map(([label, value]) => <div key={label} className="rounded-xl bg-muted/60 px-4 py-3">
+          ].map(([label, value]) => <div key={label} className="rounded-xl border border-[var(--border)] bg-[var(--card)] px-4 py-3">
             <p className="text-xs text-muted-foreground">{label}</p>
             <p className="mt-1 text-xl font-medium tabular-nums">{value}</p>
           </div>)}

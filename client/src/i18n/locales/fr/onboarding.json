@@ -66,5 +66,11 @@
   "onboarding.persona.alumnus": "Diplômé·e",
   "onboarding.fields.program": "Programme",
   "onboarding.fields.programPlaceholder": "Par ex. MSc Management",
-  "onboarding.fields.cohortYear": "Promotion (année)"
+  "onboarding.fields.cohortYear": "Promotion (année)",
+  "onboarding.terms.before": "J’accepte les ",
+  "onboarding.terms.termsLink": "Conditions d’utilisation",
+  "onboarding.terms.middle": " et j’ai lu la ",
+  "onboarding.terms.privacyLink": "Politique de confidentialité",
+  "onboarding.terms.after": ".",
+  "onboarding.terms.required": "Pour terminer, acceptez les Conditions d’utilisation et confirmez avoir lu la Politique de confidentialité."
 }

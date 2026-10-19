@@ -74,6 +74,7 @@ test('invited member signs in, changes temporary password, imports CV, and finis
   await expect(page.getByRole('heading', { name: 'What you want to learn' })).toBeVisible();
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'When can people reach you?' })).toBeVisible();
+  await page.getByTestId('onboarding-accept-terms').check();
   await page.getByRole('button', { name: 'Finish & see my matches' }).click();
   await expect(page).toHaveURL('http://127.0.0.1:3010/');
   expect(await page.evaluate(async () => {
@@ -161,16 +162,24 @@ test('CV import populates onboarding and can be saved', async ({ page }) => {
   await file.setInputFiles({ name: 'resume.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 synthetic CV') });
   await expect(page.getByRole('heading', { name: /Your background/i })).toBeVisible();
   expect(await page.evaluate(() => {
+    const paths = window.fixture.calls.map(item => item.path);
     const call = window.fixture.calls.find(item => item.path === '/profile/ingest');
-    return [call.body.get('kind'), call.body.get('file').name];
-  })).toEqual(['cv', 'resume.pdf']);
+    // The agreement is stored before the file is sent.
+    return [call.body.get('kind'), call.body.get('file').name, paths.indexOf('/users/me/consents') < paths.indexOf('/profile/ingest'), window.fixture.consents.map(row => row.purpose)];
+  })).toEqual(['cv', 'resume.pdf', true, ['ai_profile_import']]);
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'When can people reach you?' })).toBeVisible();
+  // The Terms and Privacy notice must be accepted to finish, and that is recorded.
+  await page.getByRole('button', { name: 'Finish' }).click();
+  await expect(page.getByText('To finish, accept the Terms of use and confirm you have read the Privacy notice.')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Privacy notice' })).toHaveAttribute('href', '/privacy');
+  await page.getByTestId('onboarding-accept-terms').check();
   await page.getByRole('button', { name: 'Finish' }).click();
   await expect(page).toHaveURL('http://127.0.0.1:3010/');
   expect(await page.evaluate(() => window.fixture.calls.some(item => item.path === '/profile/ingest/1/accept'))).toBe(true);
+  expect(await page.evaluate(() => window.fixture.consents.map(row => row.purpose))).toEqual(['ai_profile_import', 'terms_privacy']);
 });
 
 test('Messages keeps the list and chat layout steady while switching conversations', async ({ page }) => {
@@ -749,6 +758,7 @@ test('Reflection log check-in starts from its reminder banner', async ({ page })
   await expect(page.getByRole('button', { name: '+ Add a reflection' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Start check-in' }).click();
   const dialog = page.getByRole('dialog', { name: 'Weekly check-in' });
+  await expect(dialog.getByTestId('reflection-ai-note')).toHaveText(/An AI reads your answers to suggest skills/);
   await dialog.getByRole('textbox', { name: 'What did you feel you needed support on this week?' }).fill('Practice presenting clearly.');
   await dialog.getByRole('button', { name: 'Save reflection' }).click();
   await expect(dialog).toBeHidden();
@@ -947,6 +957,7 @@ test('onboarding to discovery, request, acceptance, chat and meeting', async ({ 
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'When can people reach you?' })).toBeVisible();
   await page.getByLabel('Weekly meeting limit').fill('3');
+  await page.getByTestId('onboarding-accept-terms').check();
   await page.getByRole('button', { name: 'Finish & see my matches' }).click();
   await expect(page).toHaveURL('http://127.0.0.1:3010/');
   // The availability chosen during onboarding is saved with the profile.
@@ -1420,6 +1431,7 @@ test('a failed availability save keeps the user on onboarding until it succeeds'
   await expect(availability).toBeVisible();
   await page.getByTestId('onboarding-accepts-requests').uncheck();
   await page.evaluate(() => { window.fixture.failPut = '/users/me'; });
+  await page.getByTestId('onboarding-accept-terms').check();
   await page.getByRole('button', { name: 'Finish & see my matches' }).click();
   // The failure is said aloud, nothing is shown as saved and nobody leaves the step.
   await expect(page.getByText('Your availability could not be saved. Try again.')).toBeVisible();
@@ -1429,6 +1441,7 @@ test('a failed availability save keeps the user on onboarding until it succeeds'
   await expect(availability).toBeVisible();
   await expect(page.getByTestId('onboarding-accepts-requests')).not.toBeChecked();
   // Trying again saves the choice, then the profile, once.
+  await page.getByTestId('onboarding-accept-terms').check();
   await page.getByRole('button', { name: 'Finish & see my matches' }).click();
   await expect(page).toHaveURL('http://127.0.0.1:3010/');
   const calls = await page.evaluate(() => window.fixture.calls.filter(call => call.path === '/users/me/onboarding' || (call.method === 'put' && call.path === '/users/me')));
@@ -1814,6 +1827,7 @@ test('a department a CV import brings in is kept as written, never turned into "
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.getByTestId('onboarding-accept-terms').check();
   await page.getByRole('button', { name: 'Finish' }).click();
   await expect.poll(() => page.evaluate(() => window.fixture.calls.find(call => call.path === '/users/me/onboarding')?.body.career.map(entry => entry.department)))
     .toEqual(['Research & Development', 'Finance']);
@@ -1826,6 +1840,7 @@ async function finishOnboarding(page) {
   await page.getByLabel('Department *').click();
   await page.getByRole('option', { name: 'Finance', exact: true }).click();
   for (let step = 0; step < 3; step++) await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.getByTestId('onboarding-accept-terms').check();
   await page.getByRole('button', { name: /^Finish/ }).click();
 }
 
@@ -1908,4 +1923,97 @@ test('a CV uploaded on the Experience tab is reviewed and edited before anything
   // The file named no teaching skills, so the ones on the profile are kept.
   expect(saved.can_teach.map(skill => skill.skill)).toEqual(['Architecture']);
   await expect(review).toHaveCount(0);
+});
+
+test('members are told the chat is an AI, and can download their own data', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByTestId('discovery-ai-note')).toHaveText(/AI assistant and can make mistakes/);
+  await page.goto('/profile?tab=availability');
+  const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('export-my-data').click()]);
+  expect(download.suggestedFilename()).toMatch(/^ment-data-\d{4}-\d{2}-\d{2}\.csv$/);
+  const lines = (await (await download.createReadStream()).toArray().then(parts => Buffer.concat(parts).toString('utf8'))).split('\r\n');
+  expect(lines.slice(0, 3)).toEqual(['\uFEFFSection,Item,Field,Value', 'export,,format,ment-export-1', 'profile,,id,viewer']);
+});
+
+test('a member can switch AI off and delete their account', async ({ page }) => {
+  await page.goto('/profile?tab=availability');
+  const ai = page.getByTestId('toggle-ai');
+  await expect(ai).toHaveAttribute('aria-checked', 'true');
+  await ai.click();
+  await expect(ai).toHaveAttribute('aria-checked', 'false');
+  await expect(page.getByText(/never sent to the AI/)).toBeVisible();
+  expect(await page.evaluate(() => window.fixture.calls.find(call => call.method === 'put' && call.path === '/users/me')?.body)).toEqual({ ai_opt_out: true });
+  // Reading a CV needs AI, so the import is gone while it is off.
+  await page.getByText('Experience', { exact: true }).click();
+  await expect(page.getByRole('button', { name: '+ Add entry' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Update from CV' })).toHaveCount(0);
+
+  await page.getByText('Availability', { exact: true }).click();
+  await page.getByTestId('delete-account').click();
+  const confirm = page.getByTestId('delete-account-confirm');
+  await expect(confirm).toBeDisabled();
+  await page.getByTestId('delete-account-word').fill('delete');
+  await confirm.click();
+  await expect(page).toHaveURL(/\/login$/);
+  expect(await page.evaluate(() => window.fixture.erased)).toBe(true);
+});
+
+test('admin pages share the member pages\' cards and tabs, and show departments rather than people', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => sessionStorage.setItem('ment.fixture.auth', JSON.stringify({ id: 'admin', name: 'Org Admin', email: 'admin@example.test', role: 'admin', onboarding_complete: true, is_admin: true, admin_scope: 'org' })));
+  await page.goto('/admin');
+  const panel = page.locator('.admin-page [data-slot="card"]').first();
+  await expect(panel).toBeVisible();
+  expect(await panel.evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgb(255, 255, 255)');
+  expect(await page.getByTestId('admin-tab-overview').evaluate(element => getComputedStyle(element).borderRadius)).toBe('0px');
+  // Departments only: no person is named or ranked on the overview.
+  const rows = page.getByTestId('department-participation-row');
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText('Suppressed to protect privacy');
+  await expect(page.getByText('Other departments (under 5 people each)')).toHaveCount(0);
+  await expect(page.getByText('Most active')).toHaveCount(0);
+  await page.getByTestId('admin-tab-people').click();
+  await expect(page.getByRole('button', { name: 'Download template' })).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+});
+
+test('the knowledge graph opens on insights and explains a skill when it is picked', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => sessionStorage.setItem('ment.fixture.auth', JSON.stringify({ id: 'admin', name: 'Org Admin', email: 'admin@example.test', role: 'admin', onboarding_complete: true, is_admin: true, admin_scope: 'org' })));
+  await page.goto('/admin/graph');
+  await expect(page.locator('[data-testid="knowledge-graph-canvas"] canvas')).toBeVisible();
+  await expect(page.getByText('Most wanted skills')).toBeVisible();
+  const gap = page.locator('.kg-ranked button').first();
+  const skill = (await gap.locator('span').first().textContent()).trim();
+  await gap.click();
+  await expect(page.getByRole('heading', { level: 2, name: skill })).toBeVisible();
+  await expect(page.getByText(/^Taught by \(\d+\)$/)).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByText('Most wanted skills')).toBeVisible();
+  await page.getByTestId('kg-view-people').click();
+  await expect(page.getByTestId('kg-view-people')).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Full screen' }).click();
+  await expect.poll(() => page.evaluate(() => Boolean(document.fullscreenElement))).toBe(true);
+  await page.getByRole('button', { name: 'Exit full screen' }).click();
+  await expect.poll(() => page.evaluate(() => Boolean(document.fullscreenElement))).toBe(false);
+});
+
+test('an admin sets how long data is kept, and nothing is set until they do', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => sessionStorage.setItem('ment.fixture.auth', JSON.stringify({ id: 'admin', name: 'Org Admin', email: 'admin@example.test', role: 'admin', onboarding_complete: true, is_admin: true, admin_scope: 'org' })));
+  await page.goto('/admin');
+  await page.getByTestId('admin-tab-privacy').click();
+  const conversations = page.getByTestId('retention-conversation_days');
+  await expect(conversations).toHaveValue('');
+  await expect(conversations).toHaveAttribute('placeholder', 'Keep');
+  await conversations.fill('7');
+  await page.getByTestId('save-retention').click();
+  await expect(page.getByText('Each period must be a whole number of days between 30 and 3650, or empty.')).toBeVisible();
+  expect(await page.evaluate(() => window.fixture.retention ?? null)).toBeNull();
+  await conversations.fill('365');
+  await page.getByTestId('retention-deactivated_account_days').fill('730');
+  await page.getByTestId('save-retention').click();
+  await expect(page.getByText('Retention periods saved')).toBeVisible();
+  expect(await page.evaluate(() => window.fixture.retention)).toEqual({
+    conversation_days: 365, search_days: null, reflection_days: null, audit_log_days: null, deactivated_account_days: 730,
+  });
 });

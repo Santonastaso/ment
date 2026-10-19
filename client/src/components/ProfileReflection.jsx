@@ -12,7 +12,7 @@ import Portal from './ui/portal.jsx';
 
 // Draft ownership stays in Profile so changing tabs does not discard an answer.
 // `open`/`onOpenChange` let Profile keep the dialog state across profile tabs.
-export default function ProfileReflection({ history = false, draft, onDraftChange, onSkillsApplied, open: openProp, onOpenChange, returnFocus }) {
+export default function ProfileReflection({ history = false, draft, onDraftChange, onSkillsApplied, open: openProp, onOpenChange, returnFocus, aiOff = false }) {
   const { t, lang } = useT();
   const fieldId = useId();
   const [openInternal, setOpenInternal] = useState(false);
@@ -124,6 +124,8 @@ export default function ProfileReflection({ history = false, draft, onDraftChang
                 placeholder={t('components.reflection.formPlaceholder')} />
             </div>
           ))}
+          {/* AI Act Art. 50: said where the answers are written, not only in the page intro. */}
+          <p className="text-xs text-muted-foreground" data-testid="reflection-ai-note">{t(aiOff ? 'components.reflection.aiOff' : 'components.reflection.aiNote')}</p>
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           <div className="flex flex-wrap justify-end gap-2">
             <Button type="button" variant="ghost" disabled={busy} onClick={() => { setOpen(false); setError(''); }}>{t('components.reflection.cancel')}</Button>

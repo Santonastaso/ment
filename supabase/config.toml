@@ -10,6 +10,12 @@ verify_jwt = true
 [functions.admin-reset-password]
 verify_jwt = true
 
+[functions.delete-account]
+verify_jwt = true
+
+[functions.retention-sweep]
+verify_jwt = true
+
 [functions.profile-ingest]
 verify_jwt = true
 

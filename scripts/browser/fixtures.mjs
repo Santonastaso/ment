@@ -9,6 +9,23 @@ const peer = { id: 'peer', name: 'Peer Mentor', department: 'Finance', job_title
 //   failAfterCommit = path                uncertain (500), but the write went through
 //   refuseNext = { path, code }           refused (400), nothing saved
 function fixtureApi(state, ApiError) {
+  // Aggregated fixture data mirrors the privacy-safe RPC contract: there are
+  // no person nodes or person-level edges, and every released cell is >= 5.
+  function sampleKnowledgeGraph() {
+    const departments = ['Finance', 'Marketing', 'Consulting', 'Operations', 'Strategy', 'Data & Analytics', 'Human Resources', 'Public Policy', 'Luxury & Retail', 'Sustainability'];
+    const departmentNodes = departments.map((label, index) => ({ id: `d:${index}`, kind: 'department', label, count: 6 }));
+    const skills = ['Financial modelling', 'Valuation', 'Brand strategy', 'SQL', 'Python', 'Negotiation', 'Public speaking', 'Supply chain']
+      .map((label, i) => ({ id: `s:${i}`, kind: 'skill', label, teachers: 8, learners: 7 }));
+    const edges = [];
+    departmentNodes.forEach((department, index) => {
+      edges.push({ source: department.id, target: 's:1', type: index % 2 ? 'wants_to_learn' : 'can_teach', count: 6 });
+      if (index < skills.length) edges.push({ source: department.id, target: `s:${index}`, type: 'can_teach', count: 6 });
+      if (index > 0) edges.push({ source: 'd:0', target: department.id, type: 'session', count: 8 });
+    });
+    edges.push({ source: 'd:0', target: 'd:1', type: 'connection', count: 6 });
+    return { nodes: [...departmentNodes, ...skills], edges, meta: { organizations: [{ id: 'org', name: 'ESSEC' }], languages: ['en', 'fr'] } };
+  }
+
   const dropped = () => new ApiError('TypeError: Failed to fetch', 500);
   const payload = session => {
     const latest = state.messages[`/sessions/${session.id}/messages`]?.at(-1);
@@ -29,6 +46,7 @@ function fixtureApi(state, ApiError) {
       if (path === '/users/me') return state.profile || { ...state.user, skills: [], career: [] };
       if (path === '/users/me/skill-evidence') return [];
       if (path === '/users/me/capacity') return state.capacity || {};
+      if (path === '/users/me/export') return { format: 'ment-export-1', profile: state.user, consents: state.consents || [] };
       if (path === '/reflections') return { entries: state.reflections || [], dueForCheckIn: !!state.reflectionDue, lastEntryDays: state.reflectionDue ? 4 : null };
       if (path === '/sessions') return state.sessions.map(payload);
       if (path === '/groups') return state.groups.map(group => ({ ...group, latest_message: state.messages[`/groups/${group.id}/messages`]?.at(-1)?.body || null }));
@@ -60,6 +78,12 @@ function fixtureApi(state, ApiError) {
       }
     }
     if (method === 'post') {
+      if (path === '/users/me/delete') { state.erased = true; return { erased: true }; }
+      if (path === '/users/me/consents') {
+        const row = { purpose: body.purpose, text_version: 'fixture', accepted_at: new Date().toISOString() };
+        state.consents = [...(state.consents || []), row];
+        return row;
+      }
       if (path === '/reflections') {
         const entry = { ...body, id: 1, created_at: new Date().toISOString(), extracted_gaps: [], extracted_strengths: [] };
         state.reflections = [entry];
@@ -138,6 +162,7 @@ function fixtureApi(state, ApiError) {
       }
     }
     if (method === 'put') {
+      if (path === '/admin/retention') { state.retention = { ...body }; return state.retention; }
       if (path === '/users/me') {
         state.user = { ...state.user, ...body };
         if (state.profile) state.profile = { ...state.profile, ...body };
@@ -156,6 +181,31 @@ function fixtureApi(state, ApiError) {
         }
         return payload(session);
       }
+    }
+    // A small organisation for the admin screens, read only.
+    if (method === 'get' && path.startsWith('/admin/')) {
+      const [route] = path.split('?');
+      const admin = {
+        '/admin/stats': { totalUsers: 4, totalEmployees: 4, onboarded: 3, onboardedOf: 4, onboardingComplete: 3, onboardingRate: 75,
+          totalMatches: 5, sessionsRequested: 6, matchPairs: [],
+          departmentParticipation: [{ department: 'Finance', members: 8, active_members: null, mentors_active: null }],
+          deptActivity: [{ department: 'Finance', session_count: null }],
+          sessionsByStatus: [{ status: 'pending', cnt: null }, { status: 'scheduled', cnt: null }, { status: 'completed', cnt: null }] },
+        '/admin/users': { users: [
+          { id: 'peer', name: 'Peer Mentor', email: 'peer@example.test', role: 'alumnus', department: 'Finance', sessions: 3 },
+          { id: 'viewer', name: 'Viewer Student', email: 'student@example.test', role: 'student', department: 'Finance', sessions: 2 },
+          { id: 'left', name: 'Former Member', email: 'left@example.test', role: 'student', department: 'Marketing', sessions: 0, deactivated_at: '2026-09-01T00:00:00Z' },
+        ], total: 3 },
+        '/admin/audit': { entries: [{ id: 1, action: 'profile.update', actor: 'Peer Mentor', target_type: 'profile', target_id: 'peer', created_at: '2026-10-01T09:00:00Z', metadata: {} }], total: 1 },
+        '/admin/feedback': [{ id: 1, category: 'bug', status: 'open', message: 'The calendar invite opened twice.', user: { name: 'Viewer Student' }, created_at: '2026-10-02T10:00:00Z', delivery: 'sent' }],
+        '/admin/request-settings': { weekly: 3, pending: 2, cooldown: 7 },
+        '/admin/retention': state.retention || { conversation_days: null, search_days: null, reflection_days: null, audit_log_days: null, deactivated_account_days: null },
+        '/admin/privacy-status': { peerVisibleFields: ['name', 'department', 'skills'], hiddenFields: ['email'], minTeamDashboardSize: 5 },
+        '/admin/kpis': null,
+        '/admin/ai-runs': [],
+        '/admin/knowledge-graph': sampleKnowledgeGraph(),
+      };
+      if (route in admin) return admin[route];
     }
     throw new Error(`Unmocked API: ${method} ${path}`);
   };

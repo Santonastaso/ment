@@ -1,4 +1,4 @@
-import { corsHeaders, jsonError, jsonOk, requireUser } from '../_shared/index.ts';
+import { aiOptedOut, corsHeaders, jsonError, jsonOk, requireUser } from '../_shared/index.ts';
 import { normalizeLang } from '../_shared/esco.ts';
 import { recordAiRun } from '../_shared/ai-telemetry.ts';
 import { aiErrorResponse, mistralJson } from '../_shared/mistral.ts';
@@ -41,6 +41,11 @@ Deno.serve(async (req) => {
       : jsonError(`read_failed: ${error.message}`, 500);
   }
   if (!log) return jsonError('not_found', 404);
+
+  // Opted out of AI: the reflection is kept as written, with no tags.
+  if (await aiOptedOut(ctx.sb, ctx.user.id)) {
+    return jsonOk({ id: reflectionId, extracted_gaps: [], extracted_strengths: [], skipped: 'ai_opted_out' });
+  }
 
   let result;
   const startedAt = Date.now();

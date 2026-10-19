@@ -87,3 +87,42 @@ test('rate limiting blocks provider calls and persistence', async () => {
   assert.deepEqual(fixture.calls, []);
   assert.equal(fixture.thread, null);
 });
+
+test('no name or profile id reaches the model while matching or drafting', async () => {
+  const maria = { ...finance, id: 'maria-id', name: 'Maria Rossi' };
+  const fixture = discoveryFixture({ candidates: [maria], responses: [
+    { decision: 'ready', search_request: 'Financial modelling' },
+    { outcome: 'matches', matches: [{ ...directMatch.matches[0], profile_id: maria.id }] },
+    { body: 'I would value your view on financial modelling.' },
+  ] });
+  const result = await request(fixture, { action: 'chat', query: 'Financial modelling', lang: 'en' });
+  assert.deepEqual(result.matches.map((m) => [m.id, m.name]), [['maria-id', 'Maria Rossi']], 'the stand-in maps back to the person');
+  const draft = await request(fixture, { action: 'draft', query: 'Financial modelling', person_id: maria.id, lang: 'en' });
+  assert.ok(draft.draft.startsWith('Hi Maria,') && draft.draft.endsWith('Viewer'), 'names are added in code');
+  for (const call of fixture.calls) {
+    const sent = JSON.stringify(call.messages);
+    for (const secret of ['Maria', 'Rossi', 'maria-id', 'Viewer']) assert.ok(!sent.includes(secret), `${secret} was sent`);
+  }
+});
+
+test('the rewording pass sees a stand-in for the person it names, and the name comes back', async () => {
+  const maria = { ...finance, id: 'maria-id', name: 'Maria Rossi' };
+  // The opening line is chosen at random and only some name the person, so
+  // ask until one does; every attempt must keep the name from the model.
+  let named = false;
+  for (let attempt = 0; attempt < 30 && !named; attempt += 1) {
+    const fixture = discoveryFixture({ voice: true, candidates: [maria], responses: [
+      { decision: 'ready', search_request: 'Financial modelling' },
+      { outcome: 'matches', matches: [{ ...directMatch.matches[0], profile_id: maria.id }] },
+      (sent) => ({ text: JSON.parse(sent.messages[1].content).message }),
+    ] });
+    const result = await request(fixture, { action: 'chat', query: 'Financial modelling', lang: 'en' });
+    const voice = fixture.calls.at(-1);
+    assert.ok(!JSON.stringify(voice.messages).includes('Maria'), 'the name is masked');
+    const masked = JSON.parse(voice.messages[1].content).message;
+    named = masked.includes('PERSON_1');
+    const shown = result.message ?? result.reply ?? result.content;
+    assert.equal(shown, masked.replaceAll('PERSON_1', 'Maria'));
+  }
+  assert.ok(named, 'some reply named the person');
+});

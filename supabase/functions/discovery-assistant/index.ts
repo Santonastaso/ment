@@ -152,10 +152,35 @@ const EXPERTISE_ON_CARD = 3;
 // program and department, "reasons" is always empty on the way in, and the
 // prompt forbids leaning on cohort year -- so all three inflated every request
 // for nothing.
-function candidateForModel(candidate: Candidate, redactIdentity: boolean) {
-  const { background: _background, reasons: _reasons, cohort_year: _cohortYear, ...lean } =
+// What the model sees of a person: their facts under a stand-in id, never their
+// name or profile id. The alias is mapped back in code, so a name never needs
+// to leave the network for the model to rank or describe someone.
+function candidateForModel(candidate: Candidate, redactIdentity: boolean, alias: string) {
+  const { background: _background, reasons: _reasons, cohort_year: _cohortYear, name: _name, id: _id, ...lean } =
     publicCandidate(candidate, undefined, redactIdentity);
-  return lean;
+  return { id: alias, ...lean };
+}
+
+// Names in text bound for the model are swapped for PERSON_n and swapped back
+// afterwards. Whole words only, case kept, longest first so a full name wins
+// over the first name inside it.
+function nameMask(names: string[]) {
+  const unique = [...new Set(names.map((name) => cleanText(name, 120)).filter((name) => name.length > 1))]
+    .sort((a, b) => b.length - a.length);
+  const escape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = unique.length ? new RegExp(`(?<![\\p{L}\\p{N}])(${unique.map(escape).join('|')})(?![\\p{L}\\p{N}])`, 'gu') : null;
+  const tokens = new Map<string, string>();
+  const byName = new Map<string, string>();
+  const mask = (text: string) => pattern ? text.replace(pattern, (name) => {
+    if (!byName.has(name)) {
+      const token = `PERSON_${byName.size + 1}`;
+      byName.set(name, token);
+      tokens.set(token, name);
+    }
+    return byName.get(name)!;
+  }) : text;
+  const unmask = (text: string) => text.replace(/PERSON_\d+/g, (token) => tokens.get(token) ?? token);
+  return { mask, unmask };
 }
 
 // ministral-3b returns reasons and matched_expertise as a bare string about as
@@ -416,19 +441,24 @@ async function smallTalkReply(language: string, message: string) {
 
 // Says a templated reply again in a warmer, less canned voice. The template
 // is returned whenever the rewrite fails or drops or invents anything.
-async function voiced(language: string, original: string, userMessage: string, recent: string[] = []) {
+async function voiced(language: string, original: string, userMessage: string, recent: string[] = [], names: string[] = []) {
   // Whatever happens below, nothing said in the last replies is said again.
   const text = withoutRepeats(original, recent);
   if (!text || Deno.env.get('DISCOVERY_VOICE') === 'off') return text;
   try {
+    const { mask, unmask } = nameMask(names);
+    const masked = mask(text);
     const result = await mistralJson<{ text?: string }>({
       feature: 'discovery_voice',
       system: VOICE_PROMPT(language),
-      user: JSON.stringify({ message: text, user_said: userMessage.slice(0, 300), previous_replies: recent }),
+      user: JSON.stringify({ message: masked, user_said: userMessage.slice(0, 300), previous_replies: recent.map(mask) }),
       temperature: 0.8,
       maxTokens: 260,
     });
-    const rewritten = humanize(cleanText(result.value?.text, 600)).replace(/^["'“]+|["'”]+$/g, '');
+    const reply = humanize(cleanText(result.value?.text, 600)).replace(/^["'“]+|["'”]+$/g, '');
+    // A person the message named must still be there, under their stand-in.
+    if ((masked.match(/PERSON_\d+/g) || []).some((token) => !reply.includes(token))) return text;
+    const rewritten = unmask(reply);
     return keepsFacts(text, rewritten, userMessage) && !repeats(rewritten, recent) && !sameOpening(rewritten, recent) ? rewritten : text;
   } catch {
     return text;
@@ -778,6 +808,14 @@ Deno.serve(async (req) => {
   let answeredScope = false;
   // The last replies, so the next one never repeats their sentences.
   let recentReplies: string[] = [];
+  // Everyone this conversation could name; kept out of what the model reads.
+  const knownNames: string[] = [];
+  const nameAndFirst = (name: unknown) => {
+    const full = cleanText(name, 120);
+    return full ? [full, full.split(/\s+/)[0]] : [];
+  };
+  const voice = (language: string, original: string, userMessage: string, recent: string[] = []) =>
+    voiced(language, original, userMessage, recent, knownNames);
   const answer = (data: Record<string, unknown>) => jsonOk(understood ? { ...data, understood } : data);
   // Set when this message is the user's answer to a question we asked. Having
   // spent their one question, returning nothing is the worst possible outcome:
@@ -820,6 +858,10 @@ Deno.serve(async (req) => {
     let bareLeaveOut = false;
     query = placePushback || spoken;
     requestForMatch = query;
+    for (const turn of priorTurns) {
+      if (Array.isArray(turn.matches)) for (const person of turn.matches as Array<Record<string, unknown>>) knownNames.push(...nameAndFirst(person?.name));
+      if (turn.person && typeof turn.person === 'object') knownNames.push(...nameAndFirst((turn.person as Record<string, unknown>).name));
+    }
     recentReplies = priorTurns.filter((turn) => turn.role === 'assistant' && typeof turn.content === 'string' && turn.kind !== 'draft')
       .slice(-2).map((turn) => cleanText(turn.content, 600));
     const conversation = conversationFromTurns(priorTurns, query)
@@ -1177,7 +1219,7 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
       if (intent === 'greeting' || intent === 'thanks' || intent === 'smalltalk') {
         const reply = intent === 'smalltalk'
           ? await smallTalkReply(language, latestRaw)
-          : await voiced(language, frameChat(language, intent, departmentExamples(language, coverage)), latestOriginal, recentReplies);
+          : await voice(language, frameChat(language, intent, departmentExamples(language, coverage)), latestOriginal, recentReplies);
         const choices = intent === 'greeting' || intent === 'smalltalk' ? departmentChoices(language, preferredDepartments(departments)) : [];
         const threadId = await persistTurns(ctx, body.thread_id, spoken, { kind: 'chat', content: reply, suggestions: choices });
         return answer({ matches: [], clarification: reply, suggestions: choices, thread_id: threadId });
@@ -1300,7 +1342,7 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
           : step.stage === 'department' ? scopeChoices(language)
             : step.stage === 'narrow' ? narrowChoices(language, shownLocations(lastShown)) : [];
         step.suggestions = choices;
-        const question = await voiced(language, choices.length ? `${step.question} ${ownWordsInvite(language)}` : step.question, latestOriginal, recentReplies);
+        const question = await voice(language, choices.length ? `${step.question} ${ownWordsInvite(language)}` : step.question, latestOriginal, recentReplies);
         const threadId = await persistTurns(ctx, body.thread_id, spoken, { kind: 'clarification', content: question, stage: step.stage, department: step.department || '', suggestions: choices });
         return answer({ matches: [], clarification: question, suggestions: choices, thread_id: threadId });
       }
@@ -1347,10 +1389,12 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
     const startedAt = Date.now();
     try {
       const recipient = publicCandidate(selected, undefined, redactInterOrg && !established.has(selected.id));
+      // The greeting and sign-off are added here, so the model needs neither name.
+      const { name: _recipientName, id: _recipientId, ...recipientFacts } = recipient;
       const writeDraft = (correction: string) => mistralJson<{ body?: string }>({
         feature: 'discovery_draft',
         system: `Write only the message body of a short, warm request for help, in ${language}. The SENDER is a student or alumnus asking for advice; the RECIPIENT is the experienced person being asked. Write in the sender's voice: "I" is the sender, who needs help; "you" is the recipient, who has the expertise. Talk about the RECIPIENT's background ("your experience in ...", "il tuo background in ...", "votre parcours en ..."), and say what the sender would like advice on. Never present the recipient's expertise as the sender's own, and never offer the sender's help or ideas: the sender is asking, not offering. Do not greet anyone, use either person's name, or add a sign-off; the application adds those. Do not describe their experience as \"verified\". Use only the supplied facts and never invent credentials, employers, skills, or relationships. Return JSON with one string field named body. Keep it under 80 words.${correction}`,
-        user: JSON.stringify({ sender: { name: caller.name, need: query }, recipient, variant: Number(body.variant) || 0 }),
+        user: JSON.stringify({ sender: { need: query }, recipient: recipientFacts, variant: Number(body.variant) || 0 }),
         temperature: Number(body.variant) ? 0.35 : 0.15,
         maxTokens: 350,
       });
@@ -1459,11 +1503,11 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
   if (!candidates.length) {
     // Nobody is available at all, so asking for more detail would not help.
     if (refineFallback.length) {
-      const message = await voiced(language, frameRefineNone(language), query, recentReplies);
+      const message = await voice(language, frameRefineNone(language), query, recentReplies);
       const threadId = await persistTurns(ctx, body.thread_id, spoken, { kind: 'matches', content: message, framed: true, search_request: requestForMatch, matches: refineFallback, nearest: true });
       return answer({ matches: refineFallback, clarification: '', nearest: true, message, no_match_reason: message, resolved_request: requestForMatch, thread_id: threadId });
     }
-    const reason = await voiced(language, followUp === 'reject' ? frameRejectedNone(language, rejectedSubject)
+    const reason = await voice(language, followUp === 'reject' ? frameRejectedNone(language, rejectedSubject)
       : followUp === 'more' ? frameExhausted(language) : EMPTY_POOL_MESSAGES[language], query, recentReplies);
     const threadId = await persistTurns(ctx, body.thread_id, spoken, { kind: 'no_match', content: reason, search_request: requestForMatch });
     return answer({ matches: [], clarification: '', no_match: true, no_match_reason: reason, resolved_request: requestForMatch, thread_id: threadId });
@@ -1497,7 +1541,7 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
         })
         : null;
     if (scope) {
-      const question = await voiced(language, `${scope.question} ${ownWordsInvite(language)}`, query, recentReplies);
+      const question = await voice(language, `${scope.question} ${ownWordsInvite(language)}`, query, recentReplies);
       const threadId = await persistTurns(ctx, body.thread_id, spoken, {
         kind: 'clarification', content: question, stage: 'scope', suggestions: scope.choices,
         // What "show me the closest" will run, and the scope an answer keeps.
@@ -1571,7 +1615,7 @@ Good: "Finance Director who teaches three-statement modelling and board reportin
 Good: "Runs pricing for a retail group and coaches on category management"
 
 Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", and must reflect genuine proximity rather than a number chosen to clear the bar. matched_expertise must copy an exact supplied skill, job title, department, program, LinkedIn headline, past role title, or employer name. Return at most three matches in best-first order. Never output an ID not present in candidates.`,
-      user: JSON.stringify({ request: requestForMatch, ...(wanted ? { wanted } : {}), exact_unavailable: nearestOnly, related_terms: nearestOnly ? [] : relatedTerms, nearest_terms: nearestTerms, must_answer: answeredClarification, candidates: candidates.map((candidate) => candidateForModel(candidate, redactInterOrg && !established.has(candidate.id))) }),
+      user: JSON.stringify({ request: requestForMatch, ...(wanted ? { wanted } : {}), exact_unavailable: nearestOnly, related_terms: nearestOnly ? [] : relatedTerms, nearest_terms: nearestTerms, must_answer: answeredClarification, candidates: candidates.map((candidate, index) => candidateForModel(candidate, redactInterOrg && !established.has(candidate.id), `c${index + 1}`)) }),
       temperature: 0,
       maxTokens: 700,
     });
@@ -1588,7 +1632,7 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
     const matches = ranked.flatMap((raw) => {
       const item = normalizeRanked(raw);
       const id = cleanText(item?.profile_id, 100);
-      const candidate = candidates.find((entry) => entry.id === id);
+      const candidate = /^c\d+$/.test(id) ? candidates[Number(id.slice(1)) - 1] : undefined;
       const confidence = Number(item?.confidence);
       if (!candidate || seen.has(id) || !Number.isFinite(confidence) || confidence < confidenceFloor || !hasGroundedExpertise(grounding(candidate), item, { allowWeakReason: nearest }) || !canHelpWithCareerGoal(candidate, requestForMatch)) return [];
       seen.add(id);
@@ -1626,7 +1670,7 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
           redactInterOrg && !established.has(candidate.id)))
       : [];
     if (!matches.length && !fallback.length && !typedCarriers.length && refineFallback.length) {
-      const message = await voiced(language, frameRefineNone(language), query, recentReplies);
+      const message = await voice(language, frameRefineNone(language), query, recentReplies);
       const threadId = await persistTurns(ctx, body.thread_id, spoken, {
         kind: 'matches', content: message, framed: true, search_request: requestForMatch,
         matches: refineFallback, nearest: true, department: requiredDepartment,
@@ -1639,7 +1683,7 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
       // Wording only: when the model extracted no subject, name the user's own
       // unfamiliar words rather than a generic "no exact match".
       const shownGap = describedGap(gapState, subjectLabel);
-      const reason = await voiced(language, followUp === 'reject' ? frameRejectedNone(language, rejectedSubject)
+      const reason = await voice(language, followUp === 'reject' ? frameRejectedNone(language, rejectedSubject)
         : followUp === 'more' ? frameExhausted(language) : frameNoMatch(language, shownGap, topDepartments(networkCandidates.filter((candidate) => candidate.department !== requiredDepartment))), query, recentReplies);
       const threadId = await persistTurns(ctx, body.thread_id, spoken, { kind: 'no_match', content: reason, search_request: requestForMatch });
       return answer({ matches: [], clarification: '', no_match: true, no_match_reason: reason, resolved_request: requestForMatch, thread_id: threadId, model: result.model });
@@ -1647,6 +1691,7 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
     // A near result is still a result: the people render as cards, under the
     // sentence that says nothing matched exactly.
     const shown = matches.length ? matches : typedCarriers.length ? typedCarriers : fallback;
+    for (const person of shown) knownNames.push(...nameAndFirst(person.name));
     const isNear = constraintsMet || (!matches.length && typedCarriers.length > 0) ? false : (!matches.length || nearest || (nearestOnly && !locationFilterApplied) || relaxedParts.length > 0);
     const shownIds = new Set(shown.map((person) => person.id));
     const shownPeople = candidates.filter((candidate) => shownIds.has(candidate.id));
@@ -1661,7 +1706,7 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
       // The first person shown, by first name and title, when not redacted.
       person: shown[0]?.name && shown[0].name !== 'Network member' && shown[0].job_title
         ? { first: String(shown[0].name).split(/\s+/)[0], title: String(shown[0].job_title) } : undefined });
-    const message = await voiced(language, repeated && repeated === shown.length ? frameSamePeople(language, shown.length)
+    const message = await voice(language, repeated && repeated === shown.length ? frameSamePeople(language, shown.length)
       : repeated ? `${framed} ${frameSomeRepeated(language, shown.length - repeated)}` : framed, query, recentReplies);
     const threadId = await persistTurns(ctx, body.thread_id, spoken, {
       kind: 'matches',

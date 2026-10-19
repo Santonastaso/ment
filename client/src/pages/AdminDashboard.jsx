@@ -29,7 +29,7 @@ function StatCard({ label, value, sub }) {
     <Surface>
       <SurfaceBody className="py-4">
         <p className="text-sm text-muted-foreground">{label}</p>
-        <p className="mt-1 text-display font-medium tabular-nums tracking-[-0.01em]">{value}</p>
+        <p className="mt-1 text-display font-medium tabular-nums tracking-[-0.01em]">{value ?? '—'}</p>
         {sub && <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p>}
       </SurfaceBody>
     </Surface>
@@ -44,15 +44,16 @@ async function downloadBlob(apiPath, filename) {
   a.href = url;
   a.download = filename;
   a.click();
-  URL.revokeObjectURL(url);
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+const RETENTION_FIELDS = ['conversation_days', 'search_days', 'reflection_days', 'audit_log_days', 'deactivated_account_days'];
 
 export default function AdminDashboard() {
   const { user } = useAuth();
   const { t: translate } = useT();
   const t = (key, vars) => pmTranslate(translate, key, vars);
   const [stats, setStats] = useState(null);
-  const [mostActiveUsers, setMostActiveUsers] = useState([]);
   const [feedback, setFeedback] = useState([]);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [feedbackFilter, setFeedbackFilter] = useState('');
@@ -62,6 +63,8 @@ export default function AdminDashboard() {
   const [privacyLoading, setPrivacyLoading] = useState(false);
   const [requestSettings, setRequestSettings] = useState(null);
   const [savingRequestSettings, setSavingRequestSettings] = useState(false);
+  const [retention, setRetention] = useState(null);
+  const [savingRetention, setSavingRetention] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [rematching, setRematching] = useState(false);
@@ -122,15 +125,6 @@ export default function AdminDashboard() {
       setStats(res.data);
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function loadMostActiveUsers() {
-    try {
-      const res = await api.get('/admin/most-active-users?limit=10');
-      setMostActiveUsers(Array.isArray(res.data) ? res.data : []);
-    } catch {
-      setMostActiveUsers([]);
     }
   }
 
@@ -198,6 +192,36 @@ export default function AdminDashboard() {
       setRequestSettings(res.data);
     } catch {
       setRequestSettings(null);
+    }
+  }
+
+  // How long each kind of data is kept. Empty keeps it; the institution, as
+  // data controller, decides the periods (migration 0089).
+  async function loadRetention() {
+    try {
+      const res = await api.get('/admin/retention');
+      setRetention(Object.fromEntries(RETENTION_FIELDS.map(field => [field, res.data?.[field] ?? ''])));
+    } catch {
+      setRetention(null);
+    }
+  }
+
+  async function saveRetention() {
+    if (!retention) return;
+    const invalid = RETENTION_FIELDS.find(field => retention[field] !== '' && !(Number(retention[field]) >= 30 && Number(retention[field]) <= 3650 && Number.isInteger(Number(retention[field]))));
+    if (invalid) {
+      setNotice({ variant: 'destructive', title: t('admin.notice.actionFailedTitle'), message: t('admin.retention.invalid') });
+      return;
+    }
+    setSavingRetention(true);
+    try {
+      const res = await api.put('/admin/retention', Object.fromEntries(RETENTION_FIELDS.map(field => [field, retention[field] === '' ? null : Number(retention[field])])));
+      setRetention(Object.fromEntries(RETENTION_FIELDS.map(field => [field, res.data?.[field] ?? ''])));
+      setNotice({ variant: 'default', title: t('admin.retention.saved'), message: t('admin.retention.savedHelp') });
+    } catch (e) {
+      setNotice({ variant: 'destructive', title: t('admin.notice.actionFailedTitle'), message: errorMessage(e, t, t('admin.common.tryAgain')) });
+    } finally {
+      setSavingRetention(false);
     }
   }
 
@@ -271,7 +295,7 @@ export default function AdminDashboard() {
     }
   }
 
-  useEffect(() => { loadStats(); loadMostActiveUsers(); loadPrivacyStatus(); loadRequestSettings(); }, []);
+  useEffect(() => { loadStats(); loadPrivacyStatus(); loadRetention(); loadRequestSettings(); }, []);
   useEffect(() => {
     if (tab === 'kpis') loadKpis();
     if (tab === 'people') loadUsers();
@@ -358,6 +382,22 @@ export default function AdminDashboard() {
     });
   }
 
+  // GDPR erasure on a member's request: their data goes, the other side of
+  // shared conversations stays. Irreversible, unlike deactivation.
+  function openEraseConfirm(user) {
+    setConfirmDialog({
+      title: t('admin.dialog.eraseTitle'),
+      description: t('admin.dialog.eraseDescription', { name: user.name }),
+      confirmLabel: t('admin.dialog.eraseConfirm'),
+      destructive: true,
+      onConfirm: async () => {
+        await api.post(`/admin/users/${user.id}/erase`);
+        loadUsers();
+        setNotice({ variant: 'default', title: t('admin.notice.userErasedTitle'), message: t('admin.notice.userErasedMsg', { name: user.name }) });
+      },
+    });
+  }
+
   function openSetManager(user) {
     setManagerEmailDraft(user.manager_email || '');
     setManagerDialog({ userId: user.id, userName: user.name });
@@ -410,10 +450,13 @@ export default function AdminDashboard() {
 
   const sessionsByStatus = stats?.sessionsByStatus?.reduce((acc, r) => { acc[r.status] = r.cnt; return acc; }, {}) || {};
   const deptActivityMax = Math.max(...(stats?.deptActivity?.map(x => x.session_count || 0) ?? []), 1);
+  const visibleSessionStatuses = ['pending', 'scheduled', 'completed'].map(status => sessionsByStatus[status]);
+  const sessionsRequested = visibleSessionStatuses.every(Number.isInteger)
+    ? visibleSessionStatuses.reduce((sum, count) => sum + count, 0) : null;
   const isPlatformAdmin = user?.admin_scope === 'platform';
 
   return (
-    <PageShell title={t('admin.pageTitle')} description={t('admin.pageDescription')}>
+    <PageShell className="admin-page" title={t('admin.pageTitle')} description={t('admin.pageDescription')}>
 
       {notice && (
         <Alert variant={notice.variant} className="relative pr-20">
@@ -438,6 +481,7 @@ export default function AdminDashboard() {
             type="button"
             onClick={() => setTab(key)}
             data-testid={`admin-tab-${key}`}
+            data-control-radius-exempt
             aria-current={tab === key ? 'page' : undefined}
             className={`-mb-px border-b-2 px-0.5 pb-2.5 pt-1 text-sm font-medium transition-colors ${
               tab === key
@@ -449,7 +493,7 @@ export default function AdminDashboard() {
           </button>
         ))}
         {isPlatformAdmin && (
-          <Link to="/admin/ops" data-testid="nav-platform-ops" className="-mb-px border-b-2 border-transparent px-0.5 pb-2.5 pt-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+          <Link to="/admin/ops" data-testid="nav-platform-ops" data-control-radius-exempt className="-mb-px border-b-2 border-transparent px-0.5 pb-2.5 pt-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
             {t('admin.ops.link')} →
           </Link>
         )}
@@ -514,7 +558,7 @@ export default function AdminDashboard() {
                         {(privacyStatus.hiddenFields || []).map(field => <li key={field}>{field}</li>)}
                       </ul>
                     </div>
-                    <div className="sm:col-span-2 rounded-lg border border-border bg-muted/30 p-3 space-y-3">
+                    <div className="sm:col-span-2 rounded-lg border border-border bg-[var(--card)] p-3 space-y-3">
                       <h3 className="text-sm font-semibold">{t('admin.pm.schoolControls')}</h3>
                       <div className="flex flex-wrap items-center gap-2">
                         <label htmlFor="admin-min-reports" className="text-xs text-muted-foreground">{t('admin.privacy.minReports')}</label>
@@ -535,7 +579,7 @@ export default function AdminDashboard() {
                         />
                       </div>
                     </div>
-                    <div className="sm:col-span-2 rounded-lg border border-border bg-muted/30 p-3">
+                    <div className="sm:col-span-2 rounded-lg border border-border bg-[var(--card)] p-3">
                       <h3 className="text-sm font-semibold">{t('admin.pm.capacityTitle')}</h3>
                       <p className="mt-1 text-xs text-muted-foreground">{t('admin.pm.capacityHelp')}</p>
                       {requestSettings && (
@@ -571,6 +615,42 @@ export default function AdminDashboard() {
               )}
             </SurfaceBody>
           </Surface>
+
+          <Surface data-testid="data-retention">
+            <SurfaceHeader title={t('admin.retention.title')} description={t('admin.retention.description')} />
+            <SurfaceBody className="pt-5">
+              {retention ? (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {RETENTION_FIELDS.map(field => (
+                    <label key={field} className="grid gap-1 text-sm">
+                      <span className="font-medium text-foreground">{t(`admin.retention.${field}`)}</span>
+                      <span className="text-xs text-muted-foreground">{t(`admin.retention.${field}Help`)}</span>
+                      <span className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min={30}
+                          max={3650}
+                          inputMode="numeric"
+                          placeholder={t('admin.retention.keep')}
+                          value={retention[field]}
+                          disabled={savingRetention}
+                          data-testid={`retention-${field}`}
+                          onChange={e => setRetention(current => ({ ...current, [field]: e.target.value }))}
+                          className="input h-9 w-32 text-sm"
+                        />
+                        <span className="text-xs text-muted-foreground">{t('admin.retention.days')}</span>
+                      </span>
+                    </label>
+                  ))}
+                  <div className="sm:col-span-2 flex justify-end">
+                    <Button type="button" size="sm" onClick={saveRetention} disabled={savingRetention} data-testid="save-retention">
+                      {savingRetention ? t('admin.common.saving') : t('admin.retention.save')}
+                    </Button>
+                  </div>
+                </div>
+              ) : <p className="text-sm text-muted-foreground">{t('admin.retention.unavailable')}</p>}
+            </SurfaceBody>
+          </Surface>
           </>
       )}
 
@@ -585,8 +665,9 @@ export default function AdminDashboard() {
             <>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <StatCard label={t('admin.stats.totalEmployees')} value={stats.totalUsers} />
-                <StatCard label={t('admin.stats.onboardingComplete')} value={`${stats.onboardingRate}%`} sub={t('admin.stats.onboardedOf', { onboarded: stats.onboarded, total: stats.totalUsers })} />
-                <StatCard label={t('admin.stats.sessionsRequested')} value={(sessionsByStatus.pending || 0) + (sessionsByStatus.scheduled || 0) + (sessionsByStatus.completed || 0)} />
+                <StatCard label={t('admin.stats.onboardingComplete')} value={stats.onboardingRate == null ? '—' : `${stats.onboardingRate}%`}
+                  sub={stats.onboardingRate == null ? t('admin.privacy.suppressed') : t('admin.stats.onboardedOf', { onboarded: stats.onboarded, total: stats.totalUsers })} />
+                <StatCard label={t('admin.stats.sessionsRequested')} value={sessionsRequested} />
                 <StatCard label={t('admin.stats.matchPairs')} value={stats.totalMatches} />
               </div>
 
@@ -601,57 +682,35 @@ export default function AdminDashboard() {
                 />
                 <SurfaceBody className="pt-5">
                   <div className="grid grid-cols-3 gap-3">
-                    <SessionBox count={sessionsByStatus.pending || 0} label={t('admin.sessions.pending')} tone="yellow" />
-                    <SessionBox count={sessionsByStatus.scheduled || 0} label={t('admin.sessions.scheduled')} tone="blue" />
-                    <SessionBox count={sessionsByStatus.completed || 0} label={t('admin.sessions.completed')} tone="green" />
+                    <SessionBox count={sessionsByStatus.pending ?? null} label={t('admin.sessions.pending')} tone="needs" />
+                    <SessionBox count={sessionsByStatus.scheduled ?? null} label={t('admin.sessions.scheduled')} tone="scheduled" />
+                    <SessionBox count={sessionsByStatus.completed ?? null} label={t('admin.sessions.completed')} tone="past" />
                   </div>
                 </SurfaceBody>
               </Surface>
 
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                <Surface>
-                  <SurfaceHeader title={t('admin.mentors.title')} />
+                {/* Departments, never people: the admin sees how each group takes
+                    part, pooled below five members so no one stands out. */}
+                <Surface data-testid="department-participation">
+                  <SurfaceHeader title={t('admin.participation.title')} />
                   <SurfaceBody className="pt-5">
-                  {stats.topMentors?.length > 0 ? (
+                  {stats.departmentParticipation?.length > 0 ? (
                     <div className="space-y-3">
-                      {stats.topMentors.map((m, i) => (
-                        <div key={m.id} className="flex items-center gap-3">
-                          <span className="w-5 text-sm font-medium tabular-nums text-muted-foreground">{i + 1}</span>
-                          <div className="flex size-8 items-center justify-center rounded-md bg-primary text-sm font-bold text-primary-foreground">
-                            {m.name?.charAt(0)}
+                      {stats.departmentParticipation.map(d => (
+                        <div key={d.department ?? ''} data-testid="department-participation-row">
+                          <div className="mb-1 flex justify-between gap-2 text-sm">
+                            <span className="font-medium text-foreground">{d.department ?? t('admin.dept.other')}</span>
+                            <span className="tabular-nums text-muted-foreground">{d.active_members == null ? t('admin.privacy.suppressed') : t('admin.participation.active', { active: d.active_members, members: d.members })}</span>
                           </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium text-foreground">{m.name}</p>
-                            <p className="text-xs text-muted-foreground">{m.department}</p>
+                          <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                            {d.active_members != null && <div className="h-full rounded-full bg-[var(--mint)]" style={{ width: `${d.members ? Math.round((d.active_members / d.members) * 100) : 0}%` }} />}
                           </div>
-                          <span className="shrink-0 text-sm font-medium tabular-nums text-muted-foreground">{t('admin.common.sessionsCount', { count: m.session_count })}</span>
+                          <p className="mt-1 text-xs text-muted-foreground">{d.mentors_active == null ? t('admin.privacy.suppressed') : t('admin.participation.mentors', { count: d.mentors_active })}</p>
                         </div>
                       ))}
                     </div>
-                  ) : <p className="text-sm text-muted-foreground">{t('admin.mentors.empty')}</p>}
-                  </SurfaceBody>
-                </Surface>
-
-                <Surface data-testid="most-active-users">
-                  <SurfaceHeader title={t('admin.activeUsers.title')} />
-                  <SurfaceBody className="pt-5">
-                  {mostActiveUsers.length > 0 ? (
-                    <div className="space-y-3">
-                      {mostActiveUsers.map((u, i) => (
-                        <div key={u.id} data-testid="most-active-users-row" className="flex items-center gap-3">
-                          <span className="w-5 text-sm font-medium tabular-nums text-muted-foreground">{i + 1}</span>
-                          <div className="flex size-8 items-center justify-center rounded-md bg-primary text-sm font-bold text-primary-foreground">
-                            {u.name?.charAt(0)}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium text-foreground">{u.name}</p>
-                            <p className="text-xs text-muted-foreground">{u.department}</p>
-                          </div>
-                          <span className="shrink-0 text-sm font-medium tabular-nums text-muted-foreground">{t('admin.common.sessionsCount', { count: u.sessions })}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : <p className="text-sm text-muted-foreground">{t('admin.activeUsers.empty')}</p>}
+                  ) : <p className="text-sm text-muted-foreground">{t('admin.dept.empty')}</p>}
                   </SurfaceBody>
                 </Surface>
 
@@ -661,19 +720,16 @@ export default function AdminDashboard() {
                   {stats.deptActivity?.length > 0 ? (
                     <div className="space-y-3">
                       {stats.deptActivity.map(d => (
-                        <div key={d.department} className="flex items-center gap-3">
+                        <div key={d.department ?? ''} className="flex items-center gap-3">
                           <div className="min-w-0 flex-1">
                             <div className="mb-1 flex justify-between gap-2 text-sm">
-                              <span className="font-medium text-foreground">{d.department}</span>
-                              <span className="tabular-nums text-muted-foreground">{t('admin.common.sessionsCount', { count: d.session_count })}</span>
+                              <span className="font-medium text-foreground">{d.department ?? t('admin.dept.other')}</span>
+                              <span className="tabular-nums text-muted-foreground">{d.session_count == null ? t('admin.privacy.suppressed') : t('admin.common.sessionsCount', { count: d.session_count })}</span>
                             </div>
                             <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                              <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, (d.session_count / deptActivityMax) * 100)}%` }} />
+                              {d.session_count != null && <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, (d.session_count / deptActivityMax) * 100)}%` }} />}
                             </div>
                           </div>
-                          {d.session_count === 0 && (
-                            <span className="shrink-0 rounded-full border border-[var(--border)] px-2 py-0.5 text-xs text-muted-foreground">{t('admin.dept.siloRisk')}</span>
-                          )}
                         </div>
                       ))}
                     </div>
@@ -695,7 +751,7 @@ export default function AdminDashboard() {
               title={t('admin.import.title')}
               description={t('admin.import.description')}
               action={
-                <Button type="button" variant="link" size="sm" className="h-auto px-0" onClick={() => downloadBlob('/admin/template', 'ment-import-template.csv')}>
+                <Button type="button" variant="outline" size="sm" onClick={() => downloadBlob('/admin/template', 'ment-import-template.csv')}>
                   {t('admin.import.downloadTemplate')}
                 </Button>
               }
@@ -786,7 +842,7 @@ export default function AdminDashboard() {
               </>
             }
             action={
-              <Button type="button" variant="link" size="sm" className="h-auto px-0" onClick={() => downloadBlob('/admin/audit/export', 'ment-audit-export.csv')}>
+              <Button type="button" variant="outline" size="sm" onClick={() => downloadBlob('/admin/audit/export', 'ment-audit-export.csv')}>
                 {t('admin.audit.exportCsv')}
               </Button>
             }
@@ -814,7 +870,7 @@ export default function AdminDashboard() {
           <SurfaceBody className="pt-5">
           <AdminProvisionUserPanel />
           <AdminInvitationPanel />
-          <form onSubmit={addExternalOutreachTarget} className="mb-5 flex flex-wrap items-end gap-3 rounded-lg border border-border bg-muted/30 p-3">
+          <form onSubmit={addExternalOutreachTarget} className="mb-5 flex flex-wrap items-end gap-3 rounded-lg border border-border bg-[var(--card)] p-3">
             <div className="min-w-56 flex-1">
               <Label htmlFor="outreach-email">{t('admin.pm.externalTargetEmail')}</Label>
               <Input id="outreach-email" type="email" required value={outreachTarget.email} onChange={(e) => setOutreachTarget((current) => ({ ...current, email: e.target.value }))} placeholder="alumni@example.edu" className="mt-1" />
@@ -876,6 +932,10 @@ export default function AdminDashboard() {
                             <Button type="button" variant="link" size="sm" className="h-auto px-0 text-xs text-destructive" onClick={() => openDeactivateConfirm(u)}>{t('admin.users.deactivate')}</Button>
                           </>
                         )}
+                        {/* An erased login keeps only a placeholder address. */}
+                        {!u.email?.endsWith('@erased.invalid') && (
+                          <Button type="button" variant="link" size="sm" className="h-auto px-0 text-xs text-destructive" data-testid={`erase-user-${u.id}`} onClick={() => openEraseConfirm(u)}>{t('admin.users.erase')}</Button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -901,7 +961,7 @@ export default function AdminDashboard() {
             action={
               <div className="flex flex-wrap items-center gap-2">
                 <select
-                  className="input filter-control min-w-32 text-sm"
+                  className="input filter-control w-44 text-sm"
                   value={feedbackFilter}
                   onChange={e => { setFeedbackFilter(e.target.value); loadFeedback(e.target.value); }}
                 >
@@ -947,7 +1007,7 @@ export default function AdminDashboard() {
                         <p className="mt-2 whitespace-pre-wrap text-sm text-foreground">{item.message}</p>
                       </div>
                       <select
-                        className="input h-8 min-w-28 text-sm"
+                        className="input filter-control w-44 text-sm"
                         value={item.status}
                         disabled={updatingFeedbackId === item.id}
                         onChange={e => updateFeedbackStatus(item.id, e.target.value)}
@@ -1039,10 +1099,10 @@ export default function AdminDashboard() {
 }
 
 function SessionBox({ count, label, tone }) {
-  const dot = { yellow: 'bg-[#ff6b57]', blue: 'bg-[#5a5870]', green: 'bg-[#2fbf9e]' }[tone] || 'bg-[#b9b6cf]';
+  const dot = { needs: 'bg-[var(--coral)]', scheduled: 'bg-[var(--mint)]', past: 'bg-[var(--muted-foreground)]' }[tone] || 'bg-[#b9b6cf]';
   return (
     <div className="rounded-lg border border-[var(--border)] p-3 text-center">
-      <p className="text-xl font-medium tabular-nums tracking-[-0.01em]">{count}</p>
+      <p className="text-xl font-medium tabular-nums tracking-[-0.01em]">{count ?? '—'}</p>
       <p className="mt-1 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
         <span className={`size-1.5 rounded-full ${dot}`} aria-hidden="true" />
         {label}

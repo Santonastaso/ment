@@ -1,0 +1,38 @@
+name: data-retention
+
+# Applies each organisation's retention periods once a day (see migration
+# 0089). Off until the RETENTION_ENABLED repository variable is 'true'; even
+# then nothing is deleted until an admin sets periods under Admin > Privacy.
+on:
+  schedule:
+    - cron: '40 3 * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  sweep:
+    # Manual dispatch is not an override for the kill switch. Restrict the
+    # production credentialed job to the default branch as well.
+    if: github.ref == 'refs/heads/main' && vars.RETENTION_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: data-retention-production
+      cancel-in-progress: false
+    timeout-minutes: 10
+    steps:
+      - name: Apply retention periods
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo '::error::Configure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.'
+            exit 1
+          fi
+          curl --silent --show-error --fail-with-body --max-time 300 \
+            --request POST \
+            --header "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            --header 'Content-Type: application/json' \
+            "$SUPABASE_URL/functions/v1/retention-sweep"

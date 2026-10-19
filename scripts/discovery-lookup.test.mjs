@@ -14,6 +14,9 @@ const chat = async (fixture, query) => {
 };
 const payload = (fixture, index) => JSON.parse(fixture.calls[index].messages[1].content);
 const lastPayload = (fixture) => payload(fixture, fixture.calls.length - 1);
+// Who was offered to the matcher, by profile id; the matcher itself sees stand-ins.
+const offered = (fixture, index) => fixture.calls[index].offered;
+const lastOffered = (fixture) => fixture.calls.at(-1).offered;
 // A near result is scoped first. This answers the scoping question with
 // "show me the closest", which runs the interrupted search unchanged.
 const throughScope = async (fixture, query, check) => {
@@ -148,7 +151,7 @@ test('after the answer, results must carry the subject: no HR people for finance
   const response = await run(fixture, { action: 'chat', thread_id: 'thread', query: 'either works', lang: 'en' });
   const result = await response.json();
   assert.deepEqual(result.matches.map((m) => m.id), [finance.id]);
-  assert.deepEqual(payload(fixture, 1).candidates.map((c) => c.id), [finance.id], 'HR is never even offered to the matcher');
+  assert.deepEqual(offered(fixture, 1), [finance.id], 'HR is never even offered to the matcher');
 });
 
 // The funnel, walked turn by turn: support -> industry -> finance -> answer.
@@ -270,13 +273,13 @@ test('"ask me questions" after results starts scoping instead of searching', asy
 });
 
 test('"more options" excludes people already shown and keeps the scope', async () => {
-  const second = { ...finance, id: 'finance2', name: 'Second Finance' };
+  const second = { ...finance, id: 'finance2', name: 'Second Finance', tenure_years: 7 };
   const fixture = discoveryFixture({ candidates: [finance, second, hr], turns: shownTurns(), responses: [
     clarify({ intent: 'more' }),
     { outcome: 'matches', matches: [{ profile_id: second.id, confidence: 0.9, reasons: ['Also in finance.'], matched_expertise: ['Financial modelling'] }] },
   ] });
   const result = await say(fixture, 'show me more options', 'thread');
-  assert.deepEqual(payload(fixture, 1).candidates.map((c) => c.id), [second.id], 'shown people and HR are excluded');
+  assert.deepEqual(offered(fixture, 1), [second.id], 'shown people and HR are excluded');
   assert.match(result.message, /more|another/i);
 });
 
@@ -403,7 +406,7 @@ test('"what about IB in Europe" after results narrows them to European cities', 
     { outcome: 'matches', matches: [{ profile_id: london.id, confidence: 0.9, reasons: ['IB in London.'], matched_expertise: ['investment banking'] }] },
   ] }), ['London', 'Rabat']);
   const result = await say(fixture, 'what about someone working in IB in Europe?', 'thread');
-  assert.deepEqual(payload(fixture, 1).candidates.map((c) => c.id), [london.id], 'only European cities reach the matcher');
+  assert.deepEqual(offered(fixture, 1), [london.id], 'only European cities reach the matcher');
   assert.match(payload(fixture, 1).request, /^investment banking; /, 'it builds on the earlier search');
   assert.deepEqual(result.matches.map((m) => m.id), [london.id]);
 });
@@ -415,7 +418,7 @@ test('a region named without the model extracting it still filters', async () =>
     { outcome: 'matches', matches: [{ profile_id: london.id, confidence: 0.9, reasons: ['IB.'], matched_expertise: ['investment banking'] }] },
   ] }), ['London', 'Dubai']);
   await chat(fixture, 'investment banking in Europe');
-  assert.deepEqual(payload(fixture, 1).candidates.map((c) => c.id), [london.id]);
+  assert.deepEqual(offered(fixture, 1), [london.id]);
 });
 
 test('a place the network does not cover is answered about the place', async () => {
@@ -440,7 +443,7 @@ test('people already shown are called out as the same people', async () => {
 });
 
 test('a mix of new and repeated people says how many are new', async () => {
-  const second = { ...finance, id: 'finance2', name: 'Second Finance' };
+  const second = { ...finance, id: 'finance2', name: 'Second Finance', tenure_years: 7 };
   const turns = [
     { role: 'user', content: 'investment banking' },
     { role: 'assistant', kind: 'matches', framed: true, content: 'Good news.', search_request: 'investment banking', department: '', location: '',
@@ -474,7 +477,7 @@ for (const [label, message, subject] of [
     const result = await say(fixture, message, 'thread');
     const sent = payload(fixture, 1);
     assert.equal(sent.request, message, 'the request is the new message, not the old topic');
-    assert.deepEqual(sent.candidates.map((c) => c.id).sort(), ['ops', 'strat'], 'no Strategy filter carried over');
+    assert.deepEqual([...offered(fixture, 1)].sort(), ['ops', 'strat'], 'no Strategy filter carried over');
     const [gapSentence] = result.no_match_reason.split(' — ');
     assert.match(gapSentence, subject, 'the gap names the new subject');
     assert.doesNotMatch(gapSentence, /strateg/i, 'and not the old one');
@@ -489,7 +492,7 @@ test('pushback searches again without the people already shown', async () => {
   ];
   const fixture = discoveryFixture({ candidates: [strategist, operator], turns, responses: [clarify(), { outcome: 'no_match', matches: [] }] });
   const result = await say(fixture, 'none of these have anything to do with construction', 'thread');
-  assert.ok(!payload(fixture, 1).candidates.some((c) => c.id === operator.id), 'the rejected person is not offered again');
+  assert.ok(!offered(fixture, 1).includes(operator.id), 'the rejected person is not offered again');
   assert.match(result.no_match_reason, /^Sorry about that — nobody here works in construction directly/);
 });
 
@@ -569,7 +572,7 @@ test('words that only look like places are not places', async () => {
 });
 
 test('pushback that finds new people says they are different, with no invented place', async () => {
-  const second = { ...finance, id: 'finance2', name: 'Second Finance' };
+  const second = { ...finance, id: 'finance2', name: 'Second Finance', tenure_years: 7 };
   const turns = [
     { role: 'user', content: 'data analyst' },
     { role: 'assistant', kind: 'matches', framed: true, content: 'This person is close.', search_request: 'data analyst', department: '', location: '',
@@ -653,7 +656,7 @@ test('an employer is a filter on career history', async () => {
     clarify({ named_subject: 'consulting', parts: { company: 'McKinsey', department: 'Consulting' } }), picked('mck', 'McKinsey'),
   ] });
   const result = await chat(fixture, 'someone who worked at McKinsey');
-  assert.deepEqual(payload(fixture, 1).candidates.map((c) => c.id), ['mck']);
+  assert.deepEqual(offered(fixture, 1), ['mck']);
   assert.equal(payload(fixture, 1).wanted.company, 'McKinsey');
   assert.deepEqual(result.matches.map((m) => m.id), ['mck']);
 });
@@ -677,7 +680,7 @@ test('an employer the user never named is discarded', async () => {
   ] });
   const result = await chat(fixture, 'someone in strategy consulting');
   assert.equal(result.understood.company, '');
-  assert.deepEqual(payload(fixture, 1).candidates.map((c) => c.id).sort(), ['bcg', 'mck']);
+  assert.deepEqual(offered(fixture, 1).sort(), ['bcg', 'mck']);
 });
 
 test('two parts that cannot describe one person are asked about, once', async () => {
@@ -717,7 +720,7 @@ test('"someone in finance" stays finance when the model "excludes non-finance ro
 
 test('"give me more options" keeps the scope even when the model repeats the earlier city', async () => {
   const hrLondon = { ...hr, id: 'hr-london', location: 'London' };
-  const hrLondon2 = { ...hr, id: 'hr-london-2', name: 'Second HR', location: 'London' };
+  const hrLondon2 = { ...hr, id: 'hr-london-2', name: 'Second HR', location: 'London', tenure_years: 7 };
   const turns = [
     { role: 'user', content: 'an HR director who worked at Google in London' },
     { role: 'assistant', kind: 'matches', framed: true, content: 'Close.', search_request: 'HR director in London', department: 'Human Resources', location: 'London',
@@ -744,7 +747,7 @@ test('answering a scoping question keeps the field: other companies still means 
   const choice = first.suggestions[0];
   assert.equal(choice.label, 'HR director at other companies');
   const result = await say(fixture, choice.message, first.thread_id);
-  assert.deepEqual(lastPayload(fixture).candidates.map((c) => c.id), ['hr'], 'only HR people are considered');
+  assert.deepEqual(lastOffered(fixture), ['hr'], 'only HR people are considered');
   assert.deepEqual(result.matches.map((m) => m.id), ['hr']);
   assert.match(result.message, /first request had no exact match|what you first asked/);
 });
@@ -832,7 +835,7 @@ const shownFinance = [
 ];
 
 test('pushback after results does not repeat the closing offer', async () => {
-  const second = { ...finance, id: 'finance2', name: 'Second Finance' };
+  const second = { ...finance, id: 'finance2', name: 'Second Finance', tenure_years: 7 };
   const fixture = discoveryFixture({ candidates: [finance, second], turns: shownFinance, responses: [
     clarify(), { outcome: 'matches', matches: [{ ...directMatch.matches[0], profile_id: second.id }] },
   ] });
@@ -842,7 +845,7 @@ test('pushback after results does not repeat the closing offer', async () => {
 });
 
 test('a rewrite that repeats the previous reply falls back to the template', async () => {
-  const second = { ...finance, id: 'finance2', name: 'Second Finance' };
+  const second = { ...finance, id: 'finance2', name: 'Second Finance', tenure_years: 7 };
   const fixture = discoveryFixture({ voice: true, candidates: [finance, second], turns: shownFinance, responses: [
     clarify(), { outcome: 'matches', matches: [{ ...directMatch.matches[0], profile_id: second.id }] },
     { text: "Here's someone new! Happy to show more people or narrow it down — just say." },
@@ -1072,7 +1075,7 @@ test('a ruled-out place is left out and people elsewhere stay', async () => {
     // The search is still the finance search, refined; no new question is asked.
     assert.equal(result.clarification, '', query);
     assert.match(lastPayload(fixture).request, /finance/i, query);
-    assert.deepEqual(lastPayload(fixture).candidates.map((candidate) => candidate.id).sort(), ['kept', 'unknown'], query);
+    assert.deepEqual(lastOffered(fixture).sort(), ['kept', 'unknown'], query);
   }
 });
 
@@ -1089,8 +1092,8 @@ test('the model cannot rule out a place the user never named, or drop a location
     const result = await (await run(fixture, { action: 'chat', thread_id: 'thread', query, lang: 'en' })).json();
     assert.ok(!(result.understood?.exclude || []).some((word) => ['paris', 'london'].includes(word)), label);
     // Whenever people were ranked, nobody had been taken out first.
-    for (const sent of fixture.calls.map((_, at) => payload(fixture, at)).filter((sent) => sent.candidates)) {
-      assert.deepEqual(sent.candidates.map((candidate) => candidate.id).sort(), ['lon', 'par'], label);
+    for (const sent of fixture.calls.filter((call) => call.offered)) {
+      assert.deepEqual([...sent.offered].sort(), ['lon', 'par'], label);
     }
   }
 });
@@ -1109,7 +1112,7 @@ test('an exclusion in the opening request survives the question that follows', a
   // "More options" afterwards must not bring London back either.
   const more = await say(fixture, 'more options', asked.thread_id);
   assert.ok((more.matches || []).every((match) => match.location !== 'London'));
-  assert.ok(fixture.calls.map((_, at) => payload(fixture, at)).filter((sent) => sent.candidates).every((sent) => sent.candidates.every((candidate) => candidate.id !== 'out')));
+  assert.ok(fixture.calls.filter((call) => call.offered).every((call) => !call.offered.includes('out')));
 });
 
 test('an exclusion ends when the place is asked for or "anywhere" is said', async () => {

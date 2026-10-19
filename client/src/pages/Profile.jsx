@@ -5,6 +5,8 @@ import SkillTagInput from '../components/SkillTagInput.jsx';
 import TeachSkillsEditor from '../components/TeachSkillsEditor.jsx';
 import SkillCloud, { SkillCloudFilters } from '../components/SkillCloud.jsx';
 import { Field } from '../components/ui/field.jsx';
+import { exportToCsv } from '../lib/exportCsv.mjs';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog.jsx';
 import SessionRequestModal from '../components/SessionRequestModal.jsx';
 
 import CareerEntryFields, { departmentOptions } from '../components/CareerEntryFields.jsx';
@@ -21,7 +23,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, MapPin, Plus, X } from 'lucide-react';
+import { ArrowLeft, Download, MapPin, Plus, Trash2, X } from 'lucide-react';
 import api from '../api/index.js';
 import { useT } from '../i18n/index.jsx';
 import { sessionPath } from '../lib/conversationLinks.mjs';
@@ -92,7 +94,7 @@ function attachSkillEvidence(profile, evidence) {
 
 export default function Profile() {
   const { id } = useParams();
-  const { user: currentUser, updateUser } = useAuth();
+  const { user: currentUser, updateUser, signOut } = useAuth();
   const navigate = useNavigate();
   const { t, lang } = useT();
 
@@ -141,6 +143,12 @@ export default function Profile() {
   const [notifyEmail, setNotifyEmail] = useState('');
   const [notifySaving, setNotifySaving] = useState(false);
   const [notifyError, setNotifyError] = useState('');
+  const [exporting, setExporting] = useState(false);
+  const [aiSaving, setAiSaving] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteWord, setDeleteWord] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   // Edit form state
   const [form, setForm] = useState({});
@@ -214,6 +222,55 @@ export default function Profile() {
   function showToast(msg) {
     setToast(msg);
     setTimeout(() => setToast(''), 3000);
+  }
+
+  // GDPR access and portability: everything stored about the member, as one
+  // CSV file, built by the database for the signed-in user only.
+  async function handleExportData() {
+    setExporting(true);
+    try {
+      const res = await api.get('/users/me/export');
+      const url = URL.createObjectURL(new Blob([exportToCsv(res.data)], { type: 'text/csv;charset=utf-8' }));
+      const link = Object.assign(document.createElement('a'), { href: url, download: `ment-data-${new Date().toISOString().slice(0, 10)}.csv` });
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+    } catch {
+      showToast(t('profile.data.error'));
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  // GDPR objection: keeps the member out of AI matching, CV reading and
+  // reflection tagging. The directory still lists them.
+  async function setAiOptOut(optOut) {
+    setAiSaving(true);
+    try {
+      const res = await api.put('/users/me', { ai_opt_out: optOut });
+      setProfile(prev => ({ ...prev, ...res.data }));
+      showToast(t(optOut ? 'profile.ai.offSaved' : 'profile.ai.onSaved'));
+    } catch {
+      showToast(t('components.sessionRequest.errorGeneric'));
+    } finally {
+      setAiSaving(false);
+    }
+  }
+
+  // GDPR erasure. The server removes the data and closes the login; the
+  // session here is then ended, since it can no longer be used.
+  async function handleDeleteAccount() {
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      await api.post('/users/me/delete');
+      await signOut();
+      navigate('/login', { replace: true });
+    } catch {
+      setDeleteError(t('profile.delete.error'));
+      setDeleting(false);
+    }
   }
 
   // Saved on its own rather than with the profile form: it lives on a
@@ -636,6 +693,7 @@ export default function Profile() {
           />
           <SurfaceBody className="pt-3 sm:px-4">
             <ProfileReflection
+              aiOff={!!profile.ai_opt_out}
               draft={reflectionDraft}
               onDraftChange={setReflectionDraft}
               onSkillsApplied={refreshProfile}
@@ -736,6 +794,38 @@ export default function Profile() {
               {!notifyEmail && profile.email && (
                 <p className="mt-2 text-xs text-muted-foreground">{t('profile.notifyEmail.usingLogin', { email: profile.email })}</p>
               )}
+            </section>
+            <section className="mt-6 border-t border-[var(--border-subtle)] pt-6">
+              <h3 className="text-section font-semibold">{t('profile.data.title')}</h3>
+              <p className="mt-0.5 text-xs text-muted-foreground">{t('profile.data.help')}</p>
+              <Button type="button" variant="outline" className="mt-3" data-testid="export-my-data" onClick={handleExportData} disabled={exporting}>
+                <Download />{exporting ? t('profile.data.preparing') : t('profile.data.download')}
+              </Button>
+            </section>
+            <section className="mt-6 border-t border-[var(--border-subtle)] pt-6">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-section font-semibold">{t('profile.ai.title')}</h3>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{t(profile.ai_opt_out ? 'profile.ai.offHelp' : 'profile.ai.onHelp')}</p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  className="availability-switch shrink-0"
+                  data-testid="toggle-ai"
+                  aria-checked={!profile.ai_opt_out}
+                  aria-label={t('profile.ai.title')}
+                  disabled={aiSaving}
+                  onClick={() => setAiOptOut(!profile.ai_opt_out)}
+                />
+              </div>
+            </section>
+            <section className="mt-6 border-t border-[var(--border-subtle)] pt-6">
+              <h3 className="text-section font-semibold">{t('profile.delete.title')}</h3>
+              <p className="mt-0.5 text-xs text-muted-foreground">{t('profile.delete.help')}</p>
+              <Button type="button" variant="outline" className="mt-3 text-destructive hover:text-destructive" data-testid="delete-account" onClick={() => { setDeleteWord(''); setDeleteError(''); setDeleteOpen(true); }}>
+                <Trash2 />{t('profile.delete.button')}
+              </Button>
             </section>
           </SurfaceBody>
         </Surface>
@@ -842,7 +932,7 @@ export default function Profile() {
             }
           />
           <SurfaceBody className="pt-5">
-            <ProfileReflection history draft={reflectionDraft} onDraftChange={setReflectionDraft} onSkillsApplied={refreshProfile} open={reflectionOpen} onOpenChange={setReflectionOpen} returnFocus={reflectionTriggerRef} />
+            <ProfileReflection history aiOff={!!profile.ai_opt_out} draft={reflectionDraft} onDraftChange={setReflectionDraft} onSkillsApplied={refreshProfile} open={reflectionOpen} onOpenChange={setReflectionOpen} returnFocus={reflectionTriggerRef} />
           </SurfaceBody>
         </Surface>
       )}
@@ -850,6 +940,29 @@ export default function Profile() {
       </div>
 
       {confirmDialog}
+      <Dialog open={deleteOpen} onOpenChange={open => { if (!deleting) setDeleteOpen(open); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('profile.delete.confirmTitle')}</DialogTitle>
+            <DialogDescription>{t('profile.delete.confirmBody')}</DialogDescription>
+          </DialogHeader>
+          <Field
+            label={t('profile.delete.typeWord', { word: t('profile.delete.word') })}
+            value={deleteWord}
+            onChange={e => setDeleteWord(e.target.value)}
+            autoComplete="off"
+            data-testid="delete-account-word"
+          />
+          {deleteError && <p role="alert" className="text-sm text-destructive">{deleteError}</p>}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleting}>{t('common.cancel')}</Button>
+            <Button type="button" variant="danger" data-testid="delete-account-confirm" onClick={handleDeleteAccount}
+              disabled={deleting || deleteWord.trim().toLocaleUpperCase() !== t('profile.delete.word').toLocaleUpperCase()}>
+              {deleting ? t('profile.delete.deleting') : t('profile.delete.confirm')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       {showModal && (
         <SessionRequestModal
           mentor={profile}

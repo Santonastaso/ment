@@ -8,6 +8,7 @@ import {
   corsHeaders,
   jsonError,
   jsonOk,
+  aiOptedOut,
   requireUser,
 } from '../_shared/index.ts';
 import { recordAiRun } from '../_shared/ai-telemetry.ts';
@@ -115,6 +116,8 @@ Deno.serve(async (req) => {
   } catch {
     return jsonError('rate_limit_unavailable', 503);
   }
+
+  if (await aiOptedOut(ctx.sb, ctx.user.id)) return jsonError('ai_opted_out', 403);
 
   const body = await req.json().catch(() => ({}));
   const storagePath = (body.storage_path || '').toString();

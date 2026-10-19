@@ -66,5 +66,11 @@
   "onboarding.persona.alumnus": "Alumni",
   "onboarding.fields.program": "Programma",
   "onboarding.fields.programPlaceholder": "es. Laurea Magistrale in Management",
-  "onboarding.fields.cohortYear": "Anno di immatricolazione"
+  "onboarding.fields.cohortYear": "Anno di immatricolazione",
+  "onboarding.terms.before": "Accetto le ",
+  "onboarding.terms.termsLink": "Condizioni d’uso",
+  "onboarding.terms.middle": " e ho letto l’",
+  "onboarding.terms.privacyLink": "Informativa sulla privacy",
+  "onboarding.terms.after": ".",
+  "onboarding.terms.required": "Per concludere, accetta le Condizioni d’uso e conferma di aver letto l’Informativa sulla privacy."
 }
