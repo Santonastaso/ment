@@ -20,7 +20,7 @@
     "check:migrations": "node scripts/check-migrations.mjs"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "^0.5.8",
+    "@electric-sql/pglite": "^0.5.10",
     "@playwright/test": "1.63.0",
     "supabase": "2.119.0"
   }
