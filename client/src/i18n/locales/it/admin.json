@@ -274,5 +274,14 @@
   "admin.privacy.field.wants": "Competenze che vogliono imparare",
   "admin.privacy.field.goal": "Risposte sull'obiettivo di carriera",
   "admin.privacy.field.meetingNotes": "Note e valutazioni sugli incontri",
-  "admin.privacy.field.email": "Indirizzo email"
+  "admin.privacy.field.email": "Indirizzo email",
+  "admin.stats.students": "Studenti",
+  "admin.stats.alumni": "Alumni",
+  "admin.users.addPeople": "Aggiungi persone",
+  "admin.users.addPeopleClose": "Nascondi",
+  "admin.users.makeAlumnus": "Cambia in alumnus",
+  "admin.users.makeStudent": "Cambia in studente",
+  "admin.dialog.roleTitle": "Cambiare in {role}?",
+  "admin.dialog.roleDescription": "{name} risulterà come {role}. Cambia con chi viene abbinato e quali richieste riceve.",
+  "admin.dialog.roleConfirm": "Cambia in {role}"
 }

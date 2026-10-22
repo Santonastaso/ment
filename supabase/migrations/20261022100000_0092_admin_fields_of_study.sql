@@ -19,7 +19,7 @@ begin
   if not public.is_admin(v_caller) then raise exception 'admin_only'; end if;
 
   return (with scoped as (
-    select p.id, nullif(trim(p.department), '') raw_field
+    select p.id, p.role, nullif(trim(p.department), '') raw_field
     from public.profiles p
     where p.admin_scope = 'none' and p.deactivated_at is null
       and (v_platform or p.organization_id = v_org)
@@ -60,6 +60,9 @@ begin
     from ranked r
   )
   select jsonb_build_object(
+    -- Students and alumni, each shown only from five up.
+    'students', (select case when count(*) >= 5 then count(*)::int end from scoped where role = 'student'),
+    'alumni', (select case when count(*) >= 5 then count(*)::int end from scoped where role = 'alumnus'),
     'fields', coalesce((select jsonb_agg(jsonb_build_object('field', field, 'members', members, 'active', active)
       order by field is null, members desc, field) from field_rows), '[]'::jsonb),
     'skills', coalesce((select jsonb_agg(jsonb_build_object('skill', label, 'offered', offered, 'wanted', wanted, 'sessions', sessions)

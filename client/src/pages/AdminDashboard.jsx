@@ -17,7 +17,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Check, Eye, Lock, MoreHorizontal } from 'lucide-react';
+import { Check, ChevronUp, Eye, Lock, MoreHorizontal, Plus } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { formatAdminDate, pmTranslate } from '../components/admin/adminPm.js';
 import AdminPmKpis from '../components/admin/AdminPmKpis.jsx';
@@ -128,6 +128,7 @@ export default function AdminDashboard() {
   const t = (key, vars) => pmTranslate(translate, key, vars);
   const [stats, setStats] = useState(null);
   const [fieldsOfStudy, setFieldsOfStudy] = useState(null);
+  const [addPeopleOpen, setAddPeopleOpen] = useState(false);
   const [feedback, setFeedback] = useState([]);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [feedbackFilter, setFeedbackFilter] = useState('');
@@ -455,6 +456,17 @@ export default function AdminDashboard() {
     });
   }
 
+  // Changing someone between student and alumnus changes who they are matched
+  // with, so it is a deliberate step with a confirmation, never a single click.
+  function openRoleConfirm(user, role) {
+    setConfirmDialog({
+      title: t('admin.dialog.roleTitle', { role: t(`admin.users.role.${role}`) }),
+      description: t('admin.dialog.roleDescription', { name: user.name, role: t(`admin.users.role.${role}`) }),
+      confirmLabel: t('admin.dialog.roleConfirm', { role: t(`admin.users.role.${role}`) }),
+      onConfirm: () => handleSetRole(user, role),
+    });
+  }
+
   function openDeactivateConfirm(user) {
     setConfirmDialog({
       title: t('admin.dialog.deactivateTitle'),
@@ -761,11 +773,11 @@ export default function AdminDashboard() {
           ) : stats && (
             <>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <StatCard label={t('admin.stats.totalEmployees')} value={stats.totalUsers} />
+                <StatCard label={t('admin.stats.students')} value={fieldsOfStudy?.students} />
+                <StatCard label={t('admin.stats.alumni')} value={fieldsOfStudy?.alumni} />
                 <StatCard label={t('admin.stats.onboardingComplete')} value={stats.onboardingRate == null ? '—' : `${stats.onboardingRate}%`}
                   sub={stats.onboardingRate == null ? t('admin.privacy.suppressed') : t('admin.stats.onboardedOf', { onboarded: stats.onboarded, total: stats.totalUsers })} />
                 <StatCard label={t('admin.stats.sessionsRequested')} value={sessionsRequested} />
-                <StatCard label={t('admin.stats.matchPairs')} value={stats.totalMatches} />
               </div>
 
               <Surface>
@@ -971,28 +983,40 @@ export default function AdminDashboard() {
 
       {tab === 'people' && (
         <Surface>
-          <SurfaceHeader title={t('admin.users.title')} />
+          <SurfaceHeader
+            title={t('admin.users.title')}
+            action={
+              <Button type="button" variant="outline" size="sm" aria-expanded={addPeopleOpen} aria-controls="add-people" data-testid="add-people-toggle" onClick={() => setAddPeopleOpen(open => !open)}>
+                {addPeopleOpen ? <ChevronUp /> : <Plus />}{addPeopleOpen ? t('admin.users.addPeopleClose') : t('admin.users.addPeople')}
+              </Button>
+            }
+          />
           <SurfaceBody className="pt-5">
-          <AdminProvisionUserPanel />
-          <AdminInvitationPanel />
-          <form onSubmit={addExternalOutreachTarget} className="mb-5 flex flex-wrap items-end gap-3 rounded-lg border border-border bg-[var(--card)] p-3">
-            <div className="min-w-56 flex-1">
-              <Label htmlFor="outreach-email">{t('admin.pm.externalTargetEmail')}</Label>
-              <Input id="outreach-email" type="email" required value={outreachTarget.email} onChange={(e) => setOutreachTarget((current) => ({ ...current, email: e.target.value }))} placeholder="alumni@example.edu" className="mt-1" />
+          {/* Adding people is occasional; the list is what admins come for. */}
+          {addPeopleOpen && (
+            <div id="add-people" data-testid="add-people" className="mb-6">
+            <AdminProvisionUserPanel />
+            <AdminInvitationPanel />
+            <form onSubmit={addExternalOutreachTarget} className="mb-5 flex flex-wrap items-end gap-3 rounded-lg border border-border bg-[var(--card)] p-3">
+              <div className="min-w-56 flex-1">
+                <Label htmlFor="outreach-email">{t('admin.pm.externalTargetEmail')}</Label>
+                <Input id="outreach-email" type="email" required value={outreachTarget.email} onChange={(e) => setOutreachTarget((current) => ({ ...current, email: e.target.value }))} placeholder="alumni@example.edu" className="mt-1" />
+              </div>
+              <label className="grid gap-1 text-sm font-medium">
+                {t('admin.pm.externalTargetPersona')}
+                <select className="input h-10" value={outreachTarget.persona} onChange={(e) => setOutreachTarget((current) => ({ ...current, persona: e.target.value }))}>
+                  <option value="alumnus">{t('admin.users.role.alumnus')}</option>
+                  <option value="student">{t('admin.users.role.student')}</option>
+                </select>
+              </label>
+              <div>
+                <Label htmlFor="outreach-cohort">{t('admin.pm.externalTargetCohort')}</Label>
+                <Input id="outreach-cohort" value={outreachTarget.cohort_term} onChange={(e) => setOutreachTarget((current) => ({ ...current, cohort_term: e.target.value }))} className="mt-1 w-28" />
+              </div>
+              <Button type="submit" disabled={outreachTargetSaving}>{outreachTargetSaving ? t('admin.common.saving') : t('admin.pm.addExternalTarget')}</Button>
+            </form>
             </div>
-            <label className="grid gap-1 text-sm font-medium">
-              {t('admin.pm.externalTargetPersona')}
-              <select className="input h-10" value={outreachTarget.persona} onChange={(e) => setOutreachTarget((current) => ({ ...current, persona: e.target.value }))}>
-                <option value="alumnus">{t('admin.users.role.alumnus')}</option>
-                <option value="student">{t('admin.users.role.student')}</option>
-              </select>
-            </label>
-            <div>
-              <Label htmlFor="outreach-cohort">{t('admin.pm.externalTargetCohort')}</Label>
-              <Input id="outreach-cohort" value={outreachTarget.cohort_term} onChange={(e) => setOutreachTarget((current) => ({ ...current, cohort_term: e.target.value }))} className="mt-1 w-28" />
-            </div>
-            <Button type="submit" disabled={outreachTargetSaving}>{outreachTargetSaving ? t('admin.common.saving') : t('admin.pm.addExternalTarget')}</Button>
-          </form>
+          )}
           {usersLoading ? <p className="text-sm text-muted-foreground">{t('admin.common.loading')}</p> : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -1016,26 +1040,14 @@ export default function AdminDashboard() {
                         {u.deactivated_at ? (
                           <span className="text-muted-foreground">{t(`admin.users.role.${u.role || 'student'}`)}</span>
                         ) : (
-                          <div role="group" aria-label={t('admin.users.role.title')} className="inline-flex rounded-full border border-[var(--border)] bg-white p-0.5" data-testid={`role-${u.id}`}>
-                            {['student', 'alumnus'].map(role => (
-                              <button
-                                key={role}
-                                type="button"
-                                data-control-radius-exempt
-                                aria-pressed={(u.role || 'student') === role}
-                                onClick={() => { if ((u.role || 'student') !== role) handleSetRole(u, role); }}
-                                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${(u.role || 'student') === role ? 'bg-[var(--ink)] text-white' : 'text-muted-foreground hover:text-foreground'}`}
-                              >
-                                {t(`admin.users.role.${role}`)}
-                              </button>
-                            ))}
-                          </div>
+                          <span data-testid={`role-${u.id}`} className={`inline-block rounded-full px-2.5 py-1 text-xs font-medium text-[var(--ink)] ${u.role === 'alumnus' ? 'bg-[#e7e5f5]' : 'bg-[#d9f4ec]'}`}>{t(`admin.users.role.${u.role || 'student'}`)}</span>
                         )}
                       </td>
                       <td className="py-2 pr-4 text-secondary-foreground">{u.manager_email || <span className="text-muted-foreground">—</span>}</td>
                       <td className="py-2 text-right">
                         <RowActions label={t('admin.users.actions')} testId={`actions-${u.id}`} items={[
                           ...(!u.deactivated_at ? [
+                            { label: t(u.role === 'alumnus' ? 'admin.users.makeStudent' : 'admin.users.makeAlumnus'), onSelect: () => openRoleConfirm(u, u.role === 'alumnus' ? 'student' : 'alumnus'), testId: `change-role-${u.id}` },
                             { label: t('admin.users.setManager'), onSelect: () => openSetManager(u) },
                             { label: outreachSavingId === u.id ? t('admin.common.saving') : t('admin.pm.markInvited'), onSelect: () => markOutreachTarget(u), disabled: outreachSavingId === u.id },
                             { label: t('admin.users.resetPassword'), onSelect: () => openResetPasswordConfirm(u) },

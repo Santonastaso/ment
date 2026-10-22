@@ -274,5 +274,14 @@
   "admin.privacy.field.wants": "Skills they want to learn",
   "admin.privacy.field.goal": "Career goal answers",
   "admin.privacy.field.meetingNotes": "Notes and ratings on meetings",
-  "admin.privacy.field.email": "Email address"
+  "admin.privacy.field.email": "Email address",
+  "admin.stats.students": "Students",
+  "admin.stats.alumni": "Alumni",
+  "admin.users.addPeople": "Add people",
+  "admin.users.addPeopleClose": "Hide",
+  "admin.users.makeAlumnus": "Change to alumnus",
+  "admin.users.makeStudent": "Change to student",
+  "admin.dialog.roleTitle": "Change to {role}?",
+  "admin.dialog.roleDescription": "{name} will be listed as {role}. This changes who they are matched with and which requests they receive.",
+  "admin.dialog.roleConfirm": "Change to {role}"
 }

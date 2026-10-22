@@ -1982,7 +1982,12 @@ test('admin pages share the member pages\' cards and tabs, and show departments 
   // Brand strategy has nobody wanting it or meeting on it, so those lines are left out.
   await expect(page.getByTestId('skill-by-field-row').nth(1).getByText('Wanted by')).toHaveCount(0);
   await expect(page.getByText(/Suppressed|Most active|Department|Total employees/)).toHaveCount(0);
-  await expect(page.getByText('Students and alumni', { exact: true })).toBeVisible();
+  // Students and alumni counted apart; match pairs are not shown.
+  await expect(page.getByText('Students', { exact: true })).toBeVisible();
+  await expect(page.getByText('180', { exact: true })).toBeVisible();
+  await expect(page.getByText('Alumni', { exact: true })).toBeVisible();
+  await expect(page.getByText('109', { exact: true })).toBeVisible();
+  await expect(page.getByText('Match pairs')).toHaveCount(0);
   await page.getByTestId('admin-tab-people').click();
   await expect(page.getByRole('button', { name: 'Download template' })).toHaveCSS('background-color', 'rgb(255, 255, 255)');
 });
@@ -2050,17 +2055,29 @@ test('school admins see five tabs and six KPIs', async ({ page }) => {
   await kpis.first().locator('summary').click();
   await expect(kpis.first().getByText(/Denominator/)).toBeVisible();
 
-  // People: a clear Student / Alumnus switch, and the row's actions in one menu.
+  // People: the forms to add people stay folded away until asked for.
   await page.getByTestId('admin-tab-people').click();
-  const role = page.getByTestId('role-viewer');
-  await expect(role.getByRole('button', { name: 'Student' })).toHaveAttribute('aria-pressed', 'true');
-  await role.getByRole('button', { name: 'Alumnus' }).click();
-  await expect.poll(() => page.evaluate(() => window.fixture.adminUserUpdates)).toEqual([{ id: 'viewer', role: 'alumnus' }]);
-  await expect(page.getByRole('menuitem')).toHaveCount(0);
+  await expect(page.getByTestId('add-people')).toHaveCount(0);
+  await page.getByTestId('add-people-toggle').click();
+  await expect(page.getByTestId('add-people')).toBeVisible();
+  await expect(page.getByText('Create an account')).toBeVisible();
+  await page.getByTestId('add-people-toggle').click();
+  await expect(page.getByTestId('add-people')).toHaveCount(0);
+
+  // The role is a label; changing it is a menu action with a confirmation.
+  await expect(page.getByTestId('role-viewer')).toHaveText('Student');
+  await expect(page.getByTestId('role-viewer').locator('button')).toHaveCount(0);
   await page.getByTestId('actions-viewer').click();
-  await expect(page.getByRole('menuitem')).toHaveText(['Set advisor', 'Mark invited', 'Reset password', 'Deactivate', 'Erase data']);
+  await expect(page.getByRole('menuitem')).toHaveText(['Change to alumnus', 'Set advisor', 'Mark invited', 'Reset password', 'Deactivate', 'Erase data']);
+  await page.getByTestId('change-role-viewer').click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toContainText('Viewer Student will be listed as Alumnus.');
+  expect(await page.evaluate(() => window.fixture.adminUserUpdates ?? [])).toEqual([]);
+  await dialog.getByRole('button', { name: 'Change to Alumnus' }).click();
+  await expect.poll(() => page.evaluate(() => window.fixture.adminUserUpdates)).toEqual([{ id: 'viewer', role: 'alumnus' }]);
+  await page.getByTestId('actions-peer').click();
+  await expect(page.getByRole('menuitem').first()).toHaveText('Change to student');
   await page.keyboard.press('Escape');
-  await expect(page.getByRole('menuitem')).toHaveCount(0);
 
   // Privacy: plain labels, not column names.
   await page.getByTestId('admin-tab-privacy').click();

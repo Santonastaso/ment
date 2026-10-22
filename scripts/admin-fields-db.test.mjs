@@ -22,7 +22,7 @@ test('admins see fields of study and the skills they take part in, with no small
       create function auth.uid() returns uuid language sql stable as
         $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
       create table profiles(id uuid primary key, organization_id uuid, name text, department text,
-        admin_scope text default 'none', deactivated_at timestamptz);
+        admin_scope text default 'none', deactivated_at timestamptz, role text default 'student');
       insert into profiles(id, organization_id, name, department, admin_scope) values ('${admin}', '${org}', 'Admin', '', 'org');
       insert into profiles(id, organization_id, name, department) values
         ${people.map(([pid, field], i) => `('${pid}', '${org}', 'Person ${i}', '${field}')`).join(',')};
@@ -37,6 +37,8 @@ test('admins see fields of study and the skills they take part in, with no small
       create function is_platform_admin(uuid) returns boolean language sql stable as $$ select false $$;
       create function current_organization_id(uuid) returns uuid language sql stable as $$ select organization_id from profiles where id = $1 $$;
     `);
+    // Six alumni, ten students.
+    await db.exec(`update profiles set role = 'alumnus' where department in ('Finance')`);
     await db.exec(await migration('20261022100000_0092_admin_fields_of_study.sql'));
     assert.equal((await one("select has_function_privilege('anon', 'public.admin_fields_of_study(integer)', 'execute') value")).value, false);
 
@@ -45,6 +47,7 @@ test('admins see fields of study and the skills they take part in, with no small
 
     await db.query("select set_config('request.jwt.claim.sub', $1, false)", [admin]);
     const result = (await one('select admin_fields_of_study() value')).value;
+    assert.deepEqual([result.students, result.alumni], [10, 6]);
     assert.deepEqual(result.fields, [
       { field: 'Finance', members: 6, active: true },
       { field: 'Marketing', members: 5, active: true },
@@ -76,7 +79,7 @@ test('a pool of other fields smaller than five is left out entirely', async () =
       create schema auth;
       create function auth.uid() returns uuid language sql stable as
         $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
-      create table profiles(id uuid primary key, organization_id uuid, name text, department text, admin_scope text default 'none', deactivated_at timestamptz);
+      create table profiles(id uuid primary key, organization_id uuid, name text, department text, admin_scope text default 'none', deactivated_at timestamptz, role text default 'student');
       insert into profiles(id, organization_id, department, admin_scope) values ('${admin}', '${org}', '', 'org');
       insert into profiles(id, organization_id, department) values
         ${[...Array(5)].map((_, i) => `('${id(i + 1)}', '${org}', 'Finance')`).join(',')}, ('${id(9)}', '${org}', 'Law');
@@ -91,6 +94,8 @@ test('a pool of other fields smaller than five is left out entirely', async () =
     await db.exec(await migration('20261022100000_0092_admin_fields_of_study.sql'));
     const result = (await one('select admin_fields_of_study() value')).value;
     assert.deepEqual(result.fields.map(f => f.field), ['Finance']);
+    // Six students, no alumni: the alumni count is not shown below five.
+    assert.deepEqual([result.students, result.alumni], [6, null]);
     // The one Law student is in no group that is shown, so their skill is not either.
     assert.deepEqual(result.skills, []);
   } finally {

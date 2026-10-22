@@ -206,6 +206,7 @@ function fixtureApi(state, ApiError) {
         '/admin/ai-runs': [],
         '/admin/knowledge-graph': sampleKnowledgeGraph(),
         '/admin/fields-of-study': {
+          students: 180, alumni: 109,
           fields: [{ field: 'Finance', members: 12, active: true }, { field: 'Marketing', members: 6, active: false }, { field: null, members: 7, active: true }],
           skills: [
             { skill: 'Valuation', offered: ['Finance'], wanted: ['Marketing', null], sessions: ['Finance'] },
