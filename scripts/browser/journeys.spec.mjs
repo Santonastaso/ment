@@ -2028,3 +2028,20 @@ test('an admin sets how long data is kept, and nothing is set until they do', as
     conversation_days: 365, search_days: null, reflection_days: null, audit_log_days: null, deactivated_account_days: 730,
   });
 });
+
+test('school admins see five tabs and six KPIs', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => sessionStorage.setItem('ment.fixture.auth', JSON.stringify({ id: 'admin', name: 'Org Admin', email: 'admin@example.test', role: 'admin', onboarding_complete: true, is_admin: true, admin_scope: 'org' })));
+  await page.goto('/admin');
+  const tabs = page.locator('[data-testid^="admin-tab-"]');
+  await expect(tabs).toHaveText(['Overview', 'KPIs', 'People', 'Privacy', 'Feedback']);
+  await page.getByTestId('admin-tab-privacy').click();
+  await expect(page.getByTestId('data-retention')).toBeVisible();
+  // The retention field keeps its "Audit log" label; the log itself is not shown.
+  await expect(page.getByText('Each event records who acted and when.', { exact: false })).toHaveCount(0);
+  await page.getByTestId('admin-tab-kpis').click();
+  const kpis = page.locator('[data-testid^="kpi-"]');
+  await expect(kpis).toHaveCount(6);
+  await expect(kpis.first()).toContainText('Alumni engagement');
+  await expect(page.getByText('Referrals')).toHaveCount(0);
+});

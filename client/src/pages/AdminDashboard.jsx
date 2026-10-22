@@ -90,7 +90,9 @@ export default function AdminDashboard() {
   // Admin subpages live in the URL (?tab=) so deep links and back/forward work.
   const [searchParams, setSearchParams] = useSearchParams();
   const rawTab = searchParams.get('tab') || 'overview';
-  const validTabs = ['overview', 'kpis', 'ai', 'people', 'privacy', 'audit', 'feedback'];
+  // AI runs and the audit log are hidden from school admins; both are still
+  // recorded, and their panels stay in the code for the platform team.
+  const validTabs = ['overview', 'kpis', 'people', 'privacy', 'feedback'];
   const tab = validTabs.includes(rawTab) ? rawTab : 'overview';
   function setTab(next) {
     const params = new URLSearchParams(searchParams);
@@ -318,7 +320,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (tab === 'kpis') loadKpis();
     if (tab === 'people') loadUsers();
-    if (tab === 'privacy' || tab === 'audit') loadAudit();
+    if (tab === 'audit') loadAudit();
     if (tab === 'privacy') loadRequestSettings();
     if (tab === 'feedback') loadFeedback();
   }, [tab]);
@@ -859,7 +861,7 @@ export default function AdminDashboard() {
           </>
       )}
 
-      {(tab === 'privacy' || tab === 'audit') && (
+      {tab === 'audit' && (
         <Surface>
           <SurfaceHeader
             title={t('admin.audit.title')}
