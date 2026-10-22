@@ -1966,12 +1966,23 @@ test('admin pages share the member pages\' cards and tabs, and show departments 
   await expect(panel).toBeVisible();
   expect(await panel.evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgb(255, 255, 255)');
   expect(await page.getByTestId('admin-tab-overview').evaluate(element => getComputedStyle(element).borderRadius)).toBe('0px');
-  // Departments only: no person is named or ranked on the overview.
-  const rows = page.getByTestId('department-participation-row');
-  await expect(rows).toHaveCount(1);
-  await expect(rows.first()).toContainText('Suppressed to protect privacy');
-  await expect(page.getByText('Other departments (under 5 people each)')).toHaveCount(0);
-  await expect(page.getByText('Most active')).toHaveCount(0);
+  // Fields of study, never people, and nothing hidden behind "suppressed".
+  const fields = page.getByTestId('field-of-study-row');
+  await expect(fields).toHaveCount(3);
+  await expect(fields.first()).toContainText('Finance');
+  await expect(fields.first()).toContainText('12 members');
+  await expect(fields.first()).toContainText('Meeting');
+  await expect(fields.nth(1)).toContainText('No meetings yet');
+  await expect(fields.nth(2)).toContainText('Other fields of study');
+  const valuation = page.getByTestId('skill-by-field-row').first();
+  await expect(valuation).toContainText('Valuation');
+  await expect(valuation).toContainText('Offered by');
+  await expect(valuation).toContainText('Wanted by');
+  await expect(valuation.getByText('Other fields of study')).toBeVisible();
+  // Brand strategy has nobody wanting it or meeting on it, so those lines are left out.
+  await expect(page.getByTestId('skill-by-field-row').nth(1).getByText('Wanted by')).toHaveCount(0);
+  await expect(page.getByText(/Suppressed|Most active|Department|Total employees/)).toHaveCount(0);
+  await expect(page.getByText('Students and alumni', { exact: true })).toBeVisible();
   await page.getByTestId('admin-tab-people').click();
   await expect(page.getByRole('button', { name: 'Download template' })).toHaveCSS('background-color', 'rgb(255, 255, 255)');
 });

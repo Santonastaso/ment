@@ -119,7 +119,9 @@ export default function KnowledgeGraph() {
   const organizations = graph?.meta?.organizations || [];
   const languages = graph?.meta?.languages || [];
 
-  const nodes = graph?.nodes || [];
+  // The database names the pooled group "Other departments"; show it in the reader's language.
+  const nodes = useMemo(() => (graph?.nodes || []).map(n => (n.kind === 'department' && n.label === 'Other departments'
+    ? { ...n, label: t('graph.otherDepartments') } : n)), [graph, t]);
   const edges = graph?.edges || [];
 
   const visibleNodes = useMemo(() => {

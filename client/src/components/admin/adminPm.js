@@ -30,7 +30,7 @@ export const adminPmCopy = {
   'admin.pm.consent': 'Consent and data handling',
   'admin.pm.consentHelp': 'Profile visibility and private data are separated below. Optional AI processing requires the applicable consent; contact the platform team for data access or deletion requests.',
   'admin.pm.platformTitle': 'Platform administration',
-  'admin.pm.platformDescription': 'Platform administrators manage organizations and access requests across schools. School administrators manage only their own school.',
+  'admin.pm.platformDescription': 'Platform administrators manage schools and access requests across schools. School administrators manage only their own school.',
   'admin.tab.audit': 'Audit history',
 };
 

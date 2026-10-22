@@ -47,6 +47,13 @@ async function downloadBlob(apiPath, filename) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+// How a field of study takes part in a skill, with the colours used across the app.
+const SKILL_ROLES = [
+  { key: 'offered', dot: 'bg-[var(--mint)]', chip: 'bg-[#d9f4ec]' },
+  { key: 'wanted', dot: 'bg-[var(--coral)]', chip: 'bg-[#ffe3de]' },
+  { key: 'sessions', dot: 'bg-[var(--ink)]', chip: 'bg-[#e7e5f5]' },
+];
+
 const RETENTION_FIELDS = ['conversation_days', 'search_days', 'reflection_days', 'audit_log_days', 'deactivated_account_days'];
 
 export default function AdminDashboard() {
@@ -54,6 +61,7 @@ export default function AdminDashboard() {
   const { t: translate } = useT();
   const t = (key, vars) => pmTranslate(translate, key, vars);
   const [stats, setStats] = useState(null);
+  const [fieldsOfStudy, setFieldsOfStudy] = useState(null);
   const [feedback, setFeedback] = useState([]);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [feedbackFilter, setFeedbackFilter] = useState('');
@@ -115,6 +123,17 @@ export default function AdminDashboard() {
       if (id === requestIds.current.kpis) { setKpis(null); setLoadErrors(prev => ({ ...prev, kpis: true })); }
     } finally {
       if (id === requestIds.current.kpis) setKpisLoading(false);
+    }
+  }
+
+  // Fields of study and the skills they take part in: groups only, no counts
+  // below five and no people (migration 0092).
+  async function loadFieldsOfStudy() {
+    try {
+      const res = await api.get('/admin/fields-of-study');
+      setFieldsOfStudy(res.data);
+    } catch {
+      setFieldsOfStudy(null);
     }
   }
 
@@ -295,7 +314,7 @@ export default function AdminDashboard() {
     }
   }
 
-  useEffect(() => { loadStats(); loadPrivacyStatus(); loadRetention(); loadRequestSettings(); }, []);
+  useEffect(() => { loadStats(); loadFieldsOfStudy(); loadPrivacyStatus(); loadRetention(); loadRequestSettings(); }, []);
   useEffect(() => {
     if (tab === 'kpis') loadKpis();
     if (tab === 'people') loadUsers();
@@ -449,7 +468,8 @@ export default function AdminDashboard() {
   }
 
   const sessionsByStatus = stats?.sessionsByStatus?.reduce((acc, r) => { acc[r.status] = r.cnt; return acc; }, {}) || {};
-  const deptActivityMax = Math.max(...(stats?.deptActivity?.map(x => x.session_count || 0) ?? []), 1);
+  // The database pools small groups under one name; it is shown in the reader's language.
+  const fieldName = field => (!field || field === 'Other departments' ? t('admin.fields.other') : field);
   const visibleSessionStatuses = ['pending', 'scheduled', 'completed'].map(status => sessionsByStatus[status]);
   const sessionsRequested = visibleSessionStatuses.every(Number.isInteger)
     ? visibleSessionStatuses.reduce((sum, count) => sum + count, 0) : null;
@@ -689,51 +709,59 @@ export default function AdminDashboard() {
                 </SurfaceBody>
               </Surface>
 
-              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                {/* Departments, never people: the admin sees how each group takes
-                    part, pooled below five members so no one stands out. */}
-                <Surface data-testid="department-participation">
-                  <SurfaceHeader title={t('admin.participation.title')} />
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+                {/* Groups, never people: each field of study with its size
+                    (five or more) and whether it has met at all. */}
+                <Surface data-testid="fields-of-study">
+                  <SurfaceHeader title={t('admin.fields.title')} description={t('admin.fields.description')} />
                   <SurfaceBody className="pt-5">
-                  {stats.departmentParticipation?.length > 0 ? (
-                    <div className="space-y-3">
-                      {stats.departmentParticipation.map(d => (
-                        <div key={d.department ?? ''} data-testid="department-participation-row">
-                          <div className="mb-1 flex justify-between gap-2 text-sm">
-                            <span className="font-medium text-foreground">{d.department ?? t('admin.dept.other')}</span>
-                            <span className="tabular-nums text-muted-foreground">{d.active_members == null ? t('admin.privacy.suppressed') : t('admin.participation.active', { active: d.active_members, members: d.members })}</span>
-                          </div>
-                          <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                            {d.active_members != null && <div className="h-full rounded-full bg-[var(--mint)]" style={{ width: `${d.members ? Math.round((d.active_members / d.members) * 100) : 0}%` }} />}
-                          </div>
-                          <p className="mt-1 text-xs text-muted-foreground">{d.mentors_active == null ? t('admin.privacy.suppressed') : t('admin.participation.mentors', { count: d.mentors_active })}</p>
-                        </div>
+                  {fieldsOfStudy?.fields?.length > 0 ? (
+                    <ul className="divide-y divide-[var(--border-subtle)]">
+                      {fieldsOfStudy.fields.map(f => (
+                        <li key={f.field ?? ''} data-testid="field-of-study-row" className="flex items-center justify-between gap-3 py-2.5 text-sm">
+                          <span className="min-w-0 truncate font-medium text-foreground">{fieldName(f.field)}</span>
+                          <span className="flex shrink-0 items-center gap-3">
+                            <span className="tabular-nums text-muted-foreground">{t('admin.fields.members', { count: f.members })}</span>
+                            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${f.active ? 'bg-[var(--status-success-bg,#d9f4ec)] text-[var(--ink)]' : 'border border-[var(--border)] text-muted-foreground'}`}>
+                              {f.active ? t('admin.fields.active') : t('admin.fields.quiet')}
+                            </span>
+                          </span>
+                        </li>
                       ))}
-                    </div>
-                  ) : <p className="text-sm text-muted-foreground">{t('admin.dept.empty')}</p>}
+                    </ul>
+                  ) : <p className="text-sm text-muted-foreground">{t('admin.fields.empty')}</p>}
                   </SurfaceBody>
                 </Surface>
 
-                <Surface>
-                  <SurfaceHeader title={t('admin.dept.title')} />
+                {/* Which fields of study offer, want and meet on each skill:
+                    lists of groups, without counts. */}
+                <Surface data-testid="skills-by-field">
+                  <SurfaceHeader title={t('admin.skillsByField.title')} description={t('admin.skillsByField.description')} />
                   <SurfaceBody className="pt-5">
-                  {stats.deptActivity?.length > 0 ? (
-                    <div className="space-y-3">
-                      {stats.deptActivity.map(d => (
-                        <div key={d.department ?? ''} className="flex items-center gap-3">
-                          <div className="min-w-0 flex-1">
-                            <div className="mb-1 flex justify-between gap-2 text-sm">
-                              <span className="font-medium text-foreground">{d.department ?? t('admin.dept.other')}</span>
-                              <span className="tabular-nums text-muted-foreground">{d.session_count == null ? t('admin.privacy.suppressed') : t('admin.common.sessionsCount', { count: d.session_count })}</span>
+                  {fieldsOfStudy?.skills?.length > 0 ? (
+                    <>
+                      <div className="mb-4 flex flex-wrap gap-3 text-xs text-muted-foreground">
+                        {SKILL_ROLES.map(role => <span key={role.key} className="flex items-center gap-1.5"><i className={`inline-block size-2.5 rounded-full ${role.dot}`} />{t(`admin.skillsByField.${role.key}`)}</span>)}
+                      </div>
+                      <ul className="space-y-4">
+                        {fieldsOfStudy.skills.map(skill => (
+                          <li key={skill.skill} data-testid="skill-by-field-row">
+                            <p className="text-sm font-semibold text-foreground">{skill.skill}</p>
+                            <div className="mt-1.5 space-y-1">
+                              {SKILL_ROLES.filter(role => skill[role.key]?.length).map(role => (
+                                <div key={role.key} className="flex flex-wrap items-center gap-1.5">
+                                  <span className="w-20 shrink-0 text-xs text-muted-foreground">{t(`admin.skillsByField.${role.key}`)}</span>
+                                  {skill[role.key].map(field => (
+                                    <span key={field ?? ''} className={`rounded-full px-2 py-0.5 text-xs text-[var(--ink)] ${role.chip}`}>{fieldName(field)}</span>
+                                  ))}
+                                </div>
+                              ))}
                             </div>
-                            <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                              {d.session_count != null && <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, (d.session_count / deptActivityMax) * 100)}%` }} />}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : <p className="text-sm text-muted-foreground">{t('admin.dept.empty')}</p>}
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  ) : <p className="text-sm text-muted-foreground">{t('admin.skillsByField.empty')}</p>}
                   </SurfaceBody>
                 </Surface>
               </div>

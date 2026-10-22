@@ -110,6 +110,7 @@ const FAMILIES = {
   'admin.ai.feature.*': 'discovery_match discovery_draft profile_ingest reflection',
   'admin.import.mode.*': 'insert upsert update',
   'admin.pm.delivery.*': 'demo queued sent failed',
+  'admin.skillsByField.*': 'offered wanted sessions',
   'admin.retention.*': 'conversation_days search_days reflection_days audit_log_days deactivated_account_days',
   'admin.retention.*Help': 'conversation_days search_days reflection_days audit_log_days deactivated_account_days',
   'admin.tab.*': 'overview kpis ai people privacy audit feedback',

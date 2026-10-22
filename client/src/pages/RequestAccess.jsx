@@ -10,7 +10,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import LegalLinks from '../components/LegalLinks.jsx';
 
-const ORGANIZATION_SIZES = ['1-50', '51-200', '201-1000', '1000+'];
+// Number of students, for a university pilot.
+const ORGANIZATION_SIZES = ['<1000', '1000-5000', '5000-20000', '20000+'];
 
 function errorMessage(t, error) {
   const code = error?.response?.data?.error || error?.message;
