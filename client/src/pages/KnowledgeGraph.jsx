@@ -180,10 +180,14 @@ export default function KnowledgeGraph() {
     return node.kind === 'department' ? 5 + Math.min(Math.sqrt(deg) * 1.6, 9) : 4 + Math.min(Math.sqrt(deg) * 1.1, 6);
   }, [degree]);
 
+  // Largest fields first and in colour; the pooled "other" group goes last, in grey.
   const departmentList = useMemo(() => {
-    return graphData.nodes.filter(n => n.kind === 'department').sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
-      .map((n, index) => ({ name: n.label, id: n.id, count: n.count, color: DEPARTMENT_PALETTE[index] || OTHER_DEPARTMENT }));
-  }, [graphData]);
+    const other = t('graph.otherDepartments');
+    const fields = graphData.nodes.filter(n => n.kind === 'department')
+      .sort((a, b) => (a.label === other) - (b.label === other) || b.count - a.count || a.label.localeCompare(b.label));
+    return fields.map((n, index) => ({ name: n.label, id: n.id, count: n.count,
+      color: n.label === other ? OTHER_DEPARTMENT : DEPARTMENT_PALETTE[index] || OTHER_DEPARTMENT }));
+  }, [graphData, t]);
   const departmentColor = useMemo(() => new Map(departmentList.map(d => [d.name, d.color])), [departmentList]);
 
   // What is in focus: the hovered node, else the selected one; plus a
@@ -370,6 +374,8 @@ export default function KnowledgeGraph() {
       <div ref={shellRef} className={cn('kg-layout', selected && 'has-selection', fullScreen && 'is-full-screen')} style={{ '--kg-height': `${graphHeight}px` }}>
         {/* Explore: search, filters, departments. */}
         <aside className="kg-panel" aria-label={t('graph.panel.explore')}>
+          {/* Scrolls inside the rounded panel, so the scrollbar stays clear of its corners. */}
+          <div className="kg-panel-scroll">
           <div className="kg-search">
             <Search className="size-4" aria-hidden="true" />
             <input type="search" value={query} placeholder={t('graph.searchAggregate')} aria-label={t('graph.searchAggregate')}
@@ -411,6 +417,7 @@ export default function KnowledgeGraph() {
           </label>
           <Button variant="outline" size="sm" className="w-full" onClick={resetGraph}>{t('graph.reset')}</Button>
 
+          </div>
         </aside>
 
         {/* The graph. */}

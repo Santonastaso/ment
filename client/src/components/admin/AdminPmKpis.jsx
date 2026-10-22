@@ -77,8 +77,11 @@ export default function AdminPmKpis({ data, loading, error, onRefresh }) {
             <details className="mt-3 text-xs text-muted-foreground">
               <summary className="cursor-pointer">{t('admin.pm.definition')}</summary>
               <p className="mt-2">{row.definition}</p>
-              <p className="mt-2">{t('admin.pm.numerator')}: {row.numerator ?? missing}</p>
-              {row.percent && <p>{t('admin.pm.denominator')}: {row.denominator ?? missing}</p>}
+              {/* A count is its own numerator; only a rate needs both parts. */}
+              {row.percent && <>
+                <p className="mt-2">{t('admin.pm.numerator')}: {row.numerator ?? missing}</p>
+                <p>{t('admin.pm.denominator')}: {row.denominator ?? missing}</p>
+              </>}
               {row.key === 'intentToContinueRate' && <p>{t('admin.pm.responseRate')}: {row.responseRate == null ? missing : `${row.responseRate}%`}</p>}
               {row.reason && <p className="mt-2">{row.reason}</p>}
             </details>

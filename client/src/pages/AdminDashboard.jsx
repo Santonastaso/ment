@@ -17,6 +17,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Check, Eye, Lock, MoreHorizontal } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { formatAdminDate, pmTranslate } from '../components/admin/adminPm.js';
 import AdminPmKpis from '../components/admin/AdminPmKpis.jsx';
@@ -54,7 +55,72 @@ const SKILL_ROLES = [
   { key: 'sessions', dot: 'bg-[var(--ink)]', chip: 'bg-[#e7e5f5]' },
 ];
 
+// Field names from privacy-status, mapped to plain labels.
+const PRIVACY_FIELD_KEYS = {
+  'first name + last initial': 'name', name: 'name', skills: 'teaches', role: 'role', department: 'field', location: 'location', bio: 'bio',
+  'teachable skills': 'teaches', reflections: 'reflections', ratings: 'ratings', 'wants-to-learn': 'wants',
+  'shadow role': 'goal', shadow_role_response: 'goal', 'session reflections/ratings': 'meetingNotes', email: 'email',
+};
+
 const RETENTION_FIELDS = ['conversation_days', 'search_days', 'reflection_days', 'audit_log_days', 'deactivated_account_days'];
+
+// One "Actions" button per row instead of five links that overflow the table.
+function RowActions({ label, items, testId }) {
+  // Placed against the window: the table scrolls sideways and would clip it.
+  const [position, setPosition] = useState(null);
+  const open = position !== null;
+  const ref = useRef(null);
+  const toggle = event => {
+    const box = event.currentTarget.getBoundingClientRect();
+    // Opens upwards near the bottom of the window, so the last rows' menus stay in view.
+    const below = window.innerHeight - box.bottom > 240;
+    setPosition(open ? null : below
+      ? { top: box.bottom + 4, right: window.innerWidth - box.right }
+      : { bottom: window.innerHeight - box.top + 4, right: window.innerWidth - box.right });
+  };
+  useEffect(() => {
+    if (!open) return undefined;
+    const close = event => {
+      if (event.type === 'keydown' ? event.key === 'Escape' : event.type !== 'mousedown' || !ref.current?.contains(event.target)) setPosition(null);
+    };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', close);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('keydown', close);
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+    };
+  }, [open]);
+  if (!items.length) return null;
+  return (
+    <div ref={ref} className="relative inline-block text-left">
+      <Button type="button" variant="outline" size="sm" aria-haspopup="menu" aria-expanded={open} data-testid={testId} onClick={toggle}>
+        <MoreHorizontal />{label}
+      </Button>
+      {open && (
+        <div role="menu" style={{ position: 'fixed', ...position }} className="z-50 min-w-48 rounded-xl border border-[var(--border)] bg-white p-1 shadow-lg">
+          {items.map(item => (
+            <button
+              key={item.label}
+              type="button"
+              role="menuitem"
+              data-control-radius-exempt
+              data-testid={item.testId}
+              disabled={item.disabled}
+              onClick={() => { setPosition(null); item.onSelect(); }}
+              className={`block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-[var(--control-surface)] disabled:opacity-50 ${item.destructive ? 'text-destructive' : 'text-foreground'}`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function AdminDashboard() {
   const { user } = useAuth();
@@ -472,6 +538,11 @@ export default function AdminDashboard() {
   const sessionsByStatus = stats?.sessionsByStatus?.reduce((acc, r) => { acc[r.status] = r.cnt; return acc; }, {}) || {};
   // The database pools small groups under one name; it is shown in the reader's language.
   const fieldName = field => (!field || field === 'Other departments' ? t('admin.fields.other') : field);
+  // The status lists fields by their technical names; admins read them in plain words.
+  const privacyFieldLabels = fields => [...new Set((fields || []).map(field => {
+    const key = PRIVACY_FIELD_KEYS[String(field).toLowerCase().replace(/\s*\(column-locked\)/, '').trim()];
+    return key ? t(`admin.privacy.field.${key}`) : field;
+  }))];
   const visibleSessionStatuses = ['pending', 'scheduled', 'completed'].map(status => sessionsByStatus[status]);
   const sessionsRequested = visibleSessionStatuses.every(Number.isInteger)
     ? visibleSessionStatuses.reduce((sum, count) => sum + count, 0) : null;
@@ -561,36 +632,40 @@ export default function AdminDashboard() {
               {privacyLoading && !privacyStatus ? (
                 <p className="text-sm text-muted-foreground">{t('admin.common.loading')}</p>
               ) : privacyStatus ? (
-                <div className="grid gap-4 lg:grid-cols-2">
-                  <div className="space-y-3 text-sm">
-                    <p>{t('admin.pm.privacyHelp')}</p>
-                    <h3 className="font-semibold">{t('admin.pm.consent')}</h3>
-                    <p className="text-muted-foreground">{t('admin.pm.consentHelp')}</p>
+                <div className="space-y-6">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <section className="rounded-2xl border border-[var(--border)] p-4" data-testid="privacy-visible">
+                      <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground"><Eye className="size-4 text-[var(--mint)]" />{t('admin.privacy.peerVisible')}</h3>
+                      <p className="mt-1 text-xs text-muted-foreground">{t('admin.privacy.peerVisibleHelp')}</p>
+                      <ul className="mt-3 flex flex-wrap gap-2">
+                        {privacyFieldLabels(privacyStatus.peerVisibleFields).map(label => <li key={label} className="rounded-full bg-[#d9f4ec] px-2.5 py-1 text-xs text-[var(--ink)]">{label}</li>)}
+                      </ul>
+                    </section>
+                    <section className="rounded-2xl border border-[var(--border)] p-4" data-testid="privacy-hidden">
+                      <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground"><Lock className="size-4 text-[var(--ink)]" />{t('admin.privacy.hidden')}</h3>
+                      <p className="mt-1 text-xs text-muted-foreground">{t('admin.privacy.hiddenHelp')}</p>
+                      <ul className="mt-3 flex flex-wrap gap-2">
+                        {privacyFieldLabels(privacyStatus.hiddenFields).map(label => <li key={label} className="rounded-full bg-[#e7e5f5] px-2.5 py-1 text-xs text-[var(--ink)]">{label}</li>)}
+                      </ul>
+                    </section>
                   </div>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div>
-                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('admin.privacy.peerVisible')}</p>
-                      <ul className="mt-2 space-y-1 text-sm text-foreground">
-                        {(privacyStatus.peerVisibleFields || []).map(field => <li key={field}>{field}</li>)}
-                      </ul>
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('admin.privacy.hidden')}</p>
-                      <ul className="mt-2 space-y-1 text-sm text-foreground">
-                        {(privacyStatus.hiddenFields || []).map(field => <li key={field}>{field}</li>)}
-                      </ul>
-                    </div>
-                    <div className="sm:col-span-2 rounded-lg border border-border bg-[var(--card)] p-3 space-y-3">
+                  <ul className="space-y-2 text-sm text-foreground">
+                    <li className="flex items-start gap-2"><Check className="mt-0.5 size-4 shrink-0 text-[var(--mint)]" />{t('admin.pm.privacyHelp')}</li>
+                    <li className="flex items-start gap-2"><Check className="mt-0.5 size-4 shrink-0 text-[var(--mint)]" />{t('admin.pm.consentHelp')}</li>
+                  </ul>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <section className="rounded-2xl border border-[var(--border)] p-4">
                       <h3 className="text-sm font-semibold">{t('admin.pm.schoolControls')}</h3>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <label htmlFor="admin-min-reports" className="text-xs text-muted-foreground">{t('admin.privacy.minReports')}</label>
+                      <p className="mt-1 text-xs text-muted-foreground">{t('admin.privacy.minReportsHelp')}</p>
+                      <label htmlFor="admin-min-reports" className="mt-3 grid gap-1 text-xs text-muted-foreground">
+                        {t('admin.privacy.minReports')}
                         <input
                           id="admin-min-reports"
                           key={privacyStatus.minTeamDashboardSize}
                           type="number" min={1} max={100}
                           defaultValue={privacyStatus.minTeamDashboardSize ?? 3}
                           data-testid="min-team-size-input"
-                          className="input w-20 text-sm"
+                          className="input h-9 w-24 text-sm"
                           disabled={savingOrgPrivacy}
                           onBlur={(e) => {
                             const v = Math.max(1, Math.min(100, Number(e.target.value) || 3));
@@ -599,9 +674,9 @@ export default function AdminDashboard() {
                             }
                           }}
                         />
-                      </div>
-                    </div>
-                    <div className="sm:col-span-2 rounded-lg border border-border bg-[var(--card)] p-3">
+                      </label>
+                    </section>
+                    <section className="rounded-2xl border border-[var(--border)] p-4">
                       <h3 className="text-sm font-semibold">{t('admin.pm.capacityTitle')}</h3>
                       <p className="mt-1 text-xs text-muted-foreground">{t('admin.pm.capacityHelp')}</p>
                       {requestSettings && (
@@ -629,7 +704,7 @@ export default function AdminDashboard() {
                           </Button>
                         </div>
                       )}
-                    </div>
+                    </section>
                   </div>
                 </div>
               ) : (
@@ -928,7 +1003,7 @@ export default function AdminDashboard() {
                     <th className="py-2 pr-4">{t('admin.users.dept')}</th>
                     <th className="py-2 pr-4">{t('admin.users.role.title')}</th>
                     <th className="py-2 pr-4">{t('admin.users.manager')}</th>
-                    <th className="py-2">{t('admin.users.actions')}</th>
+                    <th className="py-2 text-right">{t('admin.users.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -941,31 +1016,36 @@ export default function AdminDashboard() {
                         {u.deactivated_at ? (
                           <span className="text-muted-foreground">{t(`admin.users.role.${u.role || 'student'}`)}</span>
                         ) : (
-                          <select
-                            value={u.role || 'student'}
-                            onChange={e => handleSetRole(u, e.target.value)}
-                            className="input h-8 text-xs py-0"
-                            aria-label={t('admin.users.role.title')}
-                          >
-                            <option value="student">{t('admin.users.role.student')}</option>
-                            <option value="alumnus">{t('admin.users.role.alumnus')}</option>
-                          </select>
+                          <div role="group" aria-label={t('admin.users.role.title')} className="inline-flex rounded-full border border-[var(--border)] bg-white p-0.5" data-testid={`role-${u.id}`}>
+                            {['student', 'alumnus'].map(role => (
+                              <button
+                                key={role}
+                                type="button"
+                                data-control-radius-exempt
+                                aria-pressed={(u.role || 'student') === role}
+                                onClick={() => { if ((u.role || 'student') !== role) handleSetRole(u, role); }}
+                                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${(u.role || 'student') === role ? 'bg-[var(--ink)] text-white' : 'text-muted-foreground hover:text-foreground'}`}
+                              >
+                                {t(`admin.users.role.${role}`)}
+                              </button>
+                            ))}
+                          </div>
                         )}
                       </td>
                       <td className="py-2 pr-4 text-secondary-foreground">{u.manager_email || <span className="text-muted-foreground">—</span>}</td>
-                      <td className="py-2 space-x-2 whitespace-nowrap">
-                        {!u.deactivated_at && (
-                          <>
-                            <Button type="button" variant="link" size="sm" className="h-auto px-0 text-xs" onClick={() => openSetManager(u)}>{t('admin.users.setManager')}</Button>
-                            <Button type="button" variant="link" size="sm" className="h-auto px-0 text-xs" disabled={outreachSavingId === u.id} onClick={() => markOutreachTarget(u)}>{outreachSavingId === u.id ? t('admin.common.saving') : t('admin.pm.markInvited')}</Button>
-                            <Button type="button" variant="link" size="sm" className="h-auto px-0 text-xs" onClick={() => openResetPasswordConfirm(u)}>{t('admin.users.resetPassword')}</Button>
-                            <Button type="button" variant="link" size="sm" className="h-auto px-0 text-xs text-destructive" onClick={() => openDeactivateConfirm(u)}>{t('admin.users.deactivate')}</Button>
-                          </>
-                        )}
-                        {/* An erased login keeps only a placeholder address. */}
-                        {!u.email?.endsWith('@erased.invalid') && (
-                          <Button type="button" variant="link" size="sm" className="h-auto px-0 text-xs text-destructive" data-testid={`erase-user-${u.id}`} onClick={() => openEraseConfirm(u)}>{t('admin.users.erase')}</Button>
-                        )}
+                      <td className="py-2 text-right">
+                        <RowActions label={t('admin.users.actions')} testId={`actions-${u.id}`} items={[
+                          ...(!u.deactivated_at ? [
+                            { label: t('admin.users.setManager'), onSelect: () => openSetManager(u) },
+                            { label: outreachSavingId === u.id ? t('admin.common.saving') : t('admin.pm.markInvited'), onSelect: () => markOutreachTarget(u), disabled: outreachSavingId === u.id },
+                            { label: t('admin.users.resetPassword'), onSelect: () => openResetPasswordConfirm(u) },
+                            { label: t('admin.users.deactivate'), onSelect: () => openDeactivateConfirm(u), destructive: true },
+                          ] : []),
+                          // An erased login keeps only a placeholder address.
+                          ...(!u.email?.endsWith('@erased.invalid') ? [
+                            { label: t('admin.users.erase'), onSelect: () => openEraseConfirm(u), destructive: true, testId: `erase-user-${u.id}` },
+                          ] : []),
+                        ]} />
                       </td>
                     </tr>
                   ))}

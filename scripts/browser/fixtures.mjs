@@ -163,6 +163,7 @@ function fixtureApi(state, ApiError) {
     }
     if (method === 'put') {
       if (path === '/admin/retention') { state.retention = { ...body }; return state.retention; }
+      if (path.startsWith('/admin/users/')) { state.adminUserUpdates = [...(state.adminUserUpdates || []), { id: path.split('/')[3], ...body }]; return { ok: true }; }
       if (path === '/users/me') {
         state.user = { ...state.user, ...body };
         if (state.profile) state.profile = { ...state.profile, ...body };

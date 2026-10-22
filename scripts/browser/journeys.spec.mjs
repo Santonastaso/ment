@@ -2044,4 +2044,26 @@ test('school admins see five tabs and six KPIs', async ({ page }) => {
   await expect(kpis).toHaveCount(6);
   await expect(kpis.first()).toContainText('Alumni engagement');
   await expect(page.getByText('Referrals')).toHaveCount(0);
+  // A count shows its definition only; a rate also shows what it is made of.
+  await kpis.nth(1).locator('summary').click();
+  await expect(kpis.nth(1).getByText(/Numerator|Denominator/)).toHaveCount(0);
+  await kpis.first().locator('summary').click();
+  await expect(kpis.first().getByText(/Denominator/)).toBeVisible();
+
+  // People: a clear Student / Alumnus switch, and the row's actions in one menu.
+  await page.getByTestId('admin-tab-people').click();
+  const role = page.getByTestId('role-viewer');
+  await expect(role.getByRole('button', { name: 'Student' })).toHaveAttribute('aria-pressed', 'true');
+  await role.getByRole('button', { name: 'Alumnus' }).click();
+  await expect.poll(() => page.evaluate(() => window.fixture.adminUserUpdates)).toEqual([{ id: 'viewer', role: 'alumnus' }]);
+  await expect(page.getByRole('menuitem')).toHaveCount(0);
+  await page.getByTestId('actions-viewer').click();
+  await expect(page.getByRole('menuitem')).toHaveText(['Set advisor', 'Mark invited', 'Reset password', 'Deactivate', 'Erase data']);
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('menuitem')).toHaveCount(0);
+
+  // Privacy: plain labels, not column names.
+  await page.getByTestId('admin-tab-privacy').click();
+  await expect(page.getByTestId('privacy-visible')).toContainText('Field of study');
+  await expect(page.getByTestId('privacy-hidden')).toContainText('Email address');
 });
