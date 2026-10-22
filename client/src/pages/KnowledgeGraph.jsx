@@ -243,7 +243,8 @@ export default function KnowledgeGraph() {
   }, [visibleEdges, nodeById]);
 
   const peopleCount = nodes.filter(n => n.kind === 'department').reduce((sum, n) => sum + n.count, 0);
-  const skillCount = graphData.nodes.filter((n) => n.kind === 'skill').length;
+  // Counted from the whole response, so it reads the same in both views.
+  const skillCount = visibleNodes.filter((n) => n.kind === 'skill').length;
   const realLinkCount = visibleEdges.filter((e) => REAL_LINK_TYPES.has(e.type)).length;
   const selected = selectedId && kindById.get(selectedId) === 'skill' ? nodeById.get(selectedId) : null;
   const needle = query.trim().toLocaleLowerCase();
@@ -364,7 +365,7 @@ export default function KnowledgeGraph() {
       {/* The picture in four numbers. */}
       <div className="kg-stats" data-testid="kg-node-count">
         <div><span>{t('graph.stats.people')}</span><strong>{peopleCount}</strong></div>
-        <div><span>{t('graph.stats.skills')}</span><strong>{view === 'bipartite' ? skillCount : '—'}</strong></div>
+        <div><span>{t('graph.stats.skills')}</span><strong>{skillCount}</strong></div>
         <div data-testid="kg-real-count"><span>{t('graph.stats.real')}</span><strong>{realLinkCount}</strong></div>
         <div className="is-gap"><span>{t('graph.stats.gap')}</span>{skillGaps[0]
           ? <button type="button" onClick={() => focusNode(skillGaps[0].id)}><strong>{skillGaps[0].label}</strong><small>{t('graph.insights.gapCounts', { wanted: skillGaps[0].wanted, taught: skillGaps[0].taught })}</small></button>
@@ -427,8 +428,10 @@ export default function KnowledgeGraph() {
           ) : error ? null : graphData.nodes.length === 0 ? (
             <div className="kg-empty">
               <Share2 className="size-10 text-muted-foreground" />
-              <p className="font-semibold">{t('graph.empty.title')}</p>
-              <p className="max-w-sm text-sm text-muted-foreground">{t('graph.empty.description')}</p>
+              {/* In the links view an empty canvas means no pair of fields has
+                  reached five participants yet, not that a filter hid them. */}
+              <p className="font-semibold">{t(view === 'people' ? 'graph.empty.linksTitle' : 'graph.empty.title')}</p>
+              <p className="max-w-sm text-sm text-muted-foreground">{t(view === 'people' ? 'graph.empty.linksDescription' : 'graph.empty.description')}</p>
             </div>
           ) : (
             <div ref={containerRef} data-testid="knowledge-graph-canvas" className="kg-canvas" style={{ height: graphHeight }}>

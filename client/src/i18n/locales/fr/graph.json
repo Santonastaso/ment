@@ -16,8 +16,8 @@
   "graph.refresh": "Actualiser",
   "graph.error.title": "Une erreur s'est produite",
   "graph.error.loadFailed": "Impossible de charger le graphe des connaissances.",
-  "graph.empty.title": "Aucune personne ne correspond à ces filtres",
-  "graph.empty.description": "Personne dans la sélection ne parle encore la langue choisie. Essayez une autre langue ou un autre campus.",
+  "graph.empty.title": "Rien à afficher avec ces filtres",
+  "graph.empty.description": "Aucun domaine d'études ni compétence ne compte cinq personnes ou plus ici. Essayez un autre campus, une autre langue ou compétence.",
   "graph.count.people": "{count} personnes",
   "graph.count.skills": "{count} compétences",
   "graph.count.links": "{count} liens",
@@ -73,5 +73,7 @@
   "graph.otherDepartments": "Autres domaines d'études",
   "graph.kind.department": "domaine d'études",
   "graph.searchAggregate": "Chercher compétence ou domaine",
-  "graph.hiddenPeople": "Groupes agrégés sans lien masqués : {count}"
+  "graph.hiddenPeople": "Groupes agrégés sans lien masqués : {count}",
+  "graph.empty.linksTitle": "Pas encore de liens entre domaines",
+  "graph.empty.linksDescription": "Un lien apparaît dès qu'au moins cinq personnes de deux domaines d'études se sont rencontrées ou connectées sur MENT. Aucune paire de domaines n'a encore atteint cinq."
 }

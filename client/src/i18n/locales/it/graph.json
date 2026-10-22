@@ -16,8 +16,8 @@
   "graph.refresh": "Aggiorna",
   "graph.error.title": "Qualcosa è andato storto",
   "graph.error.loadFailed": "Impossibile caricare il grafo della conoscenza.",
-  "graph.empty.title": "Nessuna persona corrisponde a questi filtri",
-  "graph.empty.description": "Nessuno nell'ambito selezionato ha ancora la lingua di lavoro scelta. Prova una lingua o un'azienda diversa.",
+  "graph.empty.title": "Niente da mostrare con questi filtri",
+  "graph.empty.description": "Nessun ambito di studio o competenza ha cinque o più persone in questo ambito. Prova un altro campus, lingua o competenza.",
   "graph.count.people": "{count} persone",
   "graph.count.skills": "{count} competenze",
   "graph.count.links": "{count} collegamenti",
@@ -73,5 +73,7 @@
   "graph.otherDepartments": "Altri ambiti di studio",
   "graph.kind.department": "ambito di studio",
   "graph.searchAggregate": "Cerca competenza o ambito",
-  "graph.hiddenPeople": "Gruppi aggregati senza collegamenti nascosti: {count}"
+  "graph.hiddenPeople": "Gruppi aggregati senza collegamenti nascosti: {count}",
+  "graph.empty.linksTitle": "Ancora nessun collegamento tra ambiti",
+  "graph.empty.linksDescription": "Un collegamento compare quando almeno cinque persone di due ambiti di studio si sono incontrate o collegate su MENT. Nessuna coppia di ambiti ha ancora raggiunto cinque."
 }

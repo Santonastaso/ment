@@ -16,8 +16,8 @@
   "graph.refresh": "Refresh",
   "graph.error.title": "Something went wrong",
   "graph.error.loadFailed": "Could not load the knowledge graph.",
-  "graph.empty.title": "No people match these filters",
-  "graph.empty.description": "Nobody in the selected scope has the chosen working language yet. Try a different language or campus.",
+  "graph.empty.title": "Nothing to show for these filters",
+  "graph.empty.description": "No field of study or skill has five or more people in this scope. Try another campus, language or skill.",
   "graph.count.people": "{count} people",
   "graph.count.skills": "{count} skills",
   "graph.count.links": "{count} links",
@@ -72,5 +72,7 @@
   "graph.insights.within": "Within {department}",
   "graph.otherDepartments": "Other fields of study",
   "graph.kind.department": "field of study",
-  "graph.searchAggregate": "Find a skill or field"
+  "graph.searchAggregate": "Find a skill or field",
+  "graph.empty.linksTitle": "No links between fields yet",
+  "graph.empty.linksDescription": "A link appears once at least five people from two fields of study have met or connected on MENT. No pair of fields has reached five yet."
 }
