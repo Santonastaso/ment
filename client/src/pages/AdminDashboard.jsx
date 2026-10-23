@@ -17,6 +17,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Check, ChevronUp, Eye, Lock, MoreHorizontal, Plus } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { formatAdminDate, pmTranslate } from '../components/admin/adminPm.js';
 import AdminPmKpis from '../components/admin/AdminPmKpis.jsx';
@@ -47,13 +48,87 @@ async function downloadBlob(apiPath, filename) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+// How a field of study takes part in a skill, with the colours used across the app.
+const SKILL_ROLES = [
+  { key: 'offered', dot: 'bg-[var(--mint)]', chip: 'bg-[#d9f4ec]' },
+  { key: 'wanted', dot: 'bg-[var(--coral)]', chip: 'bg-[#ffe3de]' },
+  { key: 'sessions', dot: 'bg-[var(--ink)]', chip: 'bg-[#e7e5f5]' },
+];
+
+// Field names from privacy-status, mapped to plain labels.
+const PRIVACY_FIELD_KEYS = {
+  'first name + last initial': 'name', name: 'name', skills: 'teaches', role: 'role', department: 'field', location: 'location', bio: 'bio',
+  'teachable skills': 'teaches', reflections: 'reflections', ratings: 'ratings', 'wants-to-learn': 'wants',
+  'shadow role': 'goal', shadow_role_response: 'goal', 'session reflections/ratings': 'meetingNotes', email: 'email',
+};
+
 const RETENTION_FIELDS = ['conversation_days', 'search_days', 'reflection_days', 'audit_log_days', 'deactivated_account_days'];
+
+// One "Actions" button per row instead of five links that overflow the table.
+function RowActions({ label, items, testId }) {
+  // Placed against the window: the table scrolls sideways and would clip it.
+  const [position, setPosition] = useState(null);
+  const open = position !== null;
+  const ref = useRef(null);
+  const toggle = event => {
+    const box = event.currentTarget.getBoundingClientRect();
+    // Opens upwards near the bottom of the window, so the last rows' menus stay in view.
+    const below = window.innerHeight - box.bottom > 240;
+    setPosition(open ? null : below
+      ? { top: box.bottom + 4, right: window.innerWidth - box.right }
+      : { bottom: window.innerHeight - box.top + 4, right: window.innerWidth - box.right });
+  };
+  useEffect(() => {
+    if (!open) return undefined;
+    const close = event => {
+      if (event.type === 'keydown' ? event.key === 'Escape' : event.type !== 'mousedown' || !ref.current?.contains(event.target)) setPosition(null);
+    };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', close);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('keydown', close);
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+    };
+  }, [open]);
+  if (!items.length) return null;
+  return (
+    <div ref={ref} className="relative inline-block text-left">
+      <Button type="button" variant="outline" size="sm" aria-haspopup="menu" aria-expanded={open} data-testid={testId} onClick={toggle}>
+        <MoreHorizontal />{label}
+      </Button>
+      {open && (
+        <div role="menu" style={{ position: 'fixed', ...position }} className="z-50 min-w-48 rounded-xl border border-[var(--border)] bg-white p-1 shadow-lg">
+          {items.map(item => (
+            <button
+              key={item.label}
+              type="button"
+              role="menuitem"
+              data-control-radius-exempt
+              data-testid={item.testId}
+              disabled={item.disabled}
+              onClick={() => { setPosition(null); item.onSelect(); }}
+              className={`block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-[var(--control-surface)] disabled:opacity-50 ${item.destructive ? 'text-destructive' : 'text-foreground'}`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function AdminDashboard() {
   const { user } = useAuth();
   const { t: translate } = useT();
   const t = (key, vars) => pmTranslate(translate, key, vars);
   const [stats, setStats] = useState(null);
+  const [fieldsOfStudy, setFieldsOfStudy] = useState(null);
+  const [addPeopleOpen, setAddPeopleOpen] = useState(false);
   const [feedback, setFeedback] = useState([]);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [feedbackFilter, setFeedbackFilter] = useState('');
@@ -82,7 +157,9 @@ export default function AdminDashboard() {
   // Admin subpages live in the URL (?tab=) so deep links and back/forward work.
   const [searchParams, setSearchParams] = useSearchParams();
   const rawTab = searchParams.get('tab') || 'overview';
-  const validTabs = ['overview', 'kpis', 'ai', 'people', 'privacy', 'audit', 'feedback'];
+  // AI runs and the audit log are hidden from school admins; both are still
+  // recorded, and their panels stay in the code for the platform team.
+  const validTabs = ['overview', 'kpis', 'people', 'privacy', 'feedback'];
   const tab = validTabs.includes(rawTab) ? rawTab : 'overview';
   function setTab(next) {
     const params = new URLSearchParams(searchParams);
@@ -115,6 +192,17 @@ export default function AdminDashboard() {
       if (id === requestIds.current.kpis) { setKpis(null); setLoadErrors(prev => ({ ...prev, kpis: true })); }
     } finally {
       if (id === requestIds.current.kpis) setKpisLoading(false);
+    }
+  }
+
+  // Fields of study and the skills they take part in: groups only, no counts
+  // below five and no people (migration 0092).
+  async function loadFieldsOfStudy() {
+    try {
+      const res = await api.get('/admin/fields-of-study');
+      setFieldsOfStudy(res.data);
+    } catch {
+      setFieldsOfStudy(null);
     }
   }
 
@@ -295,11 +383,11 @@ export default function AdminDashboard() {
     }
   }
 
-  useEffect(() => { loadStats(); loadPrivacyStatus(); loadRetention(); loadRequestSettings(); }, []);
+  useEffect(() => { loadStats(); loadFieldsOfStudy(); loadPrivacyStatus(); loadRetention(); loadRequestSettings(); }, []);
   useEffect(() => {
     if (tab === 'kpis') loadKpis();
     if (tab === 'people') loadUsers();
-    if (tab === 'privacy' || tab === 'audit') loadAudit();
+    if (tab === 'audit') loadAudit();
     if (tab === 'privacy') loadRequestSettings();
     if (tab === 'feedback') loadFeedback();
   }, [tab]);
@@ -365,6 +453,17 @@ export default function AdminDashboard() {
           tempPassword: res.data.tempPassword,
         });
       },
+    });
+  }
+
+  // Changing someone between student and alumnus changes who they are matched
+  // with, so it is a deliberate step with a confirmation, never a single click.
+  function openRoleConfirm(user, role) {
+    setConfirmDialog({
+      title: t('admin.dialog.roleTitle', { role: t(`admin.users.role.${role}`) }),
+      description: t('admin.dialog.roleDescription', { name: user.name, role: t(`admin.users.role.${role}`) }),
+      confirmLabel: t('admin.dialog.roleConfirm', { role: t(`admin.users.role.${role}`) }),
+      onConfirm: () => handleSetRole(user, role),
     });
   }
 
@@ -449,7 +548,13 @@ export default function AdminDashboard() {
   }
 
   const sessionsByStatus = stats?.sessionsByStatus?.reduce((acc, r) => { acc[r.status] = r.cnt; return acc; }, {}) || {};
-  const deptActivityMax = Math.max(...(stats?.deptActivity?.map(x => x.session_count || 0) ?? []), 1);
+  // The database pools small groups under one name; it is shown in the reader's language.
+  const fieldName = field => (!field || field === 'Other departments' ? t('admin.fields.other') : field);
+  // The status lists fields by their technical names; admins read them in plain words.
+  const privacyFieldLabels = fields => [...new Set((fields || []).map(field => {
+    const key = PRIVACY_FIELD_KEYS[String(field).toLowerCase().replace(/\s*\(column-locked\)/, '').trim()];
+    return key ? t(`admin.privacy.field.${key}`) : field;
+  }))];
   const visibleSessionStatuses = ['pending', 'scheduled', 'completed'].map(status => sessionsByStatus[status]);
   const sessionsRequested = visibleSessionStatuses.every(Number.isInteger)
     ? visibleSessionStatuses.reduce((sum, count) => sum + count, 0) : null;
@@ -539,36 +644,40 @@ export default function AdminDashboard() {
               {privacyLoading && !privacyStatus ? (
                 <p className="text-sm text-muted-foreground">{t('admin.common.loading')}</p>
               ) : privacyStatus ? (
-                <div className="grid gap-4 lg:grid-cols-2">
-                  <div className="space-y-3 text-sm">
-                    <p>{t('admin.pm.privacyHelp')}</p>
-                    <h3 className="font-semibold">{t('admin.pm.consent')}</h3>
-                    <p className="text-muted-foreground">{t('admin.pm.consentHelp')}</p>
+                <div className="space-y-6">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <section className="rounded-2xl border border-[var(--border)] p-4" data-testid="privacy-visible">
+                      <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground"><Eye className="size-4 text-[var(--mint)]" />{t('admin.privacy.peerVisible')}</h3>
+                      <p className="mt-1 text-xs text-muted-foreground">{t('admin.privacy.peerVisibleHelp')}</p>
+                      <ul className="mt-3 flex flex-wrap gap-2">
+                        {privacyFieldLabels(privacyStatus.peerVisibleFields).map(label => <li key={label} className="rounded-full bg-[#d9f4ec] px-2.5 py-1 text-xs text-[var(--ink)]">{label}</li>)}
+                      </ul>
+                    </section>
+                    <section className="rounded-2xl border border-[var(--border)] p-4" data-testid="privacy-hidden">
+                      <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground"><Lock className="size-4 text-[var(--ink)]" />{t('admin.privacy.hidden')}</h3>
+                      <p className="mt-1 text-xs text-muted-foreground">{t('admin.privacy.hiddenHelp')}</p>
+                      <ul className="mt-3 flex flex-wrap gap-2">
+                        {privacyFieldLabels(privacyStatus.hiddenFields).map(label => <li key={label} className="rounded-full bg-[#e7e5f5] px-2.5 py-1 text-xs text-[var(--ink)]">{label}</li>)}
+                      </ul>
+                    </section>
                   </div>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div>
-                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('admin.privacy.peerVisible')}</p>
-                      <ul className="mt-2 space-y-1 text-sm text-foreground">
-                        {(privacyStatus.peerVisibleFields || []).map(field => <li key={field}>{field}</li>)}
-                      </ul>
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('admin.privacy.hidden')}</p>
-                      <ul className="mt-2 space-y-1 text-sm text-foreground">
-                        {(privacyStatus.hiddenFields || []).map(field => <li key={field}>{field}</li>)}
-                      </ul>
-                    </div>
-                    <div className="sm:col-span-2 rounded-lg border border-border bg-[var(--card)] p-3 space-y-3">
+                  <ul className="space-y-2 text-sm text-foreground">
+                    <li className="flex items-start gap-2"><Check className="mt-0.5 size-4 shrink-0 text-[var(--mint)]" />{t('admin.pm.privacyHelp')}</li>
+                    <li className="flex items-start gap-2"><Check className="mt-0.5 size-4 shrink-0 text-[var(--mint)]" />{t('admin.pm.consentHelp')}</li>
+                  </ul>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <section className="rounded-2xl border border-[var(--border)] p-4">
                       <h3 className="text-sm font-semibold">{t('admin.pm.schoolControls')}</h3>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <label htmlFor="admin-min-reports" className="text-xs text-muted-foreground">{t('admin.privacy.minReports')}</label>
+                      <p className="mt-1 text-xs text-muted-foreground">{t('admin.privacy.minReportsHelp')}</p>
+                      <label htmlFor="admin-min-reports" className="mt-3 grid gap-1 text-xs text-muted-foreground">
+                        {t('admin.privacy.minReports')}
                         <input
                           id="admin-min-reports"
                           key={privacyStatus.minTeamDashboardSize}
                           type="number" min={1} max={100}
                           defaultValue={privacyStatus.minTeamDashboardSize ?? 3}
                           data-testid="min-team-size-input"
-                          className="input w-20 text-sm"
+                          className="input h-9 w-24 text-sm"
                           disabled={savingOrgPrivacy}
                           onBlur={(e) => {
                             const v = Math.max(1, Math.min(100, Number(e.target.value) || 3));
@@ -577,9 +686,9 @@ export default function AdminDashboard() {
                             }
                           }}
                         />
-                      </div>
-                    </div>
-                    <div className="sm:col-span-2 rounded-lg border border-border bg-[var(--card)] p-3">
+                      </label>
+                    </section>
+                    <section className="rounded-2xl border border-[var(--border)] p-4">
                       <h3 className="text-sm font-semibold">{t('admin.pm.capacityTitle')}</h3>
                       <p className="mt-1 text-xs text-muted-foreground">{t('admin.pm.capacityHelp')}</p>
                       {requestSettings && (
@@ -607,7 +716,7 @@ export default function AdminDashboard() {
                           </Button>
                         </div>
                       )}
-                    </div>
+                    </section>
                   </div>
                 </div>
               ) : (
@@ -664,11 +773,11 @@ export default function AdminDashboard() {
           ) : stats && (
             <>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <StatCard label={t('admin.stats.totalEmployees')} value={stats.totalUsers} />
+                <StatCard label={t('admin.stats.students')} value={fieldsOfStudy?.students} />
+                <StatCard label={t('admin.stats.alumni')} value={fieldsOfStudy?.alumni} />
                 <StatCard label={t('admin.stats.onboardingComplete')} value={stats.onboardingRate == null ? '—' : `${stats.onboardingRate}%`}
                   sub={stats.onboardingRate == null ? t('admin.privacy.suppressed') : t('admin.stats.onboardedOf', { onboarded: stats.onboarded, total: stats.totalUsers })} />
                 <StatCard label={t('admin.stats.sessionsRequested')} value={sessionsRequested} />
-                <StatCard label={t('admin.stats.matchPairs')} value={stats.totalMatches} />
               </div>
 
               <Surface>
@@ -689,51 +798,59 @@ export default function AdminDashboard() {
                 </SurfaceBody>
               </Surface>
 
-              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                {/* Departments, never people: the admin sees how each group takes
-                    part, pooled below five members so no one stands out. */}
-                <Surface data-testid="department-participation">
-                  <SurfaceHeader title={t('admin.participation.title')} />
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+                {/* Groups, never people: each field of study with its size
+                    (five or more) and thresholded completed-meeting activity. */}
+                <Surface data-testid="fields-of-study">
+                  <SurfaceHeader title={t('admin.fields.title')} description={t('admin.fields.description')} />
                   <SurfaceBody className="pt-5">
-                  {stats.departmentParticipation?.length > 0 ? (
-                    <div className="space-y-3">
-                      {stats.departmentParticipation.map(d => (
-                        <div key={d.department ?? ''} data-testid="department-participation-row">
-                          <div className="mb-1 flex justify-between gap-2 text-sm">
-                            <span className="font-medium text-foreground">{d.department ?? t('admin.dept.other')}</span>
-                            <span className="tabular-nums text-muted-foreground">{d.active_members == null ? t('admin.privacy.suppressed') : t('admin.participation.active', { active: d.active_members, members: d.members })}</span>
-                          </div>
-                          <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                            {d.active_members != null && <div className="h-full rounded-full bg-[var(--mint)]" style={{ width: `${d.members ? Math.round((d.active_members / d.members) * 100) : 0}%` }} />}
-                          </div>
-                          <p className="mt-1 text-xs text-muted-foreground">{d.mentors_active == null ? t('admin.privacy.suppressed') : t('admin.participation.mentors', { count: d.mentors_active })}</p>
-                        </div>
+                  {fieldsOfStudy?.fields?.length > 0 ? (
+                    <ul className="divide-y divide-[var(--border-subtle)]">
+                      {fieldsOfStudy.fields.map(f => (
+                        <li key={f.field ?? ''} data-testid="field-of-study-row" className="flex items-center justify-between gap-3 py-2.5 text-sm">
+                          <span className="min-w-0 truncate font-medium text-foreground">{fieldName(f.field)}</span>
+                          <span className="flex shrink-0 items-center gap-3">
+                            <span className="tabular-nums text-muted-foreground">{t('admin.fields.members', { count: f.members })}</span>
+                            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${f.active ? 'bg-[var(--status-success-bg,#d9f4ec)] text-[var(--ink)]' : 'border border-[var(--border)] text-muted-foreground'}`}>
+                              {f.active ? t('admin.fields.active') : t('admin.fields.quiet')}
+                            </span>
+                          </span>
+                        </li>
                       ))}
-                    </div>
-                  ) : <p className="text-sm text-muted-foreground">{t('admin.dept.empty')}</p>}
+                    </ul>
+                  ) : <p className="text-sm text-muted-foreground">{t('admin.fields.empty')}</p>}
                   </SurfaceBody>
                 </Surface>
 
-                <Surface>
-                  <SurfaceHeader title={t('admin.dept.title')} />
+                {/* Which fields of study offer, want and meet on each skill:
+                    lists of groups, without counts. */}
+                <Surface data-testid="skills-by-field">
+                  <SurfaceHeader title={t('admin.skillsByField.title')} description={t('admin.skillsByField.description')} />
                   <SurfaceBody className="pt-5">
-                  {stats.deptActivity?.length > 0 ? (
-                    <div className="space-y-3">
-                      {stats.deptActivity.map(d => (
-                        <div key={d.department ?? ''} className="flex items-center gap-3">
-                          <div className="min-w-0 flex-1">
-                            <div className="mb-1 flex justify-between gap-2 text-sm">
-                              <span className="font-medium text-foreground">{d.department ?? t('admin.dept.other')}</span>
-                              <span className="tabular-nums text-muted-foreground">{d.session_count == null ? t('admin.privacy.suppressed') : t('admin.common.sessionsCount', { count: d.session_count })}</span>
+                  {fieldsOfStudy?.skills?.length > 0 ? (
+                    <>
+                      <div className="mb-4 flex flex-wrap gap-3 text-xs text-muted-foreground">
+                        {SKILL_ROLES.map(role => <span key={role.key} className="flex items-center gap-1.5"><i className={`inline-block size-2.5 rounded-full ${role.dot}`} />{t(`admin.skillsByField.${role.key}`)}</span>)}
+                      </div>
+                      <ul className="space-y-4">
+                        {fieldsOfStudy.skills.map(skill => (
+                          <li key={skill.skill} data-testid="skill-by-field-row">
+                            <p className="text-sm font-semibold text-foreground">{skill.skill}</p>
+                            <div className="mt-1.5 space-y-1">
+                              {SKILL_ROLES.filter(role => skill[role.key]?.length).map(role => (
+                                <div key={role.key} className="flex flex-wrap items-center gap-1.5">
+                                  <span className="w-20 shrink-0 text-xs text-muted-foreground">{t(`admin.skillsByField.${role.key}`)}</span>
+                                  {skill[role.key].map(field => (
+                                    <span key={field ?? ''} className={`rounded-full px-2 py-0.5 text-xs text-[var(--ink)] ${role.chip}`}>{fieldName(field)}</span>
+                                  ))}
+                                </div>
+                              ))}
                             </div>
-                            <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                              {d.session_count != null && <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, (d.session_count / deptActivityMax) * 100)}%` }} />}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : <p className="text-sm text-muted-foreground">{t('admin.dept.empty')}</p>}
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  ) : <p className="text-sm text-muted-foreground">{t('admin.skillsByField.empty')}</p>}
                   </SurfaceBody>
                 </Surface>
               </div>
@@ -831,7 +948,7 @@ export default function AdminDashboard() {
           </>
       )}
 
-      {(tab === 'privacy' || tab === 'audit') && (
+      {tab === 'audit' && (
         <Surface>
           <SurfaceHeader
             title={t('admin.audit.title')}
@@ -866,28 +983,40 @@ export default function AdminDashboard() {
 
       {tab === 'people' && (
         <Surface>
-          <SurfaceHeader title={t('admin.users.title')} />
+          <SurfaceHeader
+            title={t('admin.users.title')}
+            action={
+              <Button type="button" variant="outline" size="sm" aria-expanded={addPeopleOpen} aria-controls="add-people" data-testid="add-people-toggle" onClick={() => setAddPeopleOpen(open => !open)}>
+                {addPeopleOpen ? <ChevronUp /> : <Plus />}{addPeopleOpen ? t('admin.users.addPeopleClose') : t('admin.users.addPeople')}
+              </Button>
+            }
+          />
           <SurfaceBody className="pt-5">
-          <AdminProvisionUserPanel />
-          <AdminInvitationPanel />
-          <form onSubmit={addExternalOutreachTarget} className="mb-5 flex flex-wrap items-end gap-3 rounded-lg border border-border bg-[var(--card)] p-3">
-            <div className="min-w-56 flex-1">
-              <Label htmlFor="outreach-email">{t('admin.pm.externalTargetEmail')}</Label>
-              <Input id="outreach-email" type="email" required value={outreachTarget.email} onChange={(e) => setOutreachTarget((current) => ({ ...current, email: e.target.value }))} placeholder="alumni@example.edu" className="mt-1" />
+          {/* Adding people is occasional; the list is what admins come for. */}
+          {addPeopleOpen && (
+            <div id="add-people" data-testid="add-people" className="mb-6">
+            <AdminProvisionUserPanel />
+            <AdminInvitationPanel />
+            <form onSubmit={addExternalOutreachTarget} className="mb-5 flex flex-wrap items-end gap-3 rounded-lg border border-border bg-[var(--card)] p-3">
+              <div className="min-w-56 flex-1">
+                <Label htmlFor="outreach-email">{t('admin.pm.externalTargetEmail')}</Label>
+                <Input id="outreach-email" type="email" required value={outreachTarget.email} onChange={(e) => setOutreachTarget((current) => ({ ...current, email: e.target.value }))} placeholder="alumni@example.edu" className="mt-1" />
+              </div>
+              <label className="grid gap-1 text-sm font-medium">
+                {t('admin.pm.externalTargetPersona')}
+                <select className="input h-10" value={outreachTarget.persona} onChange={(e) => setOutreachTarget((current) => ({ ...current, persona: e.target.value }))}>
+                  <option value="alumnus">{t('admin.users.role.alumnus')}</option>
+                  <option value="student">{t('admin.users.role.student')}</option>
+                </select>
+              </label>
+              <div>
+                <Label htmlFor="outreach-cohort">{t('admin.pm.externalTargetCohort')}</Label>
+                <Input id="outreach-cohort" value={outreachTarget.cohort_term} onChange={(e) => setOutreachTarget((current) => ({ ...current, cohort_term: e.target.value }))} className="mt-1 w-28" />
+              </div>
+              <Button type="submit" disabled={outreachTargetSaving}>{outreachTargetSaving ? t('admin.common.saving') : t('admin.pm.addExternalTarget')}</Button>
+            </form>
             </div>
-            <label className="grid gap-1 text-sm font-medium">
-              {t('admin.pm.externalTargetPersona')}
-              <select className="input h-10" value={outreachTarget.persona} onChange={(e) => setOutreachTarget((current) => ({ ...current, persona: e.target.value }))}>
-                <option value="alumnus">{t('admin.users.role.alumnus')}</option>
-                <option value="student">{t('admin.users.role.student')}</option>
-              </select>
-            </label>
-            <div>
-              <Label htmlFor="outreach-cohort">{t('admin.pm.externalTargetCohort')}</Label>
-              <Input id="outreach-cohort" value={outreachTarget.cohort_term} onChange={(e) => setOutreachTarget((current) => ({ ...current, cohort_term: e.target.value }))} className="mt-1 w-28" />
-            </div>
-            <Button type="submit" disabled={outreachTargetSaving}>{outreachTargetSaving ? t('admin.common.saving') : t('admin.pm.addExternalTarget')}</Button>
-          </form>
+          )}
           {usersLoading ? <p className="text-sm text-muted-foreground">{t('admin.common.loading')}</p> : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -898,7 +1027,7 @@ export default function AdminDashboard() {
                     <th className="py-2 pr-4">{t('admin.users.dept')}</th>
                     <th className="py-2 pr-4">{t('admin.users.role.title')}</th>
                     <th className="py-2 pr-4">{t('admin.users.manager')}</th>
-                    <th className="py-2">{t('admin.users.actions')}</th>
+                    <th className="py-2 text-right">{t('admin.users.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -911,31 +1040,24 @@ export default function AdminDashboard() {
                         {u.deactivated_at ? (
                           <span className="text-muted-foreground">{t(`admin.users.role.${u.role || 'student'}`)}</span>
                         ) : (
-                          <select
-                            value={u.role || 'student'}
-                            onChange={e => handleSetRole(u, e.target.value)}
-                            className="input h-8 text-xs py-0"
-                            aria-label={t('admin.users.role.title')}
-                          >
-                            <option value="student">{t('admin.users.role.student')}</option>
-                            <option value="alumnus">{t('admin.users.role.alumnus')}</option>
-                          </select>
+                          <span data-testid={`role-${u.id}`} className={`inline-block rounded-full px-2.5 py-1 text-xs font-medium text-[var(--ink)] ${u.role === 'alumnus' ? 'bg-[#e7e5f5]' : 'bg-[#d9f4ec]'}`}>{t(`admin.users.role.${u.role || 'student'}`)}</span>
                         )}
                       </td>
                       <td className="py-2 pr-4 text-secondary-foreground">{u.manager_email || <span className="text-muted-foreground">—</span>}</td>
-                      <td className="py-2 space-x-2 whitespace-nowrap">
-                        {!u.deactivated_at && (
-                          <>
-                            <Button type="button" variant="link" size="sm" className="h-auto px-0 text-xs" onClick={() => openSetManager(u)}>{t('admin.users.setManager')}</Button>
-                            <Button type="button" variant="link" size="sm" className="h-auto px-0 text-xs" disabled={outreachSavingId === u.id} onClick={() => markOutreachTarget(u)}>{outreachSavingId === u.id ? t('admin.common.saving') : t('admin.pm.markInvited')}</Button>
-                            <Button type="button" variant="link" size="sm" className="h-auto px-0 text-xs" onClick={() => openResetPasswordConfirm(u)}>{t('admin.users.resetPassword')}</Button>
-                            <Button type="button" variant="link" size="sm" className="h-auto px-0 text-xs text-destructive" onClick={() => openDeactivateConfirm(u)}>{t('admin.users.deactivate')}</Button>
-                          </>
-                        )}
-                        {/* An erased login keeps only a placeholder address. */}
-                        {!u.email?.endsWith('@erased.invalid') && (
-                          <Button type="button" variant="link" size="sm" className="h-auto px-0 text-xs text-destructive" data-testid={`erase-user-${u.id}`} onClick={() => openEraseConfirm(u)}>{t('admin.users.erase')}</Button>
-                        )}
+                      <td className="py-2 text-right">
+                        <RowActions label={t('admin.users.actions')} testId={`actions-${u.id}`} items={[
+                          ...(!u.deactivated_at ? [
+                            { label: t(u.role === 'alumnus' ? 'admin.users.makeStudent' : 'admin.users.makeAlumnus'), onSelect: () => openRoleConfirm(u, u.role === 'alumnus' ? 'student' : 'alumnus'), testId: `change-role-${u.id}` },
+                            { label: t('admin.users.setManager'), onSelect: () => openSetManager(u) },
+                            { label: outreachSavingId === u.id ? t('admin.common.saving') : t('admin.pm.markInvited'), onSelect: () => markOutreachTarget(u), disabled: outreachSavingId === u.id },
+                            { label: t('admin.users.resetPassword'), onSelect: () => openResetPasswordConfirm(u) },
+                            { label: t('admin.users.deactivate'), onSelect: () => openDeactivateConfirm(u), destructive: true },
+                          ] : []),
+                          // An erased login keeps only a placeholder address.
+                          ...(!u.email?.endsWith('@erased.invalid') ? [
+                            { label: t('admin.users.erase'), onSelect: () => openEraseConfirm(u), destructive: true, testId: `erase-user-${u.id}` },
+                          ] : []),
+                        ]} />
                       </td>
                     </tr>
                   ))}

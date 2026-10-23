@@ -321,7 +321,7 @@ export default function Groups() {
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         </DialogContent>
       </Dialog>
-      <Dialog open={!!manageTarget} onOpenChange={open => { if (!open && !manageSaving) setManageTarget(null); }}>
+      <Dialog open={!!manageTarget} onOpenChange={open => { if (!open) setManageTarget(null); }}>
         <DialogContent>
           <DialogHeader><DialogTitle>{t('groups.manageMembers')} · {manageTarget?.name}</DialogTitle><DialogDescription>{t('groups.manageDescription')}</DialogDescription></DialogHeader>
           <label className="label" htmlFor="group-member-search">{t('groups.findMember')}</label>

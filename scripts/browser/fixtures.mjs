@@ -163,6 +163,7 @@ function fixtureApi(state, ApiError) {
     }
     if (method === 'put') {
       if (path === '/admin/retention') { state.retention = { ...body }; return state.retention; }
+      if (path.startsWith('/admin/users/')) { state.adminUserUpdates = [...(state.adminUserUpdates || []), { id: path.split('/')[3], ...body }]; return { ok: true }; }
       if (path === '/users/me') {
         state.user = { ...state.user, ...body };
         if (state.profile) state.profile = { ...state.profile, ...body };
@@ -204,6 +205,14 @@ function fixtureApi(state, ApiError) {
         '/admin/kpis': null,
         '/admin/ai-runs': [],
         '/admin/knowledge-graph': sampleKnowledgeGraph(),
+        '/admin/fields-of-study': {
+          students: 180, alumni: 109,
+          fields: [{ field: 'Finance', members: 12, active: true }, { field: 'Marketing', members: 6, active: false }, { field: null, members: 7, active: true }],
+          skills: [
+            { skill: 'Valuation', offered: ['Finance'], wanted: ['Marketing', null], sessions: ['Finance'] },
+            { skill: 'Brand strategy', offered: ['Marketing'], wanted: [], sessions: [] },
+          ],
+        },
       };
       if (route in admin) return admin[route];
     }

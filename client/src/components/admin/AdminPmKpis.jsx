@@ -4,17 +4,16 @@ import { Surface, SurfaceBody, SurfaceHeader } from '../Surface.jsx';
 import { Button } from '@/components/ui/button';
 import { formatAdminDate, pmTranslate } from './adminPm.js';
 
+// The six an alumni association acts on: are alumni helping, are real
+// connections forming and reaching students, do alumni answer, do
+// conversations happen, and do people want to continue. Activation is on the
+// Overview; reply rate, mentorships and referrals add little at this size.
 export const PM_METRICS = [
-  ['studentActivationRate', 'admin.kpis.studentActivation', true, 'Unique invited students with a completed profile / unique students invited in the selected cohort.'],
-  ['alumniActivationRate', 'admin.kpis.alumniActivation', true, 'Unique targeted alumni with a completed profile / unique alumni targeted in the selected cohort.'],
   ['alumniEngagementRate', 'admin.kpis.alumniEngagement', true, 'Activated alumni with a human reply, completed meeting or confirmed mentoring activity / activated alumni. Acceptance alone does not qualify.'],
   ['meaningfulConnections', 'admin.kpis.meaningfulConnections', false, 'Distinct unordered pairs with messages from both humans or a completed/logged meeting. Scheduled meetings and accepted requests alone do not qualify.'],
   ['connectionCoverageRate', 'admin.kpis.connectionCoverage', true, 'Activated students with at least one meaningful connection / activated students.'],
   ['acceptanceRate', 'admin.kpis.acceptanceRate', true, 'Requests with recorded acceptance / requests sent in the same cohort. Deduplicate retries and retain acceptance after cancellation.'],
-  ['replyRate', 'admin.kpis.replyRate', true, 'Accepted connections with a real human reply after acceptance / accepted connections. Excludes initial requests, assistant drafts and automated messages.'],
-  ['mentorshipsFormed', 'admin.kpis.mentorshipsFormed', false, 'Distinct relationships explicitly confirmed as mentorships by both participants.'],
   ['careerConversations', 'admin.kpis.careerConversations', false, 'Explicitly logged completed career conversations, deduplicated by session/event.'],
-  ['referrals', 'admin.pm.referrals', false, 'Explicit referral events, deduplicated by event identity.'],
   ['intentToContinueRate', 'admin.kpis.intentToContinue', true, 'Yes responses / all valid yes, no and unsure responses to the explicit next-term question. No responses means No data.'],
 ];
 
@@ -78,8 +77,11 @@ export default function AdminPmKpis({ data, loading, error, onRefresh }) {
             <details className="mt-3 text-xs text-muted-foreground">
               <summary className="cursor-pointer">{t('admin.pm.definition')}</summary>
               <p className="mt-2">{row.definition}</p>
-              <p className="mt-2">{t('admin.pm.numerator')}: {row.numerator ?? missing}</p>
-              {row.percent && <p>{t('admin.pm.denominator')}: {row.denominator ?? missing}</p>}
+              {/* A count is its own numerator; only a rate needs both parts. */}
+              {row.percent && <>
+                <p className="mt-2">{t('admin.pm.numerator')}: {row.numerator ?? missing}</p>
+                <p>{t('admin.pm.denominator')}: {row.denominator ?? missing}</p>
+              </>}
               {row.key === 'intentToContinueRate' && <p>{t('admin.pm.responseRate')}: {row.responseRate == null ? missing : `${row.responseRate}%`}</p>}
               {row.reason && <p className="mt-2">{row.reason}</p>}
             </details>

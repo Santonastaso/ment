@@ -1966,12 +1966,28 @@ test('admin pages share the member pages\' cards and tabs, and show departments 
   await expect(panel).toBeVisible();
   expect(await panel.evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgb(255, 255, 255)');
   expect(await page.getByTestId('admin-tab-overview').evaluate(element => getComputedStyle(element).borderRadius)).toBe('0px');
-  // Departments only: no person is named or ranked on the overview.
-  const rows = page.getByTestId('department-participation-row');
-  await expect(rows).toHaveCount(1);
-  await expect(rows.first()).toContainText('Suppressed to protect privacy');
-  await expect(page.getByText('Other departments (under 5 people each)')).toHaveCount(0);
-  await expect(page.getByText('Most active')).toHaveCount(0);
+  // Fields of study, never people, and nothing hidden behind "suppressed".
+  const fields = page.getByTestId('field-of-study-row');
+  await expect(fields).toHaveCount(3);
+  await expect(fields.first()).toContainText('Finance');
+  await expect(fields.first()).toContainText('12 members');
+  await expect(fields.first()).toContainText('Meetings reported');
+  await expect(fields.nth(1)).toContainText('Below reporting threshold');
+  await expect(fields.nth(2)).toContainText('Other fields of study');
+  const valuation = page.getByTestId('skill-by-field-row').first();
+  await expect(valuation).toContainText('Valuation');
+  await expect(valuation).toContainText('Offered by');
+  await expect(valuation).toContainText('Wanted by');
+  await expect(valuation.getByText('Other fields of study')).toBeVisible();
+  // Brand strategy has nobody wanting it or meeting on it, so those lines are left out.
+  await expect(page.getByTestId('skill-by-field-row').nth(1).getByText('Wanted by')).toHaveCount(0);
+  await expect(page.getByText(/Suppressed|Most active|Department|Total employees/)).toHaveCount(0);
+  // Students and alumni counted apart; match pairs are not shown.
+  await expect(page.getByText('Students', { exact: true })).toBeVisible();
+  await expect(page.getByText('180', { exact: true })).toBeVisible();
+  await expect(page.getByText('Alumni', { exact: true })).toBeVisible();
+  await expect(page.getByText('109', { exact: true })).toBeVisible();
+  await expect(page.getByText('Match pairs')).toHaveCount(0);
   await page.getByTestId('admin-tab-people').click();
   await expect(page.getByRole('button', { name: 'Download template' })).toHaveCSS('background-color', 'rgb(255, 255, 255)');
 });
@@ -2016,4 +2032,55 @@ test('an admin sets how long data is kept, and nothing is set until they do', as
   expect(await page.evaluate(() => window.fixture.retention)).toEqual({
     conversation_days: 365, search_days: null, reflection_days: null, audit_log_days: null, deactivated_account_days: 730,
   });
+});
+
+test('school admins see five tabs and six KPIs', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => sessionStorage.setItem('ment.fixture.auth', JSON.stringify({ id: 'admin', name: 'Org Admin', email: 'admin@example.test', role: 'admin', onboarding_complete: true, is_admin: true, admin_scope: 'org' })));
+  await page.goto('/admin');
+  const tabs = page.locator('[data-testid^="admin-tab-"]');
+  await expect(tabs).toHaveText(['Overview', 'KPIs', 'People', 'Privacy', 'Feedback']);
+  await page.getByTestId('admin-tab-privacy').click();
+  await expect(page.getByTestId('data-retention')).toBeVisible();
+  // The retention field keeps its "Audit log" label; the log itself is not shown.
+  await expect(page.getByText('Each event records who acted and when.', { exact: false })).toHaveCount(0);
+  await page.getByTestId('admin-tab-kpis').click();
+  const kpis = page.locator('[data-testid^="kpi-"]');
+  await expect(kpis).toHaveCount(6);
+  await expect(kpis.first()).toContainText('Alumni engagement');
+  await expect(page.getByText('Referrals')).toHaveCount(0);
+  // A count shows its definition only; a rate also shows what it is made of.
+  await kpis.nth(1).locator('summary').click();
+  await expect(kpis.nth(1).getByText(/Numerator|Denominator/)).toHaveCount(0);
+  await kpis.first().locator('summary').click();
+  await expect(kpis.first().getByText(/Denominator/)).toBeVisible();
+
+  // People: the forms to add people stay folded away until asked for.
+  await page.getByTestId('admin-tab-people').click();
+  await expect(page.getByTestId('add-people')).toHaveCount(0);
+  await page.getByTestId('add-people-toggle').click();
+  await expect(page.getByTestId('add-people')).toBeVisible();
+  await expect(page.getByText('Create an account')).toBeVisible();
+  await page.getByTestId('add-people-toggle').click();
+  await expect(page.getByTestId('add-people')).toHaveCount(0);
+
+  // The role is a label; changing it is a menu action with a confirmation.
+  await expect(page.getByTestId('role-viewer')).toHaveText('Student');
+  await expect(page.getByTestId('role-viewer').locator('button')).toHaveCount(0);
+  await page.getByTestId('actions-viewer').click();
+  await expect(page.getByRole('menuitem')).toHaveText(['Change to alumnus', 'Set advisor', 'Mark invited', 'Reset password', 'Deactivate', 'Erase data']);
+  await page.getByTestId('change-role-viewer').click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toContainText('Viewer Student will be listed as Alumnus.');
+  expect(await page.evaluate(() => window.fixture.adminUserUpdates ?? [])).toEqual([]);
+  await dialog.getByRole('button', { name: 'Change to Alumnus' }).click();
+  await expect.poll(() => page.evaluate(() => window.fixture.adminUserUpdates)).toEqual([{ id: 'viewer', role: 'alumnus' }]);
+  await page.getByTestId('actions-peer').click();
+  await expect(page.getByRole('menuitem').first()).toHaveText('Change to student');
+  await page.keyboard.press('Escape');
+
+  // Privacy: plain labels, not column names.
+  await page.getByTestId('admin-tab-privacy').click();
+  await expect(page.getByTestId('privacy-visible')).toContainText('Field of study');
+  await expect(page.getByTestId('privacy-hidden')).toContainText('Email address');
 });

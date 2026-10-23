@@ -985,7 +985,10 @@ a.person-row-name:hover { color: var(--primary-text); text-decoration: underline
 .kg-stats .is-gap small { color: var(--primary-text); font-size: var(--type-caption); }
 
 .kg-layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 16px; align-items: start; }
-.kg-panel { display: flex; flex-direction: column; gap: 10px; min-width: 0; max-height: var(--kg-height, 640px); overflow-y: auto; border: 1px solid var(--border); border-radius: var(--panel-radius); background: var(--card); padding: 16px; }
+.kg-panel { display: flex; min-width: 0; max-height: var(--kg-height, 640px); overflow: hidden; border: 1px solid var(--border); border-radius: var(--panel-radius); background: var(--card); padding: 12px 6px 12px 0; }
+.kg-panel-scroll { display: flex; flex: 1; flex-direction: column; gap: 10px; min-width: 0; overflow-y: auto; padding: 4px 10px 4px 16px; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.kg-panel-scroll::-webkit-scrollbar { width: 6px; }
+.kg-panel-scroll::-webkit-scrollbar-thumb { border-radius: 999px; background: var(--border); }
 .kg-panel h3 { margin: 8px 0 0; color: var(--muted-foreground); font-size: var(--type-caption); font-weight: var(--font-weight-semibold); letter-spacing: .06em; text-transform: uppercase; }
 .kg-panel h3:first-child { margin-top: 0; }
 .kg-muted { color: var(--muted-foreground); font-size: var(--type-caption); }
