@@ -1971,8 +1971,8 @@ test('admin pages share the member pages\' cards and tabs, and show departments 
   await expect(fields).toHaveCount(3);
   await expect(fields.first()).toContainText('Finance');
   await expect(fields.first()).toContainText('12 members');
-  await expect(fields.first()).toContainText('Meeting');
-  await expect(fields.nth(1)).toContainText('No meetings yet');
+  await expect(fields.first()).toContainText('Meetings reported');
+  await expect(fields.nth(1)).toContainText('Below reporting threshold');
   await expect(fields.nth(2)).toContainText('Other fields of study');
   const valuation = page.getByTestId('skill-by-field-row').first();
   await expect(valuation).toContainText('Valuation');

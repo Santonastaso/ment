@@ -800,7 +800,7 @@ export default function AdminDashboard() {
 
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
                 {/* Groups, never people: each field of study with its size
-                    (five or more) and whether it has met at all. */}
+                    (five or more) and thresholded completed-meeting activity. */}
                 <Surface data-testid="fields-of-study">
                   <SurfaceHeader title={t('admin.fields.title')} description={t('admin.fields.description')} />
                   <SurfaceBody className="pt-5">
