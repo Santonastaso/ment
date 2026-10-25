@@ -2126,3 +2126,15 @@ test('school admins see four tabs, and six KPIs folded on the Overview', async (
   await expect(page.getByTestId('privacy-visible')).toContainText('Field of study');
   await expect(page.getByTestId('privacy-hidden')).toContainText('Email address');
 });
+
+test('when the overview figures cannot load, the page says so instead of reporting small numbers', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => sessionStorage.setItem('ment.fixture.auth', JSON.stringify({ id: 'admin', name: 'Org Admin', email: 'admin@example.test', role: 'admin', onboarding_complete: true, is_admin: true, admin_scope: 'org' })));
+  await page.goto('/admin');
+  await page.evaluate(() => { window.fixture.failGet = '/admin/programme'; });
+  await page.getByTestId('admin-tab-people').click();
+  await page.getByTestId('admin-tab-overview').click();
+  await expect(page.getByTestId('programme-unavailable')).toBeVisible();
+  await expect(page.getByText(/Fewer than five|No gaps right now/)).toHaveCount(0);
+  await expect(page.getByTestId('recruit')).toContainText('Not available yet.');
+});

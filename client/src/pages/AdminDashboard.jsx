@@ -140,6 +140,7 @@ export default function AdminDashboard() {
   const [fieldsOfStudy, setFieldsOfStudy] = useState(null);
   const [addPeopleOpen, setAddPeopleOpen] = useState(false);
   const [programme, setProgramme] = useState(null);
+  const [programmeError, setProgrammeError] = useState(false);
   const [kpisOpen, setKpisOpen] = useState(false);
   const [fieldsOpen, setFieldsOpen] = useState(false);
   const [skillsOpen, setSkillsOpen] = useState(false);
@@ -216,8 +217,10 @@ export default function AdminDashboard() {
     try {
       const res = await api.get('/admin/programme');
       setProgramme(res.data);
+      setProgrammeError(false);
     } catch {
       setProgramme(null);
+      setProgrammeError(true);
     }
   }
 
@@ -591,7 +594,8 @@ export default function AdminDashboard() {
   const visibleSessionStatuses = ['pending', 'scheduled', 'completed'].map(status => sessionsByStatus[status]);
   const sessionsRequested = visibleSessionStatuses.every(Number.isInteger)
     ? visibleSessionStatuses.reduce((sum, count) => sum + count, 0) : null;
-  const recentLine = n => (n == null ? t('admin.headline.recentFew') : t('admin.headline.recent', { count: n }));
+  // Without data there is nothing to say about the last 30 days; never imply "fewer than five".
+  const recentLine = n => (!programme ? undefined : n == null ? t('admin.headline.recentFew') : t('admin.headline.recent', { count: n }));
   // The step where the most people are lost, measured against the one before.
   const biggestDrop = (() => {
     const steps = programme?.funnel || [];
@@ -844,8 +848,9 @@ export default function AdminDashboard() {
                 <StatCard label={t('admin.headline.meetings')} value={programme?.headline?.meetings}
                   sub={recentLine(programme?.headline?.meetings_new)} />
                 <StatCard label={t('admin.headline.acceptance')} value={programme?.headline?.acceptance_rate == null ? null : `${programme.headline.acceptance_rate}%`}
-                  sub={programme?.headline?.requests == null ? t('admin.headline.acceptanceFew') : t('admin.headline.acceptanceSub', { count: programme.headline.requests })} />
+                  sub={!programme ? undefined : programme.headline?.requests == null ? t('admin.headline.acceptanceFew') : t('admin.headline.acceptanceSub', { count: programme.headline.requests })} />
               </div>
+              {programmeError && <p role="status" data-testid="programme-unavailable" className="rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-muted-foreground">{t('admin.programme.unavailable')}</p>}
 
               <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
                 <Surface data-testid="funnel">
@@ -870,7 +875,7 @@ export default function AdminDashboard() {
                           );
                         })}
                       </ol>
-                    ) : <p className="text-sm text-muted-foreground">{t('admin.fields.empty')}</p>}
+                    ) : <p className="text-sm text-muted-foreground">{t(programme ? 'admin.fields.empty' : 'admin.programme.notLoaded')}</p>}
                   </SurfaceBody>
                 </Surface>
 
@@ -888,7 +893,7 @@ export default function AdminDashboard() {
                           </li>
                         ))}
                       </ul>
-                    ) : <p className="text-sm text-muted-foreground">{t('admin.recruit.empty')}</p>}
+                    ) : <p className="text-sm text-muted-foreground">{t(programme ? 'admin.recruit.empty' : 'admin.programme.notLoaded')}</p>}
                   </SurfaceBody>
                 </Surface>
               </div>

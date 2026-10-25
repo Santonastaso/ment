@@ -319,5 +319,7 @@
   "admin.recruit.empty": "Aucun manque pour l'instant : chaque compétence recherchée par cinq personnes ou plus est bien couverte.",
   "admin.kpis.foldedDescription": "Les six KPI du programme, avec définitions et export pour les rapports.",
   "admin.rematch.title": "Recalculer les mises en relation",
-  "admin.rematch.description": "Les mises en relation se mettent à jour seules. Lancez-le à la main seulement après un gros import."
+  "admin.rematch.description": "Les mises en relation se mettent à jour seules. Lancez-le à la main seulement après un gros import.",
+  "admin.programme.unavailable": "Ces chiffres n'ont pas pu être chargés. S'il s'agit d'une nouvelle version de MENT, sa mise à jour de la base de données n'est peut-être pas encore en ligne.",
+  "admin.programme.notLoaded": "Pas encore disponible."
 }

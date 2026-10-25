@@ -319,5 +319,7 @@
   "admin.recruit.empty": "No gaps right now: every skill five or more people want is well covered.",
   "admin.kpis.foldedDescription": "All six programme KPIs, with definitions and an export for reporting.",
   "admin.rematch.title": "Recompute matching",
-  "admin.rematch.description": "Matching updates on its own. Run it by hand only after a large import."
+  "admin.rematch.description": "Matching updates on its own. Run it by hand only after a large import.",
+  "admin.programme.unavailable": "These figures could not be loaded. If this is a new version of MENT, its database update may not be live yet.",
+  "admin.programme.notLoaded": "Not available yet."
 }

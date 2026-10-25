@@ -319,5 +319,7 @@
   "admin.recruit.empty": "Nessuna lacuna al momento: ogni competenza cercata da almeno cinque persone è ben coperta.",
   "admin.kpis.foldedDescription": "Tutti e sei i KPI del programma, con definizioni ed esportazione per i report.",
   "admin.rematch.title": "Ricalcola gli abbinamenti",
-  "admin.rematch.description": "Gli abbinamenti si aggiornano da soli. Avvialo a mano solo dopo un'importazione grande."
+  "admin.rematch.description": "Gli abbinamenti si aggiornano da soli. Avvialo a mano solo dopo un'importazione grande.",
+  "admin.programme.unavailable": "Non è stato possibile caricare questi dati. Se è una nuova versione di MENT, il suo aggiornamento del database potrebbe non essere ancora attivo.",
+  "admin.programme.notLoaded": "Non ancora disponibile."
 }
