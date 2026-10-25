@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { errorMessage } from '../lib/errors.mjs';
 import { Link, useSearchParams } from 'react-router-dom';
 import api from '../api/index.js';
@@ -17,7 +17,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Check, ChevronUp, Eye, Lock, MoreHorizontal, Plus } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Eye, Lock, MoreHorizontal, Plus } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { formatAdminDate, pmTranslate } from '../components/admin/adminPm.js';
 import AdminPmKpis from '../components/admin/AdminPmKpis.jsx';
@@ -63,6 +63,16 @@ const PRIVACY_FIELD_KEYS = {
 };
 
 const RETENTION_FIELDS = ['conversation_days', 'search_days', 'reflection_days', 'audit_log_days', 'deactivated_account_days'];
+
+// Folds a section away; its header stays as the way back in.
+function SectionToggle({ open, onToggle, label, testId }) {
+  const { t } = useT();
+  return (
+    <Button type="button" variant="outline" size="sm" aria-expanded={open} aria-label={`${open ? t('admin.common.hide') : t('admin.common.show')} ${label}`} data-testid={testId} onClick={onToggle}>
+      {open ? <ChevronUp /> : <ChevronDown />}{open ? t('admin.common.hide') : t('admin.common.show')}
+    </Button>
+  );
+}
 
 // One "Actions" button per row instead of five links that overflow the table.
 function RowActions({ label, items, testId }) {
@@ -129,6 +139,9 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
   const [fieldsOfStudy, setFieldsOfStudy] = useState(null);
   const [addPeopleOpen, setAddPeopleOpen] = useState(false);
+  const [fieldsOpen, setFieldsOpen] = useState(false);
+  const [skillsOpen, setSkillsOpen] = useState(false);
+  const [userFilters, setUserFilters] = useState({ name: '', email: '', field: '', role: '', advisor: '' });
   const [feedback, setFeedback] = useState([]);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [feedbackFilter, setFeedbackFilter] = useState('');
@@ -220,8 +233,15 @@ export default function AdminDashboard() {
     setUsersLoading(true);
     setLoadErrors(prev => ({ ...prev, people: false }));
     try {
-      const res = await api.get('/admin/users?limit=200');
-      setUsers(res.data.users || []);
+      // Everyone, page by page: the filters below search the whole list.
+      const all = [];
+      for (let offset = 0; ; offset += 500) {
+        const res = await api.get(`/admin/users?limit=500&offset=${offset}`);
+        const page = res.data.users || [];
+        all.push(...page);
+        if (!page.length || all.length >= (res.data.total ?? all.length)) break;
+      }
+      setUsers(all);
     } catch {
       setLoadErrors(prev => ({ ...prev, people: true }));
     } finally {
@@ -558,6 +578,16 @@ export default function AdminDashboard() {
   const visibleSessionStatuses = ['pending', 'scheduled', 'completed'].map(status => sessionsByStatus[status]);
   const sessionsRequested = visibleSessionStatuses.every(Number.isInteger)
     ? visibleSessionStatuses.reduce((sum, count) => sum + count, 0) : null;
+  // Each column of the users table can be searched; filters combine.
+  const userFieldOptions = useMemo(() => [...new Set(users.map(u => u.department).filter(Boolean))].sort((a, b) => a.localeCompare(b)), [users]);
+  const filteredUsers = useMemo(() => {
+    const has = (value, needle) => !needle.trim() || String(value || '').toLocaleLowerCase().includes(needle.trim().toLocaleLowerCase());
+    return users.filter(u => has(u.name, userFilters.name) && has(u.email, userFilters.email) && has(u.manager_email, userFilters.advisor)
+      && (!userFilters.field || (userFilters.field === '__none' ? !u.department : u.department === userFilters.field))
+      && (!userFilters.role || (u.role || 'student') === userFilters.role));
+  }, [users, userFilters]);
+  const filtering = Object.values(userFilters).some(Boolean);
+  const setUserFilter = (key, value) => setUserFilters(current => ({ ...current, [key]: value }));
   const isPlatformAdmin = user?.admin_scope === 'platform';
 
   return (
@@ -798,12 +828,13 @@ export default function AdminDashboard() {
                 </SurfaceBody>
               </Surface>
 
-              <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+              <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
                 {/* Groups, never people: each field of study with its size
                     (five or more) and thresholded completed-meeting activity. */}
                 <Surface data-testid="fields-of-study">
-                  <SurfaceHeader title={t('admin.fields.title')} description={t('admin.fields.description')} />
-                  <SurfaceBody className="pt-5">
+                  <SurfaceHeader title={t('admin.fields.title')} description={t('admin.fields.description')}
+                    action={<SectionToggle open={fieldsOpen} onToggle={() => setFieldsOpen(open => !open)} label={t('admin.fields.title')} testId="fields-of-study-toggle" />} />
+                  {fieldsOpen && <SurfaceBody className="pt-5">
                   {fieldsOfStudy?.fields?.length > 0 ? (
                     <ul className="divide-y divide-[var(--border-subtle)]">
                       {fieldsOfStudy.fields.map(f => (
@@ -819,14 +850,15 @@ export default function AdminDashboard() {
                       ))}
                     </ul>
                   ) : <p className="text-sm text-muted-foreground">{t('admin.fields.empty')}</p>}
-                  </SurfaceBody>
+                  </SurfaceBody>}
                 </Surface>
 
                 {/* Which fields of study offer, want and meet on each skill:
                     lists of groups, without counts. */}
                 <Surface data-testid="skills-by-field">
-                  <SurfaceHeader title={t('admin.skillsByField.title')} description={t('admin.skillsByField.description')} />
-                  <SurfaceBody className="pt-5">
+                  <SurfaceHeader title={t('admin.skillsByField.title')} description={t('admin.skillsByField.description')}
+                    action={<SectionToggle open={skillsOpen} onToggle={() => setSkillsOpen(open => !open)} label={t('admin.skillsByField.title')} testId="skills-by-field-toggle" />} />
+                  {skillsOpen && <SurfaceBody className="pt-5">
                   {fieldsOfStudy?.skills?.length > 0 ? (
                     <>
                       <div className="mb-4 flex flex-wrap gap-3 text-xs text-muted-foreground">
@@ -851,7 +883,7 @@ export default function AdminDashboard() {
                       </ul>
                     </>
                   ) : <p className="text-sm text-muted-foreground">{t('admin.skillsByField.empty')}</p>}
-                  </SurfaceBody>
+                  </SurfaceBody>}
                 </Surface>
               </div>
             </>
@@ -860,9 +892,157 @@ export default function AdminDashboard() {
           </>
       )}
 
+
+      {tab === 'audit' && (
+        <Surface>
+          <SurfaceHeader
+            title={t('admin.audit.title')}
+            description={
+              <>
+                {t('admin.pm.auditHelp')}
+                {auditTotal > 0 && <span className="ml-1 text-muted-foreground/80">{t('admin.audit.totalEvents', { count: auditTotal })}</span>}
+              </>
+            }
+            action={
+              <Button type="button" variant="outline" size="sm" onClick={() => downloadBlob('/admin/audit/export', 'ment-audit-export.csv')}>
+                {t('admin.audit.exportCsv')}
+              </Button>
+            }
+          />
+          <SurfaceBody className="pt-5">
+            <Label htmlFor="admin-audit-filter">{t('admin.pm.auditFilter')}</Label>
+            <Input id="admin-audit-filter" type="search" value={auditFilter} onChange={e => setAuditFilter(e.target.value)} className="my-3" />
+            {auditLoading ? <p role="status">{t('admin.common.loading')}</p> : loadErrors.audit ? <p role="alert">{t('admin.pm.loadFailed')} <Button variant="link" onClick={loadAudit}>{t('admin.common.refresh')}</Button></p> : auditEntries.filter(entry => `${entry.action || ''} ${entry.actor?.name || ''} ${entry.actor?.email || ''}`.toLowerCase().includes(auditFilter.toLowerCase())).length === 0 ? (
+              <p className="text-sm text-muted-foreground italic">{t('admin.audit.empty')}</p>
+            ) : (
+              <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
+                {auditEntries.filter(entry => `${entry.action || ''} ${entry.actor?.name || ''} ${entry.actor?.email || ''}`.toLowerCase().includes(auditFilter.toLowerCase())).map(entry => <AuditRow key={entry.id} entry={entry} />)}
+              </div>
+            )}
+          </SurfaceBody>
+        </Surface>
+      )}
+
+      {tab === 'kpis' && <AdminPmKpis data={kpis} loading={kpisLoading} error={loadErrors.kpis} onRefresh={loadKpis} />}
+      {tab === 'ai' && <AdminAiRuns t={t} />}
+
+      {tab === 'people' && (
+        <Surface>
+          <SurfaceHeader
+            title={t('admin.users.title')}
+            action={
+              <Button type="button" variant="outline" size="sm" aria-expanded={addPeopleOpen} aria-controls="add-people" data-testid="add-people-toggle" onClick={() => setAddPeopleOpen(open => !open)}>
+                {addPeopleOpen ? <ChevronUp /> : <Plus />}{addPeopleOpen ? t('admin.users.addPeopleClose') : t('admin.users.addPeople')}
+              </Button>
+            }
+          />
+          <SurfaceBody className="pt-5">
+          {/* Adding people is occasional; the list is what admins come for. */}
+          {addPeopleOpen && (
+            <div id="add-people" data-testid="add-people" className="mb-6">
+            <AdminProvisionUserPanel />
+            <AdminInvitationPanel />
+            <form onSubmit={addExternalOutreachTarget} className="mb-5 flex flex-wrap items-end gap-3 rounded-lg border border-border bg-[var(--card)] p-3">
+              <div className="min-w-56 flex-1">
+                <Label htmlFor="outreach-email">{t('admin.pm.externalTargetEmail')}</Label>
+                <Input id="outreach-email" type="email" required value={outreachTarget.email} onChange={(e) => setOutreachTarget((current) => ({ ...current, email: e.target.value }))} placeholder="alumni@example.edu" className="mt-1" />
+              </div>
+              <label className="grid gap-1 text-sm font-medium">
+                {t('admin.pm.externalTargetPersona')}
+                <select className="input h-10" value={outreachTarget.persona} onChange={(e) => setOutreachTarget((current) => ({ ...current, persona: e.target.value }))}>
+                  <option value="alumnus">{t('admin.users.role.alumnus')}</option>
+                  <option value="student">{t('admin.users.role.student')}</option>
+                </select>
+              </label>
+              <div>
+                <Label htmlFor="outreach-cohort">{t('admin.pm.externalTargetCohort')}</Label>
+                <Input id="outreach-cohort" value={outreachTarget.cohort_term} onChange={(e) => setOutreachTarget((current) => ({ ...current, cohort_term: e.target.value }))} className="mt-1 w-28" />
+              </div>
+              <Button type="submit" disabled={outreachTargetSaving}>{outreachTargetSaving ? t('admin.common.saving') : t('admin.pm.addExternalTarget')}</Button>
+            </form>
+            </div>
+          )}
+          {usersLoading ? <p className="text-sm text-muted-foreground">{t('admin.common.loading')}</p> : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-muted-foreground border-b">
+                    <th className="py-2 pr-4">{t('admin.users.name')}</th>
+                    <th className="py-2 pr-4">{t('admin.users.email')}</th>
+                    <th className="py-2 pr-4">{t('admin.users.dept')}</th>
+                    <th className="py-2 pr-4">{t('admin.users.role.title')}</th>
+                    <th className="py-2 pr-4">{t('admin.users.manager')}</th>
+                    <th className="py-2 text-right">{t('admin.users.actions')}</th>
+                  </tr>
+                  <tr className="border-b" data-testid="user-filters">
+                    <th className="py-2 pr-4 font-normal"><input className="input h-8 w-full min-w-28 text-xs" placeholder={t('admin.users.filterSearch')} aria-label={t('admin.users.filterBy', { column: t('admin.users.name') })} value={userFilters.name} onChange={e => setUserFilter('name', e.target.value)} data-testid="filter-name" /></th>
+                    <th className="py-2 pr-4 font-normal"><input className="input h-8 w-full min-w-32 text-xs" placeholder={t('admin.users.filterSearch')} aria-label={t('admin.users.filterBy', { column: t('admin.users.email') })} value={userFilters.email} onChange={e => setUserFilter('email', e.target.value)} data-testid="filter-email" /></th>
+                    <th className="py-2 pr-4 font-normal">
+                      <select className="input h-8 w-full min-w-28 text-xs" aria-label={t('admin.users.filterBy', { column: t('admin.users.dept') })} value={userFilters.field} onChange={e => setUserFilter('field', e.target.value)} data-testid="filter-field">
+                        <option value="">{t('admin.users.filterAll')}</option>
+                        {userFieldOptions.map(field => <option key={field} value={field}>{field}</option>)}
+                        <option value="__none">{t('admin.users.filterNone')}</option>
+                      </select>
+                    </th>
+                    <th className="py-2 pr-4 font-normal">
+                      <select className="input h-8 w-full min-w-24 text-xs" aria-label={t('admin.users.filterBy', { column: t('admin.users.role.title') })} value={userFilters.role} onChange={e => setUserFilter('role', e.target.value)} data-testid="filter-role">
+                        <option value="">{t('admin.users.filterAll')}</option>
+                        <option value="student">{t('admin.users.role.student')}</option>
+                        <option value="alumnus">{t('admin.users.role.alumnus')}</option>
+                      </select>
+                    </th>
+                    <th className="py-2 pr-4 font-normal"><input className="input h-8 w-full min-w-24 text-xs" placeholder={t('admin.users.filterSearch')} aria-label={t('admin.users.filterBy', { column: t('admin.users.manager') })} value={userFilters.advisor} onChange={e => setUserFilter('advisor', e.target.value)} data-testid="filter-advisor" /></th>
+                    <th className="py-2 text-right font-normal">
+                      {filtering && <Button type="button" variant="ghost" size="sm" onClick={() => setUserFilters({ name: '', email: '', field: '', role: '', advisor: '' })} data-testid="filter-clear">{t('admin.users.filterClear')}</Button>}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredUsers.length === 0 && (
+                    <tr><td colSpan={6} className="py-6 text-center text-sm text-muted-foreground">{t('admin.users.filterEmpty')}</td></tr>
+                  )}
+                  {filteredUsers.map(u => (
+                    <tr key={u.id} className="border-b border-[var(--border-subtle)]">
+                      <td className="py-2 pr-4">{u.name}{u.deactivated_at ? t('admin.users.deactivatedSuffix') : ''}</td>
+                      <td className="py-2 pr-4 text-secondary-foreground">{u.email}</td>
+                      <td className="py-2 pr-4">{u.department}</td>
+                      <td className="py-2 pr-4">
+                        {u.deactivated_at ? (
+                          <span className="text-muted-foreground">{t(`admin.users.role.${u.role || 'student'}`)}</span>
+                        ) : (
+                          <span data-testid={`role-${u.id}`} className={`inline-block rounded-full px-2.5 py-1 text-xs font-medium text-[var(--ink)] ${u.role === 'alumnus' ? 'bg-[#e7e5f5]' : 'bg-[#d9f4ec]'}`}>{t(`admin.users.role.${u.role || 'student'}`)}</span>
+                        )}
+                      </td>
+                      <td className="py-2 pr-4 text-secondary-foreground">{u.manager_email || <span className="text-muted-foreground">—</span>}</td>
+                      <td className="py-2 text-right">
+                        <RowActions label={t('admin.users.actions')} testId={`actions-${u.id}`} items={[
+                          ...(!u.deactivated_at ? [
+                            { label: t(u.role === 'alumnus' ? 'admin.users.makeStudent' : 'admin.users.makeAlumnus'), onSelect: () => openRoleConfirm(u, u.role === 'alumnus' ? 'student' : 'alumnus'), testId: `change-role-${u.id}` },
+                            { label: t('admin.users.setManager'), onSelect: () => openSetManager(u) },
+                            { label: outreachSavingId === u.id ? t('admin.common.saving') : t('admin.pm.markInvited'), onSelect: () => markOutreachTarget(u), disabled: outreachSavingId === u.id },
+                            { label: t('admin.users.resetPassword'), onSelect: () => openResetPasswordConfirm(u) },
+                            { label: t('admin.users.deactivate'), onSelect: () => openDeactivateConfirm(u), destructive: true },
+                          ] : []),
+                          // An erased login keeps only a placeholder address.
+                          ...(!u.email?.endsWith('@erased.invalid') ? [
+                            { label: t('admin.users.erase'), onSelect: () => openEraseConfirm(u), destructive: true, testId: `erase-user-${u.id}` },
+                          ] : []),
+                        ]} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="mt-3 text-xs text-muted-foreground" data-testid="users-count">{t('admin.users.showing', { shown: filteredUsers.length, total: users.length })}</p>
+            </div>
+          )}
+          </SurfaceBody>
+        </Surface>
+      )}
+
       {tab === 'people' && (
         <>
-          {/* Import */}
+          {/* Import, below the list: an occasional task. */}
           <Surface>
             <SurfaceHeader
               title={t('admin.import.title')}
@@ -946,127 +1126,6 @@ export default function AdminDashboard() {
             </SurfaceBody>
           </Surface>
           </>
-      )}
-
-      {tab === 'audit' && (
-        <Surface>
-          <SurfaceHeader
-            title={t('admin.audit.title')}
-            description={
-              <>
-                {t('admin.pm.auditHelp')}
-                {auditTotal > 0 && <span className="ml-1 text-muted-foreground/80">{t('admin.audit.totalEvents', { count: auditTotal })}</span>}
-              </>
-            }
-            action={
-              <Button type="button" variant="outline" size="sm" onClick={() => downloadBlob('/admin/audit/export', 'ment-audit-export.csv')}>
-                {t('admin.audit.exportCsv')}
-              </Button>
-            }
-          />
-          <SurfaceBody className="pt-5">
-            <Label htmlFor="admin-audit-filter">{t('admin.pm.auditFilter')}</Label>
-            <Input id="admin-audit-filter" type="search" value={auditFilter} onChange={e => setAuditFilter(e.target.value)} className="my-3" />
-            {auditLoading ? <p role="status">{t('admin.common.loading')}</p> : loadErrors.audit ? <p role="alert">{t('admin.pm.loadFailed')} <Button variant="link" onClick={loadAudit}>{t('admin.common.refresh')}</Button></p> : auditEntries.filter(entry => `${entry.action || ''} ${entry.actor?.name || ''} ${entry.actor?.email || ''}`.toLowerCase().includes(auditFilter.toLowerCase())).length === 0 ? (
-              <p className="text-sm text-muted-foreground italic">{t('admin.audit.empty')}</p>
-            ) : (
-              <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
-                {auditEntries.filter(entry => `${entry.action || ''} ${entry.actor?.name || ''} ${entry.actor?.email || ''}`.toLowerCase().includes(auditFilter.toLowerCase())).map(entry => <AuditRow key={entry.id} entry={entry} />)}
-              </div>
-            )}
-          </SurfaceBody>
-        </Surface>
-      )}
-
-      {tab === 'kpis' && <AdminPmKpis data={kpis} loading={kpisLoading} error={loadErrors.kpis} onRefresh={loadKpis} />}
-      {tab === 'ai' && <AdminAiRuns t={t} />}
-
-      {tab === 'people' && (
-        <Surface>
-          <SurfaceHeader
-            title={t('admin.users.title')}
-            action={
-              <Button type="button" variant="outline" size="sm" aria-expanded={addPeopleOpen} aria-controls="add-people" data-testid="add-people-toggle" onClick={() => setAddPeopleOpen(open => !open)}>
-                {addPeopleOpen ? <ChevronUp /> : <Plus />}{addPeopleOpen ? t('admin.users.addPeopleClose') : t('admin.users.addPeople')}
-              </Button>
-            }
-          />
-          <SurfaceBody className="pt-5">
-          {/* Adding people is occasional; the list is what admins come for. */}
-          {addPeopleOpen && (
-            <div id="add-people" data-testid="add-people" className="mb-6">
-            <AdminProvisionUserPanel />
-            <AdminInvitationPanel />
-            <form onSubmit={addExternalOutreachTarget} className="mb-5 flex flex-wrap items-end gap-3 rounded-lg border border-border bg-[var(--card)] p-3">
-              <div className="min-w-56 flex-1">
-                <Label htmlFor="outreach-email">{t('admin.pm.externalTargetEmail')}</Label>
-                <Input id="outreach-email" type="email" required value={outreachTarget.email} onChange={(e) => setOutreachTarget((current) => ({ ...current, email: e.target.value }))} placeholder="alumni@example.edu" className="mt-1" />
-              </div>
-              <label className="grid gap-1 text-sm font-medium">
-                {t('admin.pm.externalTargetPersona')}
-                <select className="input h-10" value={outreachTarget.persona} onChange={(e) => setOutreachTarget((current) => ({ ...current, persona: e.target.value }))}>
-                  <option value="alumnus">{t('admin.users.role.alumnus')}</option>
-                  <option value="student">{t('admin.users.role.student')}</option>
-                </select>
-              </label>
-              <div>
-                <Label htmlFor="outreach-cohort">{t('admin.pm.externalTargetCohort')}</Label>
-                <Input id="outreach-cohort" value={outreachTarget.cohort_term} onChange={(e) => setOutreachTarget((current) => ({ ...current, cohort_term: e.target.value }))} className="mt-1 w-28" />
-              </div>
-              <Button type="submit" disabled={outreachTargetSaving}>{outreachTargetSaving ? t('admin.common.saving') : t('admin.pm.addExternalTarget')}</Button>
-            </form>
-            </div>
-          )}
-          {usersLoading ? <p className="text-sm text-muted-foreground">{t('admin.common.loading')}</p> : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-muted-foreground border-b">
-                    <th className="py-2 pr-4">{t('admin.users.name')}</th>
-                    <th className="py-2 pr-4">{t('admin.users.email')}</th>
-                    <th className="py-2 pr-4">{t('admin.users.dept')}</th>
-                    <th className="py-2 pr-4">{t('admin.users.role.title')}</th>
-                    <th className="py-2 pr-4">{t('admin.users.manager')}</th>
-                    <th className="py-2 text-right">{t('admin.users.actions')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.map(u => (
-                    <tr key={u.id} className="border-b border-[var(--border-subtle)]">
-                      <td className="py-2 pr-4">{u.name}{u.deactivated_at ? t('admin.users.deactivatedSuffix') : ''}</td>
-                      <td className="py-2 pr-4 text-secondary-foreground">{u.email}</td>
-                      <td className="py-2 pr-4">{u.department}</td>
-                      <td className="py-2 pr-4">
-                        {u.deactivated_at ? (
-                          <span className="text-muted-foreground">{t(`admin.users.role.${u.role || 'student'}`)}</span>
-                        ) : (
-                          <span data-testid={`role-${u.id}`} className={`inline-block rounded-full px-2.5 py-1 text-xs font-medium text-[var(--ink)] ${u.role === 'alumnus' ? 'bg-[#e7e5f5]' : 'bg-[#d9f4ec]'}`}>{t(`admin.users.role.${u.role || 'student'}`)}</span>
-                        )}
-                      </td>
-                      <td className="py-2 pr-4 text-secondary-foreground">{u.manager_email || <span className="text-muted-foreground">—</span>}</td>
-                      <td className="py-2 text-right">
-                        <RowActions label={t('admin.users.actions')} testId={`actions-${u.id}`} items={[
-                          ...(!u.deactivated_at ? [
-                            { label: t(u.role === 'alumnus' ? 'admin.users.makeStudent' : 'admin.users.makeAlumnus'), onSelect: () => openRoleConfirm(u, u.role === 'alumnus' ? 'student' : 'alumnus'), testId: `change-role-${u.id}` },
-                            { label: t('admin.users.setManager'), onSelect: () => openSetManager(u) },
-                            { label: outreachSavingId === u.id ? t('admin.common.saving') : t('admin.pm.markInvited'), onSelect: () => markOutreachTarget(u), disabled: outreachSavingId === u.id },
-                            { label: t('admin.users.resetPassword'), onSelect: () => openResetPasswordConfirm(u) },
-                            { label: t('admin.users.deactivate'), onSelect: () => openDeactivateConfirm(u), destructive: true },
-                          ] : []),
-                          // An erased login keeps only a placeholder address.
-                          ...(!u.email?.endsWith('@erased.invalid') ? [
-                            { label: t('admin.users.erase'), onSelect: () => openEraseConfirm(u), destructive: true, testId: `erase-user-${u.id}` },
-                          ] : []),
-                        ]} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          </SurfaceBody>
-        </Surface>
       )}
 
       {tab === 'feedback' && (

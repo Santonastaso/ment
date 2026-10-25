@@ -283,5 +283,14 @@
   "admin.users.makeStudent": "Cambia in studente",
   "admin.dialog.roleTitle": "Cambiare in {role}?",
   "admin.dialog.roleDescription": "{name} risulterà come {role}. Cambia con chi viene abbinato e quali richieste riceve.",
-  "admin.dialog.roleConfirm": "Cambia in {role}"
+  "admin.dialog.roleConfirm": "Cambia in {role}",
+  "admin.common.show": "Mostra",
+  "admin.common.hide": "Nascondi",
+  "admin.users.filterSearch": "Cerca",
+  "admin.users.filterBy": "Filtra per {column}",
+  "admin.users.filterAll": "Tutti",
+  "admin.users.filterNone": "Non indicato",
+  "admin.users.filterClear": "Azzera",
+  "admin.users.filterEmpty": "Nessuno corrisponde a questi filtri.",
+  "admin.users.showing": "{shown} su {total}"
 }

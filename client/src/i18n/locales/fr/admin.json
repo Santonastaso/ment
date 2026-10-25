@@ -283,5 +283,14 @@
   "admin.users.makeStudent": "Passer en étudiant",
   "admin.dialog.roleTitle": "Passer en {role} ?",
   "admin.dialog.roleDescription": "{name} apparaîtra comme {role}. Cela modifie ses mises en relation et les demandes reçues.",
-  "admin.dialog.roleConfirm": "Passer en {role}"
+  "admin.dialog.roleConfirm": "Passer en {role}",
+  "admin.common.show": "Afficher",
+  "admin.common.hide": "Masquer",
+  "admin.users.filterSearch": "Rechercher",
+  "admin.users.filterBy": "Filtrer par {column}",
+  "admin.users.filterAll": "Tous",
+  "admin.users.filterNone": "Non renseigné",
+  "admin.users.filterClear": "Effacer",
+  "admin.users.filterEmpty": "Personne ne correspond à ces filtres.",
+  "admin.users.showing": "{shown} sur {total}"
 }

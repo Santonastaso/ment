@@ -1967,6 +1967,11 @@ test('admin pages share the member pages\' cards and tabs, and show departments 
   expect(await panel.evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgb(255, 255, 255)');
   expect(await page.getByTestId('admin-tab-overview').evaluate(element => getComputedStyle(element).borderRadius)).toBe('0px');
   // Fields of study, never people, and nothing hidden behind "suppressed".
+  // Both sections start folded, and open on request.
+  await expect(page.getByTestId('field-of-study-row')).toHaveCount(0);
+  await expect(page.getByTestId('skill-by-field-row')).toHaveCount(0);
+  await page.getByTestId('fields-of-study-toggle').click();
+  await page.getByTestId('skills-by-field-toggle').click();
   const fields = page.getByTestId('field-of-study-row');
   await expect(fields).toHaveCount(3);
   await expect(fields.first()).toContainText('Finance');
@@ -2054,6 +2059,25 @@ test('school admins see five tabs and six KPIs', async ({ page }) => {
   await expect(kpis.nth(1).getByText(/Numerator|Denominator/)).toHaveCount(0);
   await kpis.first().locator('summary').click();
   await expect(kpis.first().getByText(/Denominator/)).toBeVisible();
+
+  // People: every column can be searched, and filters combine.
+  await page.getByTestId('admin-tab-people').click();
+  await expect(page.getByTestId('users-count')).toHaveText('Showing 3 of 3');
+  await page.getByTestId('filter-name').fill('viewer');
+  await expect(page.getByTestId('users-count')).toHaveText('Showing 1 of 3');
+  await page.getByTestId('filter-clear').click();
+  await page.getByTestId('filter-role').selectOption('alumnus');
+  await expect(page.getByTestId('users-count')).toHaveText('Showing 1 of 3');
+  await page.getByTestId('filter-field').selectOption('Marketing');
+  await expect(page.getByText('No one matches these filters.')).toBeVisible();
+  await page.getByTestId('filter-clear').click();
+  await page.getByTestId('filter-field').selectOption('Marketing');
+  await expect(page.getByTestId('users-count')).toHaveText('Showing 1 of 3');
+  await page.getByTestId('filter-clear').click();
+  // The import panel comes after the list.
+  const listTop = await page.getByTestId('user-filters').boundingBox();
+  const importTop = await page.getByText('Import students and alumni').boundingBox();
+  expect(importTop.y).toBeGreaterThan(listTop.y);
 
   // People: the forms to add people stay folded away until asked for.
   await page.getByTestId('admin-tab-people').click();

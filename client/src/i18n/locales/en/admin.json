@@ -283,5 +283,14 @@
   "admin.users.makeStudent": "Change to student",
   "admin.dialog.roleTitle": "Change to {role}?",
   "admin.dialog.roleDescription": "{name} will be listed as {role}. This changes who they are matched with and which requests they receive.",
-  "admin.dialog.roleConfirm": "Change to {role}"
+  "admin.dialog.roleConfirm": "Change to {role}",
+  "admin.common.show": "Show",
+  "admin.common.hide": "Hide",
+  "admin.users.filterSearch": "Search",
+  "admin.users.filterBy": "Filter by {column}",
+  "admin.users.filterAll": "All",
+  "admin.users.filterNone": "Not set",
+  "admin.users.filterClear": "Clear",
+  "admin.users.filterEmpty": "No one matches these filters.",
+  "admin.users.showing": "Showing {shown} of {total}"
 }
