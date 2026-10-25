@@ -33,7 +33,7 @@ function csvCell(value) {
   return `"${text.replace(/"/g, '""')}"`;
 }
 
-export default function AdminPmKpis({ data, loading, error, onRefresh }) {
+export default function AdminPmKpis({ data, loading, error, onRefresh, embedded = false }) {
   const { t: translate } = useT();
   const t = (key, vars) => pmTranslate(translate, key, vars);
   const missing = t('admin.pm.noData');
@@ -60,12 +60,11 @@ export default function AdminPmKpis({ data, loading, error, onRefresh }) {
     const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'ment-pm-kpis.csv'; anchor.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
-  return <Surface>
-    <SurfaceHeader title={t('admin.kpis.title')} description={t('admin.kpis.desc')} action={<div className="flex flex-wrap gap-2">
+  const actions = <div className="flex flex-wrap gap-2">
       <Button variant="outline" onClick={onRefresh} disabled={loading}>{t('admin.common.refresh')}</Button>
       <Button variant="outline" onClick={exportCsv} disabled={loading || error || !data}>{t('admin.pm.export')}</Button>
-    </div>} />
-    <SurfaceBody className="space-y-4 pt-5">
+    </div>;
+  const content = <>
       {loading ? <p role="status">{t('admin.common.loading')}</p> : error ? <p role="alert">{t('admin.pm.loadFailed')}</p> : <>
         <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
           <p>{t('admin.pm.period')}: {displayPeriod}</p><p>{t('admin.pm.cohort')}: {displayCohort}</p><p>{t('admin.pm.asOf')}: {formatAdminDate(asOf, missing)}</p>
@@ -88,6 +87,11 @@ export default function AdminPmKpis({ data, loading, error, onRefresh }) {
           </article>)}
         </div>
       </>}
-    </SurfaceBody>
+</>;
+  // Inside the Overview the section supplies the title; only the actions remain.
+  if (embedded) return <div className="space-y-4"><div className="flex justify-end">{actions}</div>{content}</div>;
+  return <Surface>
+    <SurfaceHeader title={t('admin.kpis.title')} description={t('admin.kpis.desc')} action={actions} />
+    <SurfaceBody className="space-y-4 pt-5">{content}</SurfaceBody>
   </Surface>;
 }

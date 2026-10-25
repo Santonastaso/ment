@@ -205,6 +205,11 @@ function fixtureApi(state, ApiError) {
         '/admin/kpis': null,
         '/admin/ai-runs': [],
         '/admin/knowledge-graph': sampleKnowledgeGraph(),
+        '/admin/programme': {
+          headline: { students: 180, students_new: 12, alumni_available: 64, alumni_new: null, meetings: 52, meetings_new: 9, acceptance_rate: 33, requests: 52 },
+          funnel: [{ step: 'invited', count: 320 }, { step: 'joined', count: 289 }, { step: 'profile', count: 236 }, { step: 'talking', count: 70 }, { step: 'met', count: 41 }],
+          recruit: [{ skill: 'Python', wanted: 18, offered: null }, { skill: 'Venture capital', wanted: 11, offered: 6 }],
+        },
         '/admin/fields-of-study': {
           students: 180, alumni: 109,
           fields: [{ field: 'Finance', members: 12, active: true }, { field: 'Marketing', members: 6, active: false }, { field: null, members: 7, active: true }],

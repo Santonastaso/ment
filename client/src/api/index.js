@@ -545,6 +545,11 @@ async function get(url) {
     });
   }
 
+  if (url === '/admin/programme') {
+    const { data, error } = await supabase.rpc('admin_programme_overview');
+    if (error) throw new ApiError(error.message);
+    return ok(data);
+  }
   if (url === '/admin/fields-of-study') {
     const { data, error } = await supabase.rpc('admin_fields_of_study', { p_skill_limit: 12 });
     if (error) throw new ApiError(error.message);

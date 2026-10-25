@@ -139,6 +139,8 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
   const [fieldsOfStudy, setFieldsOfStudy] = useState(null);
   const [addPeopleOpen, setAddPeopleOpen] = useState(false);
+  const [programme, setProgramme] = useState(null);
+  const [kpisOpen, setKpisOpen] = useState(false);
   const [fieldsOpen, setFieldsOpen] = useState(false);
   const [skillsOpen, setSkillsOpen] = useState(false);
   const [userFilters, setUserFilters] = useState({ name: '', email: '', field: '', role: '', advisor: '' });
@@ -172,8 +174,9 @@ export default function AdminDashboard() {
   const rawTab = searchParams.get('tab') || 'overview';
   // AI runs and the audit log are hidden from school admins; both are still
   // recorded, and their panels stay in the code for the platform team.
-  const validTabs = ['overview', 'kpis', 'people', 'privacy', 'feedback'];
-  const tab = validTabs.includes(rawTab) ? rawTab : 'overview';
+  const validTabs = ['overview', 'people', 'feedback', 'settings'];
+  // Old links keep working: the KPIs now live on the Overview, Privacy in Settings.
+  const tab = { kpis: 'overview', privacy: 'settings' }[rawTab] || (validTabs.includes(rawTab) ? rawTab : 'overview');
   function setTab(next) {
     const params = new URLSearchParams(searchParams);
     if (next === 'overview') params.delete('tab'); else params.set('tab', next);
@@ -205,6 +208,16 @@ export default function AdminDashboard() {
       if (id === requestIds.current.kpis) { setKpis(null); setLoadErrors(prev => ({ ...prev, kpis: true })); }
     } finally {
       if (id === requestIds.current.kpis) setKpisLoading(false);
+    }
+  }
+
+  // Headline, funnel and alumni to recruit: school-wide totals, none under five (0094).
+  async function loadProgramme() {
+    try {
+      const res = await api.get('/admin/programme');
+      setProgramme(res.data);
+    } catch {
+      setProgramme(null);
     }
   }
 
@@ -405,10 +418,10 @@ export default function AdminDashboard() {
 
   useEffect(() => { loadStats(); loadFieldsOfStudy(); loadPrivacyStatus(); loadRetention(); loadRequestSettings(); }, []);
   useEffect(() => {
-    if (tab === 'kpis') loadKpis();
+    if (tab === 'overview') loadProgramme();
     if (tab === 'people') loadUsers();
     if (tab === 'audit') loadAudit();
-    if (tab === 'privacy') loadRequestSettings();
+    if (tab === 'settings') loadRequestSettings();
     if (tab === 'feedback') loadFeedback();
   }, [tab]);
 
@@ -578,6 +591,18 @@ export default function AdminDashboard() {
   const visibleSessionStatuses = ['pending', 'scheduled', 'completed'].map(status => sessionsByStatus[status]);
   const sessionsRequested = visibleSessionStatuses.every(Number.isInteger)
     ? visibleSessionStatuses.reduce((sum, count) => sum + count, 0) : null;
+  const recentLine = n => (n == null ? t('admin.headline.recentFew') : t('admin.headline.recent', { count: n }));
+  // The step where the most people are lost, measured against the one before.
+  const biggestDrop = (() => {
+    const steps = programme?.funnel || [];
+    let worst = null; let lost = 0;
+    for (let i = 1; i < steps.length; i += 1) {
+      const before = steps[i - 1].count; const now = steps[i].count;
+      if (before && now != null && before - now > lost) { lost = before - now; worst = steps[i].step; }
+    }
+    return worst;
+  })();
+
   // Each column of the users table can be searched; filters combine.
   const userFieldOptions = useMemo(() => [...new Set(users.map(u => u.department).filter(Boolean))].sort((a, b) => a.localeCompare(b)), [users]);
   const filteredUsers = useMemo(() => {
@@ -635,30 +660,7 @@ export default function AdminDashboard() {
       </nav>
 
       <div key={tab} className="admin-tab-content">
-      {tab === 'overview' && (
-        <>
-          {/* Weekly reflection broadcast — demo trigger */}
-          <SurfacePanel
-            title={t('admin.broadcast.title')}
-            description={t('admin.broadcast.description')}
-            action={
-              <Button onClick={handleBroadcastCheckin} disabled={broadcasting} size="sm" className="shrink-0 whitespace-nowrap">
-                {broadcasting ? t('admin.broadcast.sending') : t('admin.broadcast.send')}
-              </Button>
-            }
-          >
-            {broadcastResult && (
-              <p className="inline-flex flex-wrap items-center gap-2 rounded-lg border border-[var(--border)] px-3 py-2 text-sm text-muted-foreground">
-                <span>✓“</span>
-                <span>{broadcastResult.message}</span>
-                <span>{t('admin.broadcast.resultHint')}</span>
-              </p>
-            )}
-          </SurfacePanel>
-          </>
-      )}
-
-      {tab === 'privacy' && (
+      {tab === 'settings' && (
         <>
           <Surface>
             <SurfaceHeader
@@ -790,42 +792,112 @@ export default function AdminDashboard() {
               ) : <p className="text-sm text-muted-foreground">{t('admin.retention.unavailable')}</p>}
             </SurfaceBody>
           </Surface>
+
+          {/* The weekly reflection reminder: automatic, with a manual send. */}
+          <SurfacePanel
+            title={t('admin.broadcast.title')}
+            description={t('admin.broadcast.description')}
+            action={
+              <Button onClick={handleBroadcastCheckin} disabled={broadcasting} size="sm" className="shrink-0 whitespace-nowrap">
+                {broadcasting ? t('admin.broadcast.sending') : t('admin.broadcast.send')}
+              </Button>
+            }
+          >
+            {broadcastResult && (
+              <p className="inline-flex flex-wrap items-center gap-2 rounded-lg border border-[var(--border)] px-3 py-2 text-sm text-muted-foreground">
+                <span>✓“</span>
+                <span>{broadcastResult.message}</span>
+                <span>{t('admin.broadcast.resultHint')}</span>
+              </p>
+            )}
+          </SurfacePanel>
+
+          {/* Matching is recomputed automatically; a manual run is for the platform team. */}
+          {isPlatformAdmin && (
+            <SurfacePanel
+              title={t('admin.rematch.title')}
+              description={t('admin.rematch.description')}
+              action={
+                <Button type="button" variant="outline" size="sm" onClick={handleRematch} disabled={rematching} data-testid="rematch-btn">
+                  {rematching ? t('admin.rematch.computing') : t('admin.rematch.action')}
+                </Button>
+              }
+            />
+          )}
           </>
       )}
 
       {tab === 'overview' && (
         <>
-          {/* Key metrics */}
+          {/* Is it working, where do people drop off, whom to recruit. */}
           {loading ? (
             <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
               {[1, 2, 3, 4].map(i => <div key={i} className="h-24 animate-pulse rounded-xl border border-[var(--border)] bg-muted" />)}
             </div>
           ) : stats && (
             <>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <StatCard label={t('admin.stats.students')} value={fieldsOfStudy?.students} />
-                <StatCard label={t('admin.stats.alumni')} value={fieldsOfStudy?.alumni} />
-                <StatCard label={t('admin.stats.onboardingComplete')} value={stats.onboardingRate == null ? '—' : `${stats.onboardingRate}%`}
-                  sub={stats.onboardingRate == null ? t('admin.privacy.suppressed') : t('admin.stats.onboardedOf', { onboarded: stats.onboarded, total: stats.totalUsers })} />
-                <StatCard label={t('admin.stats.sessionsRequested')} value={sessionsRequested} />
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-4" data-testid="headline">
+                <StatCard label={t('admin.headline.students')} value={programme?.headline?.students}
+                  sub={recentLine(programme?.headline?.students_new)} />
+                <StatCard label={t('admin.headline.alumni')} value={programme?.headline?.alumni_available}
+                  sub={recentLine(programme?.headline?.alumni_new)} />
+                <StatCard label={t('admin.headline.meetings')} value={programme?.headline?.meetings}
+                  sub={recentLine(programme?.headline?.meetings_new)} />
+                <StatCard label={t('admin.headline.acceptance')} value={programme?.headline?.acceptance_rate == null ? null : `${programme.headline.acceptance_rate}%`}
+                  sub={programme?.headline?.requests == null ? t('admin.headline.acceptanceFew') : t('admin.headline.acceptanceSub', { count: programme.headline.requests })} />
               </div>
 
-              <Surface>
-                <SurfaceHeader
-                  title={t('admin.sessions.breakdown')}
-                  action={
-                    <Button type="button" variant="outline" size="sm" onClick={handleRematch} disabled={rematching} data-testid="rematch-btn">
-                      {rematching ? t('admin.rematch.computing') : t('admin.rematch.action')}
-                    </Button>
-                  }
-                />
-                <SurfaceBody className="pt-5">
-                  <div className="grid grid-cols-3 gap-3">
-                    <SessionBox count={sessionsByStatus.pending ?? null} label={t('admin.sessions.pending')} tone="needs" />
-                    <SessionBox count={sessionsByStatus.scheduled ?? null} label={t('admin.sessions.scheduled')} tone="scheduled" />
-                    <SessionBox count={sessionsByStatus.completed ?? null} label={t('admin.sessions.completed')} tone="past" />
-                  </div>
-                </SurfaceBody>
+              <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+                <Surface data-testid="funnel">
+                  <SurfaceHeader title={t('admin.funnel.title')} description={t('admin.funnel.description')} />
+                  <SurfaceBody className="pt-5">
+                    {programme?.funnel?.length ? (
+                      <ol className="space-y-3">
+                        {programme.funnel.map((step, index) => {
+                          const top = programme.funnel[0]?.count;
+                          const share = step.count != null && top ? Math.round((step.count / top) * 100) : null;
+                          return (
+                            <li key={step.step} data-testid="funnel-step" className={step.step === biggestDrop ? '-mx-2 rounded-xl bg-[#ffe3de]/60 px-2 py-1' : ''}>
+                              <div className="mb-1 flex justify-between gap-2 text-sm">
+                                <span className="font-medium text-foreground">{index + 1}. {t(`admin.funnel.${step.step}`)}</span>
+                                <span className="tabular-nums text-muted-foreground">{step.count == null ? t('admin.funnel.few') : `${step.count}${share != null && index > 0 ? ` · ${share}%` : ''}`}</span>
+                              </div>
+                              <div className="h-2 overflow-hidden rounded-full bg-muted">
+                                {share != null && <div className="h-full rounded-full bg-[var(--ink)]" style={{ width: `${share}%` }} />}
+                              </div>
+                              {step.step === biggestDrop && <p className="mt-1 text-xs text-[var(--coral)]" data-testid="funnel-drop">{t('admin.funnel.biggestDrop')}</p>}
+                            </li>
+                          );
+                        })}
+                      </ol>
+                    ) : <p className="text-sm text-muted-foreground">{t('admin.fields.empty')}</p>}
+                  </SurfaceBody>
+                </Surface>
+
+                <Surface data-testid="recruit">
+                  <SurfaceHeader title={t('admin.recruit.title')} description={t('admin.recruit.description')} />
+                  <SurfaceBody className="pt-5">
+                    {programme?.recruit?.length ? (
+                      <ul className="divide-y divide-[var(--border-subtle)]">
+                        {programme.recruit.map(gap => (
+                          <li key={gap.skill} data-testid="recruit-row" className="py-2.5">
+                            <p className="text-sm font-semibold text-foreground">{gap.skill}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {t('admin.recruit.wanted', { count: gap.wanted })} · {gap.offered == null ? t('admin.recruit.offeredFew') : t('admin.recruit.offered', { count: gap.offered })}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : <p className="text-sm text-muted-foreground">{t('admin.recruit.empty')}</p>}
+                  </SurfaceBody>
+                </Surface>
+              </div>
+
+              {/* The full KPI set with definitions and export, folded. */}
+              <Surface data-testid="kpis-section">
+                <SurfaceHeader title={t('admin.kpis.title')} description={t('admin.kpis.foldedDescription')}
+                  action={<SectionToggle open={kpisOpen} onToggle={() => { if (!kpisOpen && !kpis) loadKpis(); setKpisOpen(open => !open); }} label={t('admin.kpis.title')} testId="kpis-toggle" />} />
+                {kpisOpen && <SurfaceBody className="pt-2"><AdminPmKpis embedded data={kpis} loading={kpisLoading} error={loadErrors.kpis} onRefresh={loadKpis} /></SurfaceBody>}
               </Surface>
 
               <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
@@ -923,7 +995,6 @@ export default function AdminDashboard() {
         </Surface>
       )}
 
-      {tab === 'kpis' && <AdminPmKpis data={kpis} loading={kpisLoading} error={loadErrors.kpis} onRefresh={loadKpis} />}
       {tab === 'ai' && <AdminAiRuns t={t} />}
 
       {tab === 'people' && (

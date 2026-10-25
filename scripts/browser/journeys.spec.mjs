@@ -1987,12 +1987,24 @@ test('admin pages share the member pages\' cards and tabs, and show departments 
   // Brand strategy has nobody wanting it or meeting on it, so those lines are left out.
   await expect(page.getByTestId('skill-by-field-row').nth(1).getByText('Wanted by')).toHaveCount(0);
   await expect(page.getByText(/Suppressed|Most active|Department|Total employees/)).toHaveCount(0);
-  // Students and alumni counted apart; match pairs are not shown.
-  await expect(page.getByText('Students', { exact: true })).toBeVisible();
-  await expect(page.getByText('180', { exact: true })).toBeVisible();
-  await expect(page.getByText('Alumni', { exact: true })).toBeVisible();
-  await expect(page.getByText('109', { exact: true })).toBeVisible();
-  await expect(page.getByText('Match pairs')).toHaveCount(0);
+  // Headline: four results, each with what changed this month.
+  const headline = page.getByTestId('headline');
+  await expect(headline).toContainText('Students active');
+  await expect(headline).toContainText('180');
+  await expect(headline).toContainText('+12 in the last 30 days');
+  await expect(headline).toContainText('Alumni available to mentor');
+  await expect(headline).toContainText('Fewer than five in the last 30 days');
+  await expect(headline).toContainText('33%');
+  // The funnel shows each step against everyone invited, and where most people stop.
+  const steps = page.getByTestId('funnel-step');
+  await expect(steps).toHaveCount(5);
+  await expect(steps.nth(3)).toContainText('70 · 22%');
+  await expect(steps.nth(3).getByTestId('funnel-drop')).toBeVisible();
+  // Skills to recruit alumni for, without small counts.
+  await expect(page.getByTestId('recruit-row').first()).toContainText('Python');
+  await expect(page.getByTestId('recruit-row').first()).toContainText('18 want it · fewer than five alumni offer it');
+  // Controls left the Overview.
+  await expect(page.getByText(/Match pairs|Sessions breakdown|Send reflection notes|Re-run matching/)).toHaveCount(0);
   await page.getByTestId('admin-tab-people').click();
   await expect(page.getByRole('button', { name: 'Download template' })).toHaveCSS('background-color', 'rgb(255, 255, 255)');
 });
@@ -2022,7 +2034,7 @@ test('an admin sets how long data is kept, and nothing is set until they do', as
   await page.goto('/');
   await page.evaluate(() => sessionStorage.setItem('ment.fixture.auth', JSON.stringify({ id: 'admin', name: 'Org Admin', email: 'admin@example.test', role: 'admin', onboarding_complete: true, is_admin: true, admin_scope: 'org' })));
   await page.goto('/admin');
-  await page.getByTestId('admin-tab-privacy').click();
+  await page.getByTestId('admin-tab-settings').click();
   const conversations = page.getByTestId('retention-conversation_days');
   await expect(conversations).toHaveValue('');
   await expect(conversations).toHaveAttribute('placeholder', 'Keep');
@@ -2039,17 +2051,23 @@ test('an admin sets how long data is kept, and nothing is set until they do', as
   });
 });
 
-test('school admins see five tabs and six KPIs', async ({ page }) => {
+test('school admins see four tabs, and six KPIs folded on the Overview', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => sessionStorage.setItem('ment.fixture.auth', JSON.stringify({ id: 'admin', name: 'Org Admin', email: 'admin@example.test', role: 'admin', onboarding_complete: true, is_admin: true, admin_scope: 'org' })));
   await page.goto('/admin');
   const tabs = page.locator('[data-testid^="admin-tab-"]');
-  await expect(tabs).toHaveText(['Overview', 'KPIs', 'People', 'Privacy', 'Feedback']);
-  await page.getByTestId('admin-tab-privacy').click();
+  await expect(tabs).toHaveText(['Overview', 'People', 'Feedback', 'Settings']);
+  await page.getByTestId('admin-tab-settings').click();
   await expect(page.getByTestId('data-retention')).toBeVisible();
+  // The reflection reminder moved here; matching is the platform team's.
+  await expect(page.getByRole('button', { name: 'Send reflection notes' })).toBeVisible();
+  await expect(page.getByTestId('rematch-btn')).toHaveCount(0);
   // The retention field keeps its "Audit log" label; the log itself is not shown.
   await expect(page.getByText('Each event records who acted and when.', { exact: false })).toHaveCount(0);
-  await page.getByTestId('admin-tab-kpis').click();
+  // The six KPIs sit folded on the Overview.
+  await page.getByTestId('admin-tab-overview').click();
+  await expect(page.locator('[data-testid^="kpi-"]')).toHaveCount(0);
+  await page.getByTestId('kpis-toggle').click();
   const kpis = page.locator('[data-testid^="kpi-"]');
   await expect(kpis).toHaveCount(6);
   await expect(kpis.first()).toContainText('Alumni engagement');
@@ -2104,7 +2122,7 @@ test('school admins see five tabs and six KPIs', async ({ page }) => {
   await page.keyboard.press('Escape');
 
   // Privacy: plain labels, not column names.
-  await page.getByTestId('admin-tab-privacy').click();
+  await page.getByTestId('admin-tab-settings').click();
   await expect(page.getByTestId('privacy-visible')).toContainText('Field of study');
   await expect(page.getByTestId('privacy-hidden')).toContainText('Email address');
 });
