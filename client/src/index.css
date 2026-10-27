@@ -287,9 +287,8 @@ input[type="checkbox"], input[type="radio"] { width: 16px; height: 16px; flex-sh
 .directory-results { position: relative; display: grid; gap: 1.5rem; min-height: 6rem; }
 .directory-results[data-loading="true"] { pointer-events: none; }
 
-.admin-tab-content, .onboarding-step-content, .session-step-content { animation: contentEnter var(--motion-content) var(--motion-ease) both; }
-.admin-tab-content { display: flex; flex-direction: column; gap: 1.25rem; }
-.profile-tab-content, .admin-tab-content, .conversation-thread, .onboarding-step-content, .session-step-content { position: relative; }
+.onboarding-step-content, .session-step-content { animation: contentEnter var(--motion-content) var(--motion-ease) both; }
+.profile-tab-content, .conversation-thread, .onboarding-step-content, .session-step-content { position: relative; }
 .user-menu-panel { animation: contentEnter var(--motion-panel) var(--motion-ease) both; }
 .session-request-backdrop { overscroll-behavior: contain; animation: backdropEnter var(--motion-panel) ease-out both; }
 .session-request-modal { animation: pageEnter var(--motion-panel) var(--motion-ease) both; }
@@ -321,7 +320,7 @@ input[type="checkbox"], input[type="radio"] { width: 16px; height: 16px; flex-sh
 @media (prefers-reduced-motion: reduce) {
   .availability-switch, .availability-switch::after { transition: none; }
   :root { --motion-page: 0ms; --motion-content: 0ms; --motion-tab: 0ms; --motion-panel: 0ms; --motion-control: 0ms; }
-  .page-transition, .profile-tab-content, .profile-tab-content.profile-tab-enter-forward, .profile-tab-content.profile-tab-enter-backward, .capacity-fill, .directory-results, .directory-results[data-loading="true"]::before, .admin-tab-content, .conversation-thread, .onboarding-step-content, .session-step-content, .user-menu-panel, .session-request-backdrop, .session-request-modal { animation: none; }
+  .page-transition, .profile-tab-content, .profile-tab-content.profile-tab-enter-forward, .profile-tab-content.profile-tab-enter-backward, .capacity-fill, .directory-results, .directory-results[data-loading="true"]::before, .conversation-thread, .onboarding-step-content, .session-step-content, .user-menu-panel, .session-request-backdrop, .session-request-modal { animation: none; }
   .directory-results { transition: none; }
   [data-slot="dialog-overlay"], [data-slot="dialog-content"] { transition: none; }
   [data-slot="button"], [data-slot="input"], [data-slot="textarea"] { transition-duration: 0ms; }
@@ -967,8 +966,8 @@ a.person-row-name:hover { color: var(--primary-text); text-decoration: underline
 
 /* Admin pages follow the member pages: white panels with a lilac edge, so the
    lilac is left for chips, code samples and selected states. */
-.admin-page [data-slot="card"] { background: var(--card); box-shadow: inset 0 0 0 1px var(--border); }
-.admin-page [data-slot="card"] [data-slot="card"] { background: var(--card); box-shadow: inset 0 0 0 1px var(--border-subtle); }
+.admin-page [data-slot="card"]:not(.profile-section) { background: var(--card); box-shadow: inset 0 0 0 1px var(--border); }
+.admin-page [data-slot="card"] [data-slot="card"]:not(.profile-section) { background: var(--card); box-shadow: inset 0 0 0 1px var(--border-subtle); }
 
 /* ---- Knowledge graph: explore panel, stage, details ---- */
 .kg-header-actions { display: flex; align-items: center; gap: 8px; }
