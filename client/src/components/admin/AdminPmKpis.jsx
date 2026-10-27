@@ -70,7 +70,7 @@ export default function AdminPmKpis({ data, loading, error, onRefresh, embedded 
           <p>{t('admin.pm.period')}: {displayPeriod}</p><p>{t('admin.pm.cohort')}: {displayCohort}</p><p>{t('admin.pm.asOf')}: {formatAdminDate(asOf, missing)}</p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {rows.map(row => <article key={row.key} className="min-w-0 rounded-xl border border-border p-4" data-testid={`kpi-${row.key}`}>
+          {rows.map(row => <article key={row.key} className="min-w-0 rounded-[var(--panel-radius)] border border-border p-4" data-testid={`kpi-${row.key}`}>
             <h3 className="text-sm font-medium" title={row.definition}>{row.label}</h3>
             <p className="mt-2 text-display font-medium tabular-nums">{row.value == null ? missing : `${row.value}${row.percent ? '%' : ''}`}</p>
             <details className="mt-3 text-xs text-muted-foreground">

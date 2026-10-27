@@ -2057,6 +2057,23 @@ test('school admins see four tabs, and six KPIs folded on the Overview', async (
   await page.goto('/admin');
   const tabs = page.locator('[data-testid^="admin-tab-"]');
   await expect(tabs).toHaveText(['Overview', 'People', 'Feedback', 'Settings']);
+  await expect(page.getByRole('tablist')).toHaveCount(1);
+  const tabStrip = page.getByRole('tablist');
+  const firstPosition = await tabStrip.boundingBox();
+  for (const name of ['People', 'Feedback', 'Settings', 'Overview']) {
+    await page.getByRole('tab', { name }).click();
+    const position = await tabStrip.boundingBox();
+    expect(Math.abs(position.x - firstPosition.x)).toBeLessThan(1);
+    expect(Math.abs(position.y - firstPosition.y)).toBeLessThan(1);
+    expect(await page.getByRole('tabpanel').evaluate(element => getComputedStyle(element).animationName)).toBe('none');
+  }
+  await expect(tabs.first()).toHaveAttribute('aria-selected', 'true');
+  await tabs.first().focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tabpanel')).toHaveAttribute('aria-labelledby', 'admin-tab-people');
+  await page.keyboard.press('ArrowLeft');
+  await expect(tabs.first()).toHaveAttribute('aria-selected', 'true');
   await page.getByTestId('admin-tab-settings').click();
   await expect(page.getByTestId('data-retention')).toBeVisible();
   // The reflection reminder moved here; matching is the platform team's.
@@ -2120,6 +2137,8 @@ test('school admins see four tabs, and six KPIs folded on the Overview', async (
   await page.getByTestId('actions-peer').click();
   await expect(page.getByRole('menuitem').first()).toHaveText('Change to student');
   await page.keyboard.press('Escape');
+  await expect(page.getByRole('menuitem')).toHaveCount(0);
+  await expect(page.getByTestId('actions-peer')).toBeFocused();
 
   // Privacy: plain labels, not column names.
   await page.getByTestId('admin-tab-settings').click();

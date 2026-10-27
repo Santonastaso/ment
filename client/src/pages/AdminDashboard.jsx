@@ -1,13 +1,16 @@
 ﻿import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { errorMessage } from '../lib/errors.mjs';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import api from '../api/index.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useT } from '../i18n/index.jsx';
 import { PageShell } from '../components/PageShell.jsx';
+import PageTabs from '../components/PageTabs.jsx';
 import { Surface, SurfaceBody, SurfaceHeader, SurfacePanel } from '../components/Surface.jsx';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
+import { Button, ButtonLink } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { ActionMenu } from '@/components/ui/action-menu';
 import {
   Dialog,
   DialogContent,
@@ -17,7 +20,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Check, ChevronDown, ChevronUp, Eye, Lock, MoreHorizontal, Plus } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Eye, Lock, Plus } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { formatAdminDate, pmTranslate } from '../components/admin/adminPm.js';
 import AdminPmKpis from '../components/admin/AdminPmKpis.jsx';
@@ -50,9 +53,9 @@ async function downloadBlob(apiPath, filename) {
 
 // How a field of study takes part in a skill, with the colours used across the app.
 const SKILL_ROLES = [
-  { key: 'offered', dot: 'bg-[var(--mint)]', chip: 'bg-[#d9f4ec]' },
-  { key: 'wanted', dot: 'bg-[var(--coral)]', chip: 'bg-[#ffe3de]' },
-  { key: 'sessions', dot: 'bg-[var(--ink)]', chip: 'bg-[#e7e5f5]' },
+  { key: 'offered', dot: 'bg-[var(--status-scheduled-fg)]', chip: 'bg-[var(--status-scheduled-bg)] text-[var(--status-scheduled-fg)]' },
+  { key: 'wanted', dot: 'bg-[var(--status-attention-fg)]', chip: 'bg-[var(--status-attention-bg)] text-[var(--status-attention-fg)]' },
+  { key: 'sessions', dot: 'bg-[var(--ink)]', chip: 'bg-[var(--control-surface)] text-foreground' },
 ];
 
 // Field names from privacy-status, mapped to plain labels.
@@ -71,64 +74,6 @@ function SectionToggle({ open, onToggle, label, testId }) {
     <Button type="button" variant="outline" size="sm" aria-expanded={open} aria-label={`${open ? t('admin.common.hide') : t('admin.common.show')} ${label}`} data-testid={testId} onClick={onToggle}>
       {open ? <ChevronUp /> : <ChevronDown />}{open ? t('admin.common.hide') : t('admin.common.show')}
     </Button>
-  );
-}
-
-// One "Actions" button per row instead of five links that overflow the table.
-function RowActions({ label, items, testId }) {
-  // Placed against the window: the table scrolls sideways and would clip it.
-  const [position, setPosition] = useState(null);
-  const open = position !== null;
-  const ref = useRef(null);
-  const toggle = event => {
-    const box = event.currentTarget.getBoundingClientRect();
-    // Opens upwards near the bottom of the window, so the last rows' menus stay in view.
-    const below = window.innerHeight - box.bottom > 240;
-    setPosition(open ? null : below
-      ? { top: box.bottom + 4, right: window.innerWidth - box.right }
-      : { bottom: window.innerHeight - box.top + 4, right: window.innerWidth - box.right });
-  };
-  useEffect(() => {
-    if (!open) return undefined;
-    const close = event => {
-      if (event.type === 'keydown' ? event.key === 'Escape' : event.type !== 'mousedown' || !ref.current?.contains(event.target)) setPosition(null);
-    };
-    document.addEventListener('mousedown', close);
-    document.addEventListener('keydown', close);
-    window.addEventListener('scroll', close, true);
-    window.addEventListener('resize', close);
-    return () => {
-      document.removeEventListener('mousedown', close);
-      document.removeEventListener('keydown', close);
-      window.removeEventListener('scroll', close, true);
-      window.removeEventListener('resize', close);
-    };
-  }, [open]);
-  if (!items.length) return null;
-  return (
-    <div ref={ref} className="relative inline-block text-left">
-      <Button type="button" variant="outline" size="sm" aria-haspopup="menu" aria-expanded={open} data-testid={testId} onClick={toggle}>
-        <MoreHorizontal />{label}
-      </Button>
-      {open && (
-        <div role="menu" style={{ position: 'fixed', ...position }} className="z-50 min-w-48 rounded-xl border border-[var(--border)] bg-white p-1 shadow-lg">
-          {items.map(item => (
-            <button
-              key={item.label}
-              type="button"
-              role="menuitem"
-              data-control-radius-exempt
-              data-testid={item.testId}
-              disabled={item.disabled}
-              onClick={() => { setPosition(null); item.onSelect(); }}
-              className={`block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-[var(--control-surface)] disabled:opacity-50 ${item.destructive ? 'text-destructive' : 'text-foreground'}`}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -179,6 +124,7 @@ export default function AdminDashboard() {
   // Old links keep working: the KPIs now live on the Overview, Privacy in Settings.
   const tab = { kpis: 'overview', privacy: 'settings' }[rawTab] || (validTabs.includes(rawTab) ? rawTab : 'overview');
   function setTab(next) {
+    if (!validTabs.includes(next) || next === tab) return;
     const params = new URLSearchParams(searchParams);
     if (next === 'overview') params.delete('tab'); else params.set('tab', next);
     setSearchParams(params);
@@ -620,7 +566,8 @@ export default function AdminDashboard() {
   const isPlatformAdmin = user?.admin_scope === 'platform';
 
   return (
-    <PageShell className="admin-page" title={t('admin.pageTitle')} description={t('admin.pageDescription')}>
+    <PageShell className="admin-page gap-0" title={t('admin.pageTitle')} description={t('admin.pageDescription')}
+      action={isPlatformAdmin && <ButtonLink to="/admin/ops" variant="outline" size="sm" data-testid="nav-platform-ops">{t('admin.ops.link')} →</ButtonLink>}>
 
       {notice && (
         <Alert variant={notice.variant} className="relative pr-20">
@@ -638,35 +585,16 @@ export default function AdminDashboard() {
         </Alert>
       )}
 
-      <nav className="flex flex-wrap items-center gap-6 border-b border-[var(--border)]" aria-label={t('admin.tabs.label')}>
-        {validTabs.map(key => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => setTab(key)}
-            data-testid={`admin-tab-${key}`}
-            data-control-radius-exempt
-            aria-current={tab === key ? 'page' : undefined}
-            className={`-mb-px border-b-2 px-0.5 pb-2.5 pt-1 text-sm font-medium transition-colors ${
-              tab === key
-                ? 'border-[var(--foreground)] text-foreground'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            {t(`admin.tab.${key}`)}
-          </button>
-        ))}
-        {isPlatformAdmin && (
-          <Link to="/admin/ops" data-testid="nav-platform-ops" data-control-radius-exempt className="-mb-px border-b-2 border-transparent px-0.5 pb-2.5 pt-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
-            {t('admin.ops.link')} →
-          </Link>
-        )}
-      </nav>
+      <div className="profile-workspace">
+      <PageTabs idPrefix="admin" label={t('admin.tabs.label')}
+        tabs={validTabs.map(key => ({ key, label: t(`admin.tab.${key}`) }))}
+        value={tab} onChange={setTab} />
 
-      <div key={tab} className="admin-tab-content">
+      <div key={tab} id={`admin-panel-${tab}`} role="tabpanel" aria-labelledby={`admin-tab-${tab}`} tabIndex={0}
+        className="profile-tab-content page-frame page-frame-body">
       {tab === 'settings' && (
         <>
-          <Surface>
+          <Surface className="profile-section">
             <SurfaceHeader
               title={t('admin.privacy.title')}
               description={t('admin.privacy.description')}
@@ -682,18 +610,18 @@ export default function AdminDashboard() {
               ) : privacyStatus ? (
                 <div className="space-y-6">
                   <div className="grid gap-4 md:grid-cols-2">
-                    <section className="rounded-2xl border border-[var(--border)] p-4" data-testid="privacy-visible">
-                      <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground"><Eye className="size-4 text-[var(--mint)]" />{t('admin.privacy.peerVisible')}</h3>
+                    <section className="rounded-[var(--panel-radius)] border border-[var(--border)] p-4" data-testid="privacy-visible">
+                      <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground"><Eye className="size-4 text-[var(--status-scheduled-fg)]" />{t('admin.privacy.peerVisible')}</h3>
                       <p className="mt-1 text-xs text-muted-foreground">{t('admin.privacy.peerVisibleHelp')}</p>
                       <ul className="mt-3 flex flex-wrap gap-2">
-                        {privacyFieldLabels(privacyStatus.peerVisibleFields).map(label => <li key={label} className="rounded-full bg-[#d9f4ec] px-2.5 py-1 text-xs text-[var(--ink)]">{label}</li>)}
+                        {privacyFieldLabels(privacyStatus.peerVisibleFields).map(label => <li key={label}><Badge className="bg-[var(--status-scheduled-bg)] text-[var(--status-scheduled-fg)]">{label}</Badge></li>)}
                       </ul>
                     </section>
-                    <section className="rounded-2xl border border-[var(--border)] p-4" data-testid="privacy-hidden">
+                    <section className="rounded-[var(--panel-radius)] border border-[var(--border)] p-4" data-testid="privacy-hidden">
                       <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground"><Lock className="size-4 text-[var(--ink)]" />{t('admin.privacy.hidden')}</h3>
                       <p className="mt-1 text-xs text-muted-foreground">{t('admin.privacy.hiddenHelp')}</p>
                       <ul className="mt-3 flex flex-wrap gap-2">
-                        {privacyFieldLabels(privacyStatus.hiddenFields).map(label => <li key={label} className="rounded-full bg-[#e7e5f5] px-2.5 py-1 text-xs text-[var(--ink)]">{label}</li>)}
+                        {privacyFieldLabels(privacyStatus.hiddenFields).map(label => <li key={label}><Badge variant="secondary">{label}</Badge></li>)}
                       </ul>
                     </section>
                   </div>
@@ -702,12 +630,12 @@ export default function AdminDashboard() {
                     <li className="flex items-start gap-2"><Check className="mt-0.5 size-4 shrink-0 text-[var(--mint)]" />{t('admin.pm.consentHelp')}</li>
                   </ul>
                   <div className="grid gap-4 md:grid-cols-2">
-                    <section className="rounded-2xl border border-[var(--border)] p-4">
+                    <section className="rounded-[var(--panel-radius)] border border-[var(--border)] p-4">
                       <h3 className="text-sm font-semibold">{t('admin.pm.schoolControls')}</h3>
                       <p className="mt-1 text-xs text-muted-foreground">{t('admin.privacy.minReportsHelp')}</p>
                       <label htmlFor="admin-min-reports" className="mt-3 grid gap-1 text-xs text-muted-foreground">
                         {t('admin.privacy.minReports')}
-                        <input
+                        <Input
                           id="admin-min-reports"
                           key={privacyStatus.minTeamDashboardSize}
                           type="number" min={1} max={100}
@@ -724,7 +652,7 @@ export default function AdminDashboard() {
                         />
                       </label>
                     </section>
-                    <section className="rounded-2xl border border-[var(--border)] p-4">
+                    <section className="rounded-[var(--panel-radius)] border border-[var(--border)] p-4">
                       <h3 className="text-sm font-semibold">{t('admin.pm.capacityTitle')}</h3>
                       <p className="mt-1 text-xs text-muted-foreground">{t('admin.pm.capacityHelp')}</p>
                       {requestSettings && (
@@ -736,7 +664,7 @@ export default function AdminDashboard() {
                           ].map(([field, label, min, max]) => (
                             <label key={field} className="grid gap-1 text-xs text-muted-foreground">
                               {t(label)}
-                              <input
+                              <Input
                                 type="number"
                                 min={min}
                                 max={max}
@@ -761,7 +689,7 @@ export default function AdminDashboard() {
             </SurfaceBody>
           </Surface>
 
-          <Surface data-testid="data-retention">
+          <Surface className="profile-section" data-testid="data-retention">
             <SurfaceHeader title={t('admin.retention.title')} description={t('admin.retention.description')} />
             <SurfaceBody className="pt-5">
               {retention ? (
@@ -771,7 +699,7 @@ export default function AdminDashboard() {
                       <span className="font-medium text-foreground">{t(`admin.retention.${field}`)}</span>
                       <span className="text-xs text-muted-foreground">{t(`admin.retention.${field}Help`)}</span>
                       <span className="flex items-center gap-2">
-                        <input
+                        <Input
                           type="number"
                           min={30}
                           max={3650}
@@ -799,6 +727,7 @@ export default function AdminDashboard() {
 
           {/* The weekly reflection reminder: automatic, with a manual send. */}
           <SurfacePanel
+            className="profile-section"
             title={t('admin.broadcast.title')}
             description={t('admin.broadcast.description')}
             action={
@@ -808,7 +737,7 @@ export default function AdminDashboard() {
             }
           >
             {broadcastResult && (
-              <p className="inline-flex flex-wrap items-center gap-2 rounded-lg border border-[var(--border)] px-3 py-2 text-sm text-muted-foreground">
+              <p className="inline-flex flex-wrap items-center gap-2 rounded-[var(--item-radius)] border border-[var(--border)] px-3 py-2 text-sm text-muted-foreground">
                 <span>✓“</span>
                 <span>{broadcastResult.message}</span>
                 <span>{t('admin.broadcast.resultHint')}</span>
@@ -819,6 +748,7 @@ export default function AdminDashboard() {
           {/* Matching is recomputed automatically; a manual run is for the platform team. */}
           {isPlatformAdmin && (
             <SurfacePanel
+              className="profile-section"
               title={t('admin.rematch.title')}
               description={t('admin.rematch.description')}
               action={
@@ -836,7 +766,7 @@ export default function AdminDashboard() {
           {/* Is it working, where do people drop off, whom to recruit. */}
           {loading ? (
             <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-              {[1, 2, 3, 4].map(i => <div key={i} className="h-24 animate-pulse rounded-xl border border-[var(--border)] bg-muted" />)}
+              {[1, 2, 3, 4].map(i => <div key={i} className="h-24 animate-pulse rounded-[var(--panel-radius)] border border-[var(--border)] bg-muted" />)}
             </div>
           ) : stats && (
             <>
@@ -850,10 +780,10 @@ export default function AdminDashboard() {
                 <StatCard label={t('admin.headline.acceptance')} value={programme?.headline?.acceptance_rate == null ? null : `${programme.headline.acceptance_rate}%`}
                   sub={!programme ? undefined : programme.headline?.requests == null ? t('admin.headline.acceptanceFew') : t('admin.headline.acceptanceSub', { count: programme.headline.requests })} />
               </div>
-              {programmeError && <p role="status" data-testid="programme-unavailable" className="rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-muted-foreground">{t('admin.programme.unavailable')}</p>}
+              {programmeError && <p role="status" data-testid="programme-unavailable" className="rounded-[var(--item-radius)] border border-[var(--border)] bg-card px-4 py-3 text-sm text-muted-foreground">{t('admin.programme.unavailable')}</p>}
 
               <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-                <Surface data-testid="funnel">
+                <Surface className="profile-section" data-testid="funnel">
                   <SurfaceHeader title={t('admin.funnel.title')} description={t('admin.funnel.description')} />
                   <SurfaceBody className="pt-5">
                     {programme?.funnel?.length ? (
@@ -862,7 +792,7 @@ export default function AdminDashboard() {
                           const top = programme.funnel[0]?.count;
                           const share = step.count != null && top ? Math.round((step.count / top) * 100) : null;
                           return (
-                            <li key={step.step} data-testid="funnel-step" className={step.step === biggestDrop ? '-mx-2 rounded-xl bg-[#ffe3de]/60 px-2 py-1' : ''}>
+                            <li key={step.step} data-testid="funnel-step" className={step.step === biggestDrop ? '-mx-2 rounded-[var(--item-radius)] bg-[var(--status-attention-bg)] px-2 py-1' : ''}>
                               <div className="mb-1 flex justify-between gap-2 text-sm">
                                 <span className="font-medium text-foreground">{index + 1}. {t(`admin.funnel.${step.step}`)}</span>
                                 <span className="tabular-nums text-muted-foreground">{step.count == null ? t('admin.funnel.few') : `${step.count}${share != null && index > 0 ? ` · ${share}%` : ''}`}</span>
@@ -870,7 +800,7 @@ export default function AdminDashboard() {
                               <div className="h-2 overflow-hidden rounded-full bg-muted">
                                 {share != null && <div className="h-full rounded-full bg-[var(--ink)]" style={{ width: `${share}%` }} />}
                               </div>
-                              {step.step === biggestDrop && <p className="mt-1 text-xs text-[var(--coral)]" data-testid="funnel-drop">{t('admin.funnel.biggestDrop')}</p>}
+                              {step.step === biggestDrop && <p className="mt-1 text-xs text-[var(--status-attention-fg)]" data-testid="funnel-drop">{t('admin.funnel.biggestDrop')}</p>}
                             </li>
                           );
                         })}
@@ -879,7 +809,7 @@ export default function AdminDashboard() {
                   </SurfaceBody>
                 </Surface>
 
-                <Surface data-testid="recruit">
+                <Surface className="profile-section" data-testid="recruit">
                   <SurfaceHeader title={t('admin.recruit.title')} description={t('admin.recruit.description')} />
                   <SurfaceBody className="pt-5">
                     {programme?.recruit?.length ? (
@@ -899,7 +829,7 @@ export default function AdminDashboard() {
               </div>
 
               {/* The full KPI set with definitions and export, folded. */}
-              <Surface data-testid="kpis-section">
+              <Surface className="profile-section" data-testid="kpis-section">
                 <SurfaceHeader title={t('admin.kpis.title')} description={t('admin.kpis.foldedDescription')}
                   action={<SectionToggle open={kpisOpen} onToggle={() => { if (!kpisOpen && !kpis) loadKpis(); setKpisOpen(open => !open); }} label={t('admin.kpis.title')} testId="kpis-toggle" />} />
                 {kpisOpen && <SurfaceBody className="pt-2"><AdminPmKpis embedded data={kpis} loading={kpisLoading} error={loadErrors.kpis} onRefresh={loadKpis} /></SurfaceBody>}
@@ -908,7 +838,7 @@ export default function AdminDashboard() {
               <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
                 {/* Groups, never people: each field of study with its size
                     (five or more) and thresholded completed-meeting activity. */}
-                <Surface data-testid="fields-of-study">
+                <Surface className="profile-section" data-testid="fields-of-study">
                   <SurfaceHeader title={t('admin.fields.title')} description={t('admin.fields.description')}
                     action={<SectionToggle open={fieldsOpen} onToggle={() => setFieldsOpen(open => !open)} label={t('admin.fields.title')} testId="fields-of-study-toggle" />} />
                   {fieldsOpen && <SurfaceBody className="pt-5">
@@ -919,9 +849,9 @@ export default function AdminDashboard() {
                           <span className="min-w-0 truncate font-medium text-foreground">{fieldName(f.field)}</span>
                           <span className="flex shrink-0 items-center gap-3">
                             <span className="tabular-nums text-muted-foreground">{t('admin.fields.members', { count: f.members })}</span>
-                            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${f.active ? 'bg-[var(--status-success-bg,#d9f4ec)] text-[var(--ink)]' : 'border border-[var(--border)] text-muted-foreground'}`}>
+                            <Badge variant={f.active ? 'secondary' : 'outline'} className={f.active ? 'bg-[var(--status-scheduled-bg)] text-[var(--status-scheduled-fg)]' : 'text-muted-foreground'}>
                               {f.active ? t('admin.fields.active') : t('admin.fields.quiet')}
-                            </span>
+                            </Badge>
                           </span>
                         </li>
                       ))}
@@ -932,7 +862,7 @@ export default function AdminDashboard() {
 
                 {/* Which fields of study offer, want and meet on each skill:
                     lists of groups, without counts. */}
-                <Surface data-testid="skills-by-field">
+                <Surface className="profile-section" data-testid="skills-by-field">
                   <SurfaceHeader title={t('admin.skillsByField.title')} description={t('admin.skillsByField.description')}
                     action={<SectionToggle open={skillsOpen} onToggle={() => setSkillsOpen(open => !open)} label={t('admin.skillsByField.title')} testId="skills-by-field-toggle" />} />
                   {skillsOpen && <SurfaceBody className="pt-5">
@@ -950,7 +880,7 @@ export default function AdminDashboard() {
                                 <div key={role.key} className="flex flex-wrap items-center gap-1.5">
                                   <span className="w-20 shrink-0 text-xs text-muted-foreground">{t(`admin.skillsByField.${role.key}`)}</span>
                                   {skill[role.key].map(field => (
-                                    <span key={field ?? ''} className={`rounded-full px-2 py-0.5 text-xs text-[var(--ink)] ${role.chip}`}>{fieldName(field)}</span>
+                                    <Badge key={field ?? ''} variant="secondary" className={role.chip}>{fieldName(field)}</Badge>
                                   ))}
                                 </div>
                               ))}
@@ -971,7 +901,7 @@ export default function AdminDashboard() {
 
 
       {tab === 'audit' && (
-        <Surface>
+        <Surface className="profile-section">
           <SurfaceHeader
             title={t('admin.audit.title')}
             description={
@@ -992,7 +922,7 @@ export default function AdminDashboard() {
             {auditLoading ? <p role="status">{t('admin.common.loading')}</p> : loadErrors.audit ? <p role="alert">{t('admin.pm.loadFailed')} <Button variant="link" onClick={loadAudit}>{t('admin.common.refresh')}</Button></p> : auditEntries.filter(entry => `${entry.action || ''} ${entry.actor?.name || ''} ${entry.actor?.email || ''}`.toLowerCase().includes(auditFilter.toLowerCase())).length === 0 ? (
               <p className="text-sm text-muted-foreground italic">{t('admin.audit.empty')}</p>
             ) : (
-              <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
+              <div className="max-h-96 divide-y divide-[var(--border-subtle)] overflow-y-auto">
                 {auditEntries.filter(entry => `${entry.action || ''} ${entry.actor?.name || ''} ${entry.actor?.email || ''}`.toLowerCase().includes(auditFilter.toLowerCase())).map(entry => <AuditRow key={entry.id} entry={entry} />)}
               </div>
             )}
@@ -1003,7 +933,7 @@ export default function AdminDashboard() {
       {tab === 'ai' && <AdminAiRuns t={t} />}
 
       {tab === 'people' && (
-        <Surface>
+        <Surface className="profile-section">
           <SurfaceHeader
             title={t('admin.users.title')}
             action={
@@ -1018,7 +948,7 @@ export default function AdminDashboard() {
             <div id="add-people" data-testid="add-people" className="mb-6">
             <AdminProvisionUserPanel />
             <AdminInvitationPanel />
-            <form onSubmit={addExternalOutreachTarget} className="mb-5 flex flex-wrap items-end gap-3 rounded-lg border border-border bg-[var(--card)] p-3">
+            <form onSubmit={addExternalOutreachTarget} className="mb-5 flex flex-wrap items-end gap-3 rounded-[var(--panel-radius)] border border-border bg-card p-4">
               <div className="min-w-56 flex-1">
                 <Label htmlFor="outreach-email">{t('admin.pm.externalTargetEmail')}</Label>
                 <Input id="outreach-email" type="email" required value={outreachTarget.email} onChange={(e) => setOutreachTarget((current) => ({ ...current, email: e.target.value }))} placeholder="alumni@example.edu" className="mt-1" />
@@ -1051,8 +981,8 @@ export default function AdminDashboard() {
                     <th className="py-2 text-right">{t('admin.users.actions')}</th>
                   </tr>
                   <tr className="border-b" data-testid="user-filters">
-                    <th className="py-2 pr-4 font-normal"><input className="input h-8 w-full min-w-28 text-xs" placeholder={t('admin.users.filterSearch')} aria-label={t('admin.users.filterBy', { column: t('admin.users.name') })} value={userFilters.name} onChange={e => setUserFilter('name', e.target.value)} data-testid="filter-name" /></th>
-                    <th className="py-2 pr-4 font-normal"><input className="input h-8 w-full min-w-32 text-xs" placeholder={t('admin.users.filterSearch')} aria-label={t('admin.users.filterBy', { column: t('admin.users.email') })} value={userFilters.email} onChange={e => setUserFilter('email', e.target.value)} data-testid="filter-email" /></th>
+                    <th className="py-2 pr-4 font-normal"><Input className="h-8 w-full min-w-28 text-xs" placeholder={t('admin.users.filterSearch')} aria-label={t('admin.users.filterBy', { column: t('admin.users.name') })} value={userFilters.name} onChange={e => setUserFilter('name', e.target.value)} data-testid="filter-name" /></th>
+                    <th className="py-2 pr-4 font-normal"><Input className="h-8 w-full min-w-32 text-xs" placeholder={t('admin.users.filterSearch')} aria-label={t('admin.users.filterBy', { column: t('admin.users.email') })} value={userFilters.email} onChange={e => setUserFilter('email', e.target.value)} data-testid="filter-email" /></th>
                     <th className="py-2 pr-4 font-normal">
                       <select className="input h-8 w-full min-w-28 text-xs" aria-label={t('admin.users.filterBy', { column: t('admin.users.dept') })} value={userFilters.field} onChange={e => setUserFilter('field', e.target.value)} data-testid="filter-field">
                         <option value="">{t('admin.users.filterAll')}</option>
@@ -1067,7 +997,7 @@ export default function AdminDashboard() {
                         <option value="alumnus">{t('admin.users.role.alumnus')}</option>
                       </select>
                     </th>
-                    <th className="py-2 pr-4 font-normal"><input className="input h-8 w-full min-w-24 text-xs" placeholder={t('admin.users.filterSearch')} aria-label={t('admin.users.filterBy', { column: t('admin.users.manager') })} value={userFilters.advisor} onChange={e => setUserFilter('advisor', e.target.value)} data-testid="filter-advisor" /></th>
+                    <th className="py-2 pr-4 font-normal"><Input className="h-8 w-full min-w-24 text-xs" placeholder={t('admin.users.filterSearch')} aria-label={t('admin.users.filterBy', { column: t('admin.users.manager') })} value={userFilters.advisor} onChange={e => setUserFilter('advisor', e.target.value)} data-testid="filter-advisor" /></th>
                     <th className="py-2 text-right font-normal">
                       {filtering && <Button type="button" variant="ghost" size="sm" onClick={() => setUserFilters({ name: '', email: '', field: '', role: '', advisor: '' })} data-testid="filter-clear">{t('admin.users.filterClear')}</Button>}
                     </th>
@@ -1086,12 +1016,12 @@ export default function AdminDashboard() {
                         {u.deactivated_at ? (
                           <span className="text-muted-foreground">{t(`admin.users.role.${u.role || 'student'}`)}</span>
                         ) : (
-                          <span data-testid={`role-${u.id}`} className={`inline-block rounded-full px-2.5 py-1 text-xs font-medium text-[var(--ink)] ${u.role === 'alumnus' ? 'bg-[#e7e5f5]' : 'bg-[#d9f4ec]'}`}>{t(`admin.users.role.${u.role || 'student'}`)}</span>
+                          <Badge data-testid={`role-${u.id}`} variant="secondary" className={u.role === 'alumnus' ? '' : 'bg-[var(--status-scheduled-bg)] text-[var(--status-scheduled-fg)]'}>{t(`admin.users.role.${u.role || 'student'}`)}</Badge>
                         )}
                       </td>
                       <td className="py-2 pr-4 text-secondary-foreground">{u.manager_email || <span className="text-muted-foreground">—</span>}</td>
                       <td className="py-2 text-right">
-                        <RowActions label={t('admin.users.actions')} testId={`actions-${u.id}`} items={[
+                        <ActionMenu label={t('admin.users.actions')} testId={`actions-${u.id}`} items={[
                           ...(!u.deactivated_at ? [
                             { label: t(u.role === 'alumnus' ? 'admin.users.makeStudent' : 'admin.users.makeAlumnus'), onSelect: () => openRoleConfirm(u, u.role === 'alumnus' ? 'student' : 'alumnus'), testId: `change-role-${u.id}` },
                             { label: t('admin.users.setManager'), onSelect: () => openSetManager(u) },
@@ -1119,7 +1049,7 @@ export default function AdminDashboard() {
       {tab === 'people' && (
         <>
           {/* Import, below the list: an occasional task. */}
-          <Surface>
+          <Surface className="profile-section">
             <SurfaceHeader
               title={t('admin.import.title')}
               description={t('admin.import.description')}
@@ -1131,7 +1061,7 @@ export default function AdminDashboard() {
             />
             <SurfaceBody className="space-y-4 pt-5">
 
-            <div className="bg-muted rounded-lg p-3 mb-4 text-xs text-muted-foreground font-mono">
+            <div className="mb-4 rounded-[var(--item-radius)] bg-muted p-3 font-mono text-xs text-muted-foreground">
               name, email, department, current_role, program, cohort_year, persona (student|alumnus), tenure_years, location, manager_email, can_teach, wants_to_learn
             </div>
 
@@ -1145,7 +1075,7 @@ export default function AdminDashboard() {
             </div>
 
             <div
-              className={`cursor-pointer rounded border-2 border-dashed p-10 text-center transition-colors ${dragOver ? 'border-primary bg-accent' : 'border-border hover:border-primary hover:bg-[#f7f7fb]'}`}
+              className={`cursor-pointer rounded-[var(--panel-radius)] border-2 border-dashed p-10 text-center transition-colors ${dragOver ? 'border-primary bg-accent' : 'border-border hover:border-primary hover:bg-background'}`}
               onClick={() => fileRef.current?.click()}
               onDragOver={e => { e.preventDefault(); setDragOver(true); }}
               onDragLeave={() => setDragOver(false)}
@@ -1177,7 +1107,7 @@ export default function AdminDashboard() {
             </div>
 
             {uploadResult && (
-              <div className="mt-4 rounded-lg border border-[var(--border)] p-4 text-sm">
+              <div className="mt-4 rounded-[var(--item-radius)] border border-[var(--border)] p-4 text-sm">
                 <p className="mb-1 font-medium">{t('admin.import.complete')}</p>
                 <ul className="space-y-0.5 text-muted-foreground">
                   <li>✓“ {uploadResult.updated
@@ -1197,7 +1127,7 @@ export default function AdminDashboard() {
             )}
 
             {uploadError && (
-              <div className="rounded-lg border border-[var(--border)] bg-[var(--status-error-bg)] p-4 text-sm text-[var(--status-error-fg)]">{uploadError}</div>
+              <div className="rounded-[var(--item-radius)] border border-[var(--border)] bg-[var(--status-error-bg)] p-4 text-sm text-[var(--status-error-fg)]">{uploadError}</div>
             )}
             </SurfaceBody>
           </Surface>
@@ -1205,7 +1135,7 @@ export default function AdminDashboard() {
       )}
 
       {tab === 'feedback' && (
-        <Surface>
+        <Surface className="profile-section">
           <SurfaceHeader
             title={t('admin.feedback.title')}
             description={
@@ -1234,7 +1164,7 @@ export default function AdminDashboard() {
             }
           />
           <SurfaceBody className="pt-5">
-            <p className="mb-4 rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">{t('admin.pm.feedbackInbox')}</p>
+            <p className="mb-4 rounded-[var(--item-radius)] border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">{t('admin.pm.feedbackInbox')}</p>
             {feedbackLoading ? (
               <p className="text-sm text-muted-foreground">{t('admin.common.loading')}</p>
             ) : feedback.length ? (
@@ -1243,7 +1173,7 @@ export default function AdminDashboard() {
                   <li
                     key={item.id}
                     data-testid="feedback-item"
-                    className="rounded-lg border border-border bg-card/40 p-4"
+                    className="rounded-[var(--panel-radius)] border border-border bg-card/40 p-4"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -1259,7 +1189,7 @@ export default function AdminDashboard() {
                           )}
                           <span className="text-muted-foreground">·</span>
                           <span className="text-muted-foreground">{formatAdminDate(item.created_at)}</span>
-                          <span className="rounded-full bg-muted px-2 py-0.5 font-medium text-muted-foreground">{t(`admin.pm.delivery.${item.delivery?.status || 'demo'}`)}</span>
+                          <Badge variant="secondary">{t(`admin.pm.delivery.${item.delivery?.status || 'demo'}`)}</Badge>
                         </div>
                         <p className="mt-2 whitespace-pre-wrap text-sm text-foreground">{item.message}</p>
                       </div>
@@ -1311,7 +1241,7 @@ export default function AdminDashboard() {
               {t('admin.tempPwd.description', { email: tempPasswordDialog?.email })}
             </DialogDescription>
           </DialogHeader>
-          <div className="rounded-lg border bg-muted px-3 py-2 font-mono text-sm">{tempPasswordDialog?.tempPassword}</div>
+          <div className="rounded-[var(--item-radius)] border bg-muted px-3 py-2 font-mono text-sm">{tempPasswordDialog?.tempPassword}</div>
           <DialogFooter>
             <Button
               type="button"
@@ -1351,20 +1281,8 @@ export default function AdminDashboard() {
       </Dialog>
 
       </div>
+      </div>
     </PageShell>
-  );
-}
-
-function SessionBox({ count, label, tone }) {
-  const dot = { needs: 'bg-[var(--coral)]', scheduled: 'bg-[var(--mint)]', past: 'bg-[var(--muted-foreground)]' }[tone] || 'bg-[#b9b6cf]';
-  return (
-    <div className="rounded-lg border border-[var(--border)] p-3 text-center">
-      <p className="text-xl font-medium tabular-nums tracking-[-0.01em]">{count ?? '—'}</p>
-      <p className="mt-1 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
-        <span className={`size-1.5 rounded-full ${dot}`} aria-hidden="true" />
-        {label}
-      </p>
-    </div>
   );
 }
 
