@@ -2171,9 +2171,12 @@ test('the search narrates what it is doing, and the student says why before a me
   await composer.fill('Financial modelling');
   await composer.press('Enter');
   // While the search runs, each real stage shows as a line, the latest one still working.
+  // One line at a time, each replacing the last about every two seconds.
   const progress = page.getByTestId('discovery-progress');
-  await expect(progress.locator('li')).toHaveText(['Reading your request', 'Searching the network', 'Looking through 12 profiles', 'Comparing the closest ones', 'Considering Peer: teaches financial modelling']);
-  await expect(progress.locator('li').last()).toHaveClass(/is-current/);
+  await expect(progress).toHaveText('Reading your request');
+  await expect(progress).toHaveText('Searching the network', { timeout: 4000 });
+  await expect(progress).toHaveText('Looking through 12 profiles', { timeout: 4000 });
+  await expect(progress).not.toContainText('Reading your request');
   await page.evaluate(() => window.fixture.releaseMatches());
   await expect(progress).toHaveCount(0);
 

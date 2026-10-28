@@ -174,6 +174,7 @@ export default function DiscoveryFlow() {
   // Live stages of the current search, and the student's reason for the chosen person.
   const [progress, setProgress] = useState([]);
   const [motivation, setMotivation] = useState('');
+  const [progressShown, setProgressShown] = useState(0);
   const [draftVariant, setDraftVariant] = useState(0);
   const [draft, setDraft] = useState('');
   // The invite's own title, shown and editable on the draft card. It starts
@@ -278,7 +279,7 @@ export default function DiscoveryFlow() {
     const message = nextQuery.trim();
     if (!message) return;
     setTurns(current => [...current, { role: 'user', content: message, at: new Date().toISOString() }]);
-    setError(''); setStage('matching'); setMatchFeedback(null); setProgress([]);
+    setError(''); setStage('matching'); setMatchFeedback(null); setProgress([]); setProgressShown(0);
     setSelected(null); setDraft('');
     try {
       const onProgress = event => { if (version === flowVersion.current) setProgress(current => [...current, event]); };
@@ -489,6 +490,14 @@ export default function DiscoveryFlow() {
     return key ? [copy[key]] : [];
   });
 
+  // One line at a time, each held for two seconds before the next replaces it.
+  useEffect(() => {
+    if (stage !== 'matching' || progressShown >= progressLines.length - 1) return undefined;
+    const timer = setTimeout(() => setProgressShown(index => index + 1), 2000);
+    return () => clearTimeout(timer);
+  }, [stage, progressShown, progressLines.length]);
+  const progressNow = progressLines[Math.min(progressShown, progressLines.length - 1)];
+
   function composer() {
     return <><form className="discovery-composer" onSubmit={submit}><textarea data-control-radius-exempt ref={composerInputRef} value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} maxLength={2000} rows={1} placeholder={copy.placeholder} aria-label={copy.placeholder} disabled={stage === 'matching' || stage === 'drafting' || sending} /><Button size="icon" type="submit" className="send-spark" disabled={!query.trim() || stage === 'matching' || stage === 'drafting' || sending} aria-label={t('conversations.send')}><ArrowUp /></Button></form>
       {/* AI Act Art. 50: people are told they are talking to an AI. */}
@@ -629,17 +638,10 @@ export default function DiscoveryFlow() {
           ? <Link key={choice.label} className="discovery-suggestion is-link" to={choice.href}>{choice.label}</Link>
           : <button type="button" key={choice.label} className="discovery-suggestion" disabled={sending} onClick={() => findMatches(choice.message)}>{choice.label}</button>)}</div>}</div></div>;
     })}</div>
-    {stage === 'matching' && progressLines.length > 0 ? (
+    {stage === 'matching' && progressNow ? (
       <div className="discovery-chat-turn is-assistant is-working" role="status" aria-live="polite">
         <span className="discovery-agent-mark" aria-label="Ment">M</span>
-        <ol className="discovery-progress" data-testid="discovery-progress">
-          {progressLines.map((line, index) => (
-            <li key={`${index}-${line}`} className={index === progressLines.length - 1 ? 'is-current' : 'is-done'}>
-              {index === progressLines.length - 1 ? <span className="discovery-typing" aria-hidden="true"><i /><i /><i /></span> : <Check aria-hidden="true" />}
-              <span>{line}</span>
-            </li>
-          ))}
-        </ol>
+        <p className="discovery-assistant-bubble" data-testid="discovery-progress"><span key={progressNow} className="discovery-progress-line">{progressNow}</span><span className="discovery-typing" aria-hidden="true"><i /><i /><i /></span></p>
       </div>
     ) : (stage === 'matching' || stage === 'drafting') && <div className="discovery-chat-turn is-assistant is-working" role="status" aria-live="polite"><span className="discovery-agent-mark" aria-label="Ment">M</span><p className="discovery-assistant-bubble">{stage === 'matching' ? copy.finding : copy.drafting}<span className="discovery-typing" aria-hidden="true"><i /><i /><i /></span></p></div>}
     {stage === 'motivate' && selected && (
