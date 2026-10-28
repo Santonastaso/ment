@@ -22,7 +22,7 @@ const COPY = {
     finding: 'Having a look', chooseLead: 'Here are the people who fit.', chooseBold: 'Pick one and I will write the message.',
     why: 'Why this match', choose: 'Choose', selected: 'Selected', different: 'Ask for different people', browse: 'browse the full directory', notRight: 'Not quite right?', or: 'or',
     to: 'To', intro: "Here's a suggested intro. Edit anything, then send when it feels like you.", aiNote: 'Ment is an AI assistant and can make mistakes. You choose who to contact and what to send.', draftNote: 'Drafted by AI. Read it and make it yours before sending.', suggested: 'Suggested draft', send: 'Send request', regenerate: 'Regenerate',
-    sent: 'Request sent to {name}.', sentSubline: "The conversation is ready. Continue there when they reply.", openChat: 'Open chat', again: 'Ask about something else', newChat: 'New chat', recentSearches: 'Recent searches', deleteSearch: 'Delete search', confirmDeleteSearch: 'Delete this search and its saved conversation?', cancel: 'Keep search', retry: 'Start a new search', error: 'We could not complete that request. Please try again.', aiMissing: 'Matching is not configured yet. Ask an administrator to connect Mistral.', aiBusy: 'Matching is temporarily rate-limited. Please try again in a moment.', aiAdmin: 'Matching needs an administrator to check the Mistral connection.', noMatches: 'There is no relevant professional in the current network for this request.', nearestLead: 'These are the closest I could find \u2014 pick one and I will write the message.', snapshot: 'Your connections', upcoming: 'Upcoming', pending: 'Pending', completed: 'Completed', viewAll: 'View conversations', viewProfile: 'View profile', showEarlier: 'Show these {count} people again', showEarlierOne: 'Show this person again', hideEarlier: 'Hide these people', roleAt: '{role} at {company}', shownBefore: 'Shown before', back: 'Back to matches', progressReading: 'Reading your request', progressSearching: 'Searching the network', progressCandidates: 'Looking through {count} profiles', progressRanking: 'Comparing the closest ones', progressConsidering: 'Considering {name}: {reason}', progressWriting: 'Writing it up', motivateQuestion: 'Before I write to {name}: what would you like to ask, and why them?', motivateLabel: 'In your own words', motivatePlaceholder: 'e.g. I am choosing between banking and venture capital, and you have worked in both.', motivateHelp: 'One or two lines are enough. They make the message yours, not a template.', motivateWrite: 'Write my message', motivateSkip: 'Skip, write it for me', drafting: 'Preparing your request', useful: 'Were these matches useful?', yes: 'Yes', no: 'No', feedbackSaved: 'Thanks — this helps improve matching.',
+    sent: 'Request sent to {name}.', sentSubline: "The conversation is ready. Continue there when they reply.", openChat: 'Open chat', again: 'Ask about something else', newChat: 'New chat', recentSearches: 'Recent searches', deleteSearch: 'Delete search', confirmDeleteSearch: 'Delete this search and its saved conversation?', cancel: 'Keep search', retry: 'Start a new search', error: 'We could not complete that request. Please try again.', aiMissing: 'Matching is not configured yet. Ask an administrator to connect Mistral.', aiBusy: 'Matching is temporarily rate-limited. Please try again in a moment.', aiAdmin: 'Matching needs an administrator to check the Mistral connection.', noMatches: 'There is no relevant professional in the current network for this request.', nearestLead: 'These are the closest I could find \u2014 pick one and I will write the message.', snapshot: 'Your connections', upcoming: 'Upcoming', pending: 'Pending', completed: 'Completed', viewAll: 'View conversations', viewProfile: 'View profile', showEarlier: 'Show these {count} people again', showEarlierOne: 'Show this person again', hideEarlier: 'Hide these people', roleAt: '{role} at {company}', shownBefore: 'Shown before', back: 'Back to matches', progressConsidering: 'Considering {name}: {reason}', motivateQuestion: 'Before I write to {name}: what would you like to ask, and why them?', motivateLabel: 'In your own words', motivatePlaceholder: 'e.g. I am choosing between banking and venture capital, and you have worked in both.', motivateHelp: 'One or two lines are enough. They make the message yours, not a template.', motivateWrite: 'Write my message', motivateSkip: 'Skip, write it for me', drafting: 'Preparing your request', useful: 'Were these matches useful?', yes: 'Yes', no: 'No', feedbackSaved: 'Thanks — this helps improve matching.',
   },
   it: {
     history: 'Cronologia',
@@ -30,7 +30,7 @@ const COPY = {
     finding: 'Do un’occhiata', chooseLead: 'Ecco le persone adatte.', chooseBold: 'Scegline una e scrivo io il messaggio.',
     why: 'Perché è adatto', choose: 'Scegli', selected: 'Scelto', different: 'Mostra altre persone', browse: 'sfoglia la directory', notRight: 'Non è quello che cercavi?', or: 'oppure',
     to: 'A', intro: 'Ecco un messaggio proposto. Modifica tutto quello che vuoi, poi invialo quando ti sembra giusto.', aiNote: 'Ment è un assistente basato sull’IA e può sbagliare. Sei tu a scegliere chi contattare e cosa inviare.', draftNote: 'Scritto dall’IA. Rileggilo e rendilo tuo prima di inviarlo.', suggested: 'Messaggio proposto', send: 'Invia richiesta', regenerate: 'Rigenera',
-    sent: 'Richiesta inviata a {name}.', sentSubline: 'La conversazione è pronta. Continua da lì quando risponderà.', openChat: 'Apri chat', again: "Chiedi qualcos'altro", newChat: 'Nuova chat', recentSearches: 'Ricerche recenti', deleteSearch: 'Elimina ricerca', confirmDeleteSearch: 'Eliminare questa ricerca e la conversazione salvata?', cancel: 'Mantieni la ricerca', retry: 'Inizia una nuova ricerca', error: 'Non siamo riusciti a completare la richiesta. Riprova.', aiMissing: 'Il matching non è ancora configurato. Chiedi a un amministratore di collegare Mistral.', aiBusy: 'Il matching è temporaneamente limitato. Riprova tra poco.', aiAdmin: 'Un amministratore deve verificare la connessione a Mistral.', noMatches: 'Nella rete attuale non c’è un professionista pertinente per questa richiesta.', nearestLead: 'Queste sono le più vicine che ho trovato: scegline una e scrivo io il messaggio.', snapshot: 'Le tue connessioni', upcoming: 'In programma', pending: 'In attesa', completed: 'Completate', viewAll: 'Vedi conversazioni', viewProfile: 'Vedi profilo', showEarlier: 'Mostra di nuovo queste {count} persone', showEarlierOne: 'Mostra di nuovo questa persona', hideEarlier: 'Nascondi', roleAt: '{role} presso {company}', shownBefore: 'Già mostrato', back: 'Torna ai risultati', progressReading: 'Leggo la tua richiesta', progressSearching: 'Cerco nella rete', progressCandidates: 'Scorro {count} profili', progressRanking: 'Confronto le più vicine', progressConsidering: 'Valuto {name}: {reason}', progressWriting: 'Preparo la risposta', motivateQuestion: 'Prima di scrivere a {name}: cosa vorresti chiedere, e perché proprio a questa persona?', motivateLabel: 'Con parole tue', motivatePlaceholder: 'es. Sto scegliendo tra banca d’affari e venture capital e tu hai lavorato in entrambi.', motivateHelp: 'Bastano una o due righe. Rendono il messaggio tuo, non un modello.', motivateWrite: 'Scrivi il mio messaggio', motivateSkip: 'Salta, scrivilo tu', drafting: 'Preparo la richiesta', useful: 'Questi match sono utili?', yes: 'Sì', no: 'No', feedbackSaved: 'Grazie — ci aiuta a migliorare il matching.',
+    sent: 'Richiesta inviata a {name}.', sentSubline: 'La conversazione è pronta. Continua da lì quando risponderà.', openChat: 'Apri chat', again: "Chiedi qualcos'altro", newChat: 'Nuova chat', recentSearches: 'Ricerche recenti', deleteSearch: 'Elimina ricerca', confirmDeleteSearch: 'Eliminare questa ricerca e la conversazione salvata?', cancel: 'Mantieni la ricerca', retry: 'Inizia una nuova ricerca', error: 'Non siamo riusciti a completare la richiesta. Riprova.', aiMissing: 'Il matching non è ancora configurato. Chiedi a un amministratore di collegare Mistral.', aiBusy: 'Il matching è temporaneamente limitato. Riprova tra poco.', aiAdmin: 'Un amministratore deve verificare la connessione a Mistral.', noMatches: 'Nella rete attuale non c’è un professionista pertinente per questa richiesta.', nearestLead: 'Queste sono le più vicine che ho trovato: scegline una e scrivo io il messaggio.', snapshot: 'Le tue connessioni', upcoming: 'In programma', pending: 'In attesa', completed: 'Completate', viewAll: 'Vedi conversazioni', viewProfile: 'Vedi profilo', showEarlier: 'Mostra di nuovo queste {count} persone', showEarlierOne: 'Mostra di nuovo questa persona', hideEarlier: 'Nascondi', roleAt: '{role} presso {company}', shownBefore: 'Già mostrato', back: 'Torna ai risultati', progressConsidering: 'Valuto {name}: {reason}', motivateQuestion: 'Prima di scrivere a {name}: cosa vorresti chiedere, e perché proprio a questa persona?', motivateLabel: 'Con parole tue', motivatePlaceholder: 'es. Sto scegliendo tra banca d’affari e venture capital e tu hai lavorato in entrambi.', motivateHelp: 'Bastano una o due righe. Rendono il messaggio tuo, non un modello.', motivateWrite: 'Scrivi il mio messaggio', motivateSkip: 'Salta, scrivilo tu', drafting: 'Preparo la richiesta', useful: 'Questi match sono utili?', yes: 'Sì', no: 'No', feedbackSaved: 'Grazie — ci aiuta a migliorare il matching.',
   },
   fr: {
     history: 'Historique',
@@ -38,11 +38,41 @@ const COPY = {
     finding: 'Je regarde', chooseLead: 'Voici les personnes qui conviennent.', chooseBold: 'Choisissez-en une et j’écris le message.',
     why: 'Pourquoi ce profil', choose: 'Choisir', selected: 'Sélectionné', different: 'Voir d’autres personnes', browse: 'parcourir l’annuaire', notRight: 'Pas tout à fait ?', or: 'ou',
     to: 'À', intro: 'Voici un message proposé. Modifiez ce que vous voulez, puis envoyez-le lorsqu’il vous convient.', aiNote: 'Ment est un assistant fondé sur l’IA et peut se tromper. C’est vous qui choisissez qui contacter et quoi envoyer.', draftNote: 'Rédigé par l’IA. Relisez-le et adaptez-le avant de l’envoyer.', suggested: 'Message proposé', send: 'Envoyer la demande', regenerate: 'Régénérer',
-    sent: 'Demande envoyée à {name}.', sentSubline: 'La conversation est prête. Continuez là lorsqu’une réponse arrive.', openChat: 'Ouvrir le chat', again: 'Poser une autre question', newChat: 'Nouveau chat', recentSearches: 'Recherches récentes', deleteSearch: 'Supprimer la recherche', confirmDeleteSearch: 'Supprimer cette recherche et la conversation enregistrée ?', cancel: 'Garder la recherche', retry: 'Lancer une nouvelle recherche', error: 'Nous n’avons pas pu finaliser cette demande. Réessayez.', aiMissing: 'Le matching n’est pas encore configuré. Demandez à un administrateur de connecter Mistral.', aiBusy: 'Le matching est temporairement limité. Réessayez dans un instant.', aiAdmin: 'Un administrateur doit vérifier la connexion à Mistral.', noMatches: 'Le réseau actuel ne contient aucun professionnel pertinent pour cette demande.', nearestLead: 'Voici les plus proches que j’ai trouvées : choisissez-en une et j’écris le message.', snapshot: 'Vos connexions', upcoming: 'À venir', pending: 'En attente', completed: 'Terminées', viewAll: 'Voir les conversations', viewProfile: 'Voir le profil', showEarlier: 'Revoir ces {count} personnes', showEarlierOne: 'Revoir cette personne', hideEarlier: 'Masquer', roleAt: '{role} chez {company}', shownBefore: 'Déjà proposé', back: 'Retour aux résultats', progressReading: 'Je lis votre demande', progressSearching: 'Je cherche dans le réseau', progressCandidates: 'Je parcours {count} profils', progressRanking: 'Je compare les plus proches', progressConsidering: 'J’envisage {name} : {reason}', progressWriting: 'Je rédige la réponse', motivateQuestion: 'Avant d’écrire à {name} : que voudriez-vous demander, et pourquoi cette personne ?', motivateLabel: 'Avec vos mots', motivatePlaceholder: 'ex. J’hésite entre la banque d’affaires et le capital-risque, et vous avez travaillé dans les deux.', motivateHelp: 'Une ou deux lignes suffisent. Elles rendent le message personnel, pas un modèle.', motivateWrite: 'Rédiger mon message', motivateSkip: 'Passer, rédigez-le pour moi', drafting: 'Préparation de la demande', useful: 'Ces profils sont-ils utiles ?', yes: 'Oui', no: 'Non', feedbackSaved: 'Merci — cela nous aide à améliorer les suggestions.',
+    sent: 'Demande envoyée à {name}.', sentSubline: 'La conversation est prête. Continuez là lorsqu’une réponse arrive.', openChat: 'Ouvrir le chat', again: 'Poser une autre question', newChat: 'Nouveau chat', recentSearches: 'Recherches récentes', deleteSearch: 'Supprimer la recherche', confirmDeleteSearch: 'Supprimer cette recherche et la conversation enregistrée ?', cancel: 'Garder la recherche', retry: 'Lancer une nouvelle recherche', error: 'Nous n’avons pas pu finaliser cette demande. Réessayez.', aiMissing: 'Le matching n’est pas encore configuré. Demandez à un administrateur de connecter Mistral.', aiBusy: 'Le matching est temporairement limité. Réessayez dans un instant.', aiAdmin: 'Un administrateur doit vérifier la connexion à Mistral.', noMatches: 'Le réseau actuel ne contient aucun professionnel pertinent pour cette demande.', nearestLead: 'Voici les plus proches que j’ai trouvées : choisissez-en une et j’écris le message.', snapshot: 'Vos connexions', upcoming: 'À venir', pending: 'En attente', completed: 'Terminées', viewAll: 'Voir les conversations', viewProfile: 'Voir le profil', showEarlier: 'Revoir ces {count} personnes', showEarlierOne: 'Revoir cette personne', hideEarlier: 'Masquer', roleAt: '{role} chez {company}', shownBefore: 'Déjà proposé', back: 'Retour aux résultats', progressConsidering: 'J’envisage {name} : {reason}', motivateQuestion: 'Avant d’écrire à {name} : que voudriez-vous demander, et pourquoi cette personne ?', motivateLabel: 'Avec vos mots', motivatePlaceholder: 'ex. J’hésite entre la banque d’affaires et le capital-risque, et vous avez travaillé dans les deux.', motivateHelp: 'Une ou deux lignes suffisent. Elles rendent le message personnel, pas un modèle.', motivateWrite: 'Rédiger mon message', motivateSkip: 'Passer, rédigez-le pour moi', drafting: 'Préparation de la demande', useful: 'Ces profils sont-ils utiles ?', yes: 'Oui', no: 'Non', feedbackSaved: 'Merci — cela nous aide à améliorer les suggestions.',
   },
 };
 
 const pause = (ms) => new Promise(resolve => window.setTimeout(resolve, ms));
+// Ways to say what the search is doing, so it never reads like the same three
+// sentences. Each search picks its own phrasing per stage; while it is still
+// working after the real steps, the short "working" words keep it moving.
+const PROGRESS_WORDS = {
+  en: {
+    reading: ['Reading your request', 'Getting the gist', 'Unpacking what you need'],
+    searching: ['Searching the network', 'Scanning the directory', 'Casting a wide net'],
+    candidates: ['Looking through {count} profiles', 'Leafing through {count} profiles', 'Sifting through {count} profiles'],
+    ranking: ['Comparing the closest ones', 'Narrowing it down', 'Weighing the best fits'],
+    writing: ['Writing it up', 'Putting it into words', 'Polishing the reply'],
+    filler: ['Pondering…', 'Mulling it over…', 'Cross-checking…', 'Matchmaking…', 'Connecting the dots…', 'Shortlisting…', 'Weighing it up…', 'Untangling…', 'Coalescing…'],
+  },
+  it: {
+    reading: ['Leggo la tua richiesta', 'Capisco cosa cerchi', 'Metto a fuoco la richiesta'],
+    searching: ['Cerco nella rete', 'Scorro la community', 'Allargo la ricerca'],
+    candidates: ['Scorro {count} profili', 'Passo in rassegna {count} profili', 'Setaccio {count} profili'],
+    ranking: ['Confronto i più vicini', 'Restringo il campo', 'Valuto i più adatti'],
+    writing: ['Preparo la risposta', 'Metto tutto in parole', 'Rifinisco la risposta'],
+    filler: ['Ci rifletto…', 'Valuto con calma…', 'Verifico…', 'Combino i profili…', 'Unisco i puntini…', 'Preparo una rosa…', 'Soppeso…', 'Metto in ordine…'],
+  },
+  fr: {
+    reading: ['Je lis votre demande', 'Je saisis l’essentiel', 'Je décortique votre besoin'],
+    searching: ['Je cherche dans le réseau', 'Je parcours l’annuaire', 'J’élargis la recherche'],
+    candidates: ['Je parcours {count} profils', 'Je passe en revue {count} profils', 'Je trie {count} profils'],
+    ranking: ['Je compare les plus proches', 'Je resserre la sélection', 'Je pèse les meilleurs profils'],
+    writing: ['Je rédige la réponse', 'Je mets tout en mots', 'Je peaufine la réponse'],
+    filler: ['Je réfléchis…', 'Je pèse le pour et le contre…', 'Je recoupe…', 'Je fais les présentations…', 'Je relie les points…', 'Je fais une sélection…', 'J’affine…', 'Je démêle…'],
+  },
+};
+
 const text = (copy, key, vars = {}) => copy[key].replace(/\{(\w+)\}/g, (_, name) => vars[name] ?? '');
 
 function requestErrorMessage(error, copy) {
@@ -174,7 +204,9 @@ export default function DiscoveryFlow() {
   // Live stages of the current search, and the student's reason for the chosen person.
   const [progress, setProgress] = useState([]);
   const [motivation, setMotivation] = useState('');
-  const [progressShown, setProgressShown] = useState(0);
+  // Which real line is showing, and how many working words since it.
+  const [progressTick, setProgressTick] = useState({ line: 0, filler: 0 });
+  const progressSeed = useRef(0);
   const [draftVariant, setDraftVariant] = useState(0);
   const [draft, setDraft] = useState('');
   // The invite's own title, shown and editable on the draft card. It starts
@@ -279,7 +311,7 @@ export default function DiscoveryFlow() {
     const message = nextQuery.trim();
     if (!message) return;
     setTurns(current => [...current, { role: 'user', content: message, at: new Date().toISOString() }]);
-    setError(''); setStage('matching'); setMatchFeedback(null); setProgress([]); setProgressShown(0);
+    setError(''); setStage('matching'); setMatchFeedback(null); setProgress([]); setProgressTick({ line: 0, filler: 0 }); progressSeed.current = Math.floor(Math.random() * 997);
     setSelected(null); setDraft('');
     try {
       const onProgress = event => { if (version === flowVersion.current) setProgress(current => [...current, event]); };
@@ -479,24 +511,31 @@ export default function DiscoveryFlow() {
     if (currentThread) api.put(`/discovery/threads/${currentThread}`, { archived: true }).then(refreshHistory).catch(() => {});
   }
 
-  // What the search is doing right now, one short line per real stage.
-  const progressLines = progress.flatMap(event => {
+  // What the search is doing right now: one line per real stage, phrased a
+  // little differently each search, then working words while it continues.
+  const progressWords = PROGRESS_WORDS[lang] || PROGRESS_WORDS.en;
+  const pickWord = (list, index) => list[(progressSeed.current + index * 7) % list.length];
+  const progressLines = progress.flatMap((event, index) => {
     if (event.stage === 'considering') {
       return (event.people || []).filter(person => person.first && person.reason)
         .map(person => text(copy, 'progressConsidering', { name: person.first, reason: person.reason.replace(/^./, c => c.toLocaleLowerCase()).replace(/\.$/, '') }));
     }
-    if (event.stage === 'candidates') return event.count ? [text(copy, 'progressCandidates', { count: event.count })] : [];
-    const key = { reading: 'progressReading', searching: 'progressSearching', ranking: 'progressRanking', writing: 'progressWriting' }[event.stage];
-    return key ? [copy[key]] : [];
+    if (event.stage === 'candidates' && !event.count) return [];
+    const options = progressWords[event.stage];
+    return options ? [pickWord(options, index).replace('{count}', event.count ?? '')] : [];
   });
 
-  // One line at a time, each held for two seconds before the next replaces it.
+  // Every two seconds the line changes: the next real step if there is one,
+  // otherwise another working word.
   useEffect(() => {
-    if (stage !== 'matching' || progressShown >= progressLines.length - 1) return undefined;
-    const timer = setTimeout(() => setProgressShown(index => index + 1), 2000);
+    if (stage !== 'matching' || !progressLines.length) return undefined;
+    const timer = setTimeout(() => setProgressTick(tick => (tick.line < progressLines.length - 1
+      ? { line: tick.line + 1, filler: 0 } : { line: tick.line, filler: tick.filler + 1 })), 2000);
     return () => clearTimeout(timer);
-  }, [stage, progressShown, progressLines.length]);
-  const progressNow = progressLines[Math.min(progressShown, progressLines.length - 1)];
+  }, [stage, progressTick, progressLines.length]);
+  const progressNow = progressTick.filler > 0
+    ? pickWord(progressWords.filler, progressTick.line * 3 + progressTick.filler)
+    : progressLines[Math.min(progressTick.line, progressLines.length - 1)];
 
   function composer() {
     return <><form className="discovery-composer" onSubmit={submit}><textarea data-control-radius-exempt ref={composerInputRef} value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} maxLength={2000} rows={1} placeholder={copy.placeholder} aria-label={copy.placeholder} disabled={stage === 'matching' || stage === 'drafting' || sending} /><Button size="icon" type="submit" className="send-spark" disabled={!query.trim() || stage === 'matching' || stage === 'drafting' || sending} aria-label={t('conversations.send')}><ArrowUp /></Button></form>
