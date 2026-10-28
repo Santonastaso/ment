@@ -970,6 +970,7 @@ test('onboarding to discovery, request, acceptance, chat and meeting', async ({ 
   await composer.fill('Financial modelling');
   await composer.press('Enter');
   await page.getByRole('button', { name: 'Choose Peer Mentor' }).click();
+  await page.getByTestId('discovery-motivation-skip').click();
   await page.getByRole('textbox', { name: 'Suggested draft' }).fill('Please help me with financial modelling.');
   // The invite has its own title on the card: suggested, editable and required.
   const inviteTitle = page.locator('.discovery-draft').getByRole('textbox', { name: 'Request title' });
@@ -1623,6 +1624,7 @@ async function draftHomeInvite(page) {
   await composer.fill('Financial modelling');
   await composer.press('Enter');
   await page.getByRole('button', { name: 'Choose Peer Mentor' }).click();
+  await page.getByTestId('discovery-motivation-skip').click();
   const draft = page.getByRole('textbox', { name: 'Suggested draft' });
   await draft.fill('First wording.');
   return {
@@ -1680,6 +1682,7 @@ test('a second request from the same conversation is sent, not refused', async (
   await composer.fill('Financial modelling');
   await composer.press('Enter');
   await page.getByRole('button', { name: 'Choose Peer Mentor' }).last().click();
+  await page.getByTestId('discovery-motivation-skip').click();
   await invite.draft.fill('A second request.');
   await invite.send.click();
   await expect.poll(invite.created).toBe(2);
@@ -2156,4 +2159,35 @@ test('when the overview figures cannot load, the page says so instead of reporti
   await expect(page.getByTestId('programme-unavailable')).toBeVisible();
   await expect(page.getByText(/Fewer than five|No gaps right now/)).toHaveCount(0);
   await expect(page.getByTestId('recruit')).toContainText('Not available yet.');
+});
+
+test('the search narrates what it is doing, and the student says why before a message is drafted', async ({ page }) => {
+  await page.goto('/');
+  const composer = page.getByRole('textbox', { name: 'Describe who could help' });
+  await composer.fill('finance');
+  await composer.press('Enter');
+  await expect(page.getByText('Which finance skill would you like help with?')).toBeVisible();
+  await page.evaluate(() => { window.fixture.holdMatches = true; });
+  await composer.fill('Financial modelling');
+  await composer.press('Enter');
+  // While the search runs, each real stage shows as a line, the latest one still working.
+  const progress = page.getByTestId('discovery-progress');
+  await expect(progress.locator('li')).toHaveText(['Reading your request', 'Searching the network', 'Found 12 people who could fit', 'Comparing the closest ones', 'Considering Peer: teaches financial modelling']);
+  await expect(progress.locator('li').last()).toHaveClass(/is-current/);
+  await page.evaluate(() => window.fixture.releaseMatches());
+  await expect(progress).toHaveCount(0);
+
+  // Choosing someone asks why them, before anything is written.
+  await page.getByRole('button', { name: 'Choose Peer Mentor' }).click();
+  const motivate = page.getByTestId('discovery-motivate');
+  await expect(motivate).toContainText('Before I write to Peer: what would you like to ask, and why them?');
+  const write = page.getByTestId('discovery-motivation-write');
+  await expect(write).toBeDisabled();
+  await page.getByTestId('discovery-motivation').fill('I am choosing between banking and venture capital.');
+  await write.click();
+  const draft = page.getByRole('textbox', { name: 'Suggested draft' });
+  await expect(draft).toHaveValue(/I am choosing between banking and venture capital\./);
+  expect(await page.evaluate(() => window.fixture.calls.find(call => call.path === '/discovery/draft').body.motivation)).toBe('I am choosing between banking and venture capital.');
+  // The draft box has square corners, so its first letter is never clipped.
+  expect(await draft.evaluate(element => getComputedStyle(element).borderTopLeftRadius)).toBe('0px');
 });

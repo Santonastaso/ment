@@ -126,3 +126,35 @@ test('the rewording pass sees a stand-in for the person it names, and the name c
   }
   assert.ok(named, 'some reply named the person');
 });
+
+test('a caller that asks for progress gets each stage as it happens, then the same result', async () => {
+  const maria = { ...finance, id: 'maria-id', name: 'Maria Rossi' };
+  const fixture = discoveryFixture({ candidates: [maria], responses: [
+    { decision: 'ready', search_request: 'Financial modelling' },
+    { outcome: 'matches', matches: [{ ...directMatch.matches[0], profile_id: maria.id }] },
+  ] });
+  const response = await run(fixture, { action: 'chat', query: 'Financial modelling', lang: 'en' }, { accept: 'application/x-ndjson' });
+  assert.match(response.headers.get('content-type'), /ndjson/);
+  const lines = (await response.text()).trim().split('\n').map((line) => JSON.parse(line));
+  assert.deepEqual(lines.filter((line) => line.type === 'progress').map((line) => line.stage),
+    ['reading', 'searching', 'candidates', 'ranking', 'considering', 'writing']);
+  assert.equal(lines.find((line) => line.stage === 'candidates').count, 1);
+  assert.deepEqual(lines.find((line) => line.stage === 'considering').people, [{ first: 'Maria', reason: 'Teaches financial modelling.' }]);
+  const result = lines.at(-1);
+  assert.equal(result.type, 'result');
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.data.matches.map((m) => m.id), ['maria-id']);
+});
+
+test('the student\'s own reason shapes the draft, and the draft never opens with flattery', async () => {
+  const fixture = discoveryFixture({ responses: [{ body: 'I am weighing banking against VC and would value your view.' }] });
+  await request(fixture, { action: 'draft', query: 'Financial modelling', person_id: finance.id, lang: 'en',
+    motivation: 'I am choosing between investment banking and venture capital and you worked in both.' });
+  const call = fixture.calls.at(-1);
+  assert.equal(JSON.parse(call.messages[1].content).sender.why, 'I am choosing between investment banking and venture capital and you worked in both.');
+  assert.match(call.messages[0].content, /Do not open with a compliment/);
+  // Without a reason, nothing is invented in its place.
+  const plain = discoveryFixture({ responses: [{ body: 'Could you share how you approach modelling?' }] });
+  await request(plain, { action: 'draft', query: 'Financial modelling', person_id: finance.id, lang: 'en' });
+  assert.ok(!('why' in JSON.parse(plain.calls.at(-1).messages[1].content).sender));
+});

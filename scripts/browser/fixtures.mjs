@@ -32,7 +32,7 @@ function fixtureApi(state, ApiError) {
     return { ...session, isMentor: session.mentor_id === state.user.id, isMentee: session.mentee_id === state.user.id,
       latest_message: latest?.body || null, latest_message_kind: latest?.kind || null };
   };
-  const call = async (method, path, body) => {
+  const call = async (method, path, body, opts = {}) => {
     state.calls.push({ method, path, body });
     if (method === 'get' && state.holdLoads?.some(held => held.endsWith('*') ? path.startsWith(held.slice(0, -1)) : path === held)) {
       state.heldLoadStartedAt.push(Date.now());
@@ -121,9 +121,15 @@ function fixtureApi(state, ApiError) {
       if (path === '/discovery/matches') {
         if (state.calls.filter(c => c.path === path).length === 1) return { thread_id: 'thread', matches: [], clarification: 'Which finance skill would you like help with?',
           suggestions: [{ label: 'Financial modelling', message: 'Financial modelling' }] };
+        // Live progress, as the real function streams it; holdMatches keeps the
+        // search running so a test can look at it.
+        for (const event of [{ stage: 'reading' }, { stage: 'searching' }, { stage: 'candidates', count: 12 }, { stage: 'ranking' },
+          { stage: 'considering', people: [{ first: 'Peer', reason: 'Teaches financial modelling.' }] }]) opts.onProgress?.(event);
+        if (state.holdMatches) await new Promise(resolve => { state.releaseMatches = resolve; });
         return { thread_id: 'thread', resolved_request: 'Financial modelling', matches: [{ ...state.peer, expertise: ['Financial modelling'], reasons: ['Teaches financial modelling.'] }] };
       }
-      if (path === '/discovery/draft') return { thread_id: 'thread', draft: 'Hi Peer, I would appreciate your advice on financial modelling.' };
+      if (path === '/discovery/draft') return { thread_id: 'thread', draft: body?.motivation
+        ? `Hi Peer, ${body.motivation} Could we talk about financial modelling?` : 'Hi Peer, I would appreciate your advice on financial modelling.' };
       if (path === '/sessions') {
         // As the database does: the same identifier returns the request it
         // already made, and refuses to stand for different content.
@@ -223,7 +229,7 @@ function fixtureApi(state, ApiError) {
     }
     throw new Error(`Unmocked API: ${method} ${path}`);
   };
-  return Object.fromEntries(['get', 'post', 'put', 'delete'].map(method => [method, async (path, body) => ({ data: structuredClone(await call(method, path, body)) })]));
+  return Object.fromEntries(['get', 'post', 'put', 'delete'].map(method => [method, async (path, body, opts) => ({ data: structuredClone(await call(method, path, body, opts)) })]));
 }
 
 export const test = base.extend({

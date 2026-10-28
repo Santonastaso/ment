@@ -748,7 +748,38 @@ async function persistTurns(
   return data.id;
 }
 
+// Live progress: a caller that accepts NDJSON gets one line per stage while
+// the search runs, then the usual result as the last line. Without it the
+// response is exactly what it always was.
+type ProgressEvent = Record<string, unknown>;
+const PROGRESS = new WeakMap<Request, (event: ProgressEvent) => void>();
+
 Deno.serve(async (req) => {
+  if (req.method !== 'POST' || !(req.headers.get('accept') || '').includes('application/x-ndjson')) return handle(req);
+  const stream = new TransformStream<Uint8Array, Uint8Array>();
+  const writer = stream.writable.getWriter();
+  const encoder = new TextEncoder();
+  const send = (line: ProgressEvent) => writer.write(encoder.encode(`${JSON.stringify(line)}\n`)).catch(() => {});
+  PROGRESS.set(req, (event) => { send({ type: 'progress', ...event }); });
+  (async () => {
+    let response: Response;
+    try {
+      response = await handle(req);
+    } catch (error) {
+      console.error(JSON.stringify({ event: 'discovery_stream_failed', error: error instanceof Error ? error.name : 'unknown' }));
+      response = jsonError('ai_request_failed', 500);
+    }
+    const data = await response.json().catch(() => null);
+    await send({ type: 'result', status: response.status, data });
+    await writer.close().catch(() => {});
+  })();
+  return new Response(stream.readable, {
+    headers: { ...corsHeaders, 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-cache' },
+  });
+});
+
+async function handle(req: Request): Promise<Response> {
+  const progress = (event: ProgressEvent) => PROGRESS.get(req)?.(event);
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return jsonError('method_not_allowed', 405);
 
@@ -756,6 +787,7 @@ Deno.serve(async (req) => {
   try { ctx = await requireUser(req); } catch (response) { return response as Response; }
   const body = await req.json().catch(() => ({}));
   const action = body.action === 'draft' ? 'draft' : body.action === 'chat' ? 'chat' : 'match';
+  progress({ stage: action === 'draft' ? 'writing' : 'reading' });
   try {
     if (!await enforceRateLimit(ctx.sb, `discovery-${action}`, ctx.user.id, 30, 300)) {
       return jsonError('rate_limited', 429);
@@ -1358,6 +1390,7 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
     }
   }
 
+  if (action !== 'draft') progress({ stage: 'searching' });
   const { data: rows, error: candidateError } = await ctx.sb.rpc('discovery_candidates', {
     p_organization_id: caller.organization_id,
     p_viewer_id: ctx.user.id,
@@ -1382,6 +1415,7 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
     ...row,
     linkedin_headline: !redactInterOrg || established.has(row.id) ? row.linkedin_headline : null,
   }));
+  if (action !== 'draft') progress({ stage: 'candidates', count: candidates.length });
 
   if (action === 'draft') {
     const selected = candidates.find((candidate) => candidate.id === body.person_id);
@@ -1391,10 +1425,12 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
       const recipient = publicCandidate(selected, undefined, redactInterOrg && !established.has(selected.id));
       // The greeting and sign-off are added here, so the model needs neither name.
       const { name: _recipientName, id: _recipientId, ...recipientFacts } = recipient;
+      // The student's own reason, when given, is what makes the message theirs.
+      const why = cleanText(body.motivation, 500);
       const writeDraft = (correction: string) => mistralJson<{ body?: string }>({
         feature: 'discovery_draft',
-        system: `Write only the message body of a short, warm request for help, in ${language}. The SENDER is a student or alumnus asking for advice; the RECIPIENT is the experienced person being asked. Write in the sender's voice: "I" is the sender, who needs help; "you" is the recipient, who has the expertise. Talk about the RECIPIENT's background ("your experience in ...", "il tuo background in ...", "votre parcours en ..."), and say what the sender would like advice on. Never present the recipient's expertise as the sender's own, and never offer the sender's help or ideas: the sender is asking, not offering. Do not greet anyone, use either person's name, or add a sign-off; the application adds those. Do not describe their experience as \"verified\". Use only the supplied facts and never invent credentials, employers, skills, or relationships. Return JSON with one string field named body. Keep it under 80 words.${correction}`,
-        user: JSON.stringify({ sender: { need: query }, recipient: recipientFacts, variant: Number(body.variant) || 0 }),
+        system: `Write only the message body of a short, warm request for help, in ${language}. The SENDER is a student or alumnus asking for advice; the RECIPIENT is the experienced person being asked. Write in the sender's voice: "I" is the sender, who needs help; "you" is the recipient, who has the expertise. Talk about the RECIPIENT's background ("your experience in ...", "il tuo background in ...", "votre parcours en ..."), and say what the sender would like advice on. Never present the recipient's expertise as the sender's own, and never offer the sender's help or ideas: the sender is asking, not offering. Do not greet anyone, use either person's name, or add a sign-off; the application adds those. Do not describe their experience as \"verified\". Use only the supplied facts and never invent credentials, employers, skills, or relationships. Do not open with a compliment or generic praise ("your experience has always impressed me"); open with what the sender wants to talk about. When the sender gives "why", build the message around that reason, keep its specifics and, where natural, its wording, and add nothing they did not say about themselves. Return JSON with one string field named body. Keep it under 80 words.${correction}`,
+        user: JSON.stringify({ sender: { need: query, ...(why ? { why } : {}) }, recipient: recipientFacts, variant: Number(body.variant) || 0 }),
         temperature: Number(body.variant) ? 0.35 : 0.15,
         maxTokens: 350,
       });
@@ -1560,6 +1596,7 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
     company: narrowed.active.includes('company') ? companyFilter : '',
   }).filter(([, value]) => (Array.isArray(value) ? value.length : value));
   const wanted = wantedEntries.length ? Object.fromEntries(wantedEntries) : null;
+  progress({ stage: 'ranking' });
   try {
     const result = await mistralJson<MatchResult>({
       feature: 'discovery_match',
@@ -1692,6 +1729,11 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
     // sentence that says nothing matched exactly.
     const shown = matches.length ? matches : typedCarriers.length ? typedCarriers : fallback;
     for (const person of shown) knownNames.push(...nameAndFirst(person.name));
+    // Who is being put forward and why, in the reasons the user will see.
+    progress({ stage: 'considering', people: shown.slice(0, 3).map((person) => ({
+      first: person.name && person.name !== 'Network member' ? String(person.name).split(/\s+/)[0] : null,
+      reason: Array.isArray(person.reasons) ? cleanText(person.reasons[0], 160) : '',
+    })) });
     const isNear = constraintsMet || (!matches.length && typedCarriers.length > 0) ? false : (!matches.length || nearest || (nearestOnly && !locationFilterApplied) || relaxedParts.length > 0);
     const shownIds = new Set(shown.map((person) => person.id));
     const shownPeople = candidates.filter((candidate) => shownIds.has(candidate.id));
@@ -1706,6 +1748,7 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
       // The first person shown, by first name and title, when not redacted.
       person: shown[0]?.name && shown[0].name !== 'Network member' && shown[0].job_title
         ? { first: String(shown[0].name).split(/\s+/)[0], title: String(shown[0].job_title) } : undefined });
+    progress({ stage: 'writing' });
     const message = await voice(language, repeated && repeated === shown.length ? frameSamePeople(language, shown.length)
       : repeated ? `${framed} ${frameSomeRepeated(language, shown.length - repeated)}` : framed, query, recentReplies);
     const threadId = await persistTurns(ctx, body.thread_id, spoken, {
@@ -1730,4 +1773,4 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
     });
     return jsonError(mapped.message, mapped.status);
   }
-});
+}

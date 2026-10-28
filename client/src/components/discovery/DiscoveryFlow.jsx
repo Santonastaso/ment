@@ -22,7 +22,7 @@ const COPY = {
     finding: 'Having a look', chooseLead: 'Here are the people who fit.', chooseBold: 'Pick one and I will write the message.',
     why: 'Why this match', choose: 'Choose', selected: 'Selected', different: 'Ask for different people', browse: 'browse the full directory', notRight: 'Not quite right?', or: 'or',
     to: 'To', intro: "Here's a suggested intro. Edit anything, then send when it feels like you.", aiNote: 'Ment is an AI assistant and can make mistakes. You choose who to contact and what to send.', draftNote: 'Drafted by AI. Read it and make it yours before sending.', suggested: 'Suggested draft', send: 'Send request', regenerate: 'Regenerate',
-    sent: 'Request sent to {name}.', sentSubline: "The conversation is ready. Continue there when they reply.", openChat: 'Open chat', again: 'Ask about something else', newChat: 'New chat', recentSearches: 'Recent searches', deleteSearch: 'Delete search', confirmDeleteSearch: 'Delete this search and its saved conversation?', cancel: 'Keep search', retry: 'Start a new search', error: 'We could not complete that request. Please try again.', aiMissing: 'Matching is not configured yet. Ask an administrator to connect Mistral.', aiBusy: 'Matching is temporarily rate-limited. Please try again in a moment.', aiAdmin: 'Matching needs an administrator to check the Mistral connection.', noMatches: 'There is no relevant professional in the current network for this request.', nearestLead: 'These are the closest I could find \u2014 pick one and I will write the message.', snapshot: 'Your connections', upcoming: 'Upcoming', pending: 'Pending', completed: 'Completed', viewAll: 'View conversations', viewProfile: 'View profile', showEarlier: 'Show these {count} people again', showEarlierOne: 'Show this person again', hideEarlier: 'Hide these people', roleAt: '{role} at {company}', shownBefore: 'Shown before', back: 'Back to matches', drafting: 'Preparing your request', useful: 'Were these matches useful?', yes: 'Yes', no: 'No', feedbackSaved: 'Thanks — this helps improve matching.',
+    sent: 'Request sent to {name}.', sentSubline: "The conversation is ready. Continue there when they reply.", openChat: 'Open chat', again: 'Ask about something else', newChat: 'New chat', recentSearches: 'Recent searches', deleteSearch: 'Delete search', confirmDeleteSearch: 'Delete this search and its saved conversation?', cancel: 'Keep search', retry: 'Start a new search', error: 'We could not complete that request. Please try again.', aiMissing: 'Matching is not configured yet. Ask an administrator to connect Mistral.', aiBusy: 'Matching is temporarily rate-limited. Please try again in a moment.', aiAdmin: 'Matching needs an administrator to check the Mistral connection.', noMatches: 'There is no relevant professional in the current network for this request.', nearestLead: 'These are the closest I could find \u2014 pick one and I will write the message.', snapshot: 'Your connections', upcoming: 'Upcoming', pending: 'Pending', completed: 'Completed', viewAll: 'View conversations', viewProfile: 'View profile', showEarlier: 'Show these {count} people again', showEarlierOne: 'Show this person again', hideEarlier: 'Hide these people', roleAt: '{role} at {company}', shownBefore: 'Shown before', back: 'Back to matches', progressReading: 'Reading your request', progressSearching: 'Searching the network', progressCandidates: 'Found {count} people who could fit', progressRanking: 'Comparing the closest ones', progressConsidering: 'Considering {name}: {reason}', progressWriting: 'Writing it up', motivateQuestion: 'Before I write to {name}: what would you like to ask, and why them?', motivateLabel: 'In your own words', motivatePlaceholder: 'e.g. I am choosing between banking and venture capital, and you have worked in both.', motivateHelp: 'One or two lines are enough. They make the message yours, not a template.', motivateWrite: 'Write my message', motivateSkip: 'Skip, write it for me', drafting: 'Preparing your request', useful: 'Were these matches useful?', yes: 'Yes', no: 'No', feedbackSaved: 'Thanks — this helps improve matching.',
   },
   it: {
     history: 'Cronologia',
@@ -30,7 +30,7 @@ const COPY = {
     finding: 'Do un’occhiata', chooseLead: 'Ecco le persone adatte.', chooseBold: 'Scegline una e scrivo io il messaggio.',
     why: 'Perché è adatto', choose: 'Scegli', selected: 'Scelto', different: 'Mostra altre persone', browse: 'sfoglia la directory', notRight: 'Non è quello che cercavi?', or: 'oppure',
     to: 'A', intro: 'Ecco un messaggio proposto. Modifica tutto quello che vuoi, poi invialo quando ti sembra giusto.', aiNote: 'Ment è un assistente basato sull’IA e può sbagliare. Sei tu a scegliere chi contattare e cosa inviare.', draftNote: 'Scritto dall’IA. Rileggilo e rendilo tuo prima di inviarlo.', suggested: 'Messaggio proposto', send: 'Invia richiesta', regenerate: 'Rigenera',
-    sent: 'Richiesta inviata a {name}.', sentSubline: 'La conversazione è pronta. Continua da lì quando risponderà.', openChat: 'Apri chat', again: "Chiedi qualcos'altro", newChat: 'Nuova chat', recentSearches: 'Ricerche recenti', deleteSearch: 'Elimina ricerca', confirmDeleteSearch: 'Eliminare questa ricerca e la conversazione salvata?', cancel: 'Mantieni la ricerca', retry: 'Inizia una nuova ricerca', error: 'Non siamo riusciti a completare la richiesta. Riprova.', aiMissing: 'Il matching non è ancora configurato. Chiedi a un amministratore di collegare Mistral.', aiBusy: 'Il matching è temporaneamente limitato. Riprova tra poco.', aiAdmin: 'Un amministratore deve verificare la connessione a Mistral.', noMatches: 'Nella rete attuale non c’è un professionista pertinente per questa richiesta.', nearestLead: 'Queste sono le più vicine che ho trovato: scegline una e scrivo io il messaggio.', snapshot: 'Le tue connessioni', upcoming: 'In programma', pending: 'In attesa', completed: 'Completate', viewAll: 'Vedi conversazioni', viewProfile: 'Vedi profilo', showEarlier: 'Mostra di nuovo queste {count} persone', showEarlierOne: 'Mostra di nuovo questa persona', hideEarlier: 'Nascondi', roleAt: '{role} presso {company}', shownBefore: 'Già mostrato', back: 'Torna ai risultati', drafting: 'Preparo la richiesta', useful: 'Questi match sono utili?', yes: 'Sì', no: 'No', feedbackSaved: 'Grazie — ci aiuta a migliorare il matching.',
+    sent: 'Richiesta inviata a {name}.', sentSubline: 'La conversazione è pronta. Continua da lì quando risponderà.', openChat: 'Apri chat', again: "Chiedi qualcos'altro", newChat: 'Nuova chat', recentSearches: 'Ricerche recenti', deleteSearch: 'Elimina ricerca', confirmDeleteSearch: 'Eliminare questa ricerca e la conversazione salvata?', cancel: 'Mantieni la ricerca', retry: 'Inizia una nuova ricerca', error: 'Non siamo riusciti a completare la richiesta. Riprova.', aiMissing: 'Il matching non è ancora configurato. Chiedi a un amministratore di collegare Mistral.', aiBusy: 'Il matching è temporaneamente limitato. Riprova tra poco.', aiAdmin: 'Un amministratore deve verificare la connessione a Mistral.', noMatches: 'Nella rete attuale non c’è un professionista pertinente per questa richiesta.', nearestLead: 'Queste sono le più vicine che ho trovato: scegline una e scrivo io il messaggio.', snapshot: 'Le tue connessioni', upcoming: 'In programma', pending: 'In attesa', completed: 'Completate', viewAll: 'Vedi conversazioni', viewProfile: 'Vedi profilo', showEarlier: 'Mostra di nuovo queste {count} persone', showEarlierOne: 'Mostra di nuovo questa persona', hideEarlier: 'Nascondi', roleAt: '{role} presso {company}', shownBefore: 'Già mostrato', back: 'Torna ai risultati', progressReading: 'Leggo la tua richiesta', progressSearching: 'Cerco nella rete', progressCandidates: 'Ho trovato {count} persone che potrebbero fare al caso tuo', progressRanking: 'Confronto le più vicine', progressConsidering: 'Valuto {name}: {reason}', progressWriting: 'Preparo la risposta', motivateQuestion: 'Prima di scrivere a {name}: cosa vorresti chiedere, e perché proprio a questa persona?', motivateLabel: 'Con parole tue', motivatePlaceholder: 'es. Sto scegliendo tra banca d’affari e venture capital e tu hai lavorato in entrambi.', motivateHelp: 'Bastano una o due righe. Rendono il messaggio tuo, non un modello.', motivateWrite: 'Scrivi il mio messaggio', motivateSkip: 'Salta, scrivilo tu', drafting: 'Preparo la richiesta', useful: 'Questi match sono utili?', yes: 'Sì', no: 'No', feedbackSaved: 'Grazie — ci aiuta a migliorare il matching.',
   },
   fr: {
     history: 'Historique',
@@ -38,7 +38,7 @@ const COPY = {
     finding: 'Je regarde', chooseLead: 'Voici les personnes qui conviennent.', chooseBold: 'Choisissez-en une et j’écris le message.',
     why: 'Pourquoi ce profil', choose: 'Choisir', selected: 'Sélectionné', different: 'Voir d’autres personnes', browse: 'parcourir l’annuaire', notRight: 'Pas tout à fait ?', or: 'ou',
     to: 'À', intro: 'Voici un message proposé. Modifiez ce que vous voulez, puis envoyez-le lorsqu’il vous convient.', aiNote: 'Ment est un assistant fondé sur l’IA et peut se tromper. C’est vous qui choisissez qui contacter et quoi envoyer.', draftNote: 'Rédigé par l’IA. Relisez-le et adaptez-le avant de l’envoyer.', suggested: 'Message proposé', send: 'Envoyer la demande', regenerate: 'Régénérer',
-    sent: 'Demande envoyée à {name}.', sentSubline: 'La conversation est prête. Continuez là lorsqu’une réponse arrive.', openChat: 'Ouvrir le chat', again: 'Poser une autre question', newChat: 'Nouveau chat', recentSearches: 'Recherches récentes', deleteSearch: 'Supprimer la recherche', confirmDeleteSearch: 'Supprimer cette recherche et la conversation enregistrée ?', cancel: 'Garder la recherche', retry: 'Lancer une nouvelle recherche', error: 'Nous n’avons pas pu finaliser cette demande. Réessayez.', aiMissing: 'Le matching n’est pas encore configuré. Demandez à un administrateur de connecter Mistral.', aiBusy: 'Le matching est temporairement limité. Réessayez dans un instant.', aiAdmin: 'Un administrateur doit vérifier la connexion à Mistral.', noMatches: 'Le réseau actuel ne contient aucun professionnel pertinent pour cette demande.', nearestLead: 'Voici les plus proches que j’ai trouvées : choisissez-en une et j’écris le message.', snapshot: 'Vos connexions', upcoming: 'À venir', pending: 'En attente', completed: 'Terminées', viewAll: 'Voir les conversations', viewProfile: 'Voir le profil', showEarlier: 'Revoir ces {count} personnes', showEarlierOne: 'Revoir cette personne', hideEarlier: 'Masquer', roleAt: '{role} chez {company}', shownBefore: 'Déjà proposé', back: 'Retour aux résultats', drafting: 'Préparation de la demande', useful: 'Ces profils sont-ils utiles ?', yes: 'Oui', no: 'Non', feedbackSaved: 'Merci — cela nous aide à améliorer les suggestions.',
+    sent: 'Demande envoyée à {name}.', sentSubline: 'La conversation est prête. Continuez là lorsqu’une réponse arrive.', openChat: 'Ouvrir le chat', again: 'Poser une autre question', newChat: 'Nouveau chat', recentSearches: 'Recherches récentes', deleteSearch: 'Supprimer la recherche', confirmDeleteSearch: 'Supprimer cette recherche et la conversation enregistrée ?', cancel: 'Garder la recherche', retry: 'Lancer une nouvelle recherche', error: 'Nous n’avons pas pu finaliser cette demande. Réessayez.', aiMissing: 'Le matching n’est pas encore configuré. Demandez à un administrateur de connecter Mistral.', aiBusy: 'Le matching est temporairement limité. Réessayez dans un instant.', aiAdmin: 'Un administrateur doit vérifier la connexion à Mistral.', noMatches: 'Le réseau actuel ne contient aucun professionnel pertinent pour cette demande.', nearestLead: 'Voici les plus proches que j’ai trouvées : choisissez-en une et j’écris le message.', snapshot: 'Vos connexions', upcoming: 'À venir', pending: 'En attente', completed: 'Terminées', viewAll: 'Voir les conversations', viewProfile: 'Voir le profil', showEarlier: 'Revoir ces {count} personnes', showEarlierOne: 'Revoir cette personne', hideEarlier: 'Masquer', roleAt: '{role} chez {company}', shownBefore: 'Déjà proposé', back: 'Retour aux résultats', progressReading: 'Je lis votre demande', progressSearching: 'Je cherche dans le réseau', progressCandidates: '{count} personnes pourraient correspondre', progressRanking: 'Je compare les plus proches', progressConsidering: 'J’envisage {name} : {reason}', progressWriting: 'Je rédige la réponse', motivateQuestion: 'Avant d’écrire à {name} : que voudriez-vous demander, et pourquoi cette personne ?', motivateLabel: 'Avec vos mots', motivatePlaceholder: 'ex. J’hésite entre la banque d’affaires et le capital-risque, et vous avez travaillé dans les deux.', motivateHelp: 'Une ou deux lignes suffisent. Elles rendent le message personnel, pas un modèle.', motivateWrite: 'Rédiger mon message', motivateSkip: 'Passer, rédigez-le pour moi', drafting: 'Préparation de la demande', useful: 'Ces profils sont-ils utiles ?', yes: 'Oui', no: 'Non', feedbackSaved: 'Merci — cela nous aide à améliorer les suggestions.',
   },
 };
 
@@ -171,6 +171,9 @@ export default function DiscoveryFlow() {
   const [turns, setTurns] = useState([]);
   const [matches, setMatches] = useState([]);
   const [selected, setSelected] = useState(null);
+  // Live stages of the current search, and the student's reason for the chosen person.
+  const [progress, setProgress] = useState([]);
+  const [motivation, setMotivation] = useState('');
   const [draftVariant, setDraftVariant] = useState(0);
   const [draft, setDraft] = useState('');
   // The invite's own title, shown and editable on the draft card. It starts
@@ -275,10 +278,11 @@ export default function DiscoveryFlow() {
     const message = nextQuery.trim();
     if (!message) return;
     setTurns(current => [...current, { role: 'user', content: message, at: new Date().toISOString() }]);
-    setError(''); setStage('matching'); setMatchFeedback(null);
+    setError(''); setStage('matching'); setMatchFeedback(null); setProgress([]);
     setSelected(null); setDraft('');
     try {
-      const [{ data }] = await Promise.all([api.post('/discovery/matches', { query: message, thread_id: activeThreadId }), pause(350)]);
+      const onProgress = event => { if (version === flowVersion.current) setProgress(current => [...current, event]); };
+      const [{ data }] = await Promise.all([api.post('/discovery/matches', { query: message, thread_id: activeThreadId }, { onProgress }), pause(350)]);
       if (version !== flowVersion.current) return;
       setThreadId(data.thread_id || activeThreadId);
       refreshHistory().catch(() => {});
@@ -321,13 +325,21 @@ export default function DiscoveryFlow() {
     findMatches(nextQuery);
   }
 
-  async function choose(match) {
-    const version = flowVersion.current;
+  // Choosing someone first asks why them: a reason in the student's own words
+  // is what keeps the message from reading like a template.
+  function choose(match) {
     setPendingRequest(null);
     setSelected(match); setDraftVariant(0); setRequestTitle(suggestedTitle(match, submittedQuery));
+    setMotivation(''); setError(''); setStage('motivate');
+  }
+
+  async function writeDraft(why) {
+    const version = flowVersion.current;
+    const match = selected;
+    if (!match) return;
     setStage('drafting'); setError('');
     try {
-      const { data } = await api.post('/discovery/draft', { query: submittedQuery, person_id: match.person.id, variant: 0, thread_id: threadId });
+      const { data } = await api.post('/discovery/draft', { query: submittedQuery, person_id: match.person.id, variant: 0, thread_id: threadId, ...(why ? { motivation: why } : {}) });
       if (version !== flowVersion.current) return;
       setThreadId(data.thread_id || threadId); setDraft(data.draft || ''); setStage('reachout');
       refreshHistory().catch(() => {});
@@ -341,7 +353,7 @@ export default function DiscoveryFlow() {
     const variant = draftVariant === 0 ? 1 : 0;
     setDraftVariant(variant); setSending(true); setError('');
     try {
-      const { data } = await api.post('/discovery/draft', { query: submittedQuery, person_id: selected.person.id, variant, thread_id: threadId });
+      const { data } = await api.post('/discovery/draft', { query: submittedQuery, person_id: selected.person.id, variant, thread_id: threadId, ...(motivation.trim() ? { motivation: motivation.trim() } : {}) });
       setThreadId(data.thread_id || threadId);
       setDraft(data.draft || '');
     } catch (requestError) { setError(requestErrorMessage(requestError, copy)); }
@@ -466,8 +478,19 @@ export default function DiscoveryFlow() {
     if (currentThread) api.put(`/discovery/threads/${currentThread}`, { archived: true }).then(refreshHistory).catch(() => {});
   }
 
+  // What the search is doing right now, one short line per real stage.
+  const progressLines = progress.flatMap(event => {
+    if (event.stage === 'considering') {
+      return (event.people || []).filter(person => person.first && person.reason)
+        .map(person => text(copy, 'progressConsidering', { name: person.first, reason: person.reason.replace(/^./, c => c.toLocaleLowerCase()).replace(/\.$/, '') }));
+    }
+    if (event.stage === 'candidates') return event.count ? [text(copy, 'progressCandidates', { count: event.count })] : [];
+    const key = { reading: 'progressReading', searching: 'progressSearching', ranking: 'progressRanking', writing: 'progressWriting' }[event.stage];
+    return key ? [copy[key]] : [];
+  });
+
   function composer() {
-    return <><form className="discovery-composer" onSubmit={submit}><textarea ref={composerInputRef} value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} maxLength={2000} rows={1} placeholder={copy.placeholder} aria-label={copy.placeholder} disabled={stage === 'matching' || stage === 'drafting' || sending} /><Button size="icon" type="submit" className="send-spark" disabled={!query.trim() || stage === 'matching' || stage === 'drafting' || sending} aria-label={t('conversations.send')}><ArrowUp /></Button></form>
+    return <><form className="discovery-composer" onSubmit={submit}><textarea data-control-radius-exempt ref={composerInputRef} value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} maxLength={2000} rows={1} placeholder={copy.placeholder} aria-label={copy.placeholder} disabled={stage === 'matching' || stage === 'drafting' || sending} /><Button size="icon" type="submit" className="send-spark" disabled={!query.trim() || stage === 'matching' || stage === 'drafting' || sending} aria-label={t('conversations.send')}><ArrowUp /></Button></form>
       {/* AI Act Art. 50: people are told they are talking to an AI. */}
       <p className="discovery-ai-note" data-testid="discovery-ai-note">{copy.aiNote}</p></>;
   }
@@ -606,7 +629,49 @@ export default function DiscoveryFlow() {
           ? <Link key={choice.label} className="discovery-suggestion is-link" to={choice.href}>{choice.label}</Link>
           : <button type="button" key={choice.label} className="discovery-suggestion" disabled={sending} onClick={() => findMatches(choice.message)}>{choice.label}</button>)}</div>}</div></div>;
     })}</div>
-    {(stage === 'matching' || stage === 'drafting') && <div className="discovery-chat-turn is-assistant is-working" role="status" aria-live="polite"><span className="discovery-agent-mark" aria-label="Ment">M</span><p className="discovery-assistant-bubble">{stage === 'matching' ? copy.finding : copy.drafting}<span className="discovery-typing" aria-hidden="true"><i /><i /><i /></span></p></div>}
+    {stage === 'matching' && progressLines.length > 0 ? (
+      <div className="discovery-chat-turn is-assistant is-working" role="status" aria-live="polite">
+        <span className="discovery-agent-mark" aria-label="Ment">M</span>
+        <ol className="discovery-progress" data-testid="discovery-progress">
+          {progressLines.map((line, index) => (
+            <li key={`${index}-${line}`} className={index === progressLines.length - 1 ? 'is-current' : 'is-done'}>
+              {index === progressLines.length - 1 ? <span className="discovery-typing" aria-hidden="true"><i /><i /><i /></span> : <Check aria-hidden="true" />}
+              <span>{line}</span>
+            </li>
+          ))}
+        </ol>
+      </div>
+    ) : (stage === 'matching' || stage === 'drafting') && <div className="discovery-chat-turn is-assistant is-working" role="status" aria-live="polite"><span className="discovery-agent-mark" aria-label="Ment">M</span><p className="discovery-assistant-bubble">{stage === 'matching' ? copy.finding : copy.drafting}<span className="discovery-typing" aria-hidden="true"><i /><i /><i /></span></p></div>}
+    {stage === 'motivate' && selected && (
+      <div className="discovery-reachout discovery-reveal" data-testid="discovery-motivate">
+        <div className="discovery-assistant-message">
+          <span className="discovery-agent-mark" aria-hidden="true">M</span>
+          <div className="discovery-message-body">
+            <p>{text(copy, 'motivateQuestion', { name: selected.person.name.split(' ')[0] })}</p>
+            <div className="discovery-to-row">
+              <span className="discovery-avatar size-10" style={{ backgroundColor: avatarTint(selected.person.name) }}>{initials(selected.person.name)}</span>
+              <span>
+                <span className="discovery-micro">{copy.to}</span>
+                <strong>{selected.person.name}</strong>
+                <small>{[selected.person.job_title || selected.person.current_role, selected.person.department].filter(Boolean).join(' · ')}</small>
+              </span>
+            </div>
+            <form className="discovery-draft is-motivate" onSubmit={event => { event.preventDefault(); if (motivation.trim().length >= 10) writeDraft(motivation.trim()); }}>
+              <span className="discovery-draft-title"><span>{copy.motivateLabel}</span></span>
+              <textarea data-control-radius-exempt autoFocus value={motivation} maxLength={500} onChange={event => setMotivation(event.target.value)} placeholder={copy.motivatePlaceholder} aria-label={copy.motivateLabel} data-testid="discovery-motivation" />
+              <p className="discovery-ai-note is-draft">{copy.motivateHelp}</p>
+              <div className="discovery-actions">
+                <Button type="button" variant="link" onClick={() => setStage('choose')}><ArrowLeft />{copy.back}</Button>
+                <div className="discovery-action-controls">
+                  <Button type="button" variant="ghost" onClick={() => writeDraft('')} data-testid="discovery-motivation-skip">{copy.motivateSkip}</Button>
+                  <Button type="submit" disabled={motivation.trim().length < 10} data-testid="discovery-motivation-write"><Pencil />{copy.motivateWrite}</Button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    )}
     {stage === 'choose' && <div className="discovery-reveal"><div className="discovery-match-grid" role="radiogroup" aria-label="Choose a person">{matches.map((match, index) => <MatchCard key={match.person.id} match={match} index={index} seenBefore={earlierIds.has(match.person.id)} profileHref={profileHref} onViewProfile={viewProfile} selected={selected?.person.id === match.person.id} onSelect={choose} copy={copy} style={{ animationDelay: `${Math.min(index, 6) * 65}ms` }} />)}</div><div className="discovery-result-actions" role="group" aria-label={copy.useful}>
       <button type="button" className="discovery-result-icon" aria-label={`${copy.useful} ${copy.yes}`} title={copy.yes} aria-pressed={matchFeedback === true} onClick={() => saveMatchFeedback(true)}><ThumbsUp /></button>
       <button type="button" className="discovery-result-icon" aria-label={`${copy.useful} ${copy.no}`} title={copy.no} aria-pressed={matchFeedback === false} onClick={() => saveMatchFeedback(false)}><ThumbsDown /></button>
@@ -636,7 +701,7 @@ export default function DiscoveryFlow() {
                 <span>{t('components.sessionRequest.requestTitle')}</span>
                 <input type="text" data-control-radius-exempt value={requestTitle} maxLength={120} onChange={event => setRequestTitle(event.target.value)} disabled={stage === 'sent' || sending || !!pendingRequest} />
               </label>
-              <textarea value={draft} onChange={event => setDraft(event.target.value)} disabled={stage === 'sent' || sending || !!pendingRequest} aria-label={copy.suggested} />
+              <textarea data-control-radius-exempt value={draft} onChange={event => setDraft(event.target.value)} disabled={stage === 'sent' || sending || !!pendingRequest} aria-label={copy.suggested} />
               {stage !== 'sent' && <p className="discovery-ai-note is-draft" data-testid="discovery-draft-ai-note">{copy.draftNote}</p>}
             </div>
             {stage === 'reachout' ? (

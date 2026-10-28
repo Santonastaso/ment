@@ -42,6 +42,54 @@ export async function invokeUserFunction(name, body) {
   return result;
 }
 
+// Calls a function that can report progress: each NDJSON line before the last
+// goes to onProgress, the last carries the result. Any trouble with streaming
+// (an older function, no session, a network hiccup) falls back to a plain call.
+export async function invokeWithProgress(name, body, onProgress) {
+  const { data: auth } = await supabase.auth.getSession();
+  const token = auth?.session?.access_token;
+  if (!token || typeof TextDecoder === 'undefined') return invokeUserFunction(name, body);
+  let response;
+  try {
+    response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${name}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, apikey: import.meta.env.VITE_SUPABASE_ANON_KEY, 'Content-Type': 'application/json', Accept: 'application/x-ndjson' },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    return invokeUserFunction(name, body);
+  }
+  if (response.status === 401 || !response.body || !(response.headers.get('content-type') || '').includes('ndjson')) {
+    if (response.status === 401) return invokeUserFunction(name, body);
+    const data = await response.json().catch(() => null);
+    return response.ok ? { data, error: null } : { data, error: { status: response.status, message: data?.error } };
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffered = '';
+  let result = null;
+  const take = (line) => {
+    if (!line.trim()) return;
+    let event;
+    try { event = JSON.parse(line); } catch { return; }
+    if (event.type === 'result') result = event;
+    else if (event.type === 'progress') { try { onProgress(event); } catch { /* progress is decoration */ } }
+  };
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffered += decoder.decode(value, { stream: true });
+    const lines = buffered.split('\n');
+    buffered = lines.pop();
+    lines.forEach(take);
+  }
+  take(buffered);
+  if (!result) return { data: null, error: { status: 502, message: 'ai_request_failed' } };
+  return result.status >= 400
+    ? { data: result.data, error: { status: result.status, message: result.data?.error } }
+    : { data: result.data, error: null };
+}
+
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 async function getViewerId() {
@@ -713,11 +761,11 @@ async function post(url, body = {}, opts = {}) {
   if (url === '/discovery/matches' || url === '/discovery/draft') {
     // A local build can point at a test copy of the function; production
     // leaves this unset and calls the real one.
-    const { data, error } = await invokeUserFunction(import.meta.env.VITE_DISCOVERY_FUNCTION || 'discovery-assistant', {
-      ...body,
-      lang: body.lang || getLang(),
-      action: url.endsWith('/draft') ? 'draft' : 'chat',
-    });
+    const name = import.meta.env.VITE_DISCOVERY_FUNCTION || 'discovery-assistant';
+    const payload = { ...body, lang: body.lang || getLang(), action: url.endsWith('/draft') ? 'draft' : 'chat' };
+    const { data, error } = opts.onProgress
+      ? await invokeWithProgress(name, payload, opts.onProgress)
+      : await invokeUserFunction(name, payload);
     if (error || data?.error) throw await edgeFunctionError(error, data, 'ai_request_failed');
     return ok(data);
   }
