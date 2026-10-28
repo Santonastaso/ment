@@ -18,9 +18,9 @@ export async function discoveryHandler() {
     banner: { js: `let fixture, handler;
       const Deno = {serve: fn => {handler = fn}, env: {get: key => fixture.env[key]}};
       const fetch = (...args) => fixture.fetch(...args);` },
-    footer: { js: `export async function run(context, body) {
+    footer: { js: `export async function run(context, body, headers = {}) {
       fixture = context;
-      return handler(new Request('https://fixture.invalid/discovery', {method:'POST',body:JSON.stringify(body)}));
+      return handler(new Request('https://fixture.invalid/discovery', {method:'POST',body:JSON.stringify(body),headers}));
     }` },
     plugins: [{ name: 'fixture-boundaries', setup(builder) {
       builder.onResolve({ filter: /\/_shared\/(index|rate-limit|ai-telemetry)\.ts$/ }, args => ({ path: args.path.split('/').at(-1), namespace: 'fixture' }));
