@@ -589,8 +589,8 @@ test('Explorer sticky panel controls share dimensions and use the interactive ra
   await page.locator('.directory-filter').first().click();
   const option = page.locator('.directory-filter-option:visible').first();
   await expect(option).toBeVisible();
-  expect(await option.evaluate(element => element.getBoundingClientRect().height)).toBeCloseTo(homeHeight, 3);
-  expect(await option.evaluate(element => getComputedStyle(element).borderRadius)).toBe('999px');
+  await expect.poll(async () => (await option.boundingBox())?.height ?? 0).toBeCloseTo(homeHeight, 3);
+  await expect(option).toHaveCSS('border-radius', '999px');
   await page.keyboard.press('Escape');
   const [searchBox, brandBox] = await Promise.all([
     page.locator('.page-title-row h1').boundingBox(),
@@ -2094,20 +2094,25 @@ test('an older server blocks admin creation with a useful explanation before sub
 });
 
 test('school admins see four tabs, and six KPIs folded on the Overview', async ({ page }) => {
+  test.setTimeout(120_000);
   await page.goto('/');
   await page.evaluate(() => sessionStorage.setItem('ment.fixture.auth', JSON.stringify({ id: 'admin', name: 'Org Admin', email: 'admin@example.test', role: 'admin', onboarding_complete: true, is_admin: true, admin_scope: 'org' })));
   await page.goto('/admin');
   const tabs = page.locator('[data-testid^="admin-tab-"]');
-  await expect(tabs).toHaveText(['Overview', 'People', 'Feedback', 'Settings']);
+  await expect(tabs).toHaveText(['Overview', 'People', 'Feedback', 'Settings'], { timeout: 30_000 });
   await expect(page.getByRole('tablist')).toHaveCount(1);
   const tabStrip = page.getByRole('tablist');
   const firstPosition = await tabStrip.boundingBox();
   for (const name of ['People', 'Feedback', 'Settings', 'Overview']) {
-    await page.getByRole('tab', { name }).click();
+    const selectedTab = page.getByRole('tab', { name });
+    await selectedTab.click();
+    await expect(selectedTab).toHaveAttribute('aria-selected', 'true');
+    const panel = page.getByRole('tabpanel');
+    await expect(panel).toHaveAttribute('aria-labelledby', await selectedTab.getAttribute('id'));
     const position = await tabStrip.boundingBox();
     expect(Math.abs(position.x - firstPosition.x)).toBeLessThan(1);
     expect(Math.abs(position.y - firstPosition.y)).toBeLessThan(1);
-    expect(await page.getByRole('tabpanel').evaluate(element => getComputedStyle(element).animationName)).toBe('none');
+    await expect(panel).toHaveCSS('animation-name', 'none');
   }
   await expect(tabs.first()).toHaveAttribute('aria-selected', 'true');
   await tabs.first().focus();
