@@ -124,6 +124,74 @@ async function createSingleMember(ctx: Awaited<ReturnType<typeof requireAdmin>>,
   return jsonOk({ email, created, attached: !created, temp_password: created ? tempPassword : null }, 201);
 }
 
+async function createOrgAdmin(ctx: Awaited<ReturnType<typeof requireAdmin>>, body: Record<string, unknown>) {
+  // An organization admin cannot delegate their own privileges. Platform
+  // admins may create school admins, never another platform admin here.
+  if (ctx.profile.admin_scope !== 'platform') return jsonError('platform_admin_required', 403);
+
+  const email = String(body.email || '').trim().toLowerCase();
+  const name = String(body.name || '').trim();
+  const organizationId = String(body.organization_id || '').trim();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || !name) return jsonError('valid_email_and_name_required');
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(organizationId)) {
+    return jsonError('organization_required');
+  }
+  const { data: organization, error: orgError } = await ctx.sb.from('organizations')
+    .select('id').eq('id', organizationId).maybeSingle();
+  if (orgError) return jsonError('organization_lookup_failed', 500);
+  if (!organization) return jsonError('organization_not_found', 404);
+
+  // Do not silently promote an existing member or adopt an Auth-only account.
+  // Granting privileges to an existing login deserves a separate reviewed flow.
+  const { data: existingId, error: lookupError } = await ctx.sb.rpc('admin_auth_user_id_by_email', { p_email: email });
+  if (lookupError) return jsonError('account_lookup_failed', 500);
+  if (existingId) return jsonError('account_already_exists', 409);
+
+  const tempPassword = generateTempPassword();
+  const { data: created, error: createError } = await ctx.sb.auth.admin.createUser({
+    email,
+    password: tempPassword,
+    email_confirm: true,
+    user_metadata: { name },
+  });
+  if (createError || !created.user) {
+    return jsonError(createError?.message?.toLowerCase().includes('already') ? 'account_already_exists' : 'account_create_failed',
+      createError?.message?.toLowerCase().includes('already') ? 409 : 500);
+  }
+
+  const userId = created.user.id;
+  const rollback = async () => {
+    const { error } = await ctx.sb.auth.admin.deleteUser(userId);
+    if (error) console.error('admin provisioning rollback failed', userId, error.message);
+  };
+  const { error: metadataError } = await ctx.sb.auth.admin.updateUserById(userId, {
+    app_metadata: {
+      ...created.user.app_metadata,
+      organization_id: organizationId,
+      admin_scope: 'org',
+      must_change_password: true,
+    },
+  });
+  if (metadataError) {
+    await rollback();
+    return jsonError('trusted_metadata_update_failed', 500);
+  }
+
+  const { error: provisionError } = await ctx.sb.rpc('platform_provision_org_admin', {
+    p_actor_id: ctx.user.id,
+    p_user_id: userId,
+    p_organization_id: organizationId,
+    p_name: name,
+  });
+  if (provisionError) {
+    await rollback();
+    console.error('admin provisioning failed', provisionError.message);
+    return jsonError('admin_profile_create_failed', 500);
+  }
+
+  return jsonOk({ email, created: true, temp_password: tempPassword, scope: 'org' }, 201);
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return jsonError('method_not_allowed', 405);
@@ -132,7 +200,11 @@ Deno.serve(async (req) => {
   try { ctx = await requireAdmin(req); } catch (r) { return r as Response; }
 
   const body = await req.json().catch(() => ({}));
+  if (body.action === 'capabilities') {
+    return jsonOk({ create_org_admin: ctx.profile.admin_scope === 'platform' });
+  }
   if (body.action === 'create_single') return createSingleMember(ctx, body);
+  if (body.action === 'create_org_admin') return createOrgAdmin(ctx, body);
   const storagePath = (body.storage_path || '').toString();
   const mode = IMPORT_MODES.includes(body.mode) ? body.mode : 'insert';
   if (!storagePath) return jsonError('storage_path_required');

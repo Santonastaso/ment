@@ -2051,6 +2051,48 @@ test('an admin sets how long data is kept, and nothing is set until they do', as
   });
 });
 
+test('platform admins can create school admins for an explicit school; school admins cannot', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => sessionStorage.setItem('ment.fixture.auth', JSON.stringify({ id: 'platform', name: 'Platform Admin', email: 'platform@example.test', role: 'admin', onboarding_complete: true, is_admin: true, admin_scope: 'platform' })));
+  await page.goto('/admin?tab=people');
+  await page.getByTestId('add-people-toggle').click();
+  const type = page.getByLabel('Account type');
+  await expect(type.locator('option')).toHaveText(['Member', 'School admin']);
+  await type.selectOption('admin');
+  const school = page.getByLabel('School', { exact: true });
+  await expect(school).toHaveValue('');
+  await expect(page.getByRole('button', { name: 'Create school admin' })).toBeDisabled();
+  await school.selectOption('10000000-0000-0000-0000-000000000002');
+  await page.getByLabel('Email', { exact: true }).first().fill('new-admin@example.test');
+  await page.getByLabel('Full name').fill('New School Admin');
+  await page.getByRole('button', { name: 'Create school admin' }).click();
+  await expect(page.getByText('School admin created. No email was sent.')).toBeVisible();
+  expect(await page.evaluate(() => window.fixture.adminProvisionCalls)).toEqual([{
+    action: 'create_org_admin', email: 'new-admin@example.test', name: 'New School Admin',
+    organization_id: '10000000-0000-0000-0000-000000000002',
+  }]);
+
+  await page.evaluate(() => sessionStorage.setItem('ment.fixture.auth', JSON.stringify({ id: 'admin', name: 'Org Admin', email: 'admin@example.test', role: 'admin', onboarding_complete: true, is_admin: true, admin_scope: 'org' })));
+  await page.goto('/admin?tab=people');
+  await page.getByTestId('add-people-toggle').click();
+  await expect(page.getByLabel('Account type').locator('option')).toHaveText(['Member']);
+});
+
+test('an older server blocks admin creation with a useful explanation before submitting', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => {
+    sessionStorage.setItem('ment.fixture.auth', JSON.stringify({ id: 'platform', name: 'Platform Admin', email: 'platform@example.test', role: 'admin', onboarding_complete: true, is_admin: true, admin_scope: 'platform' }));
+  });
+  await page.goto('/admin?tab=people');
+  await page.evaluate(() => { window.fixture.adminCapabilitiesUnavailable = true; });
+  await page.getByTestId('add-people-toggle').click();
+  await page.getByLabel('Account type').selectOption('admin');
+  await expect(page.getByText('Admin account creation is not live yet.', { exact: false })).toBeVisible();
+  await page.getByLabel('School', { exact: true }).selectOption('10000000-0000-0000-0000-000000000001');
+  await expect(page.getByRole('button', { name: 'Create school admin' })).toBeDisabled();
+  expect(await page.evaluate(() => window.fixture.adminProvisionCalls || [])).toEqual([]);
+});
+
 test('school admins see four tabs, and six KPIs folded on the Overview', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => sessionStorage.setItem('ment.fixture.auth', JSON.stringify({ id: 'admin', name: 'Org Admin', email: 'admin@example.test', role: 'admin', onboarding_complete: true, is_admin: true, admin_scope: 'org' })));
