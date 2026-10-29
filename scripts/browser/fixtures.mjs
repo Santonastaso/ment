@@ -218,6 +218,10 @@ function fixtureApi(state, ApiError) {
             { skill: 'Brand strategy', offered: ['Marketing'], wanted: [], sessions: [] },
           ],
         },
+        '/admin/owner-stats': { organizations: [
+          { organizationId: '10000000-0000-0000-0000-000000000001', organizationName: 'ESSEC' },
+          { organizationId: '10000000-0000-0000-0000-000000000002', organizationName: 'Test School' },
+        ] },
       };
       if (route in admin) return admin[route];
     }
@@ -294,6 +298,16 @@ export const test = base.extend({
         const listeners = [];
         window.fixture.emit = (table, row) => listeners.filter(l => l.filter.table === table).forEach(l => l.callback({new:row}));
         export const supabase = {functions:{invoke:async(name,{body})=>{
+          if(name==='admin-create-user') {
+            if(body.action==='capabilities') {
+              if(window.fixture.adminCapabilitiesUnavailable) return {
+                data:null,error:{context:{json:async()=>({error:'storage_path_required'})}},
+              };
+              return {data:{create_org_admin:true},error:null};
+            }
+            window.fixture.adminProvisionCalls=[...(window.fixture.adminProvisionCalls||[]),body];
+            return {data:{email:body.email,created:true,temp_password:'temporary-test-password',scope:body.action==='create_org_admin'?'org':'none'},error:null};
+          }
           if(name!=='complete-password-change') throw new Error('Unexpected function: '+name);
           window.fixture.changedPassword=body.password;
           window.fixture.authReady=false;
