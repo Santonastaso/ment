@@ -2022,8 +2022,20 @@ test('the knowledge graph opens on insights and explains a skill when it is pick
   await expect(page.getByText(/^Taught by \(\d+\)$/)).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByText('Most wanted skills')).toBeVisible();
-  await page.getByTestId('kg-view-people').click();
-  await expect(page.getByTestId('kg-view-people')).toHaveAttribute('aria-pressed', 'true');
+  // The skill network opens first: skills linked to each other, and the best-linked ranked.
+  await expect(page.getByTestId('kg-view-skills')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('kg-ranking')).toContainText('Most connected skills');
+  await expect(page.getByTestId('kg-ranking').locator('li').first()).toContainText('Public speaking');
+  await page.getByTestId('kg-ranking').locator('li button').first().click();
+  await expect(page.getByText('Often offered with')).toBeVisible();
+  await page.keyboard.press('Escape');
+  // Shared across programmes: programmes grouped by programme, and only shared skills.
+  await page.getByTestId('kg-view-shared').click();
+  await expect(page.getByTestId('kg-view-shared')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('kg-ranking')).toContainText('Skills shared by most programmes');
+  await expect(page.getByTestId('kg-ranking').locator('li').first()).toContainText('Valuation');
+  await expect(page.locator('.kg-departments')).toContainText('MSc in Finance');
+  await expect(page.locator('.kg-departments li').last()).toContainText('Other programmes');
   await page.getByRole('button', { name: 'Full screen' }).click();
   await expect.poll(() => page.evaluate(() => Boolean(document.fullscreenElement))).toBe(true);
   await page.getByRole('button', { name: 'Exit full screen' }).click();

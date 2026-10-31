@@ -12,18 +12,22 @@ function fixtureApi(state, ApiError) {
   // Aggregated fixture data mirrors the privacy-safe RPC contract: there are
   // no person nodes or person-level edges, and every released cell is >= 5.
   function sampleKnowledgeGraph() {
-    const departments = ['Finance', 'Marketing', 'Consulting', 'Operations', 'Strategy', 'Data & Analytics', 'Human Resources', 'Public Policy', 'Luxury & Retail', 'Sustainability'];
-    const departmentNodes = departments.map((label, index) => ({ id: `d:${index}`, kind: 'department', label, count: 6 }));
+    // Programmes and skills, as the 0095 function returns them: no people, and
+    // every count at five or more. The pooled group comes without a name.
+    const programs = ['MiM', 'MSc in Finance', 'SMIB', 'Global BBA', 'MBA', null];
+    const programNodes = programs.map((label, index) => ({ id: `g:${index}`, kind: 'program', label, count: 12 - index }));
     const skills = ['Financial modelling', 'Valuation', 'Brand strategy', 'SQL', 'Python', 'Negotiation', 'Public speaking', 'Supply chain']
       .map((label, i) => ({ id: `s:${i}`, kind: 'skill', label, teachers: 8, learners: 7 }));
     const edges = [];
-    departmentNodes.forEach((department, index) => {
-      edges.push({ source: department.id, target: 's:1', type: index % 2 ? 'wants_to_learn' : 'can_teach', count: 6 });
-      if (index < skills.length) edges.push({ source: department.id, target: `s:${index}`, type: 'can_teach', count: 6 });
-      if (index > 0) edges.push({ source: 'd:0', target: department.id, type: 'session', count: 8 });
+    programNodes.forEach((program, index) => {
+      edges.push({ source: program.id, target: 's:1', type: index % 2 ? 'wants_to_learn' : 'can_teach', count: 6 });
+      edges.push({ source: program.id, target: `s:${index}`, type: 'can_teach', count: 6 });
+      if (index > 0) edges.push({ source: 'g:0', target: program.id, type: 'session', count: 8 });
     });
-    edges.push({ source: 'd:0', target: 'd:1', type: 'connection', count: 6 });
-    return { nodes: [...departmentNodes, ...skills], edges, meta: { organizations: [{ id: 'org', name: 'ESSEC' }], languages: ['en', 'fr'] } };
+    // Skills offered together: modelling with valuation (strongest), and a chain.
+    [['s:0', 's:1', 11], ['s:1', 's:6', 6], ['s:3', 's:4', 9], ['s:4', 's:0', 5], ['s:2', 's:6', 7], ['s:5', 's:6', 5]]
+      .forEach(([source, target, count]) => edges.push({ source, target, type: 'skill_link', count }));
+    return { nodes: [...programNodes, ...skills], edges, meta: { organizations: [{ id: 'org', name: 'ESSEC' }], languages: ['en', 'fr'] } };
   }
 
   const dropped = () => new ApiError('TypeError: Failed to fetch', 500);

@@ -29,7 +29,7 @@ const EDGE_COLORS = {
   wants_to_learn: '#ff6b57',
   session: '#1e1b3a',
   connection: '#8e89c4',
-  peer: '#5a5870',
+  skill_link: '#8e89c4',
 };
 const QUIET_LINK = 'rgba(90, 88, 112, 0.14)';
 const FADED_LINK = 'rgba(90, 88, 112, 0.04)';
@@ -75,9 +75,9 @@ export default function KnowledgeGraph() {
   const [company, setCompany] = useState('');
   const [language, setLanguage] = useState('');
   const [hovered, setHovered] = useState(null);
-  // Both views contain department aggregates only; the second focuses on
-  // aggregate session/connection links between departments.
-  const [view, setView] = useState('bipartite');
+  // Two views, both aggregates only: 'skills' links skills offered together,
+  // 'shared' shows programmes and the skills two or more of them share.
+  const [view, setView] = useState('skills');
   const [showReal, setShowReal] = useState(true);
   const [skill, setSkill] = useState('');
   const [query, setQuery] = useState('');
@@ -119,9 +119,9 @@ export default function KnowledgeGraph() {
   const organizations = graph?.meta?.organizations || [];
   const languages = graph?.meta?.languages || [];
 
-  // The database names the pooled group "Other departments"; show it in the reader's language.
-  const nodes = useMemo(() => (graph?.nodes || []).map(n => (n.kind === 'department' && n.label === 'Other departments'
-    ? { ...n, label: t('graph.otherDepartments') } : n)), [graph, t]);
+  // The pooled programme comes without a name; show it in the reader's language.
+  const nodes = useMemo(() => (graph?.nodes || []).map(n => (n.kind === 'program' && !n.label
+    ? { ...n, label: t('graph.otherPrograms'), pooled: true } : n)), [graph, t]);
   const edges = graph?.edges || [];
 
   const visibleNodes = useMemo(() => {
@@ -138,23 +138,33 @@ export default function KnowledgeGraph() {
   const kindById = useMemo(() => new Map(nodes.map((n) => [n.id, n.kind])), [nodes]);
   const nodeById = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
 
-  // The endpoint returns department and skill aggregates, never member nodes.
+  // Programmes that share each skill (offer or want it, five or more each).
+  const programsBySkill = useMemo(() => {
+    const map = new Map();
+    for (const e of visibleEdges) {
+      if (e.type !== 'can_teach' && e.type !== 'wants_to_learn') continue;
+      if (!map.has(e.target)) map.set(e.target, new Set());
+      map.get(e.target).add(e.source);
+    }
+    return map;
+  }, [visibleEdges]);
+
+  // The endpoint returns programme and skill aggregates, never member nodes.
   const { graphData } = useMemo(() => {
-    const realLinks = showReal
-      ? visibleEdges
-          .filter((e) => REAL_LINK_TYPES.has(e.type))
-          .map((e) => ({ source: e.source, target: e.target, value: e.count || 1, type: e.type }))
-      : [];
-    let candidateNodes = view === 'people' ? visibleNodes.filter(n => n.kind === 'department') : visibleNodes;
     let links;
-    if (view === 'people') {
-      links = realLinks;
+    let candidateNodes;
+    if (view === 'skills') {
+      candidateNodes = visibleNodes.filter(n => n.kind === 'skill');
+      links = visibleEdges.filter(e => e.type === 'skill_link')
+        .map(e => ({ source: e.source, target: e.target, type: e.type, value: e.count || 1 }));
     } else {
+      const shared = new Set([...programsBySkill.entries()].filter(([, programs]) => programs.size >= 2).map(([id]) => id));
+      candidateNodes = visibleNodes.filter(n => n.kind === 'program' || shared.has(n.id));
       links = [
-        ...visibleEdges
-          .filter((e) => !REAL_LINK_TYPES.has(e.type))
-          .map((e) => ({ source: e.source, target: e.target, type: e.type, value: e.count || 1 })),
-        ...realLinks,
+        ...visibleEdges.filter(e => (e.type === 'can_teach' || e.type === 'wants_to_learn') && shared.has(e.target))
+          .map(e => ({ source: e.source, target: e.target, type: e.type, value: e.count || 1 })),
+        ...(showReal ? visibleEdges.filter(e => REAL_LINK_TYPES.has(e.type))
+          .map(e => ({ source: e.source, target: e.target, value: e.count || 1, type: e.type })) : []),
       ];
     }
     const linked = new Set(links.flatMap(l => [l.source, l.target]));
@@ -162,7 +172,7 @@ export default function KnowledgeGraph() {
     return {
       graphData: { nodes: kept.map((n) => ({ ...n })), links },
     };
-  }, [visibleNodes, visibleEdges, view, kindById, showReal]);
+  }, [visibleNodes, visibleEdges, view, programsBySkill, showReal]);
 
   // Degree (within the active view) drives node size.
   const degree = useMemo(() => {
@@ -177,17 +187,17 @@ export default function KnowledgeGraph() {
   }, [graphData]);
   const radius = useCallback((node) => {
     const deg = degree.get(node.id) || 0;
-    return node.kind === 'department' ? 5 + Math.min(Math.sqrt(deg) * 1.6, 9) : 4 + Math.min(Math.sqrt(deg) * 1.1, 6);
+    return node.kind === 'program' ? 5 + Math.min(Math.sqrt(deg) * 1.6, 9) : 4 + Math.min(Math.sqrt(deg) * 1.1, 6);
   }, [degree]);
 
-  // Largest fields first and in colour; the pooled "other" group goes last, in grey.
+  // Largest programmes first and in colour; the pooled group goes last, in grey.
+  // Listed from the whole response, so the list is the same in both views.
   const departmentList = useMemo(() => {
-    const other = t('graph.otherDepartments');
-    const fields = graphData.nodes.filter(n => n.kind === 'department')
-      .sort((a, b) => (a.label === other) - (b.label === other) || b.count - a.count || a.label.localeCompare(b.label));
-    return fields.map((n, index) => ({ name: n.label, id: n.id, count: n.count,
-      color: n.label === other ? OTHER_DEPARTMENT : DEPARTMENT_PALETTE[index] || OTHER_DEPARTMENT }));
-  }, [graphData, t]);
+    const programs = visibleNodes.filter(n => n.kind === 'program')
+      .sort((a, b) => Boolean(a.pooled) - Boolean(b.pooled) || b.count - a.count || a.label.localeCompare(b.label));
+    return programs.map((n, index) => ({ name: n.label, id: n.id, count: n.count,
+      color: n.pooled ? OTHER_DEPARTMENT : DEPARTMENT_PALETTE[index] || OTHER_DEPARTMENT }));
+  }, [visibleNodes]);
   const departmentColor = useMemo(() => new Map(departmentList.map(d => [d.name, d.color])), [departmentList]);
 
   // What is in focus: the hovered node, else the selected one; plus a
@@ -196,7 +206,7 @@ export default function KnowledgeGraph() {
   const focusSet = useMemo(() => {
     if (!focusId && !departmentFocus) return null;
     const set = new Set();
-    const seeds = focusId ? [focusId] : graphData.nodes.filter(n => n.kind === 'department' && n.label === departmentFocus).map(n => n.id);
+    const seeds = focusId ? [focusId] : graphData.nodes.filter(n => n.kind === 'program' && n.label === departmentFocus).map(n => n.id);
     for (const id of seeds) set.add(id);
     for (const l of graphData.links) {
       const s = endId(l.source);
@@ -211,12 +221,12 @@ export default function KnowledgeGraph() {
   const labelled = useMemo(() => {
     const ranked = [...graphData.nodes].sort((a, b) => (degree.get(b.id) || 0) - (degree.get(a.id) || 0));
     return new Set([
-      ...ranked.filter(n => n.kind === 'department').slice(0, 6).map(n => n.id),
-      ...ranked.filter(n => n.kind === 'skill').slice(0, 4).map(n => n.id),
+      ...ranked.filter(n => n.kind === 'program').slice(0, 6).map(n => n.id),
+      ...ranked.filter(n => n.kind === 'skill').slice(0, view === 'skills' ? 10 : 4).map(n => n.id),
     ]);
-  }, [graphData, degree]);
+  }, [graphData, degree, view]);
 
-  // These are department-level counts only; no person IDs are available here.
+  // These are programme-level counts only; no person IDs are available here.
   const relations = useMemo(() => {
     const map = new Map();
     const add = (id, key, item) => {
@@ -236,24 +246,34 @@ export default function KnowledgeGraph() {
       taught: r.taughtBy.reduce((sum, row) => sum + row.count, 0) }))
     .sort((a, b) => (b.wanted - b.taught) - (a.wanted - a.taught) || b.wanted - a.wanted)
     .slice(0, 8), [relations, kindById, nodeById]);
-  const departmentPairs = useMemo(() => {
-    return visibleEdges.filter(e => REAL_LINK_TYPES.has(e.type)).map(e => ({
-      a: nodeById.get(e.source)?.label, b: nodeById.get(e.target)?.label, count: e.count, type: e.type,
-    })).filter(e => e.a && e.b).sort((a, b) => b.count - a.count).slice(0, 8);
+  // Skills offered together with each skill, strongest first.
+  const linkedSkills = useMemo(() => {
+    const map = new Map();
+    const add = (from, to, count) => { if (!map.has(from)) map.set(from, []); map.get(from).push({ id: to, label: nodeById.get(to)?.label, count }); };
+    for (const e of visibleEdges) if (e.type === 'skill_link') { add(e.source, e.target, e.count); add(e.target, e.source, e.count); }
+    for (const list of map.values()) list.sort((a, b) => b.count - a.count);
+    return map;
   }, [visibleEdges, nodeById]);
+  // The second ranking follows the view: best-linked skills, or most shared.
+  const ranking = useMemo(() => (view === 'skills'
+    ? [...linkedSkills.entries()].map(([id, list]) => ({ id, label: nodeById.get(id)?.label || id, value: list.length }))
+    : [...programsBySkill.entries()].filter(([, programs]) => programs.size >= 2)
+      .map(([id, programs]) => ({ id, label: nodeById.get(id)?.label || id, value: programs.size }))
+  ).sort((a, b) => b.value - a.value || a.label.localeCompare(b.label)).slice(0, 8), [view, linkedSkills, programsBySkill, nodeById]);
 
-  const peopleCount = nodes.filter(n => n.kind === 'department').reduce((sum, n) => sum + n.count, 0);
+  const peopleCount = nodes.filter(n => n.kind === 'program').reduce((sum, n) => sum + n.count, 0);
   // Counted from the whole response, so it reads the same in both views.
   const skillCount = visibleNodes.filter((n) => n.kind === 'skill').length;
-  const realLinkCount = visibleEdges.filter((e) => REAL_LINK_TYPES.has(e.type)).length;
+  const skillLinkCount = visibleEdges.filter((e) => e.type === 'skill_link').length;
+  const sharedSkillCount = [...programsBySkill.values()].filter(programs => programs.size >= 2).length;
   const selected = selectedId && kindById.get(selectedId) === 'skill' ? nodeById.get(selectedId) : null;
   const needle = query.trim().toLocaleLowerCase();
   const searchResults = needle
-    ? [...departmentList.filter(d => d.name.toLocaleLowerCase().includes(needle)).map(d => ({ id: `department:${d.name}`, kind: 'department', label: d.name, color: d.color })),
+    ? [...departmentList.filter(d => d.name.toLocaleLowerCase().includes(needle)).map(d => ({ id: `program:${d.name}`, kind: 'program', label: d.name, color: d.color })),
       ...graphData.nodes.filter(n => n.kind === 'skill' && (n.label || '').toLocaleLowerCase().includes(needle))].slice(0, 8)
     : [];
   const pickResult = (result) => {
-    if (result.kind === 'department') { setSelectedId(null); setDepartmentFocus(result.label); } else focusNode(result.id);
+    if (result.kind === 'program') { if (view === 'skills') setView('shared'); setSelectedId(null); setDepartmentFocus(result.label); } else focusNode(result.id);
     setQuery('');
   };
 
@@ -325,7 +345,8 @@ export default function KnowledgeGraph() {
     if (!fg) return;
     fg.d3Force('charge')?.strength(-70).distanceMax(320);
     const link = fg.d3Force('link');
-    if (link) link.distance((l) => (view === 'people' ? 72 : 46));
+    // Skills offered together by more people sit closer.
+    if (link) link.distance((l) => (view === 'skills' ? Math.max(30, 90 - (l.value || 1) * 4) : 46));
     fg.d3Force('collide', collideForce(radius));
     fg.d3ReheatSimulation?.();
   }, [graphData, view, radius]);
@@ -336,7 +357,7 @@ export default function KnowledgeGraph() {
       {options.map(option => <option key={option.value ?? option} value={option.value ?? option}>{option.label ?? option}</option>)}
     </select>
   );
-  // Departments are present only when their aggregate count meets the minimum.
+  // Programmes are present only when their aggregate count meets the minimum.
   const groupChips = (groups, empty) => {
     return groups.length
       ? <ul className="kg-chips">{groups.map(({ department, count }) => <li key={department}><span>{department} · {count}</span></li>)}</ul>
@@ -349,8 +370,8 @@ export default function KnowledgeGraph() {
       description={t('graph.pageDescription')}
       action={<div className="kg-header-actions">
         <div className="kg-segmented" role="group" aria-label={t('graph.view.label')}>
-          <button type="button" data-testid="kg-view-bipartite" aria-pressed={view === 'bipartite'} onClick={() => setView('bipartite')} data-control-radius-exempt>{t('graph.view.bipartite')}</button>
-          <button type="button" data-testid="kg-view-people" aria-pressed={view === 'people'} onClick={() => setView('people')} data-control-radius-exempt>{t('graph.view.people')}</button>
+          <button type="button" data-testid="kg-view-skills" aria-pressed={view === 'skills'} onClick={() => setView('skills')} data-control-radius-exempt>{t('graph.view.skills')}</button>
+          <button type="button" data-testid="kg-view-shared" aria-pressed={view === 'shared'} onClick={() => setView('shared')} data-control-radius-exempt>{t('graph.view.shared')}</button>
         </div>
         <Button variant="outline" size="sm" onClick={() => loadGraph(company, language)} data-testid="kg-refresh"><RefreshCw className="size-4" /> {t('graph.refresh')}</Button>
       </div>}
@@ -366,7 +387,7 @@ export default function KnowledgeGraph() {
       <div className="kg-stats" data-testid="kg-node-count">
         <div><span>{t('graph.stats.people')}</span><strong>{peopleCount}</strong></div>
         <div><span>{t('graph.stats.skills')}</span><strong>{skillCount}</strong></div>
-        <div data-testid="kg-real-count"><span>{t('graph.stats.real')}</span><strong>{realLinkCount}</strong></div>
+        <div data-testid="kg-link-count"><span>{t(view === 'skills' ? 'graph.stats.skillLinks' : 'graph.stats.shared')}</span><strong>{view === 'skills' ? skillLinkCount : sharedSkillCount}</strong></div>
         <div className="is-gap"><span>{t('graph.stats.gap')}</span>{skillGaps[0]
           ? <button type="button" onClick={() => focusNode(skillGaps[0].id)}><strong>{skillGaps[0].label}</strong><small>{t('graph.insights.gapCounts', { wanted: skillGaps[0].wanted, taught: skillGaps[0].taught })}</small></button>
           : <strong>—</strong>}</div>
@@ -386,7 +407,7 @@ export default function KnowledgeGraph() {
           {query.trim() && <ul className="kg-results" aria-label={t('graph.accessibleList')}>
             {searchResults.length === 0 && <li className="kg-muted">{t('graph.noResults')}</li>}
             {searchResults.map(n => <li key={n.id}><button type="button" onClick={() => pickResult(n)}>
-              <span className={cn('kg-mark', n.kind === 'skill' && 'is-skill')} style={n.kind === 'department' ? { background: n.color } : undefined} />
+              <span className={cn('kg-mark', n.kind === 'skill' && 'is-skill')} style={n.kind === 'program' ? { background: n.color } : undefined} />
               <span>{n.label}</span><small>{t(`graph.kind.${n.kind}`)}</small>
             </button></li>)}
           </ul>}
@@ -395,7 +416,7 @@ export default function KnowledgeGraph() {
             <h3>{t('graph.panel.departments')}</h3>
             <ul className="kg-departments">
               {departmentList.map(d => <li key={d.name}>
-                <button type="button" aria-pressed={departmentFocus === d.name} onClick={() => { setSelectedId(null); setDepartmentFocus(departmentFocus === d.name ? '' : d.name); }}>
+                <button type="button" aria-pressed={departmentFocus === d.name} onClick={() => { if (view === 'skills') setView('shared'); setSelectedId(null); setDepartmentFocus(departmentFocus === d.name ? '' : d.name); }}>
                   <span className="kg-mark" style={{ background: d.color }} /><span>{d.name}</span><small>{d.count}</small>
                 </button>
               </li>)}
@@ -412,10 +433,10 @@ export default function KnowledgeGraph() {
             <label htmlFor="kg-skill">{t('graph.filter.skill')}</label>
             {selectFilter('kg-skill', skill, setSkill, nodes.filter(n => n.kind === 'skill').map(n => ({ value: n.id, label: n.label })).sort((a, b) => a.label.localeCompare(b.label)), t('graph.filter.all'))}
           </div>
-          <label className="kg-toggle">
+          {view === 'shared' && <label className="kg-toggle">
             <input type="checkbox" data-testid="kg-toggle-real" checked={showReal} onChange={(e) => setShowReal(e.target.checked)} />
             {t('graph.view.realLinks')}
-          </label>
+          </label>}
           <Button variant="outline" size="sm" className="w-full" onClick={resetGraph}>{t('graph.reset')}</Button>
 
           </div>
@@ -428,10 +449,9 @@ export default function KnowledgeGraph() {
           ) : error ? null : graphData.nodes.length === 0 ? (
             <div className="kg-empty">
               <Share2 className="size-10 text-muted-foreground" />
-              {/* In the links view an empty canvas means no pair of fields has
-                  reached five participants yet, not that a filter hid them. */}
-              <p className="font-semibold">{t(view === 'people' ? 'graph.empty.linksTitle' : 'graph.empty.title')}</p>
-              <p className="max-w-sm text-sm text-muted-foreground">{t(view === 'people' ? 'graph.empty.linksDescription' : 'graph.empty.description')}</p>
+              {/* Empty means nothing has reached five people yet, not that a filter hid it. */}
+              <p className="font-semibold">{t(view === 'skills' ? 'graph.empty.skillsTitle' : 'graph.empty.sharedTitle')}</p>
+              <p className="max-w-sm text-sm text-muted-foreground">{t(view === 'skills' ? 'graph.empty.skillsDescription' : 'graph.empty.sharedDescription')}</p>
             </div>
           ) : (
             <div ref={containerRef} data-testid="knowledge-graph-canvas" className="kg-canvas" style={{ height: graphHeight }}>
@@ -445,7 +465,7 @@ export default function KnowledgeGraph() {
                 onEngineStop={() => { if (autoFit.current) { fitView(); autoFit.current = false; } }}
                 nodeLabel={() => ''}
                 onNodeHover={(n) => setHovered(n ? n.id : null)}
-                onNodeClick={(n) => { if (n.kind === 'department') { setSelectedId(null); setDepartmentFocus(n.label); } else focusNode(n.id); }}
+                onNodeClick={(n) => { if (n.kind === 'program') { setSelectedId(null); setDepartmentFocus(n.label); } else focusNode(n.id); }}
                 onBackgroundClick={clearFocus}
                 onNodeDragEnd={(n) => { n.fx = n.x; n.fy = n.y; }}
                 linkColor={(l) => {
@@ -457,7 +477,8 @@ export default function KnowledgeGraph() {
                   }
                   return REAL_LINK_TYPES.has(l.type) ? REAL_LINK : QUIET_LINK;
                 }}
-                linkWidth={(l) => (REAL_LINK_TYPES.has(l.type) ? Math.min(1.5 + (l.value || 1) * 0.5, 4) : (focusSet ? 1.2 : 0.7))}
+                linkWidth={(l) => (REAL_LINK_TYPES.has(l.type) ? Math.min(1.5 + (l.value || 1) * 0.5, 4)
+                  : l.type === 'skill_link' ? Math.min(0.6 + Math.sqrt(l.value || 1) * 0.45, 3.5) : (focusSet ? 1.2 : 0.7))}
                 nodePointerAreaPaint={(node, color, ctx) => {
                   ctx.fillStyle = color;
                   ctx.beginPath();
@@ -466,7 +487,7 @@ export default function KnowledgeGraph() {
                 }}
                 nodeCanvasObject={(node, ctx, globalScale) => {
                   const r = radius(node);
-                  const isDepartment = node.kind === 'department';
+                  const isDepartment = node.kind === 'program';
                   const inFocus = !focusSet || focusSet.has(node.id);
                   ctx.globalAlpha = inFocus ? 1 : 0.12;
                   ctx.beginPath();
@@ -511,13 +532,16 @@ export default function KnowledgeGraph() {
                 <button type="button" onClick={toggleFullScreen} aria-pressed={fullScreen} aria-label={t(fullScreen ? 'graph.exitFullScreen' : 'graph.fullScreen')} title={t(fullScreen ? 'graph.exitFullScreen' : 'graph.fullScreen')}>{fullScreen ? <Shrink /> : <Expand />}</button>
               </div>
               <div className="kg-legend">
-                {view === 'bipartite' ? <>
+                {view === 'shared' ? <>
                   <span><i className="kg-line" style={{ background: EDGE_COLORS.can_teach }} />{t('graph.legend.canTeach')}</span>
                   <span><i className="kg-line" style={{ background: EDGE_COLORS.wants_to_learn }} />{t('graph.legend.wantsToLearn')}</span>
                   <span><i className="kg-mark is-skill" />{t('graph.legend.skill')}</span>
-                </> : <span>{t('graph.legend.peerLink')}</span>}
-                {showReal && <span><i className="kg-line is-thick" style={{ background: EDGE_COLORS.session }} />{t('graph.legend.real')}</span>}
-                <span className="kg-muted">{t('graph.legend.size')}</span>
+                  {showReal && <span><i className="kg-line is-thick" style={{ background: EDGE_COLORS.session }} />{t('graph.legend.real')}</span>}
+                </> : <>
+                  <span><i className="kg-mark is-skill" />{t('graph.legend.skill')}</span>
+                  <span><i className="kg-line" style={{ background: EDGE_COLORS.skill_link }} />{t('graph.legend.skillLink')}</span>
+                </>}
+                <span className="kg-muted">{t(view === 'skills' ? 'graph.legend.skillSize' : 'graph.legend.size')}</span>
               </div>
               {/* What is selected, as a card over the graph so the graph keeps its width. */}
               {selected && selected.kind === 'skill' && <aside className="kg-detail-card" aria-label={t('graph.details')} aria-live="polite">
@@ -526,6 +550,10 @@ export default function KnowledgeGraph() {
                   <div><h2>{selected.label}</h2><p>{t('graph.kind.skill')}</p></div>
                   <button type="button" className="kg-close" onClick={clearFocus} aria-label={t('graph.close')}><X /></button>
                 </div>
+                {(linkedSkills.get(selected.id) || []).length > 0 && <>
+                  <h3>{t('graph.details.offeredWith')}</h3>
+                  <ul className="kg-chips">{linkedSkills.get(selected.id).slice(0, 8).map(item => <li key={item.id}><button type="button" onClick={() => focusNode(item.id)}>{item.label} · {item.count}</button></li>)}</ul>
+                </>}
                 <h3>{t('graph.details.taughtBy', { count: (relations.get(selected.id)?.taughtBy || []).reduce((sum, row) => sum + row.count, 0) })}</h3>{groupChips(relations.get(selected.id)?.taughtBy || [], t('graph.details.nobody'))}
                 <h3>{t('graph.details.wantedBy', { count: (relations.get(selected.id)?.wantedBy || []).reduce((sum, row) => sum + row.count, 0) })}</h3>{groupChips(relations.get(selected.id)?.wantedBy || [], t('graph.details.nobody'))}
               </aside>}
@@ -548,15 +576,13 @@ export default function KnowledgeGraph() {
             <small>{t('graph.insights.gapCounts', { wanted: g.wanted, taught: g.taught })}</small>
           </button></li>)}</ol> : <p className="kg-muted">{t('graph.details.none')}</p>}
         </section>
-        <section className="kg-card is-pairs" aria-label={t('graph.insights.pairs')}>
-          <h3>{t('graph.insights.pairs')}</h3>
-          {departmentPairs.length ? <ol className="kg-ranked">{departmentPairs.map(pair => <li key={`${pair.a}-${pair.b}-${pair.type}`}><div className="kg-ranked-row">
-            <span className="kg-ranked-label">
-              <i className="kg-mark" style={{ background: departmentColor.get(pair.a) || OTHER_DEPARTMENT }} />{pair.a === pair.b ? t('graph.insights.within', { department: pair.a }) : `${pair.a} ↔ ${pair.b}`}
-            </span>
-            <span className="kg-bar" aria-hidden="true"><i className="is-links" style={{ width: `${(pair.count / departmentPairs[0].count) * 100}%` }} /></span>
-            <small>{t('graph.insights.pairCount', { count: pair.count })}</small>
-          </div></li>)}</ol> : <p className="kg-muted">{t('graph.insights.noPairs')}</p>}
+        <section className="kg-card is-pairs" aria-label={t(view === 'skills' ? 'graph.insights.connected' : 'graph.insights.shared')} data-testid="kg-ranking">
+          <h3>{t(view === 'skills' ? 'graph.insights.connected' : 'graph.insights.shared')}</h3>
+          {ranking.length ? <ol className="kg-ranked">{ranking.map(row => <li key={row.id}><button type="button" onClick={() => focusNode(row.id)}>
+            <span className="kg-ranked-label">{row.label}</span>
+            <span className="kg-bar" aria-hidden="true"><i className="is-links" style={{ width: `${(row.value / ranking[0].value) * 100}%` }} /></span>
+            <small>{t(view === 'skills' ? 'graph.insights.linkCount' : 'graph.insights.programCount', { count: row.value })}</small>
+          </button></li>)}</ol> : <p className="kg-muted">{t(view === 'skills' ? 'graph.insights.noLinks' : 'graph.insights.noShared')}</p>}
         </section>
       </div>
       <p className="kg-hint">{t('graph.hoverHint')}</p>
