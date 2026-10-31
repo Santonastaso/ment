@@ -40,7 +40,7 @@ test('the knowledge graph groups by programme, links skills offered together, an
     await skill(id(300), 'Negotiation'); await skill(id(301), 'Negotiation');
     // Three completed meetings MiM <-> MiF: six people.
     for (let i = 0; i < 3; i += 1) await db.query("insert into sessions(mentor_id, mentee_id, status) values ($1, $2, 'completed')", [id(i), id(100 + i)]);
-    await db.exec(await migration('20261031100000_0095_knowledge_graph_programmes.sql'));
+    await db.exec(await migration('20261031100000_0096_knowledge_graph_programmes.sql'));
     await db.query("select set_config('request.jwt.claim.sub', $1, false)", [admin]);
     const graph = (await one('select knowledge_graph() value')).value;
     const programs = graph.nodes.filter(n => n.kind === 'program');
