@@ -23,7 +23,7 @@ import { Input } from '@/components/ui/input';
 import { Check, ChevronDown, ChevronUp, Eye, Lock, Plus } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { formatAdminDate, pmTranslate } from '../components/admin/adminPm.js';
-import AdminPmKpis from '../components/admin/AdminPmKpis.jsx';
+import { metricEvidence } from '../components/admin/AdminPmKpis.jsx';
 import AdminInvitationPanel from '../components/admin/AdminInvitationPanel.jsx';
 import AdminProvisionUserPanel from '../components/admin/AdminProvisionUserPanel.jsx';
 import AdminAiRuns from '../components/admin/AdminAiRuns.jsx';
@@ -67,6 +67,21 @@ const PRIVACY_FIELD_KEYS = {
 
 const RETENTION_FIELDS = ['conversation_days', 'search_days', 'reflection_days', 'audit_log_days', 'deactivated_account_days'];
 
+// The scorecard as a CSV for reporting: what each number is and how it is counted.
+function exportScorecard(groups, t) {
+  const cell = value => `"${String(value ?? '').replace(/"/g, '""')}"`;
+  const rows = [[t('admin.scorecard.csvGroup'), t('admin.scorecard.csvMetric'), t('admin.scorecard.csvValue'), t('admin.scorecard.csvContext'), t('admin.scorecard.csvCounted')]];
+  for (const group of groups) for (const item of group.items) {
+    rows.push([t(`admin.scorecard.group.${group.key}`), t(`admin.score.${item.key}.label`), item.value ?? t('admin.scorecard.notEnough'),
+      item.sub || t(`admin.score.${item.key}.means`), t(`admin.score.${item.key}.counted`)]);
+  }
+  const blob = new Blob(['\uFEFF', rows.map(row => row.map(cell).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = Object.assign(document.createElement('a'), { href: url, download: `ment-scorecard-${new Date().toISOString().slice(0, 10)}.csv` });
+  document.body.appendChild(link); link.click(); link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 // Folds a section away; its header stays as the way back in.
 function SectionToggle({ open, onToggle, label, testId }) {
   const { t } = useT();
@@ -85,8 +100,8 @@ export default function AdminDashboard() {
   const [fieldsOfStudy, setFieldsOfStudy] = useState(null);
   const [addPeopleOpen, setAddPeopleOpen] = useState(false);
   const [programme, setProgramme] = useState(null);
+  const [scorecard, setScorecard] = useState(null);
   const [programmeError, setProgrammeError] = useState(false);
-  const [kpisOpen, setKpisOpen] = useState(false);
   const [fieldsOpen, setFieldsOpen] = useState(false);
   const [skillsOpen, setSkillsOpen] = useState(false);
   const [userFilters, setUserFilters] = useState({ name: '', email: '', field: '', role: '', advisor: '' });
@@ -159,6 +174,16 @@ export default function AdminDashboard() {
   }
 
   // Headline, funnel and alumni to recruit: school-wide totals, none under five (0094).
+  // The scorecard figures the KPIs do not already cover (0096).
+  async function loadScorecard() {
+    try {
+      const res = await api.get('/admin/scorecard');
+      setScorecard(res.data);
+    } catch {
+      setScorecard(null);
+    }
+  }
+
   async function loadProgramme() {
     try {
       const res = await api.get('/admin/programme');
@@ -367,7 +392,7 @@ export default function AdminDashboard() {
 
   useEffect(() => { loadStats(); loadFieldsOfStudy(); loadPrivacyStatus(); loadRetention(); loadRequestSettings(); }, []);
   useEffect(() => {
-    if (tab === 'overview') loadProgramme();
+    if (tab === 'overview') { loadProgramme(); loadScorecard(); loadKpis(); }
     if (tab === 'people') loadUsers();
     if (tab === 'audit') loadAudit();
     if (tab === 'settings') loadRequestSettings();
@@ -541,6 +566,32 @@ export default function AdminDashboard() {
   const sessionsRequested = visibleSessionStatuses.every(Number.isInteger)
     ? visibleSessionStatuses.reduce((sum, count) => sum + count, 0) : null;
   // Without data there is nothing to say about the last 30 days; never imply "fewer than five".
+  // Eight numbers in three groups; each carries its own plain explanation.
+  const pm = key => metricEvidence(kpis, key);
+  const percent = n => (n == null ? null : `${n}%`);
+  const replyTime = hours => (hours == null ? null : hours < 24 ? t('admin.score.hours', { count: hours }) : t('admin.score.days', { count: Math.round((hours / 24) * 10) / 10 }));
+  const engagement = pm('alumniEngagementRate');
+  const reach = pm('connectionCoverageRate');
+  const meaningful = pm('meaningfulConnections');
+  const intent = pm('intentToContinueRate');
+  const scorecardGroups = [
+    { key: 'success', items: [
+      { key: 'engagement', value: percent(engagement.value), sub: engagement.value != null && engagement.denominator ? t('admin.score.engagement.sub', { engaged: engagement.numerator, total: engagement.denominator }) : null },
+      { key: 'acceptance', value: percent(programme?.headline?.acceptance_rate), sub: programme?.headline?.requests != null ? t('admin.headline.acceptanceSub', { count: programme.headline.requests }) : null },
+      { key: 'reach', value: percent(reach.value), sub: reach.value != null && reach.denominator ? t('admin.score.reach.sub', { reached: reach.numerator, total: reach.denominator }) : null },
+    ] },
+    { key: 'impact', items: [
+      { key: 'connections', value: meaningful.value, sub: scorecard?.new_connections_30d != null ? t('admin.headline.recent', { count: scorecard.new_connections_30d }) : null },
+      { key: 'crossField', value: percent(scorecard?.cross_field_share), sub: scorecard?.cross_field_pairs != null ? t('admin.score.crossField.sub', { count: scorecard.cross_field_pairs }) : null },
+      { key: 'benefit', value: percent(scorecard?.benefit_rate), sub: scorecard?.benefit_rate != null
+        ? [t('admin.score.benefit.sub', { count: scorecard.benefit_answers }), intent.value != null && t('admin.score.benefit.intent', { rate: intent.value })].filter(Boolean).join(' · ') : null },
+    ] },
+    { key: 'scale', items: [
+      { key: 'capacity', value: percent(scorecard?.capacity_used), sub: programme?.recruit?.length ? t('admin.score.capacity.sub', { count: programme.recruit.length }) : null },
+      { key: 'reply', value: replyTime(scorecard?.median_reply_hours), sub: null },
+    ] },
+  ];
+
   const recentLine = n => (!programme ? undefined : n == null ? t('admin.headline.recentFew') : t('admin.headline.recent', { count: n }));
   // The step where the most people are lost, measured against the one before.
   const biggestDrop = (() => {
@@ -763,26 +814,56 @@ export default function AdminDashboard() {
 
       {tab === 'overview' && (
         <>
-          {/* Is it working, where do people drop off, whom to recruit. */}
+          {/* The programme in one view: a line of totals, then eight numbers in
+              three groups (is it working, what ESSEC gains, will it hold). */}
           {loading ? (
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-              {[1, 2, 3, 4].map(i => <div key={i} className="h-24 animate-pulse rounded-[var(--panel-radius)] border border-[var(--border)] bg-muted" />)}
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+              {[1, 2, 3].map(i => <div key={i} className="h-64 animate-pulse rounded-[var(--panel-radius)] border border-[var(--border)] bg-muted" />)}
             </div>
           ) : stats && (
             <>
-              <div className="grid grid-cols-2 gap-4 md:grid-cols-4" data-testid="headline">
-                <StatCard label={t('admin.headline.students')} value={programme?.headline?.students}
-                  sub={recentLine(programme?.headline?.students_new)} />
-                <StatCard label={t('admin.headline.alumni')} value={programme?.headline?.alumni_available}
-                  sub={recentLine(programme?.headline?.alumni_new)} />
-                <StatCard label={t('admin.headline.meetings')} value={programme?.headline?.meetings}
-                  sub={recentLine(programme?.headline?.meetings_new)} />
-                <StatCard label={t('admin.headline.acceptance')} value={programme?.headline?.acceptance_rate == null ? null : `${programme.headline.acceptance_rate}%`}
-                  sub={!programme ? undefined : programme.headline?.requests == null ? t('admin.headline.acceptanceFew') : t('admin.headline.acceptanceSub', { count: programme.headline.requests })} />
-              </div>
+              {programme?.headline && (
+                <p className="mb-6 w-fit self-start rounded-full bg-[var(--control-surface)] px-3 py-1 text-sm text-muted-foreground" data-testid="at-a-glance">
+                  {[
+                    programme.headline.students != null && t('admin.glance.students', { count: programme.headline.students }),
+                    programme.headline.alumni_available != null && t('admin.glance.alumni', { count: programme.headline.alumni_available }),
+                    programme.headline.meetings != null && t('admin.glance.meetings', { count: programme.headline.meetings }),
+                  ].filter(Boolean).join(' · ')}
+                </p>
+              )}
               {programmeError && <p role="status" data-testid="programme-unavailable" className="rounded-[var(--item-radius)] border border-[var(--border)] bg-card px-4 py-3 text-sm text-muted-foreground">{t('admin.programme.unavailable')}</p>}
 
-              <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+              <Surface className="profile-section" data-testid="scorecard">
+                <SurfaceHeader title={t('admin.scorecard.title')} description={t('admin.scorecard.description')}
+                  action={<Button type="button" variant="outline" size="sm" onClick={() => exportScorecard(scorecardGroups, t)} data-testid="scorecard-export">{t('admin.scorecard.export')}</Button>} />
+                <SurfaceBody className="pt-5">
+                  <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+                    {scorecardGroups.map(group => (
+                      <section key={group.key} data-testid={`scorecard-${group.key}`} aria-labelledby={`scorecard-${group.key}-title`}>
+                        <h3 id={`scorecard-${group.key}-title`} className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t(`admin.scorecard.group.${group.key}`)}</h3>
+                        <p className="mt-0.5 text-xs text-muted-foreground">{t(`admin.scorecard.group.${group.key}Help`)}</p>
+                        <ul className="mt-3 space-y-3">
+                          {group.items.map(item => (
+                            <li key={item.key} data-testid={`score-${item.key}`} className="rounded-[var(--item-radius)] border border-[var(--border)] bg-card p-4">
+                              <p className="text-sm font-medium text-foreground">{t(`admin.score.${item.key}.label`)}</p>
+                              {item.value == null
+                                ? <p className="mt-1 text-sm text-muted-foreground">{t('admin.scorecard.notEnough')}</p>
+                                : <p className="mt-1 text-display font-medium tabular-nums leading-none">{item.value}</p>}
+                              <p className="mt-2 text-xs text-muted-foreground">{item.sub || t(`admin.score.${item.key}.means`)}</p>
+                              <details className="mt-2 text-xs text-muted-foreground">
+                                <summary className="cursor-pointer">{t('admin.scorecard.howCounted')}</summary>
+                                <p className="mt-1">{t(`admin.score.${item.key}.counted`)}</p>
+                              </details>
+                            </li>
+                          ))}
+                        </ul>
+                      </section>
+                    ))}
+                  </div>
+                </SurfaceBody>
+              </Surface>
+
+              <div className="mt-10 grid grid-cols-1 items-start gap-6 border-t border-[var(--border-subtle)] pt-8 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
                 <Surface className="profile-section" data-testid="funnel">
                   <SurfaceHeader title={t('admin.funnel.title')} description={t('admin.funnel.description')} />
                   <SurfaceBody className="pt-5">
@@ -828,14 +909,7 @@ export default function AdminDashboard() {
                 </Surface>
               </div>
 
-              {/* The full KPI set with definitions and export, folded. */}
-              <Surface className="profile-section" data-testid="kpis-section">
-                <SurfaceHeader title={t('admin.kpis.title')} description={t('admin.kpis.foldedDescription')}
-                  action={<SectionToggle open={kpisOpen} onToggle={() => { if (!kpisOpen && !kpis) loadKpis(); setKpisOpen(open => !open); }} label={t('admin.kpis.title')} testId="kpis-toggle" />} />
-                {kpisOpen && <SurfaceBody className="pt-2"><AdminPmKpis embedded data={kpis} loading={kpisLoading} error={loadErrors.kpis} onRefresh={loadKpis} /></SurfaceBody>}
-              </Surface>
-
-              <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+              <div className="mt-10 grid grid-cols-1 items-start gap-6 border-t border-[var(--border-subtle)] pt-8 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
                 {/* Groups, never people: each field of study with its size
                     (five or more) and thresholded completed-meeting activity. */}
                 <Surface className="profile-section" data-testid="fields-of-study">

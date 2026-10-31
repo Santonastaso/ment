@@ -545,6 +545,11 @@ async function get(url) {
     });
   }
 
+  if (url === '/admin/scorecard') {
+    const { data, error } = await supabase.rpc('admin_scorecard');
+    if (error) throw new ApiError(error.message);
+    return ok(data);
+  }
   if (url === '/admin/programme') {
     const { data, error } = await supabase.rpc('admin_programme_overview');
     if (error) throw new ApiError(error.message);
@@ -1033,6 +1038,12 @@ async function post(url, body = {}, opts = {}) {
     });
     if (error) throw new ApiError(error.message);
     return ok(data, 201);
+  }
+
+  if (/^\/sessions\/\d+\/benefit$/.test(url)) {
+    const { data, error } = await supabase.rpc('record_meeting_benefit', { p_session_id: Number(url.split('/')[2]), p_answer: body.answer });
+    if (error) throw new ApiError(error.message);
+    return ok(data);
   }
 
   if (url === '/continuation-intent') {

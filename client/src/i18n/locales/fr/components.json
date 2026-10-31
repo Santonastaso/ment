@@ -179,5 +179,10 @@
   "components.monthYear.month11": "nov.",
   "components.monthYear.month12": "déc.",
   "components.reflection.aiNote": "Une IA lit vos réponses pour suggérer des compétences. Elle peut se tromper, et rien n’est ajouté à votre profil sans votre choix.",
-  "components.reflection.aiOff": "Les suggestions de l’IA sont désactivées : vos réponses sont enregistrées sans suggestion de compétences."
+  "components.reflection.aiOff": "Les suggestions de l’IA sont désactivées : vos réponses sont enregistrées sans suggestion de compétences.",
+  "components.meeting.benefitQuestion": "Cette rencontre vous a-t-elle aidé pour une décision, une candidature ou une prochaine étape ?",
+  "components.meeting.benefit.yes": "Oui",
+  "components.meeting.benefit.somewhat": "En partie",
+  "components.meeting.benefit.no": "Pas vraiment",
+  "components.meeting.benefitHelp": "Facultatif. Compté seulement dans les totaux de l'école, jamais affiché avec votre nom."
 }
