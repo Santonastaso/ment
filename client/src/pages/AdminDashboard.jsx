@@ -826,15 +826,6 @@ export default function AdminDashboard() {
             </div>
           ) : stats && (
             <>
-              {programme?.headline && (
-                <p className="mb-6 w-fit self-start rounded-full bg-[var(--control-surface)] px-3 py-1 text-sm text-muted-foreground" data-testid="at-a-glance">
-                  {[
-                    programme.headline.students != null && t('admin.glance.students', { count: programme.headline.students }),
-                    programme.headline.alumni_available != null && t('admin.glance.alumni', { count: programme.headline.alumni_available }),
-                    programme.headline.meetings != null && t('admin.glance.meetings', { count: programme.headline.meetings }),
-                  ].filter(Boolean).join(' · ')}
-                </p>
-              )}
               {programmeError && <p role="status" data-testid="programme-unavailable" className="rounded-[var(--item-radius)] border border-[var(--border)] bg-card px-4 py-3 text-sm text-muted-foreground">{t('admin.programme.unavailable')}</p>}
 
               <Surface className="profile-section" data-testid="scorecard">
@@ -843,12 +834,13 @@ export default function AdminDashboard() {
                 <SurfaceBody className="pt-5">
                   {/* One grid for all three groups, so tiles line up row by row;
                       on a phone each group simply stacks. */}
-                  <div className="grid grid-cols-1 gap-x-4 gap-y-3 lg:grid-cols-3 lg:grid-rows-[auto_1fr_1fr_1fr]">
+                  <div className="grid grid-cols-1 gap-x-4 gap-y-2.5 lg:grid-cols-3">
                     {scorecardGroups.map((group, column) => (
                       <section key={group.key} data-testid={`scorecard-${group.key}`} aria-labelledby={`scorecard-${group.key}-title`} className="mb-4 lg:contents">
-                        <div className={`${SCORE_COLUMNS[column]} lg:row-start-1 mb-1`}>
-                          <h3 id={`scorecard-${group.key}-title`} className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t(`admin.scorecard.group.${group.key}`)}</h3>
-                          <p className="mt-0.5 text-xs text-muted-foreground">{t(`admin.scorecard.group.${group.key}Help`)}</p>
+                        <div className={`${SCORE_COLUMNS[column]} lg:row-start-1`}>
+                          <h3 id={`scorecard-${group.key}-title`} className="text-[11px] font-semibold uppercase leading-4 tracking-wide text-muted-foreground">
+                            {t(`admin.scorecard.group.${group.key}`)}<span className="font-normal normal-case tracking-normal"> · {t(`admin.scorecard.group.${group.key}Help`)}</span>
+                          </h3>
                         </div>
                         <ul className="mt-2 space-y-2 lg:contents">
                           {group.items.map((item, row) => (
@@ -860,7 +852,7 @@ export default function AdminDashboard() {
                                   : <span className="shrink-0 text-xl font-semibold tabular-nums leading-none text-foreground">{item.value}</span>}
                               </div>
                               <p className="mt-1 text-xs text-muted-foreground">{item.sub || t(`admin.score.${item.key}.means`)}</p>
-                              <details className="mt-auto pt-1.5 text-[11px] text-muted-foreground">
+                              <details className="mt-1 text-[11px] text-muted-foreground">
                                 <summary className="w-fit cursor-pointer">{t('admin.scorecard.howCounted')}</summary>
                                 <p className="mt-1">{t(`admin.score.${item.key}.counted`)}</p>
                               </details>

@@ -1992,8 +1992,8 @@ test('admin pages share the member pages\' cards and tabs, and show departments 
   await expect(page.getByTestId('skill-by-field-row').nth(1).getByText('Wanted by')).toHaveCount(0);
   await expect(page.getByText(/Suppressed|Most active|Department|Total employees/)).toHaveCount(0);
   // One line of totals, then the scorecard in three groups.
-  await expect(page.getByTestId('at-a-glance')).toHaveText('180 students active · 64 alumni available to mentor · 52 meetings completed');
-  await expect(page.getByTestId('scorecard-success')).toContainText('Is the programme working?');
+  await expect(page.getByTestId('at-a-glance')).toHaveCount(0);
+  await expect(page.getByTestId('scorecard-success')).toContainText('Is it working?');
   await expect(page.getByTestId('score-engagement')).toContainText('42%');
   await expect(page.getByTestId('score-engagement')).toContainText('27 of 64 activated alumni');
   await expect(page.getByTestId('score-acceptance')).toContainText('33%');
