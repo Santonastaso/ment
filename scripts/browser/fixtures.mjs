@@ -78,6 +78,7 @@ function fixtureApi(state, ApiError) {
       }
     }
     if (method === 'post') {
+      if (/^\/sessions\/\d+\/benefit$/.test(path)) { state.benefits = [...(state.benefits || []), { path, ...body }]; return { answer: body.answer }; }
       if (path === '/users/me/delete') { state.erased = true; return { erased: true }; }
       if (path === '/users/me/consents') {
         const row = { purpose: body.purpose, text_version: 'fixture', accepted_at: new Date().toISOString() };
@@ -202,7 +203,13 @@ function fixtureApi(state, ApiError) {
         '/admin/request-settings': { weekly: 3, pending: 2, cooldown: 7 },
         '/admin/retention': state.retention || { conversation_days: null, search_days: null, reflection_days: null, audit_log_days: null, deactivated_account_days: null },
         '/admin/privacy-status': { peerVisibleFields: ['name', 'department', 'skills'], hiddenFields: ['email'], minTeamDashboardSize: 5 },
-        '/admin/kpis': null,
+        '/admin/kpis': { metrics: {
+          alumniEngagementRate: { value: 42, numerator: 27, denominator: 64, available: true },
+          connectionCoverageRate: { value: 23, numerator: 41, denominator: 180, available: true },
+          meaningfulConnections: { value: 41, numerator: 41, available: true },
+          intentToContinueRate: { value: 80, numerator: 8, denominator: 10, available: true },
+        } },
+        '/admin/scorecard': { new_connections_30d: 9, cross_field_share: 38, cross_field_pairs: 7, benefit_rate: 72, benefit_answers: 25, capacity_used: 31, median_reply_hours: 19.5 },
         '/admin/ai-runs': [],
         '/admin/knowledge-graph': sampleKnowledgeGraph(),
         '/admin/programme': {

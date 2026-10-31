@@ -14,6 +14,7 @@ export default function MeetingFeedback({ session, onSaved, compact = false }) {
   const [open, setOpen] = useState(false);
   const [reflection, setReflection] = useState('');
   const [rating, setRating] = useState(null);
+  const [benefit, setBenefit] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   // Right after a meeting is marked complete is when its lessons are fresh:
@@ -26,6 +27,7 @@ export default function MeetingFeedback({ session, onSaved, compact = false }) {
   function edit() {
     setReflection((session.isMentor ? session.mentor_reflection : session.reflection) || '');
     setRating((session.isMentor ? session.mentor_rating : session.mentee_rating) ?? null);
+    setBenefit(null);
     setError('');
     setOfferCheckIn(false);
     setOpen(true);
@@ -38,6 +40,8 @@ export default function MeetingFeedback({ session, onSaved, compact = false }) {
     setError('');
     try {
       await api.put(`/sessions/${session.id}`, meetingFeedback(session, reflection, rating));
+      // The student's answer to "did it help?" feeds the school's impact figure; optional.
+      if (!session.isMentor && benefit) await api.post(`/sessions/${session.id}/benefit`, { answer: benefit });
       const firstCompletion = !completed;
       await onSaved();
       if (firstCompletion) setOfferCheckIn(true); else setOpen(false);
@@ -71,6 +75,20 @@ export default function MeetingFeedback({ session, onSaved, compact = false }) {
             <textarea className="input min-h-24" maxLength={4000} value={reflection} onChange={event => setReflection(event.target.value)} disabled={saving} />
           </label>
           <div className="grid gap-2"><span>{t('components.meeting.yourRatingPrivate')}</span><RatingPicker value={rating} onChange={setRating} disabled={saving} /></div>
+          {!session.isMentor && (
+            <fieldset className="grid gap-2" data-testid="meeting-benefit">
+              <legend className="mb-1">{t('components.meeting.benefitQuestion')}</legend>
+              <div className="flex flex-wrap gap-2">
+                {['yes', 'somewhat', 'no'].map(answer => (
+                  <Button key={answer} type="button" size="sm" variant={benefit === answer ? 'default' : 'outline'} aria-pressed={benefit === answer}
+                    disabled={saving} onClick={() => setBenefit(current => (current === answer ? null : answer))}>
+                    {t(`components.meeting.benefit.${answer}`)}
+                  </Button>
+                ))}
+              </div>
+              <span className="text-xs text-muted-foreground">{t('components.meeting.benefitHelp')}</span>
+            </fieldset>
+          )}
           {error && <p role="alert" className="text-destructive">{error}</p>}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="ghost" disabled={saving} onClick={() => setOpen(false)}>{t('common.cancel')}</Button>

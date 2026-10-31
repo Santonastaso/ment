@@ -195,5 +195,10 @@
   "components.monthYear.month11": "Nov",
   "components.monthYear.month12": "Dec",
   "components.reflection.aiNote": "An AI reads your answers to suggest skills. It can make mistakes, and nothing is added to your profile unless you choose it.",
-  "components.reflection.aiOff": "AI suggestions are off, so your answers are saved without skill suggestions."
+  "components.reflection.aiOff": "AI suggestions are off, so your answers are saved without skill suggestions.",
+  "components.meeting.benefitQuestion": "Did this meeting help you with a decision, an application or a next step?",
+  "components.meeting.benefit.yes": "Yes",
+  "components.meeting.benefit.somewhat": "Somewhat",
+  "components.meeting.benefit.no": "Not really",
+  "components.meeting.benefitHelp": "Optional. Only counted in school-wide totals, never shown with your name."
 }

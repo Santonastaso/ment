@@ -1032,7 +1032,10 @@ test('onboarding to discovery, request, acceptance, chat and meeting', async ({ 
   const dialog = page.getByRole('dialog');
   await dialog.getByRole('textbox').fill('Useful conversation');
   await dialog.getByRole('radio').nth(3).click();
+  // The student can say whether the meeting helped; it is optional.
+  await dialog.getByTestId('meeting-benefit').getByRole('button', { name: 'Yes' }).click();
   await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.fixture.benefits)).toEqual([{ path: '/sessions/3/benefit', answer: 'yes' }]);
   // Marking a meeting complete offers the check-in that updates skills.
   await expect(dialog.getByText('Update your skills?')).toBeVisible();
   await expect(dialog.getByRole('button', { name: 'Start check-in' })).toBeVisible();
@@ -1962,7 +1965,8 @@ test('admin pages share the member pages\' cards and tabs, and show departments 
   await page.goto('/');
   await page.evaluate(() => sessionStorage.setItem('ment.fixture.auth', JSON.stringify({ id: 'admin', name: 'Org Admin', email: 'admin@example.test', role: 'admin', onboarding_complete: true, is_admin: true, admin_scope: 'org' })));
   await page.goto('/admin');
-  const panel = page.locator('.admin-page [data-slot="card"]').first();
+  // Sections are flat, as on member pages; the tiles inside are white cards.
+  const panel = page.getByTestId('score-engagement');
   await expect(panel).toBeVisible();
   expect(await panel.evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgb(255, 255, 255)');
   expect(await page.getByTestId('admin-tab-overview').evaluate(element => getComputedStyle(element).borderRadius)).toBe('0px');
@@ -1987,14 +1991,26 @@ test('admin pages share the member pages\' cards and tabs, and show departments 
   // Brand strategy has nobody wanting it or meeting on it, so those lines are left out.
   await expect(page.getByTestId('skill-by-field-row').nth(1).getByText('Wanted by')).toHaveCount(0);
   await expect(page.getByText(/Suppressed|Most active|Department|Total employees/)).toHaveCount(0);
-  // Headline: four results, each with what changed this month.
-  const headline = page.getByTestId('headline');
-  await expect(headline).toContainText('Students active');
-  await expect(headline).toContainText('180');
-  await expect(headline).toContainText('+12 in the last 30 days');
-  await expect(headline).toContainText('Alumni available to mentor');
-  await expect(headline).toContainText('Fewer than five in the last 30 days');
-  await expect(headline).toContainText('33%');
+  // One line of totals, then the scorecard in three groups.
+  await expect(page.getByTestId('at-a-glance')).toHaveText('180 students active · 64 alumni available to mentor · 52 meetings completed');
+  await expect(page.getByTestId('scorecard-success')).toContainText('Is the programme working?');
+  await expect(page.getByTestId('score-engagement')).toContainText('42%');
+  await expect(page.getByTestId('score-engagement')).toContainText('27 of 64 activated alumni');
+  await expect(page.getByTestId('score-acceptance')).toContainText('33%');
+  await expect(page.getByTestId('score-reach')).toContainText('41 of 180 active students');
+  await expect(page.getByTestId('score-connections')).toContainText('+9 in the last 30 days');
+  await expect(page.getByTestId('score-crossField')).toContainText('38%');
+  await expect(page.getByTestId('score-crossField')).toContainText('Linking 7 pairs of fields');
+  await expect(page.getByTestId('score-benefit')).toContainText('Of 25 answers · 80% want to continue');
+  await expect(page.getByTestId('score-capacity')).toContainText('2 skills need more alumni');
+  await expect(page.getByTestId('score-reply')).toContainText('19.5 h');
+  // Each number says how it is counted, on request.
+  const counted = page.getByTestId('score-connections').locator('details');
+  await expect(counted).not.toHaveAttribute('open', '');
+  await counted.locator('summary').click();
+  await expect(counted).toContainText('each pair counted once');
+  const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('scorecard-export').click()]);
+  expect(download.suggestedFilename()).toMatch(/^ment-scorecard-\d{4}-\d{2}-\d{2}\.csv$/);
   // The funnel shows each step against everyone invited, and where most people stop.
   const steps = page.getByTestId('funnel-step');
   await expect(steps).toHaveCount(5);
@@ -2128,19 +2144,11 @@ test('school admins see four tabs, and six KPIs folded on the Overview', async (
   await expect(page.getByTestId('rematch-btn')).toHaveCount(0);
   // The retention field keeps its "Audit log" label; the log itself is not shown.
   await expect(page.getByText('Each event records who acted and when.', { exact: false })).toHaveCount(0);
-  // The six KPIs sit folded on the Overview.
+  // The scorecard replaces the old KPI list: eight numbers, no separate KPI section.
   await page.getByTestId('admin-tab-overview').click();
-  await expect(page.locator('[data-testid^="kpi-"]')).toHaveCount(0);
-  await page.getByTestId('kpis-toggle').click();
-  const kpis = page.locator('[data-testid^="kpi-"]');
-  await expect(kpis).toHaveCount(6);
-  await expect(kpis.first()).toContainText('Alumni engagement');
+  await expect(page.locator('[data-testid^="score-"]')).toHaveCount(8);
+  await expect(page.getByTestId('kpis-toggle')).toHaveCount(0);
   await expect(page.getByText('Referrals')).toHaveCount(0);
-  // A count shows its definition only; a rate also shows what it is made of.
-  await kpis.nth(1).locator('summary').click();
-  await expect(kpis.nth(1).getByText(/Numerator|Denominator/)).toHaveCount(0);
-  await kpis.first().locator('summary').click();
-  await expect(kpis.first().getByText(/Denominator/)).toBeVisible();
 
   // People: every column can be searched, and filters combine.
   await page.getByTestId('admin-tab-people').click();

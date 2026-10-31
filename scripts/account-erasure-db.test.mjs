@@ -95,6 +95,9 @@ test('an erased account leaves nothing personal, and the other side keeps the co
     await db.exec(await migration('20261019110000_0087_ai_opt_out_and_account_erasure.sql'));
     await db.exec(await migration('20261019130000_0089_data_retention.sql'));
     await db.exec(await migration('20261020110000_0091_retention_storage_cleanup_order.sql'));
+    // 0096 adds "did this meeting help" answers, which erasure must also remove.
+    await db.exec(await migration('20261031100000_0096_admin_scorecard.sql'));
+    await db.exec(`insert into meeting_benefits(session_id, user_id, answer) values (1, '${leaver}', 'yes')`);
 
     // Only the server may erase.
     for (const role of ['anon', 'authenticated']) {
@@ -130,6 +133,7 @@ test('an erased account leaves nothing personal, and the other side keeps the co
       assert.equal(await count(`${table} = '${leaver}'`), 0, table);
     }
     assert.equal(await count(`skills where user_id = '${mentor}'`), 1, 'other people\'s data is untouched');
+    assert.equal(await count('meeting_benefits'), 0, 'their answers about meetings are gone too');
     assert.equal(await count(`discovery_threads where selected_person_id = '${leaver}'`), 0);
     assert.equal((await one('select email from outreach_targets')).email, null);
     const invitation = await one('select email, profile_data from invitations');

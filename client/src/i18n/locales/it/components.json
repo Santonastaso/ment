@@ -179,5 +179,10 @@
   "components.monthYear.month11": "Nov",
   "components.monthYear.month12": "Dic",
   "components.reflection.aiNote": "Un’IA legge le tue risposte per suggerire competenze. Può sbagliare, e nulla viene aggiunto al profilo se non lo scegli tu.",
-  "components.reflection.aiOff": "I suggerimenti dell’IA sono disattivati: le risposte vengono salvate senza suggerimenti di competenze."
+  "components.reflection.aiOff": "I suggerimenti dell’IA sono disattivati: le risposte vengono salvate senza suggerimenti di competenze.",
+  "components.meeting.benefitQuestion": "Questo incontro ti ha aiutato in una decisione, una candidatura o un prossimo passo?",
+  "components.meeting.benefit.yes": "Sì",
+  "components.meeting.benefit.somewhat": "In parte",
+  "components.meeting.benefit.no": "Non proprio",
+  "components.meeting.benefitHelp": "Facoltativo. Conta solo nei totali della scuola, mai mostrato con il tuo nome."
 }
