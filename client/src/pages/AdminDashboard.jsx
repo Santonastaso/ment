@@ -67,6 +67,10 @@ const PRIVACY_FIELD_KEYS = {
 
 const RETENTION_FIELDS = ['conversation_days', 'search_days', 'reflection_days', 'audit_log_days', 'deactivated_account_days'];
 
+// Grid places for the scorecard (literal class names, so the build keeps them).
+const SCORE_COLUMNS = ['lg:col-start-1', 'lg:col-start-2', 'lg:col-start-3'];
+const SCORE_ROWS = ['lg:row-start-2', 'lg:row-start-3', 'lg:row-start-4'];
+
 // The scorecard as a CSV for reporting: what each number is and how it is counted.
 function exportScorecard(groups, t) {
   const cell = value => `"${String(value ?? '').replace(/"/g, '""')}"`;
@@ -837,21 +841,27 @@ export default function AdminDashboard() {
                 <SurfaceHeader title={t('admin.scorecard.title')} description={t('admin.scorecard.description')}
                   action={<Button type="button" variant="outline" size="sm" onClick={() => exportScorecard(scorecardGroups, t)} data-testid="scorecard-export">{t('admin.scorecard.export')}</Button>} />
                 <SurfaceBody className="pt-5">
-                  <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                    {scorecardGroups.map(group => (
-                      <section key={group.key} data-testid={`scorecard-${group.key}`} aria-labelledby={`scorecard-${group.key}-title`}>
-                        <h3 id={`scorecard-${group.key}-title`} className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t(`admin.scorecard.group.${group.key}`)}</h3>
-                        <p className="mt-0.5 text-xs text-muted-foreground">{t(`admin.scorecard.group.${group.key}Help`)}</p>
-                        <ul className="mt-3 space-y-3">
-                          {group.items.map(item => (
-                            <li key={item.key} data-testid={`score-${item.key}`} className="rounded-[var(--item-radius)] border border-[var(--border)] bg-card p-4">
-                              <p className="text-sm font-medium text-foreground">{t(`admin.score.${item.key}.label`)}</p>
-                              {item.value == null
-                                ? <p className="mt-1 text-sm text-muted-foreground">{t('admin.scorecard.notEnough')}</p>
-                                : <p className="mt-1 text-display font-medium tabular-nums leading-none">{item.value}</p>}
-                              <p className="mt-2 text-xs text-muted-foreground">{item.sub || t(`admin.score.${item.key}.means`)}</p>
-                              <details className="mt-2 text-xs text-muted-foreground">
-                                <summary className="cursor-pointer">{t('admin.scorecard.howCounted')}</summary>
+                  {/* One grid for all three groups, so tiles line up row by row;
+                      on a phone each group simply stacks. */}
+                  <div className="grid grid-cols-1 gap-x-4 gap-y-3 lg:grid-cols-3 lg:grid-rows-[auto_1fr_1fr_1fr]">
+                    {scorecardGroups.map((group, column) => (
+                      <section key={group.key} data-testid={`scorecard-${group.key}`} aria-labelledby={`scorecard-${group.key}-title`} className="mb-4 lg:contents">
+                        <div className={`${SCORE_COLUMNS[column]} lg:row-start-1 mb-1`}>
+                          <h3 id={`scorecard-${group.key}-title`} className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t(`admin.scorecard.group.${group.key}`)}</h3>
+                          <p className="mt-0.5 text-xs text-muted-foreground">{t(`admin.scorecard.group.${group.key}Help`)}</p>
+                        </div>
+                        <ul className="mt-2 space-y-2 lg:contents">
+                          {group.items.map((item, row) => (
+                            <li key={item.key} data-testid={`score-${item.key}`} className={`${SCORE_COLUMNS[column]} ${SCORE_ROWS[row]} flex h-full flex-col rounded-[var(--item-radius)] border border-[var(--border)] bg-card px-3.5 py-3`}>
+                              <div className="flex items-baseline justify-between gap-3">
+                                <p className="text-sm font-medium text-foreground">{t(`admin.score.${item.key}.label`)}</p>
+                                {item.value == null
+                                  ? <span className="shrink-0 text-xs text-muted-foreground">{t('admin.scorecard.notEnough')}</span>
+                                  : <span className="shrink-0 text-xl font-semibold tabular-nums leading-none text-foreground">{item.value}</span>}
+                              </div>
+                              <p className="mt-1 text-xs text-muted-foreground">{item.sub || t(`admin.score.${item.key}.means`)}</p>
+                              <details className="mt-auto pt-1.5 text-[11px] text-muted-foreground">
+                                <summary className="w-fit cursor-pointer">{t('admin.scorecard.howCounted')}</summary>
                                 <p className="mt-1">{t(`admin.score.${item.key}.counted`)}</p>
                               </details>
                             </li>
