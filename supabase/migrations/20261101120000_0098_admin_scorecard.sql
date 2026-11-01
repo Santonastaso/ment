@@ -7,8 +7,8 @@
 --                   the member's data export and removed on erasure.
 -- admin_scorecard   the figures the existing KPIs do not cover: new
 --                   meaningful connections in the last 30 days, the share of
---                   completed meetings across two fields of study and how many
---                   field pairs that links, the share of students who said a
+--                   completed meetings between two programmes and how many
+--                   programme pairs that links, the share of students who said a
 --                   meeting helped, how much of available alumni's monthly
 --                   capacity is in use, and the median time to a first reply.
 --                   School-wide figures only; a figure built on fewer than
@@ -169,7 +169,8 @@ begin
 
   return (with members as (
     select p.id, p.role, p.onboarding_complete, p.monthly_meeting_limit,
-      case when count(*) over (partition by nullif(trim(p.department), '')) >= 5 then nullif(trim(p.department), '') end field
+      -- Grouped by programme, as the knowledge graph and Overview are (0096, 0097).
+      case when count(*) over (partition by nullif(trim(p.program), '')) >= 5 then nullif(trim(p.program), '') end field
     from public.profiles p
     where p.admin_scope = 'none' and p.deactivated_at is null and (v_platform or p.organization_id = v_org)
   ), completed as (

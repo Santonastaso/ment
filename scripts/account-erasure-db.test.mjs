@@ -96,7 +96,7 @@ test('an erased account leaves nothing personal, and the other side keeps the co
     await db.exec(await migration('20261019130000_0089_data_retention.sql'));
     await db.exec(await migration('20261020110000_0091_retention_storage_cleanup_order.sql'));
     // 0096 adds "did this meeting help" answers, which erasure must also remove.
-    await db.exec(await migration('20261031100000_0096_admin_scorecard.sql'));
+    await db.exec(await migration('20261101120000_0098_admin_scorecard.sql'));
     await db.exec(`insert into meeting_benefits(session_id, user_id, answer) values (1, '${leaver}', 'yes')`);
 
     // Only the server may erase.

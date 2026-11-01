@@ -2000,7 +2000,7 @@ test('admin pages share the member pages\' cards and tabs, and show departments 
   await expect(page.getByTestId('score-reach')).toContainText('41 of 180 active students');
   await expect(page.getByTestId('score-connections')).toContainText('+9 in the last 30 days');
   await expect(page.getByTestId('score-crossField')).toContainText('38%');
-  await expect(page.getByTestId('score-crossField')).toContainText('Linking 7 pairs of fields');
+  await expect(page.getByTestId('score-crossField')).toContainText('Linking 7 pairs of programmes');
   await expect(page.getByTestId('score-benefit')).toContainText('Of 25 answers · 80% want to continue');
   await expect(page.getByTestId('score-capacity')).toContainText('2 skills need more alumni');
   await expect(page.getByTestId('score-reply')).toContainText('19.5 h');
