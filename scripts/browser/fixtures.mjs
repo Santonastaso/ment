@@ -216,10 +216,10 @@ function fixtureApi(state, ApiError) {
         },
         '/admin/fields-of-study': {
           students: 180, alumni: 109,
-          fields: [{ field: 'Finance', members: 12, active: true }, { field: 'Marketing', members: 6, active: false }, { field: null, members: 7, active: true }],
+          fields: [{ field: 'MiM', members: 12, active: true }, { field: 'MSc in Finance', members: 6, active: false }, { field: null, members: 7, active: true }],
           skills: [
-            { skill: 'Valuation', offered: ['Finance'], wanted: ['Marketing', null], sessions: ['Finance'] },
-            { skill: 'Brand strategy', offered: ['Marketing'], wanted: [], sessions: [] },
+            { skill: 'Valuation', offered: ['MiM'], wanted: ['MSc in Finance', null], sessions: ['MiM'] },
+            { skill: 'Brand strategy', offered: ['MSc in Finance'], wanted: [], sessions: [] },
           ],
         },
         '/admin/owner-stats': { organizations: [

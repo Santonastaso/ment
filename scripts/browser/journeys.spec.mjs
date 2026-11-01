@@ -1966,7 +1966,7 @@ test('admin pages share the member pages\' cards and tabs, and show departments 
   await expect(panel).toBeVisible();
   expect(await panel.evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgb(255, 255, 255)');
   expect(await page.getByTestId('admin-tab-overview').evaluate(element => getComputedStyle(element).borderRadius)).toBe('0px');
-  // Fields of study, never people, and nothing hidden behind "suppressed".
+  // Programmes, never people, and nothing hidden behind "suppressed".
   // Both sections start folded, and open on request.
   await expect(page.getByTestId('field-of-study-row')).toHaveCount(0);
   await expect(page.getByTestId('skill-by-field-row')).toHaveCount(0);
@@ -1974,16 +1974,16 @@ test('admin pages share the member pages\' cards and tabs, and show departments 
   await page.getByTestId('skills-by-field-toggle').click();
   const fields = page.getByTestId('field-of-study-row');
   await expect(fields).toHaveCount(3);
-  await expect(fields.first()).toContainText('Finance');
+  await expect(fields.first()).toContainText('MiM');
   await expect(fields.first()).toContainText('12 members');
   await expect(fields.first()).toContainText('Meetings reported');
   await expect(fields.nth(1)).toContainText('Below reporting threshold');
-  await expect(fields.nth(2)).toContainText('Other fields of study');
+  await expect(fields.nth(2)).toContainText('Other programmes');
   const valuation = page.getByTestId('skill-by-field-row').first();
   await expect(valuation).toContainText('Valuation');
   await expect(valuation).toContainText('Offered by');
   await expect(valuation).toContainText('Wanted by');
-  await expect(valuation.getByText('Other fields of study')).toBeVisible();
+  await expect(valuation.getByText('Other programmes')).toBeVisible();
   // Brand strategy has nobody wanting it or meeting on it, so those lines are left out.
   await expect(page.getByTestId('skill-by-field-row').nth(1).getByText('Wanted by')).toHaveCount(0);
   await expect(page.getByText(/Suppressed|Most active|Department|Total employees/)).toHaveCount(0);
