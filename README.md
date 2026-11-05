@@ -258,7 +258,7 @@ These are the useful V1 notes that still apply after the Supabase migration:
 - **Calendar**: Google and Microsoft OAuth event creation is implemented; production credentials and provider approval are required. `.ics` remains the offline fallback. Two-way external edits are not yet synchronized back into Ment.
 - **AI**: Mistral matching, drafting, profile ingestion, and reflection extraction are implemented and fail closed until approved production credentials are configured.
 - **Matching**: feedback is still coarse-grained around departments. Per-skill feedback and incremental match recompute would matter at larger scale.
-- **Privacy and admin ops**: audit export exists, but retention policy, GDPR export/delete workflows, org-level settings, 2FA/SSO, and legal consent screens are not built.
+- **Privacy and admin ops**: member export, account erasure, CV consent withdrawal, and organization retention settings exist. The daily retention sweep still needs `RETENTION_ENABLED=true` and approved periods; 2FA/SSO and final legal notice approval remain open.
 - **Accessibility/i18n/PWA**: English, Italian, and French catalogs are wired; French copy is still being completed. No PWA install/offline mode exists, and touch/keyboard accessibility should get a dedicated audit before broad rollout.
 - **Analytics**: owner/org CSV export exists, but deeper anonymized HR analytics and funnel/cohort reporting are not yet productized.
 

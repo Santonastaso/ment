@@ -46,3 +46,49 @@ export async function removeUserProfileUploads(storage, userId) {
   await removePrefix(userId);
   return removedCount;
 }
+
+/** Remove transient CV uploads older than cutoff, including uploads for active accounts.
+ * Listing completes before deletion so changing page offsets cannot hide objects.
+ */
+export async function removeStaleProfileUploads(storage, cutoff) {
+  const bucket = storage.from('profile-uploads');
+  const cutoffMs = new Date(cutoff).getTime();
+  if (!Number.isFinite(cutoffMs)) throw new Error('profile_upload_invalid_cutoff');
+  const stalePaths = [];
+  let undated = 0;
+
+  async function scan(prefix) {
+    for (let offset = 0; ; offset += PAGE_SIZE) {
+      const { data, error } = await bucket.list(prefix, {
+        limit: PAGE_SIZE, offset, sortBy: { column: 'name', order: 'asc' },
+      });
+      if (error) throw new Error('profile_upload_list_failed');
+      const entries = data || [];
+      for (const entry of entries) {
+        const path = prefix ? `${prefix}/${entry.name}` : entry.name;
+        if (!entry.id && !entry.metadata) {
+          // Profile uploads live below a user UUID. Ignore unexpected root paths.
+          if (prefix || /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(entry.name)) {
+            await scan(path);
+          }
+          continue;
+        }
+        if (!prefix) continue;
+        const lastChanged = Date.parse(entry.updated_at || entry.created_at || '');
+        if (!Number.isFinite(lastChanged)) {
+          undated += 1;
+        } else if (lastChanged < cutoffMs) {
+          stalePaths.push(path);
+        }
+      }
+      if (entries.length < PAGE_SIZE) break;
+    }
+  }
+
+  await scan('');
+  for (let offset = 0; offset < stalePaths.length; offset += DELETE_BATCH_SIZE) {
+    const { error } = await bucket.remove(stalePaths.slice(offset, offset + DELETE_BATCH_SIZE));
+    if (error) throw new Error('profile_upload_remove_failed');
+  }
+  return { removed: stalePaths.length, undated };
+}

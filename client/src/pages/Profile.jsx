@@ -145,6 +145,7 @@ export default function Profile() {
   const [notifyError, setNotifyError] = useState('');
   const [exporting, setExporting] = useState(false);
   const [aiSaving, setAiSaving] = useState(false);
+  const [cvWithdrawing, setCvWithdrawing] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteWord, setDeleteWord] = useState('');
   const [deleting, setDeleting] = useState(false);
@@ -255,6 +256,18 @@ export default function Profile() {
       showToast(t('components.sessionRequest.errorGeneric'));
     } finally {
       setAiSaving(false);
+    }
+  }
+
+  async function withdrawCvConsent() {
+    setCvWithdrawing(true);
+    try {
+      await api.post('/users/me/consents/cv/withdraw');
+      showToast(t('profile.ai.cvWithdrawn'));
+    } catch {
+      showToast(t('components.sessionRequest.errorGeneric'));
+    } finally {
+      setCvWithdrawing(false);
     }
   }
 
@@ -819,6 +832,11 @@ export default function Profile() {
                   onClick={() => setAiOptOut(!profile.ai_opt_out)}
                 />
               </div>
+              <p className="mt-4 text-xs text-muted-foreground">{t('profile.ai.cvConsentHelp')}</p>
+              <Button type="button" variant="outline" size="sm" className="mt-2" data-testid="withdraw-cv-consent"
+                onClick={withdrawCvConsent} disabled={cvWithdrawing}>
+                {t('profile.ai.cvWithdraw')}
+              </Button>
             </section>
             <section className="mt-6 border-t border-[var(--border-subtle)] pt-6">
               <h3 className="text-section font-semibold">{t('profile.delete.title')}</h3>

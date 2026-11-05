@@ -84,6 +84,11 @@ function fixtureApi(state, ApiError) {
     if (method === 'post') {
       if (/^\/sessions\/\d+\/benefit$/.test(path)) { state.benefits = [...(state.benefits || []), { path, ...body }]; return { answer: body.answer }; }
       if (path === '/users/me/delete') { state.erased = true; return { erased: true }; }
+      if (path === '/users/me/consents/cv/withdraw') {
+        state.consents = (state.consents || []).map(row => row.purpose === 'ai_profile_import' && !row.withdrawn_at
+          ? { ...row, withdrawn_at: new Date().toISOString() } : row);
+        return { withdrawn: state.consents.filter(row => row.purpose === 'ai_profile_import').length };
+      }
       if (path === '/users/me/consents') {
         const row = { purpose: body.purpose, text_version: 'fixture', accepted_at: new Date().toISOString() };
         state.consents = [...(state.consents || []), row];

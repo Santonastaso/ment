@@ -737,6 +737,12 @@ async function post(url, body = {}, opts = {}) {
     return ok(data, 201);
   }
 
+  if (url === '/users/me/consents/cv/withdraw') {
+    const { data, error } = await supabase.rpc('withdraw_cv_import_consent');
+    if (error) throw new ApiError(error.message);
+    return ok({ withdrawn: data });
+  }
+
   if (url === '/users/me/skills') {
     const { skill, type, example_project } = body;
     const example = type === 'can_teach' ? (example_project || '').toString().trim() : '';

@@ -12,6 +12,8 @@ This is an engineering record, not legal advice.
 - Calendar OAuth tokens are encrypted with AES-GCM before storage and are never readable by browser clients.
 - Persisted audit events, private reflections/ratings, account deactivation, profile editing, and documented data-source provenance.
 - Content-free AI run telemetry records successful and failed processing; the admin view is limited by organization-scoped RLS. Edge rate-limit counters store only service-keyed HMAC digests and are inaccessible to member clients.
+- Members can export their own account and activity data, withdraw future CV processing permission, and request account erasure. CV source drafts are removed on withdrawal; transient uploads are deleted after ingestion or by the stale-upload sweep.
+- Organization admins can configure retention periods for conversations, searches, reflections, audit logs, inactive accounts, profile drafts, notifications, AI telemetry, outreach records, invitations, and meeting-benefit answers. No period is set by the migration. The daily sweep is gated by `RETENTION_ENABLED=true`; the workflow reports when it is disabled.
 
 ## Product transparency
 
@@ -22,6 +24,7 @@ This is an engineering record, not legal advice.
 ## Decisions still owned outside engineering
 
 - Controller/processor roles, lawful basis, final retention schedule, data-subject request operating procedure, and production privacy wording.
+- Approval and activation of each retention period, plus confirmation that the production sweep ran successfully.
 - Mistral, Supabase, Google, Microsoft, email, and hosting DPAs/subprocessor review.
 - Whether LinkedIn-derived data may be supplied by ESSEC and displayed to other members.
 - Iubenda configuration and final legal approval.
@@ -30,3 +33,4 @@ This is an engineering record, not legal advice.
 ## Recommended evidence before launch
 
 - Exported RLS/security test results, a completed DPIA screening, provider DPAs, deletion/export test, invitation abuse test, OAuth token rotation test, and a signed staging-import approval.
+- A production check of CV withdrawal, the data export, and an enabled retention sweep after deployment.

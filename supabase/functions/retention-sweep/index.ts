@@ -1,10 +1,12 @@
 // Daily data retention. Called by the data-retention workflow with the service
 // role. The database applies each organisation's periods (run_data_retention);
-// this function then closes the logins of accounts it erased. With no periods
-// set, nothing is deleted.
+// this function then closes the logins of accounts it erased. Transient CV
+// uploads older than seven days are also removed, even with no periods set.
 
 import { adminClient, closeErasedLogin, corsHeaders, generateTempPassword, jsonError, jsonOk } from '../_shared/index.ts';
-import { removeUserProfileUploads } from '../_shared/profile-uploads.mjs';
+import { removeStaleProfileUploads, removeUserProfileUploads } from '../_shared/profile-uploads.mjs';
+
+const STALE_UPLOAD_DAYS = 7;
 
 function hasServiceRole(req: Request) {
   const token = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
@@ -35,10 +37,16 @@ Deno.serve(async (req) => {
     return jsonError('retention_failed', 500);
   }
   const pendingAuthIds: string[] = Array.isArray(pendingAuthData) ? pendingAuthData : [];
+  let staleUploads = { removed: 0, undated: 0 };
   try {
     for (const userId of new Set([...candidateIds, ...pendingAuthIds])) {
       await removeUserProfileUploads(sb.storage, userId);
     }
+    // CV uploads are transient, including for members whose accounts remain active.
+    // A grace period avoids interfering with an upload that has yet to be ingested.
+    staleUploads = await removeStaleProfileUploads(
+      sb.storage, new Date(Date.now() - STALE_UPLOAD_DAYS * 24 * 60 * 60 * 1000),
+    );
   } catch (error) {
     console.error(JSON.stringify({ event: 'retention_failed', stage: 'profile_uploads', code: error instanceof Error ? error.message : 'unknown' }));
     return jsonError('retention_failed', 500);
@@ -69,7 +77,8 @@ Deno.serve(async (req) => {
   }
   // Counts only: which accounts were erased is not logged.
   const summary = { ...data, erased_user_ids: undefined, accounts_erased: erased.length,
-    logins_closed: loginsClosed, auth_cleanup_pending: authCleanupIds.length - loginsClosed };
+    logins_closed: loginsClosed, auth_cleanup_pending: authCleanupIds.length - loginsClosed,
+    stale_uploads_removed: staleUploads.removed, stale_uploads_undated: staleUploads.undated };
   console.log(JSON.stringify({ event: 'retention_done', ...summary }));
   return jsonOk(summary, loginsClosed === authCleanupIds.length ? 200 : 500);
 });
