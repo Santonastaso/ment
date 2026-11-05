@@ -204,6 +204,16 @@ test('retention deletes nothing until periods are set, then only what is older t
     await db.exec(await migration('20261019110000_0087_ai_opt_out_and_account_erasure.sql'));
     await db.exec(await migration('20261019130000_0089_data_retention.sql'));
     await db.exec(await migration('20261020110000_0091_retention_storage_cleanup_order.sql'));
+    await db.exec(`
+      alter table profile_drafts add column source text default 'cv', add column created_at timestamptz default now();
+      alter table notification_outbox add column status text default 'sent', add column created_at timestamptz default now();
+      alter table ai_runs add column organization_id uuid, add column created_at timestamptz default now();
+      alter table outreach_targets add column organization_id uuid, add column created_at timestamptz default now();
+      alter table invitations add column organization_id uuid, add column status text default 'accepted',
+        add column expires_at timestamptz default now(), add column created_at timestamptz default now();
+      create table meeting_benefits(user_id uuid, created_at timestamptz default now());
+    `);
+    await db.exec(await migration('20261105120000_0101_more_retention_categories.sql'));
     for (const role of ['anon', 'authenticated']) {
       assert.equal((await one(`select has_function_privilege('${role}', 'public.run_data_retention()', 'execute') value`)).value, false);
       assert.equal((await one(`select has_function_privilege('${role}', 'public.retention_account_candidates()', 'execute') value`)).value, false);
@@ -214,7 +224,9 @@ test('retention deletes nothing until periods are set, then only what is older t
 
     // No periods: nothing goes.
     const idle = (await one('select run_data_retention() value')).value;
-    assert.deepEqual(idle, { messages: 0, sessions_cleared: 0, searches: 0, reflections: 0, audit_logs: 0, erased_user_ids: [] });
+    assert.deepEqual(idle, { messages: 0, sessions_cleared: 0, searches: 0, reflections: 0, audit_logs: 0,
+      profile_drafts: 0, notifications: 0, ai_runs: 0, outreach_targets: 0, invitations: 0, meeting_benefits: 0,
+      erased_user_ids: [] });
     assert.equal(await count('session_messages'), 2);
 
     // An admin sets the periods for their own organisation; members cannot.
@@ -222,13 +234,34 @@ test('retention deletes nothing until periods are set, then only what is older t
     await assert.rejects(db.query(`select admin_set_retention_settings('{"conversation_days": 365}')`), /admin_only/);
     await db.query("select set_config('request.jwt.claim.sub', $1, false)", [admin]);
     await assert.rejects(db.query(`select admin_set_retention_settings('{"conversation_days": 7}')`), /check/);
-    const saved = (await one(`select admin_set_retention_settings('{"conversation_days": 365, "search_days": "365", "reflection_days": 365, "audit_log_days": 365, "deactivated_account_days": 365}') value`)).value;
+    await db.exec(`
+      insert into profile_drafts(user_id, created_at) values ('${mentor}', ${old}), ('${mentor}', now());
+      insert into notification_outbox(user_id, status, created_at) values
+        ('${mentor}', 'sent', ${old}), ('${mentor}', 'queued', ${old}), ('${mentor}', 'sent', now());
+      insert into ai_runs(user_id, organization_id, created_at) values ('${mentor}', '${org}', ${old}), ('${mentor}', '${org}', now());
+      insert into outreach_targets(profile_id, email, organization_id, created_at) values
+        ('${mentor}', 'old@example.test', '${org}', ${old}), ('${mentor}', 'new@example.test', '${org}', now());
+      insert into invitations(email, organization_id, status, expires_at, created_at) values
+        ('old@example.test', '${org}', 'accepted', ${old}, ${old}),
+        ('pending@example.test', '${org}', 'pending', now() + interval '1 day', ${old}),
+        ('new@example.test', '${org}', 'accepted', now(), now());
+      insert into meeting_benefits(user_id, created_at) values ('${mentor}', ${old}), ('${mentor}', now());
+    `);
+    const saved = (await one(`select admin_set_retention_settings('{"conversation_days": 365, "search_days": "365", "reflection_days": 365, "audit_log_days": 365, "deactivated_account_days": 365, "profile_draft_days": 365, "notification_days": 365, "ai_telemetry_days": 365, "outreach_days": 365, "invitation_days": 365, "meeting_benefit_days": 365}') value`)).value;
     assert.equal(saved.conversation_days, 365);
 
     const candidates = (await one('select retention_account_candidates() value')).value;
     assert.deepEqual(candidates, [leaver]);
     const swept = (await one('select run_data_retention() value')).value;
-    assert.deepEqual(swept, { messages: 2, sessions_cleared: 1, searches: 1, reflections: 1, audit_logs: 1, erased_user_ids: [] });
+    assert.deepEqual(swept, { messages: 2, sessions_cleared: 1, searches: 1, reflections: 1, audit_logs: 1,
+      profile_drafts: 1, notifications: 1, ai_runs: 1, outreach_targets: 1, invitations: 1, meeting_benefits: 1,
+      erased_user_ids: [] });
+    assert.equal(await count('profile_drafts'), 1);
+    assert.equal(await count('notification_outbox'), 2, 'queued notices are kept');
+    assert.equal(await count('ai_runs'), 1);
+    assert.equal(await count('outreach_targets'), 1);
+    assert.equal(await count('invitations'), 2, 'valid pending invitations are kept');
+    assert.equal(await count('meeting_benefits'), 1);
     assert.deepEqual((await db.query('select body from session_messages')).rows.map(r => r.body), ['new']);
     assert.deepEqual((await db.query('select body from group_messages')).rows.map(r => r.body), ['new']);
     assert.deepEqual((await db.query('select outbound_message from sessions order by id')).rows.map(r => r.outbound_message), ['', 'new words']);

@@ -65,7 +65,11 @@ const PRIVACY_FIELD_KEYS = {
   'shadow role': 'goal', shadow_role_response: 'goal', 'session reflections/ratings': 'meetingNotes', email: 'email',
 };
 
-const RETENTION_FIELDS = ['conversation_days', 'search_days', 'reflection_days', 'audit_log_days', 'deactivated_account_days'];
+const RETENTION_FIELDS = [
+  'conversation_days', 'search_days', 'reflection_days', 'audit_log_days', 'deactivated_account_days',
+  'profile_draft_days', 'notification_days', 'ai_telemetry_days', 'outreach_days',
+  'invitation_days', 'meeting_benefit_days',
+];
 
 // Grid places for the scorecard (literal class names, so the build keeps them).
 const SCORE_COLUMNS = ['lg:col-start-1', 'lg:col-start-2', 'lg:col-start-3'];

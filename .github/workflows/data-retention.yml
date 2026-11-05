@@ -1,8 +1,9 @@
 name: data-retention
 
 # Applies each organisation's retention periods once a day (see migration
-# 0089). Off until the RETENTION_ENABLED repository variable is 'true'; even
-# then nothing is deleted until an admin sets periods under Admin > Privacy.
+# 0089). Off until the RETENTION_ENABLED repository variable is 'true'. Once
+# enabled, stale CV uploads are cleaned; other retention needs periods set
+# under Admin > Privacy.
 on:
   schedule:
     - cron: '40 3 * * *'
@@ -36,3 +37,18 @@ jobs:
             --header "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
             --header 'Content-Type: application/json' \
             "$SUPABASE_URL/functions/v1/retention-sweep"
+  retention-state:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Report retention switch state
+        env:
+          RETENTION_ENABLED: ${{ vars.RETENTION_ENABLED }}
+        run: |
+          if [ "$RETENTION_ENABLED" = 'true' ]; then
+            echo 'Retention sweep is enabled.' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo '::warning::Retention sweep skipped: RETENTION_ENABLED is not true.'
+            echo 'Retention sweep is skipped until the owner sets RETENTION_ENABLED to true.' >> "$GITHUB_STEP_SUMMARY"
+          fi

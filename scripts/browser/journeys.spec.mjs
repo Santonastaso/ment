@@ -1938,6 +1938,16 @@ test('members are told the chat is an AI, and can download their own data', asyn
   expect(lines.slice(0, 3)).toEqual(['\uFEFFSection,Item,Field,Value', 'export,,format,ment-export-1', 'profile,,id,viewer']);
 });
 
+test('a member can withdraw CV processing permission from their profile', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.fixture.consents = [{ purpose: 'ai_profile_import', accepted_at: new Date().toISOString() }];
+  });
+  await page.goto('/profile?tab=availability');
+  await page.getByTestId('withdraw-cv-consent').click();
+  await expect.poll(() => page.evaluate(() => window.fixture.consents[0]?.withdrawn_at)).toEqual(expect.any(String));
+  await expect(page.getByText('CV processing permission withdrawn and source drafts removed.')).toBeVisible();
+});
+
 test('a member can switch AI off and delete their account', async ({ page }) => {
   await page.goto('/profile?tab=availability');
   const ai = page.getByTestId('toggle-ai');
@@ -2072,10 +2082,13 @@ test('an admin sets how long data is kept, and nothing is set until they do', as
   expect(await page.evaluate(() => window.fixture.retention ?? null)).toBeNull();
   await conversations.fill('365');
   await page.getByTestId('retention-deactivated_account_days').fill('730');
+  await page.getByTestId('retention-notification_days').fill('180');
   await page.getByTestId('save-retention').click();
   await expect(page.getByText('Retention periods saved')).toBeVisible();
   expect(await page.evaluate(() => window.fixture.retention)).toEqual({
     conversation_days: 365, search_days: null, reflection_days: null, audit_log_days: null, deactivated_account_days: 730,
+    profile_draft_days: null, notification_days: 180, ai_telemetry_days: null, outreach_days: null,
+    invitation_days: null, meeting_benefit_days: null,
   });
 });
 

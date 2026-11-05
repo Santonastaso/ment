@@ -127,6 +127,15 @@ Deno.serve(async (req) => {
   if (!storagePath) return jsonError('storage_path_required');
   if (!storagePath.startsWith(`${ctx.user.id}/`)) return jsonError('forbidden', 403);
 
+  // The checkbox alone is a browser control. Verify the signed-in member's
+  // current permission before an uploaded document can reach the AI provider.
+  try {
+    const { data: consent, error: consentError } = await ctx.sb.from('consent_records')
+      .select('id').eq('user_id', ctx.user.id).eq('purpose', 'ai_profile_import')
+      .is('withdrawn_at', null).order('accepted_at', { ascending: false }).limit(1).maybeSingle();
+    if (consentError) return jsonError('consent_check_unavailable', 503);
+    if (!consent) return jsonError('cv_consent_required', 403);
+
   // Storage path is expected to be `<auth.uid()>/<filename>` so RLS allows the user to read.
   // We use the service-role client to download (avoiding any token-pass plumbing).
   const { data: file, error: dlErr } = await ctx.sb.storage
@@ -153,6 +162,13 @@ Deno.serve(async (req) => {
     return jsonError('document_read_failed_or_too_complex', 400);
   }
   if (!rawText || rawText.trim().length < 20) return jsonError('text_too_short', 400);
+
+  // Parsing can take time; honour a withdrawal made while the file was read.
+  const { data: currentConsent, error: currentConsentError } = await ctx.sb.from('consent_records')
+    .select('id').eq('user_id', ctx.user.id).eq('purpose', 'ai_profile_import')
+    .is('withdrawn_at', null).limit(1).maybeSingle();
+  if (currentConsentError) return jsonError('consent_check_unavailable', 503);
+  if (!currentConsent) return jsonError('cv_consent_required', 403);
 
   let proposed: Record<string, unknown>;
   let classifier_source;
@@ -193,6 +209,13 @@ Deno.serve(async (req) => {
     return jsonError(mapped.message, mapped.status);
   }
 
+  // If permission was withdrawn during the provider call, discard its result.
+  const { data: saveConsent, error: saveConsentError } = await ctx.sb.from('consent_records')
+    .select('id').eq('user_id', ctx.user.id).eq('purpose', 'ai_profile_import')
+    .is('withdrawn_at', null).limit(1).maybeSingle();
+  if (saveConsentError) return jsonError('consent_check_unavailable', 503);
+  if (!saveConsent) return jsonError('cv_consent_required', 403);
+
   const { data: insert, error: insErr } = await ctx.sb
     .from('profile_drafts')
     .insert({
@@ -206,8 +229,15 @@ Deno.serve(async (req) => {
     .single();
   if (insErr) return jsonError(`insert_failed: ${insErr.message}`, 500);
 
-  // Best-effort: clean up the upload after parsing.
-  await ctx.sb.storage.from('profile-uploads').remove([storagePath]);
-
   return jsonOk({ draft_id: insert.id, proposed, classifier_source });
+  } finally {
+    // Clear the uploaded file on every outcome, including parser/provider
+    // errors. The scheduled sweep retries an orphan if Storage removal fails.
+    try {
+      const { error: removalError } = await ctx.sb.storage.from('profile-uploads').remove([storagePath]);
+      if (removalError) console.error(JSON.stringify({ event: 'profile_ingest_upload_cleanup_failed', code: removalError.statusCode || '' }));
+    } catch {
+      console.error(JSON.stringify({ event: 'profile_ingest_upload_cleanup_failed', code: 'storage_unavailable' }));
+    }
+  }
 });
