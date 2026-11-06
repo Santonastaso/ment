@@ -1,0 +1,57 @@
+name: Synthetic production privacy acceptance
+
+on:
+  workflow_dispatch:
+    inputs:
+      synthetic_fixtures_confirmation:
+        description: 'Type CREATE_AND_DELETE_SYNTHETIC_FIXTURES_ONLY (creates disposable fixtures; never uses existing accounts)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# Serialize with Supabase releases; never cancel a run during fixture cleanup.
+concurrency:
+  group: release-supabase-production
+  cancel-in-progress: false
+
+jobs:
+  acceptance:
+    if: github.ref == 'refs/heads/main' && inputs.synthetic_fixtures_confirmation == 'CREATE_AND_DELETE_SYNTHETIC_FIXTURES_ONLY'
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+      - name: Install local test dependencies
+        run: npm ci --ignore-scripts
+      - name: Verify runner safety locally
+        run: node --test scripts/privacy-acceptance.test.mjs
+      - name: Run synthetic acceptance and guarded cleanup
+        id: acceptance
+        env:
+          PRIVACY_ENVIRONMENT: production
+          PRIVACY_SYNTHETIC_CONFIRMATION: ${{ inputs.synthetic_fixtures_confirmation }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/privacy-acceptance.mjs --execute > privacy-acceptance-report.json
+      - name: Prepare sanitized acceptance artifact and job summary
+        if: always()
+        env:
+          PRIVACY_EXECUTION_OUTCOME: ${{ steps.acceptance.outcome }}
+        run: node scripts/privacy-acceptance.mjs --summarize
+      - name: Retain provisional sanitized acceptance report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: privacy-acceptance-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
+          path: .privacy-acceptance/acceptance.json
+          retention-days: 30
+          if-no-files-found: error

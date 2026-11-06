@@ -89,14 +89,8 @@ jobs:
       - name: Verify user journeys with isolated fixtures
         run: npm run test:browser
 
-      - name: Preserve browser failure diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: browser-failures
-          path: test-results/
-          if-no-files-found: ignore
-          retention-days: 7
+      # Never upload raw browser output, screenshots, traces or reports.
+      # The evidence job retains allowlisted results on success and failure.
 
   edge-functions:
     runs-on: ubuntu-latest
@@ -177,6 +171,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: production
+    outputs:
+      database_lint: ${{ steps.production-lint.outcome }}
+      rls: ${{ steps.production-rls.outcome }}
     # One release at a time, never interrupted.
     concurrency:
       group: release-supabase-production
@@ -250,6 +247,7 @@ jobs:
           supabase functions deploy --project-ref "$project_ref"
 
       - name: Verify linked database
+        id: production-lint
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
@@ -257,9 +255,18 @@ jobs:
           set -euo pipefail
           project_ref=$(sed -n 's/^project_id = "\([^"]*\)"/\1/p' supabase/config.toml)
           supabase link --project-ref "$project_ref"
-          supabase db lint --linked --fail-on error
+          # Database diagnostics can contain schema/data details. Do not retain
+          # raw output in Actions logs or artifacts, including on failure.
+          diagnostic_file=$(mktemp)
+          trap 'rm -f "$diagnostic_file"' EXIT
+          if ! supabase db lint --linked --fail-on error >"$diagnostic_file" 2>&1; then
+            echo '::error::Production database lint failed; inspect through restricted operator access.'
+            exit 1
+          fi
+          echo 'Production database lint passed.'
 
       - name: Verify production RLS policies
+        id: production-rls
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
@@ -267,4 +274,90 @@ jobs:
           MENT_EMP_PASSWORD: ${{ secrets.MENT_EMP_PASSWORD }}
           MENT_ADMIN_EMAIL: ${{ secrets.MENT_ADMIN_EMAIL }}
           MENT_ADMIN_PASSWORD: ${{ secrets.MENT_ADMIN_PASSWORD }}
-        run: python3 scripts/rls_smoke_test.py
+        run: |
+          set -euo pipefail
+          # This script may print response bodies. Never publish its raw output.
+          diagnostic_file=$(mktemp)
+          trap 'rm -f "$diagnostic_file"' EXIT
+          if ! python3 scripts/rls_smoke_test.py >"$diagnostic_file" 2>&1; then
+            echo '::error::Production RLS verification failed; inspect with dedicated test accounts through restricted operator access.'
+            exit 1
+          fi
+          echo 'Production RLS verification passed.'
+
+  verification-evidence:
+    if: always()
+    needs: [changed-functions, gitleaks, build, edge-functions, database, newest-on-main, release-supabase]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # No checkout, credentials, downloaded reports, member data or raw logs.
+      - name: Summarize verification outcomes
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          python3 - <<'PY'
+          import json, os, re
+          from pathlib import Path
+          results = json.loads(os.environ['RESULTS'])
+          statuses = {'success', 'failure', 'cancelled', 'skipped'}
+          def status(value):
+              return value if value in statuses else 'unknown'
+          def sha(value):
+              if not re.fullmatch(r'[0-9a-f]{40}', value):
+                  raise ValueError('Invalid commit identifier')
+              return value
+          scopes = {
+              'changed-functions': 'function-removal-guard',
+              'gitleaks': 'repository-secret-scan',
+              'build': 'translations-migrations-unit-pglite-build-audit-fixture-browser',
+              'edge-functions': 'edge-typecheck-and-pdf-runtime',
+              'database': 'disposable-migration-replay-lint-rls-request-contract',
+              'newest-on-main': 'release-freshness-gate',
+              'release-supabase': 'production-release',
+          }
+          checks = {key: {'status': status(results.get(key, {}).get('result')), 'scope': scope}
+                    for key, scope in scopes.items()}
+          production = results.get('release-supabase', {}).get('outputs', {})
+          # A skipped release is not successful production verification.
+          for key in ('database_lint', 'rls'):
+              checks['production-' + key] = {'status': status(production.get(key) or 'skipped'),
+                                            'scope': 'production-dedicated-account-check'}
+          required = ('changed-functions', 'gitleaks', 'build', 'edge-functions', 'database')
+          evidence = {
+              'schema_version': 1,
+              'tested_sha': sha(os.environ['GITHUB_SHA']),
+              'source_sha': sha(os.environ['SOURCE_SHA']),
+              'event': os.environ['EVENT_NAME'],
+              'run_id': int(os.environ['GITHUB_RUN_ID']),
+              'run_attempt': int(os.environ['GITHUB_RUN_ATTEMPT']),
+              'run_url': os.environ['GITHUB_SERVER_URL'] + '/' + os.environ['GITHUB_REPOSITORY'] + '/actions/runs/' + os.environ['GITHUB_RUN_ID'],
+              'ci_verification': 'success' if all(checks[k]['status'] == 'success' for k in required) else 'incomplete-or-failed',
+              'checks': checks,
+              'limitations': ['No legal approval or production acceptance implied',
+                              'Browser uses isolated fixtures; database job uses disposable users',
+                              'Job outcomes, not individual test counts; skipped is not passed'],
+          }
+          Path('verification-evidence').mkdir()
+          Path('verification-evidence/summary.json').write_text(json.dumps(evidence, indent=2) + '\n')
+          lines = ['## Privacy/security verification', '',
+                   'Tested commit: `' + evidence['tested_sha'] + '`',
+                   'Source commit: `' + evidence['source_sha'] + '`',
+                   'CI verification: **' + evidence['ci_verification'] + '**', '',
+                   '| Check | Outcome |', '| --- | --- |']
+          lines += ['| ' + key + ' | ' + item['status'] + ' |' for key, item in checks.items()]
+          lines += ['', 'No legal approval or production acceptance implied. No raw test output retained here.', '']
+          summary = '\n'.join(lines)
+          Path('verification-evidence/summary.md').write_text(summary)
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as target:
+              target.write(summary)
+          PY
+      - name: Retain sanitized success and failure evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: privacy-security-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: verification-evidence/
+          if-no-files-found: error
+          retention-days: 30

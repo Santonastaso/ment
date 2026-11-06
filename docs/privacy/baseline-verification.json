@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "collected_on": "2026-11-06",
+  "evidence_type": "historical-github-job-metadata",
+  "source_sha": "df0d36f024a3fbcfa0b56b9127ebbcb9da7d79a6",
+  "run_id": 42031584583,
+  "run_url": "https://github.com/Santonastaso/ment/actions/runs/42031584583",
+  "checks": {
+    "gitleaks": {
+      "status": "success",
+      "job_id": 127259113896,
+      "steps": []
+    },
+    "changed-functions": {
+      "status": "success",
+      "job_id": 127259114145,
+      "steps": []
+    },
+    "build": {
+      "status": "success",
+      "job_id": 127259114430,
+      "steps": [
+        {
+          "check": "Run npm run check",
+          "status": "success"
+        },
+        {
+          "check": "Run npm audit --prefix client --audit-level=high",
+          "status": "success"
+        },
+        {
+          "check": "Verify user journeys with isolated fixtures",
+          "status": "success"
+        }
+      ]
+    },
+    "edge-functions": {
+      "status": "success",
+      "job_id": 127259114495,
+      "steps": []
+    },
+    "database": {
+      "status": "success",
+      "job_id": 127259114642,
+      "steps": [
+        {
+          "check": "Replay migrations on a fresh local database",
+          "status": "success"
+        },
+        {
+          "check": "Validate database functions",
+          "status": "success"
+        },
+        {
+          "check": "Verify RLS against disposable local users",
+          "status": "success"
+        }
+      ]
+    },
+    "newest-on-main": {
+      "status": "success",
+      "job_id": 127261083259,
+      "steps": []
+    },
+    "release-supabase": {
+      "status": "success",
+      "job_id": 127261133631,
+      "steps": [
+        {
+          "check": "Apply migrations",
+          "status": "success"
+        },
+        {
+          "check": "Deploy all Edge Functions",
+          "status": "success"
+        },
+        {
+          "check": "Verify linked database",
+          "status": "success"
+        },
+        {
+          "check": "Verify production RLS policies",
+          "status": "success"
+        }
+      ]
+    }
+  },
+  "historical_artifacts": [],
+  "retention": {
+    "run_id": 42019067368,
+    "run_url": "https://github.com/Santonastaso/ment/actions/runs/42019067368",
+    "sweep": "skipped"
+  },
+  "deployment": {
+    "id": "dpl_9dQdXLV929V3mjHQfQwRWphNej7j",
+    "state": "READY",
+    "verification_source": "connected-provider-verified baseline"
+  },
+  "limitations": [
+    "Run-to-commit mapping and deployment verified through connected GitHub and Vercel; job and artifact metadata independently read through connected GitHub",
+    "No raw logs, member data, credentials or test counts collected",
+    "Does not verify uncommitted changes, provider account settings or legal compliance"
+  ]
+}
