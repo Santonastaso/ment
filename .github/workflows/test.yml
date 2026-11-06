@@ -137,6 +137,7 @@ jobs:
           python3 scripts/rls_smoke_test.py
           # Writes requests, so it runs here only, never in the production check below.
           python3 scripts/request_api_contract_test.py
+          PRIVACY_LOCAL_CONTRACT=true python3 scripts/privacy_storage_contract_test.py
       - name: Stop local services
         if: always()
         run: supabase stop --no-backup
