@@ -48,6 +48,7 @@ function fixtureApi(state, ApiError) {
     if (method === 'get') {
       if (state.failGet === path) throw dropped();
       if (path === '/users/me') return state.profile || { ...state.user, skills: [], career: [] };
+      if (path === '/users/me/terms-review') return { accepted: !state.needsLegalReview || (state.consents || []).some(row => row.purpose === 'terms_privacy' && row.text_version === '2026-09-08'), text_version: '2026-09-08' };
       if (path === '/users/me/skill-evidence') return [];
       if (path === '/users/me/capacity') return state.capacity || {};
       if (path === '/users/me/export') return { format: 'ment-export-1', profile: state.user, consents: state.consents || [] };
@@ -90,7 +91,7 @@ function fixtureApi(state, ApiError) {
         return { withdrawn: state.consents.filter(row => row.purpose === 'ai_profile_import').length };
       }
       if (path === '/users/me/consents') {
-        const row = { purpose: body.purpose, text_version: 'fixture', accepted_at: new Date().toISOString() };
+        const row = { purpose: body.purpose, text_version: body.purpose === 'terms_privacy' ? '2026-09-08' : 'fixture', accepted_at: new Date().toISOString() };
         state.consents = [...(state.consents || []), row];
         return row;
       }

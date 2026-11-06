@@ -42,3 +42,6 @@ verify_jwt = false
 
 [functions.calendar-provider]
 verify_jwt = true
+
+[functions.withdraw-cv-consent]
+verify_jwt = true

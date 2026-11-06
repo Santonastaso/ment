@@ -4,6 +4,7 @@ import { useAuth } from './context/AuthContext.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useT } from './i18n/index.jsx';
 import { Button } from './components/ui/button.jsx';
+import LegalReviewPrompt from './components/LegalReviewPrompt.jsx';
 
 const LandingPage = lazy(() => import('./pages/LandingPage.jsx'));
 const Login = lazy(() => import('./pages/Login.jsx'));
@@ -156,7 +157,7 @@ function ProtectedRoute() {
   if (!user) return <Navigate to="/login" state={{ from: location }} replace />;
   const gate = authGatePath(user);
   if (gate) return <Navigate to={gate} state={{ returnTo: `${location.pathname}${location.search}${location.hash}` }} replace />;
-  return page(<AppLayout />, false);
+  return page(<LegalReviewPrompt key={user.id} userId={user.id}><AppLayout /></LegalReviewPrompt>, false);
 }
 
 function ChangePasswordRoute() {

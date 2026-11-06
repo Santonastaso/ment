@@ -1,0 +1,12 @@
+{
+  "legalReview.title": "Consulta i Termini e l’informativa sulla privacy",
+  "legalReview.description": "Prima di continuare, consulta i documenti pubblicati. Questo non autorizza i trattamenti facoltativi tramite IA.",
+  "legalReview.version": "Versione dei documenti: {version}",
+  "legalReview.agreement": "Accetto i Termini di utilizzo e dichiaro di aver letto l’informativa sulla privacy.",
+  "legalReview.error": "Non è stato possibile confermare la tua accettazione. Riprova.",
+  "legalReview.retry": "Riprova",
+  "legalReview.accept": "Accetta e continua",
+  "legalReview.saving": "Salvataggio…",
+  "legalReview.signOut": "Esci",
+  "legalReview.checking": "Verifica della lettura dei documenti…"
+}

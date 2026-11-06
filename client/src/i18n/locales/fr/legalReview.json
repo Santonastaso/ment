@@ -1,0 +1,12 @@
+{
+  "legalReview.title": "Consultez les conditions et la politique de confidentialité",
+  "legalReview.description": "Avant de continuer, veuillez consulter les documents publiés. Cela ne donne pas votre autorisation pour les traitements facultatifs par IA.",
+  "legalReview.version": "Version des documents : {version}",
+  "legalReview.agreement": "J’accepte les conditions d’utilisation et reconnais avoir pris connaissance de la politique de confidentialité.",
+  "legalReview.error": "Nous n’avons pas pu confirmer votre validation. Veuillez réessayer.",
+  "legalReview.retry": "Réessayer",
+  "legalReview.accept": "Accepter et continuer",
+  "legalReview.saving": "Enregistrement…",
+  "legalReview.signOut": "Se déconnecter",
+  "legalReview.checking": "Vérification de votre validation des documents…"
+}

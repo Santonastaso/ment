@@ -76,7 +76,7 @@ test('invited member signs in, changes temporary password, imports CV, and finis
   await expect(page.getByRole('heading', { name: 'When can people reach you?' })).toBeVisible();
   await page.getByTestId('onboarding-accept-terms').check();
   await page.getByRole('button', { name: 'Finish & see my matches' }).click();
-  await expect(page).toHaveURL('http://127.0.0.1:3010/');
+  await expect(page).toHaveURL(new URL('/', page.url()).href);
   expect(await page.evaluate(async () => {
     const calls = window.fixture.calls;
     const upload = calls.find(call => call.path === '/profile/ingest');
@@ -96,7 +96,7 @@ test('invited member signs in, changes temporary password, imports CV, and finis
     acceptedDraft: true, ready: true,
   });
   await page.reload();
-  await expect(page).toHaveURL('http://127.0.0.1:3010/');
+  await expect(page).toHaveURL(new URL('/', page.url()).href);
   await expect(page.getByRole('link', { name: 'My profile' })).toBeVisible();
 });
 
@@ -142,7 +142,7 @@ test('password reset stays on Ment and accepts a recovery link', async ({ page }
   await page.getByRole('textbox', { name: 'Email' }).fill('student@example.test');
   await page.getByRole('button', { name: 'Forgot password?' }).click();
   await expect(page.getByText(/reset link/i)).toBeVisible();
-  expect(await page.evaluate(() => window.fixture.resetRequest.options.redirectTo)).toBe('http://127.0.0.1:3010/reset-password');
+  expect(await page.evaluate(() => window.fixture.resetRequest.options.redirectTo)).toBe(new URL('/reset-password', page.url()).href);
 
   await page.goto('/reset-password#access_token=test&refresh_token=test&type=recovery');
   await expect(page.getByText('Choose a new password', { exact: true })).toBeVisible();
@@ -177,7 +177,7 @@ test('CV import populates onboarding and can be saved', async ({ page }) => {
   await expect(page.getByRole('link', { name: 'Privacy notice' })).toHaveAttribute('href', '/privacy');
   await page.getByTestId('onboarding-accept-terms').check();
   await page.getByRole('button', { name: 'Finish' }).click();
-  await expect(page).toHaveURL('http://127.0.0.1:3010/');
+  await expect(page).toHaveURL(new URL('/', page.url()).href);
   expect(await page.evaluate(() => window.fixture.calls.some(item => item.path === '/profile/ingest/1/accept'))).toBe(true);
   expect(await page.evaluate(() => window.fixture.consents.map(row => row.purpose))).toEqual(['ai_profile_import', 'terms_privacy']);
 });
@@ -232,7 +232,7 @@ test('Home navigation resets an active discovery conversation', async ({ page })
   await page.locator('.app-sidebar').getByRole('link', { name: 'Home' }).click();
   await expect(page.getByRole('textbox', { name: 'Describe who could help' })).toHaveValue('');
   await expect(page.getByText('Which finance skill would you like help with?')).toHaveCount(0);
-  await expect(page).toHaveURL('http://127.0.0.1:3010/');
+  await expect(page).toHaveURL(new URL('/', page.url()).href);
 });
 
 test('profile overview shows saved skills before the first session and CV can update them', async ({ page }) => {
@@ -784,7 +784,21 @@ test('Messages count sits beside its heading', async ({ page }) => {
 
 test('Messages shows chat skeleton rows until sessions and groups load', async ({ page }) => {
   await page.goto('/');
-  await page.evaluate(() => { window.fixture.holdLoads = ['/sessions', '/groups']; });
+  await expect(page.getByTestId('discovery-ai-note')).toBeVisible();
+  await expect(page.locator('.discovery-home-skeleton')).toHaveCount(0);
+  await page.evaluate(() => {
+    window.fixture.holdLoads = ['/sessions', '/groups'];
+    window.fixture.heldLoadStartedAt = [];
+    // Measure DOM changes inside the browser; tool round trips can be slow on
+    // a busy workstation without reflecting any delay in the actual render.
+    const observer = new MutationObserver(() => {
+      if (!window.fixture.skeletonShownAt && document.querySelector('.conversation-list-skeleton')) window.fixture.skeletonShownAt = Date.now();
+      if (window.fixture.releasedLoadAt && document.querySelector('.conversation-list-item')) {
+        window.fixture.rowsShownAt = Date.now(); observer.disconnect();
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  });
   await page.locator('nav').getByRole('link', { name: /^Messages/ }).click();
 
   const skeleton = page.locator('.conversation-list-skeleton');
@@ -792,7 +806,7 @@ test('Messages shows chat skeleton rows until sessions and groups load', async (
     await expect(skeleton).toBeVisible();
     await expect(skeleton.locator('.conversation-list-skeleton-row')).toHaveCount(7);
     await expect(page.locator('.conversation-list-item')).toHaveCount(0);
-    expect(await page.evaluate(() => Date.now() - Math.min(...window.fixture.heldLoadStartedAt))).toBeLessThan(900);
+    expect(await page.evaluate(() => window.fixture.skeletonShownAt - Math.min(...window.fixture.heldLoadStartedAt))).toBeLessThan(900);
   } finally {
     await page.evaluate(() => {
       window.fixture.releasedLoadAt = Date.now();
@@ -802,7 +816,7 @@ test('Messages shows chat skeleton rows until sessions and groups load', async (
   await expect(skeleton).toHaveCount(0);
   await expect(page.locator('.conversation-list-item')).toHaveCount(3);
   await expect(page.locator('.conversation-list-item').first()).toContainText('Peer 1');
-  expect(await page.evaluate(() => Date.now() - window.fixture.releasedLoadAt)).toBeLessThan(900);
+  expect(await page.evaluate(() => window.fixture.rowsShownAt - window.fixture.releasedLoadAt)).toBeLessThan(900);
 });
 
 test('Explorer shows profile-shaped skeletons until directory results load', async ({ page }) => {
@@ -926,7 +940,7 @@ test('Home categories expand into chat cards before opening a conversation', asy
     const panel = page.getByRole('region', { name: new RegExp(`^${label}`) });
     await expect(panel.getByRole('link')).toHaveCount(1);
     await expect(panel.getByRole('link', { name: `Open chat: ${peer}` })).toBeVisible();
-    await expect(page).toHaveURL('http://127.0.0.1:3010/');
+    await expect(page).toHaveURL(new URL('/', page.url()).href);
   }
   await page.setViewportSize({ width: 390, height: 844 });
   const mainLeft = await page.locator('main').evaluate(element => element.getBoundingClientRect().left);
@@ -959,7 +973,7 @@ test('onboarding to discovery, request, acceptance, chat and meeting', async ({ 
   await page.getByLabel('Weekly meeting limit').fill('3');
   await page.getByTestId('onboarding-accept-terms').check();
   await page.getByRole('button', { name: 'Finish & see my matches' }).click();
-  await expect(page).toHaveURL('http://127.0.0.1:3010/');
+  await expect(page).toHaveURL(new URL('/', page.url()).href);
   // The availability chosen during onboarding is saved with the profile.
   expect(await page.evaluate(() => window.fixture.calls.some(call => call.method === 'put' && call.path === '/users/me'
     && call.body?.weekly_meeting_limit === 3 && call.body?.mentorship_paused === false))).toBe(true);
@@ -1446,7 +1460,7 @@ test('a failed availability save keeps the user on onboarding until it succeeds'
   // Trying again saves the choice, then the profile, once.
   await page.getByTestId('onboarding-accept-terms').check();
   await page.getByRole('button', { name: 'Finish & see my matches' }).click();
-  await expect(page).toHaveURL('http://127.0.0.1:3010/');
+  await expect(page).toHaveURL(new URL('/', page.url()).href);
   const calls = await page.evaluate(() => window.fixture.calls.filter(call => call.path === '/users/me/onboarding' || (call.method === 'put' && call.path === '/users/me')));
   expect(calls.filter(call => call.path === '/users/me/onboarding')).toHaveLength(1);
   const saves = calls.filter(call => call.method === 'put');
@@ -1945,7 +1959,7 @@ test('a member can withdraw CV processing permission from their profile', async 
   await page.goto('/profile?tab=availability');
   await page.getByTestId('withdraw-cv-consent').click();
   await expect.poll(() => page.evaluate(() => window.fixture.consents[0]?.withdrawn_at)).toEqual(expect.any(String));
-  await expect(page.getByText('CV processing permission withdrawn and source drafts removed.')).toBeVisible();
+  await expect(page.getByText('CV processing permission withdrawn; CV drafts and uploaded files removed.')).toBeVisible();
 });
 
 test('a member can switch AI off and delete their account', async ({ page }) => {
