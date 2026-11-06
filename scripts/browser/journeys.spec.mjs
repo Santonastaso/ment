@@ -1870,8 +1870,12 @@ test('an alumnus who finishes onboarding lands in Messages', async ({ page }) =>
 
 test('finishing onboarding returns the user to the page they were headed for', async ({ page }) => {
   await page.goto('/');
-  await visit(page, '/explorer');
+  await page.locator('nav').getByRole('link', { name: 'Explorer' }).click();
+  await expect(page).toHaveURL(/\/explorer$/);
+  await expect(page.getByRole('heading', { name: 'Explorer', exact: true })).toBeVisible();
   await page.evaluate(() => window.fixture.setUser({ ...window.fixture.user, role: 'alumnus', onboarding_complete: false }));
+  await expect(page).toHaveURL(/\/onboarding$/);
+  await expect.poll(() => page.evaluate(() => history.state?.usr?.returnTo)).toBe('/explorer');
   await finishOnboarding(page);
   await expect(page).toHaveURL(/\/explorer$/);
 });
