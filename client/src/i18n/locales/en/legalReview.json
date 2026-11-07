@@ -1,0 +1,12 @@
+{
+  "legalReview.title": "Review the Terms and Privacy notice",
+  "legalReview.description": "Before continuing, please review the published documents. This does not give permission for optional AI processing.",
+  "legalReview.version": "Document version: {version}",
+  "legalReview.agreement": "I agree to the Terms of use and acknowledge the Privacy notice.",
+  "legalReview.error": "We could not confirm your review. Please try again.",
+  "legalReview.retry": "Try again",
+  "legalReview.accept": "Accept and continue",
+  "legalReview.saving": "Saving…",
+  "legalReview.signOut": "Sign out",
+  "legalReview.checking": "Checking your document review…"
+}

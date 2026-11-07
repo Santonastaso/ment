@@ -383,14 +383,33 @@ async function get(url) {
 
   if (url === '/discovery/threads' || url.startsWith('/discovery/threads?')) {
     const params = new URLSearchParams(url.split('?')[1] || '');
-    const limit = Math.min(30, Math.max(1, Number(params.get('limit')) || 10));
-    const { data, error } = await supabase.from('discovery_threads')
+    const limit = Math.min(30, Math.max(1, Math.floor(Number(params.get('limit')) || 10)));
+    const cursor = params.get('cursor');
+    let boundary = null;
+    if (cursor) {
+      try { boundary = JSON.parse(cursor); } catch { throw new ApiError('invalid_history_cursor', 400); }
+      // Validate before interpolating the composite PostgREST filter. Keep the
+      // original timestamp precision: rounding to milliseconds can skip rows.
+      if (!boundary || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/.test(boundary.created_at)
+        || !Number.isFinite(Date.parse(boundary.created_at))
+        || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(boundary.id)) {
+        throw new ApiError('invalid_history_cursor', 400);
+      }
+    }
+    // Creation time is immutable; reopening a search changes updated_at.
+    // The ID breaks ties, so deletions and updates cannot shift later pages.
+    let query = supabase.from('discovery_threads')
       .select('id,title,turns,selected_person_id,session_id,archived,created_at,updated_at')
       .eq('user_id', viewer.id)
-      .order('updated_at', { ascending: false })
-      .limit(limit);
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false });
+    if (boundary) query = query.or(`created_at.lt.${boundary.created_at},and(created_at.eq.${boundary.created_at},id.lt.${boundary.id})`);
+    const { data, error } = await query.limit(limit + 1);
     if (error) throw new ApiError(error.message);
-    return ok(data || []);
+    const rows = (data || []).slice(0, limit);
+    const last = rows.at(-1);
+    return { ...ok(rows), nextCursor: data?.length > limit && last
+      ? JSON.stringify({ created_at: last.created_at, id: last.id }) : null };
   }
 
   if (/^\/discovery\/threads\/[0-9a-f-]+$/i.test(url)) {
@@ -415,6 +434,15 @@ async function get(url) {
     if (error) throw new ApiError(error.message);
     return ok(data);
   }
+  if (url === '/users/me/terms-review') {
+    const { data, error } = await supabase.from('consent_records')
+      .select('text_version,accepted_at').eq('user_id', viewer.id)
+      .eq('purpose', 'terms_privacy').eq('text_version', CONSENT_VERSIONS.terms_privacy)
+      .order('accepted_at', { ascending: false }).limit(1).maybeSingle();
+    if (error) throw new ApiError(error.message);
+    return ok({ accepted: Boolean(data), text_version: CONSENT_VERSIONS.terms_privacy, accepted_at: data?.accepted_at || null });
+  }
+
   if (url === '/users/me/export') {
     const { data, error } = await supabase.rpc('export_my_data');
     if (error) throw new ApiError(error.message);
@@ -738,9 +766,10 @@ async function post(url, body = {}, opts = {}) {
   }
 
   if (url === '/users/me/consents/cv/withdraw') {
-    const { data, error } = await supabase.rpc('withdraw_cv_import_consent');
-    if (error) throw new ApiError(error.message);
-    return ok({ withdrawn: data });
+    const { data, error } = await invokeUserFunction('withdraw-cv-consent', {});
+    if (error || data?.error) throw await edgeFunctionError(error, data, 'cv_withdrawal_unavailable');
+    if (data?.cleanup_complete !== true) throw new ApiError('cv_upload_cleanup_pending', 503);
+    return ok(data);
   }
 
   if (url === '/users/me/skills') {

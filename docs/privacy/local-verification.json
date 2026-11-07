@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "collected_at_utc": "2026-11-06T10:38:17.193062+00:00",
+  "baseline_commit": "df0d36f024a3fbcfa0b56b9127ebbcb9da7d79a6",
+  "branch": "fix/privacy-readiness-sprint",
+  "scope": "local candidate before commit",
+  "checks": {
+    "repository_check": {
+      "status": "success",
+      "unit_tests": 207,
+      "migrations": 106,
+      "translations": "success",
+      "production_build": "success"
+    },
+    "privacy_database_follow_up": {
+      "status": "success",
+      "scope": "lean export, calendar-link exclusions, idempotent current-version review and deactivated-token denial"
+    },
+    "browser_full_run": {
+      "status": "failure",
+      "passed": 92,
+      "failed": 1,
+      "total": 93,
+      "failure": "timing measured tool round-trip overhead"
+    },
+    "browser_timing_follow_up": {
+      "status": "success",
+      "passed": 1,
+      "scope": "same 900ms limit measured with in-browser DOM observer"
+    },
+    "client_dependency_audit": {
+      "status": "success",
+      "total_vulnerabilities": 0
+    },
+    "fresh_docker_migration_replay": {
+      "status": "pending-ci"
+    },
+    "fresh_deno_edge_check": {
+      "status": "pending-ci"
+    }
+  },
+  "limitations": [
+    "Local checks cover the changing candidate tree; authoritative committed revision results will be in CI artifacts.",
+    "No candidate production acceptance or live model quality result.",
+    "Hosted AI evaluation attempt failed staging preflight before provider calls.",
+    "Provider consoles and approved retention settings remain pending."
+  ]
+}

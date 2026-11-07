@@ -42,6 +42,8 @@ Thumbs.db
 /tmp/test-*.js
 test-results/
 playwright-report/
+.privacy-acceptance/
+privacy-acceptance-report.json
 
 # Python bytecode (from scripts/*.py dev tooling)
 __pycache__/

@@ -17,28 +17,28 @@ import { avatarTint } from '../../lib/avatarTint.js';
 
 const COPY = {
   en: {
-    history: 'History',
+    history: 'History', loadMore: 'Load more searches', retryHistory: 'Retry loading history', historyLoadError: 'We could not load your search history. Please try again.', archivedSearch: 'Archived', activeSearch: 'Active',
     greeting: 'Hey {name}, would you like to meet today?', placeholder: 'Describe who could help', examples: ['Someone to help me prepare for consulting interviews', 'A finance professional who has worked in M&A', 'Alumni working in marketing in Paris'], resume: 'Resume search',
     finding: 'Having a look', chooseLead: 'Here are the people who fit.', chooseBold: 'Pick one and I will write the message.',
     why: 'Why this match', choose: 'Choose', selected: 'Selected', different: 'Ask for different people', browse: 'browse the full directory', notRight: 'Not quite right?', or: 'or',
     to: 'To', intro: "Here's a suggested intro. Edit anything, then send when it feels like you.", aiNote: 'Ment is an AI assistant and can make mistakes. You choose who to contact and what to send.', draftNote: 'Drafted by AI. Read it and make it yours before sending.', suggested: 'Suggested draft', send: 'Send request', regenerate: 'Regenerate',
-    sent: 'Request sent to {name}.', sentSubline: "The conversation is ready. Continue there when they reply.", openChat: 'Open chat', again: 'Ask about something else', newChat: 'New chat', recentSearches: 'Recent searches', deleteSearch: 'Delete search', confirmDeleteSearch: 'Delete this search and its saved conversation?', cancel: 'Keep search', retry: 'Start a new search', error: 'We could not complete that request. Please try again.', aiMissing: 'Matching is not configured yet. Ask an administrator to connect Mistral.', aiBusy: 'Matching is temporarily rate-limited. Please try again in a moment.', aiAdmin: 'Matching needs an administrator to check the Mistral connection.', noMatches: 'There is no relevant professional in the current network for this request.', nearestLead: 'These are the closest I could find \u2014 pick one and I will write the message.', snapshot: 'Your connections', upcoming: 'Upcoming', pending: 'Pending', completed: 'Completed', viewAll: 'View conversations', viewProfile: 'View profile', showEarlier: 'Show these {count} people again', showEarlierOne: 'Show this person again', hideEarlier: 'Hide these people', roleAt: '{role} at {company}', shownBefore: 'Shown before', back: 'Back to matches', drafting: 'Preparing your request', useful: 'Were these matches useful?', yes: 'Yes', no: 'No', feedbackSaved: 'Thanks — this helps improve matching.',
+    sent: 'Request sent to {name}.', sentSubline: "The conversation is ready. Continue there when they reply.", openChat: 'Open chat', again: 'Ask about something else', newChat: 'New chat', recentSearches: 'Recent searches', deleteSearch: 'Delete search', confirmDeleteSearch: 'Delete this search and its saved AI conversation? Sent requests and messages will be kept.', cancel: 'Keep search', retry: 'Start a new search', error: 'We could not complete that request. Please try again.', aiMissing: 'Matching is not configured yet. Ask an administrator to connect Mistral.', aiBusy: 'Matching is temporarily rate-limited. Please try again in a moment.', aiAdmin: 'Matching needs an administrator to check the Mistral connection.', noMatches: 'There is no relevant professional in the current network for this request.', nearestLead: 'These are the closest I could find \u2014 pick one and I will write the message.', snapshot: 'Your connections', upcoming: 'Upcoming', pending: 'Pending', completed: 'Completed', viewAll: 'View conversations', viewProfile: 'View profile', showEarlier: 'Show these {count} people again', showEarlierOne: 'Show this person again', hideEarlier: 'Hide these people', roleAt: '{role} at {company}', shownBefore: 'Shown before', back: 'Back to matches', drafting: 'Preparing your request', useful: 'Were these matches useful?', yes: 'Yes', no: 'No', feedbackSaved: 'Thanks — this helps improve matching.',
   },
   it: {
-    history: 'Cronologia',
+    history: 'Cronologia', loadMore: 'Carica altre ricerche', retryHistory: 'Riprova a caricare la cronologia', historyLoadError: 'Non è stato possibile caricare la cronologia delle ricerche. Riprova.', archivedSearch: 'Archiviata', activeSearch: 'Attiva',
     greeting: 'Ehi {name}, ti va di incontrare qualcuno oggi?', placeholder: 'Descrivi chi potrebbe aiutarti', examples: ['Qualcuno che mi aiuti a preparare i colloqui in consulenza', 'Un professionista della finanza con esperienza in M&A', 'Alumni che lavorano nel marketing a Parigi'], resume: 'Riprendi la ricerca',
     finding: 'Do un’occhiata', chooseLead: 'Ecco le persone adatte.', chooseBold: 'Scegline una e scrivo io il messaggio.',
     why: 'Perché è adatto', choose: 'Scegli', selected: 'Scelto', different: 'Mostra altre persone', browse: 'sfoglia la directory', notRight: 'Non è quello che cercavi?', or: 'oppure',
     to: 'A', intro: 'Ecco un messaggio proposto. Modifica tutto quello che vuoi, poi invialo quando ti sembra giusto.', aiNote: 'Ment è un assistente basato sull’IA e può sbagliare. Sei tu a scegliere chi contattare e cosa inviare.', draftNote: 'Scritto dall’IA. Rileggilo e rendilo tuo prima di inviarlo.', suggested: 'Messaggio proposto', send: 'Invia richiesta', regenerate: 'Rigenera',
-    sent: 'Richiesta inviata a {name}.', sentSubline: 'La conversazione è pronta. Continua da lì quando risponderà.', openChat: 'Apri chat', again: "Chiedi qualcos'altro", newChat: 'Nuova chat', recentSearches: 'Ricerche recenti', deleteSearch: 'Elimina ricerca', confirmDeleteSearch: 'Eliminare questa ricerca e la conversazione salvata?', cancel: 'Mantieni la ricerca', retry: 'Inizia una nuova ricerca', error: 'Non siamo riusciti a completare la richiesta. Riprova.', aiMissing: 'Il matching non è ancora configurato. Chiedi a un amministratore di collegare Mistral.', aiBusy: 'Il matching è temporaneamente limitato. Riprova tra poco.', aiAdmin: 'Un amministratore deve verificare la connessione a Mistral.', noMatches: 'Nella rete attuale non c’è un professionista pertinente per questa richiesta.', nearestLead: 'Queste sono le più vicine che ho trovato: scegline una e scrivo io il messaggio.', snapshot: 'Le tue connessioni', upcoming: 'In programma', pending: 'In attesa', completed: 'Completate', viewAll: 'Vedi conversazioni', viewProfile: 'Vedi profilo', showEarlier: 'Mostra di nuovo queste {count} persone', showEarlierOne: 'Mostra di nuovo questa persona', hideEarlier: 'Nascondi', roleAt: '{role} presso {company}', shownBefore: 'Già mostrato', back: 'Torna ai risultati', drafting: 'Preparo la richiesta', useful: 'Questi match sono utili?', yes: 'Sì', no: 'No', feedbackSaved: 'Grazie — ci aiuta a migliorare il matching.',
+    sent: 'Richiesta inviata a {name}.', sentSubline: 'La conversazione è pronta. Continua da lì quando risponderà.', openChat: 'Apri chat', again: "Chiedi qualcos'altro", newChat: 'Nuova chat', recentSearches: 'Ricerche recenti', deleteSearch: 'Elimina ricerca', confirmDeleteSearch: 'Eliminare questa ricerca e la conversazione IA salvata? Le richieste inviate e i messaggi saranno conservati.', cancel: 'Mantieni la ricerca', retry: 'Inizia una nuova ricerca', error: 'Non siamo riusciti a completare la richiesta. Riprova.', aiMissing: 'Il matching non è ancora configurato. Chiedi a un amministratore di collegare Mistral.', aiBusy: 'Il matching è temporaneamente limitato. Riprova tra poco.', aiAdmin: 'Un amministratore deve verificare la connessione a Mistral.', noMatches: 'Nella rete attuale non c’è un professionista pertinente per questa richiesta.', nearestLead: 'Queste sono le più vicine che ho trovato: scegline una e scrivo io il messaggio.', snapshot: 'Le tue connessioni', upcoming: 'In programma', pending: 'In attesa', completed: 'Completate', viewAll: 'Vedi conversazioni', viewProfile: 'Vedi profilo', showEarlier: 'Mostra di nuovo queste {count} persone', showEarlierOne: 'Mostra di nuovo questa persona', hideEarlier: 'Nascondi', roleAt: '{role} presso {company}', shownBefore: 'Già mostrato', back: 'Torna ai risultati', drafting: 'Preparo la richiesta', useful: 'Questi match sono utili?', yes: 'Sì', no: 'No', feedbackSaved: 'Grazie — ci aiuta a migliorare il matching.',
   },
   fr: {
-    history: 'Historique',
+    history: 'Historique', loadMore: 'Charger plus de recherches', retryHistory: 'Réessayer de charger l’historique', historyLoadError: 'Impossible de charger l’historique de vos recherches. Réessayez.', archivedSearch: 'Archivée', activeSearch: 'Active',
     greeting: 'Salut {name}, on fait une rencontre aujourd’hui ?', placeholder: 'Décrivez qui pourrait vous aider', examples: ['Quelqu’un pour m’aider à préparer des entretiens en conseil', 'Un professionnel de la finance passé par le M&A', 'Des alumni qui travaillent en marketing à Paris'], resume: 'Reprendre la recherche',
     finding: 'Je regarde', chooseLead: 'Voici les personnes qui conviennent.', chooseBold: 'Choisissez-en une et j’écris le message.',
     why: 'Pourquoi ce profil', choose: 'Choisir', selected: 'Sélectionné', different: 'Voir d’autres personnes', browse: 'parcourir l’annuaire', notRight: 'Pas tout à fait ?', or: 'ou',
     to: 'À', intro: 'Voici un message proposé. Modifiez ce que vous voulez, puis envoyez-le lorsqu’il vous convient.', aiNote: 'Ment est un assistant fondé sur l’IA et peut se tromper. C’est vous qui choisissez qui contacter et quoi envoyer.', draftNote: 'Rédigé par l’IA. Relisez-le et adaptez-le avant de l’envoyer.', suggested: 'Message proposé', send: 'Envoyer la demande', regenerate: 'Régénérer',
-    sent: 'Demande envoyée à {name}.', sentSubline: 'La conversation est prête. Continuez là lorsqu’une réponse arrive.', openChat: 'Ouvrir le chat', again: 'Poser une autre question', newChat: 'Nouveau chat', recentSearches: 'Recherches récentes', deleteSearch: 'Supprimer la recherche', confirmDeleteSearch: 'Supprimer cette recherche et la conversation enregistrée ?', cancel: 'Garder la recherche', retry: 'Lancer une nouvelle recherche', error: 'Nous n’avons pas pu finaliser cette demande. Réessayez.', aiMissing: 'Le matching n’est pas encore configuré. Demandez à un administrateur de connecter Mistral.', aiBusy: 'Le matching est temporairement limité. Réessayez dans un instant.', aiAdmin: 'Un administrateur doit vérifier la connexion à Mistral.', noMatches: 'Le réseau actuel ne contient aucun professionnel pertinent pour cette demande.', nearestLead: 'Voici les plus proches que j’ai trouvées : choisissez-en une et j’écris le message.', snapshot: 'Vos connexions', upcoming: 'À venir', pending: 'En attente', completed: 'Terminées', viewAll: 'Voir les conversations', viewProfile: 'Voir le profil', showEarlier: 'Revoir ces {count} personnes', showEarlierOne: 'Revoir cette personne', hideEarlier: 'Masquer', roleAt: '{role} chez {company}', shownBefore: 'Déjà proposé', back: 'Retour aux résultats', drafting: 'Préparation de la demande', useful: 'Ces profils sont-ils utiles ?', yes: 'Oui', no: 'Non', feedbackSaved: 'Merci — cela nous aide à améliorer les suggestions.',
+    sent: 'Demande envoyée à {name}.', sentSubline: 'La conversation est prête. Continuez là lorsqu’une réponse arrive.', openChat: 'Ouvrir le chat', again: 'Poser une autre question', newChat: 'Nouveau chat', recentSearches: 'Recherches récentes', deleteSearch: 'Supprimer la recherche', confirmDeleteSearch: 'Supprimer cette recherche et la conversation IA enregistrée ? Les demandes envoyées et les messages seront conservés.', cancel: 'Garder la recherche', retry: 'Lancer une nouvelle recherche', error: 'Nous n’avons pas pu finaliser cette demande. Réessayez.', aiMissing: 'Le matching n’est pas encore configuré. Demandez à un administrateur de connecter Mistral.', aiBusy: 'Le matching est temporairement limité. Réessayez dans un instant.', aiAdmin: 'Un administrateur doit vérifier la connexion à Mistral.', noMatches: 'Le réseau actuel ne contient aucun professionnel pertinent pour cette demande.', nearestLead: 'Voici les plus proches que j’ai trouvées : choisissez-en une et j’écris le message.', snapshot: 'Vos connexions', upcoming: 'À venir', pending: 'En attente', completed: 'Terminées', viewAll: 'Voir les conversations', viewProfile: 'Voir le profil', showEarlier: 'Revoir ces {count} personnes', showEarlierOne: 'Revoir cette personne', hideEarlier: 'Masquer', roleAt: '{role} chez {company}', shownBefore: 'Déjà proposé', back: 'Retour aux résultats', drafting: 'Préparation de la demande', useful: 'Ces profils sont-ils utiles ?', yes: 'Oui', no: 'Non', feedbackSaved: 'Merci — cela nous aide à améliorer les suggestions.',
   },
 };
 
@@ -188,6 +188,14 @@ export default function DiscoveryFlow() {
   const [history, setHistory] = useState([]);
   const [resumeThread, setResumeThread] = useState(null);
   const [historyError, setHistoryError] = useState('');
+  const [historyLoadError, setHistoryLoadError] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyCursor, setHistoryCursor] = useState(null);
+  const historyVersion = useRef(0);
+  const historyBusy = useRef(false);
+  const [deleting, setDeleting] = useState(false);
+  const deleteBusy = useRef(false);
+  const [reopening, setReopening] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState(null);
   const [matchFeedback, setMatchFeedback] = useState(null);
   const [sentSessionToken, setSentSessionToken] = useState('');
@@ -236,23 +244,37 @@ export default function DiscoveryFlow() {
     input.style.height = `${Math.min(input.scrollHeight, 120)}px`;
   }, [query, stage]);
 
-  async function refreshHistory() {
-    const { data } = await api.get('/discovery/threads?limit=8');
-    setHistory(data || []);
-    setResumeThread((data || []).find(resumableSearch) || null);
+  async function refreshHistory(append = false) {
+    if (append && (historyBusy.current || !historyCursor)) return;
+    const version = append ? historyVersion.current : ++historyVersion.current;
+    historyBusy.current = true;
+    setHistoryLoading(true);
+    try {
+      const page = await api.get(`/discovery/threads?limit=8${append ? `&cursor=${encodeURIComponent(historyCursor)}` : ''}`);
+      if (version !== historyVersion.current) return;
+      setHistoryLoadError(false);
+      const rows = page.data || [];
+      setHistory(current => append
+        ? [...current, ...rows.filter(row => !current.some(item => item.id === row.id))]
+        : rows);
+      setHistoryCursor(page.nextCursor || null);
+      if (!append) setResumeThread(rows.find(resumableSearch) || null);
+    } catch {
+      if (version === historyVersion.current) setHistoryLoadError(true);
+    } finally {
+      if (version === historyVersion.current) {
+        historyBusy.current = false;
+        setHistoryLoading(false);
+        setHistoryReady(true);
+      }
+    }
   }
 
   useEffect(() => { if (stage !== 'ask') threadEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); }, [stage, selected, turns.length]);
   useEffect(() => {
-    if (!user?.id) return;
-    let cancelled = false;
-    api.get('/discovery/threads?limit=8').then(({ data }) => {
-      if (cancelled) return;
-      setHistory(data || []);
-      setResumeThread((data || []).find(resumableSearch) || null);
-      setHistoryReady(true);
-    }).catch(() => { if (!cancelled) setHistoryReady(true); });
-    return () => { cancelled = true; };
+    setHistory([]); setHistoryCursor(null); setHistoryReady(false);
+    if (user?.id) refreshHistory();
+    return () => { historyVersion.current += 1; historyBusy.current = false; };
   }, [user?.id]);
   useEffect(() => {
     const requested = searchParams.get('thread');
@@ -386,27 +408,32 @@ export default function DiscoveryFlow() {
   }
 
   async function resumeSearch(id) {
+    const version = ++flowVersion.current;
+    setReopening(true);
+    setHistoryError('');
     setError('');
     try {
       const { data } = await api.get(`/discovery/threads/${id}`);
+      if (version !== flowVersion.current) return;
       const lastAssistant = [...(data.turns || [])].reverse().find(turn => turn?.role === 'assistant');
       const lastUser = [...(data.turns || [])].reverse().find(turn => turn?.role === 'user');
-      if (!lastUser?.content) return;
+      if (!lastUser?.content) throw new Error('empty_search');
       if (!lastAssistant) {
         setThreadId(id);
         setSubmittedQuery(lastUser.content);
         await findMatches(lastUser.content, id);
         return;
       }
-      setTurns(visibleTurns(data.turns));
       // A search records the request it produced. Nothing is inferred from
       // who else the user has a request with, and a request that has since
       // been declined or completed is still the one this search sent.
-      setLinkedThread(data.session_id ? id : null);
       if (data.session_id && lastAssistant.kind === 'draft' && lastAssistant.person) {
         const { data: sessions } = await api.get('/sessions');
+        if (version !== flowVersion.current) return;
         const sentSession = (sessions || []).find(session => session.id === data.session_id);
         if (sentSession) {
+          setTurns(visibleTurns(data.turns));
+          setLinkedThread(id);
           setSentStatus(isExpired(sentSession) ? 'expired' : sentSession.status);
           setSelected({ person: lastAssistant.person, expertise: lastAssistant.person.expertise || [], background: lastAssistant.person.background || '', reasons: lastAssistant.person.reasons || [] });
           // What was sent, which the user may have reworded after it was drafted.
@@ -421,6 +448,9 @@ export default function DiscoveryFlow() {
         }
       }
       await api.put(`/discovery/threads/${id}`, { archived: false });
+      if (version !== flowVersion.current) return;
+      setTurns(visibleTurns(data.turns));
+      setLinkedThread(data.session_id ? id : null);
       setThreadId(id);
       setSubmittedQuery(requestText(lastAssistant.search_request, lastUser.content));
       setQuery(''); setMatches([]); setSelected(null); setDraft('');
@@ -439,31 +469,40 @@ export default function DiscoveryFlow() {
         setStage('reachout');
       }
     } catch {
-      setHistoryError(copy.error);
+      if (version === flowVersion.current) {
+        resumedFromUrl.current = null;
+        setHistoryError(copy.error);
+      }
+    } finally {
+      if (version === flowVersion.current) setReopening(false);
     }
   }
 
   async function deleteSearch() {
     const id = deleteTargetId;
-    if (!id) return;
+    if (!id || deleteBusy.current) return;
+    deleteBusy.current = true; setDeleting(true); setHistoryError('');
     try {
       await api.delete(`/discovery/threads/${id}`);
       setHistory(items => items.filter(item => item.id !== id));
       if (resumeThread?.id === id) setResumeThread(null);
-      if (threadId === id) reset();
+      if (threadId === id) reset(false);
       setDeleteTargetId(null);
     } catch {
       setHistoryError(copy.error);
+    } finally {
+      deleteBusy.current = false; setDeleting(false);
     }
   }
 
-  async function reset() {
+  async function reset(archive = true) {
     if (searchParams.get('thread')) { resumedFromUrl.current = null; setSearchParams({}, { replace: true }); }
     flowVersion.current += 1;
     const currentThread = threadId;
+    setReopening(false);
     setConnectionCategory(null);
     setStage('ask'); setQuery(''); setSubmittedQuery(''); setTurns([]); setMatches([]); setSelected(null); setDraft(''); setRequestTitle(''); setRequestIntent('one_off'); setSending(false); setError(''); setSessionId(null); setSentSessionToken(''); setSentStatus(''); setThreadId(null); setMatchFeedback(null); setPendingRequest(null);
-    if (currentThread) api.put(`/discovery/threads/${currentThread}`, { archived: true }).then(refreshHistory).catch(() => {});
+    if (archive && currentThread) api.put(`/discovery/threads/${currentThread}`, { archived: true }).then(() => refreshHistory()).catch(() => {});
   }
 
   function composer() {
@@ -512,23 +551,28 @@ export default function DiscoveryFlow() {
               {connectionFilters.map(option => <Skeleton key={option.key} className="size-[var(--connection-control-size)] rounded-full" />)}
             </div></div>
           </div>
-        ) : (history.length > 0 || connections.length > 0) && (
+        ) : (history.length > 0 || historyCursor || historyLoadError || connections.length > 0) && (
           <div className="discovery-meta-row">
-            {history.length > 0 && (
+            {(history.length > 0 || historyCursor || historyLoadError) && (
               <div className="discovery-recent-row">
                 <details className="discovery-history">
                   <summary><span className="discovery-history-mark"><Clock3 aria-hidden="true" /></span><span>{copy.history}</span></summary>
                   <div className="discovery-history-list" aria-label={copy.recentSearches}>{history.map(item => {
                     const title = [...(item.turns || [])].reverse().find(turn => turn?.role === 'user')?.content || requestText(item.title);
-                    const date = item.updated_at ? new Date(item.updated_at) : null;
+                    const date = item.created_at ? new Date(item.created_at) : null;
                     const dateLabel = date && !Number.isNaN(date.getTime()) ? formatDay(date, lang) : '';
                     return <div className="discovery-history-row" key={item.id}>
-                      <button type="button" className="discovery-history-open" onClick={() => resumeSearch(item.id)} aria-label={`${copy.resume}: ${title}`} title={title}>
-                        <span className="discovery-history-date">{dateLabel}</span><span className="discovery-history-title">{title}</span><span className="discovery-history-arrow"><ArrowUpRight aria-hidden="true" /></span>
+                      <button type="button" className="discovery-history-open" disabled={reopening || deleting} onClick={() => resumeSearch(item.id)} aria-label={`${copy.resume}: ${title}`} title={title}>
+                        <span className="discovery-history-date">{dateLabel}</span><span className="discovery-history-title">{title}</span><span>{item.archived ? copy.archivedSearch : copy.activeSearch}</span><span className="discovery-history-arrow"><ArrowUpRight aria-hidden="true" /></span>
                       </button>
-                      <button type="button" className="discovery-history-delete" aria-label={`${copy.deleteSearch}: ${title}`} title={copy.deleteSearch} onClick={() => { setHistoryError(''); setDeleteTargetId(item.id); }}><Trash2 aria-hidden="true" /></button>
+                      <button type="button" className="discovery-history-delete" disabled={reopening || deleting} aria-label={`${copy.deleteSearch}: ${title}`} title={copy.deleteSearch} onClick={() => { setHistoryError(''); setDeleteTargetId(item.id); }}><Trash2 aria-hidden="true" /></button>
                     </div>;
-                  })}</div>
+                  })}
+                  {historyLoadError && <p role="alert">{copy.historyLoadError}</p>}
+                  {(historyCursor || historyLoadError) && <Button variant="ghost" disabled={historyLoading} onClick={() => refreshHistory(Boolean(historyCursor))}>
+                    {historyLoading ? t('common.loading') : historyLoadError ? copy.retryHistory : copy.loadMore}
+                  </Button>}
+                  </div>
                 </details>
               </div>
             )}
@@ -664,11 +708,11 @@ export default function DiscoveryFlow() {
     )}
     <div ref={threadEndRef} /></div>}
   </div>{isConversation && <div className="discovery-composer-dock">{composer()}</div>}
-  <Dialog open={deleteTargetId !== null} onOpenChange={(open) => { if (!open) setDeleteTargetId(null); }}>
+  <Dialog open={deleteTargetId !== null} onOpenChange={(open) => { if (!open && !deleting) setDeleteTargetId(null); }}>
     <DialogContent>
       <DialogHeader><DialogTitle>{copy.deleteSearch}</DialogTitle><DialogDescription>{copy.confirmDeleteSearch}</DialogDescription></DialogHeader>
       {historyError && <p role="alert" className="text-sm text-destructive">{historyError}</p>}
-      <DialogFooter><Button variant="outline" onClick={() => setDeleteTargetId(null)}>{copy.cancel}</Button><Button onClick={deleteSearch}>{copy.deleteSearch}</Button></DialogFooter>
+      <DialogFooter><Button variant="outline" disabled={deleting} onClick={() => setDeleteTargetId(null)}>{copy.cancel}</Button><Button disabled={deleting} onClick={deleteSearch}>{copy.deleteSearch}</Button></DialogFooter>
     </DialogContent>
   </Dialog></section>;
 }
