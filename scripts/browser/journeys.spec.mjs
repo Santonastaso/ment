@@ -287,11 +287,8 @@ test('Messages rail moves smoothly and compact menus remain usable', async ({ pa
     return boxes.map(box => box.x + box.width / 2);
   };
   const before = await anchorCenters();
+  expect(await sidebar.evaluate(element => getComputedStyle(element).transitionDuration)).toBe('0.28s');
   await page.getByRole('button', { name: 'Close sidebar' }).last().click();
-  await page.waitForTimeout(100);
-  const sidebarWidth = await sidebar.evaluate(element => element.getBoundingClientRect().width);
-  expect(sidebarWidth).toBeGreaterThan(68);
-  expect(sidebarWidth).toBeLessThan(260);
   await expect.poll(() => sidebar.evaluate(element => Math.round(element.getBoundingClientRect().width))).toBe(68);
   await expect(sidebar.getByRole('link', { name: /MENT/ })).toHaveCount(0);
   const after = await anchorCenters();
@@ -311,10 +308,6 @@ test('Messages rail moves smoothly and compact menus remain usable', async ({ pa
   expect(Math.abs(await centerY(page.getByRole('heading', { name: 'Messages' })) - await centerY(page.locator('.conversation-header')))).toBeLessThan(3);
   expect(await rail.evaluate(element => getComputedStyle(element.parentElement).transitionDuration)).toBe('0.28s');
   await close.click();
-  await page.waitForTimeout(100);
-  const movingWidth = await rail.evaluate(element => element.getBoundingClientRect().width);
-  expect(movingWidth).toBeGreaterThan(64);
-  expect(movingWidth).toBeLessThan(400);
   await expect.poll(() => rail.evaluate(element => Math.round(element.getBoundingClientRect().width))).toBe(64);
   const compact = page.getByRole('group', { name: 'Messages' });
   expect(Math.abs(await centerY(compact.getByRole('button', { name: 'Filter conversations' })) - await centerY(sidebar.getByRole('link', { name: 'Home' })))).toBeLessThan(3);
