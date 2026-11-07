@@ -13,7 +13,7 @@ User decisions: existing members must accept the current Terms and acknowledge t
 | Synthetic AI quality | Deterministic tests present; hosted evaluation attempted and stopped before model calls due missing staging | Separate staging setup, then successful live evaluation and quality review |
 | Provider review | Requested calendar scopes inventoried; public DPA links located; production Vercel revision verified | Signed-in account-setting evidence, contract/transfer review and named owner |
 | Operating documents | Draft AI record, security measures, provider/processing registers, incident and rights procedures, backup limitations, acceptance/evidence ledger | Owner/controller review and assignment |
-| Retention | Eleven configurable categories and gated sweep exist; switch currently absent | Approved durations, explicit activation and successful production run |
+| Retention | Eleven configurable categories plus a non-mutating report, explicit report/apply Edge modes, Production credential preflight, exact manual apply confirmation and the existing kill switch; switch remains absent | Merge/release, configure the Production service-role secret, approve durations, review a production report, then separately authorize activation and verify a successful apply |
 | Production acceptance | Manual workflow creates and erases only fresh marked synthetic fixtures, retaining sanitized results | Merge/release through existing production gate, then manual run; remaining UI/race checks in runbook |
 
 This branch does not activate retention or change provider settings. Production still serves the baseline until the candidate is merged and released. No claim of completed GDPR/AI Act compliance is made by a successful build.

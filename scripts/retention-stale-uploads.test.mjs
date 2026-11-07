@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { removeStaleProfileUploads } from '../supabase/functions/_shared/profile-uploads.mjs';
+import { inspectStaleProfileUploads, removeStaleProfileUploads } from '../supabase/functions/_shared/profile-uploads.mjs';
 
 const USER = '11111111-1111-4111-8111-111111111111';
 const OTHER = '22222222-2222-4222-8222-222222222222';
@@ -50,6 +50,18 @@ test('stale CV sweep removes old uploads for active users and preserves recent o
   assert.deepEqual(await removeStaleProfileUploads(fixture.storage, CUTOFF), { removed: 0, undated: 1 });
 });
 
+test('stale CV report counts eligible uploads without deleting them', async () => {
+  const fixture = storageFixture({
+    [`${USER}/old.pdf`]: { created_at: '2026-10-20T00:00:00Z' },
+    [`${USER}/new.pdf`]: { created_at: '2026-11-01T00:00:00Z' },
+    [`${OTHER}/nested/old.docx`]: { updated_at: '2026-10-21T00:00:00Z' },
+    [`${USER}/undated.pdf`]: {},
+  });
+  assert.deepEqual(await inspectStaleProfileUploads(fixture.storage, CUTOFF), { eligible: 2, undated: 1 });
+  assert.deepEqual(fixture.removed, []);
+  assert.equal(fixture.remaining.size, 4);
+});
+
 test('stale CV sweep paginates without losing objects after deletion', async () => {
   const objects = {};
   for (let index = 0; index < 215; index++) {
@@ -87,6 +99,6 @@ test('disabled retention remains visible through an independent uncredentialed j
   assert.ok(stateJob);
   assert.match(stateJob, /if: github\.ref == 'refs\/heads\/main'/);
   assert.match(stateJob, /RETENTION_ENABLED: \$\{\{ vars\.RETENTION_ENABLED \}\}/);
-  assert.match(stateJob, /Retention sweep skipped/);
+  assert.match(stateJob, /Retention apply is disabled/);
   assert.doesNotMatch(stateJob, /SUPABASE_SERVICE_ROLE_KEY|functions\/v1\/retention-sweep/);
 });

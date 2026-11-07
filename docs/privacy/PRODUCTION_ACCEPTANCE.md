@@ -4,11 +4,20 @@ Release operator, product acceptor, privacy/controller reviewer, security review
 
 ## Guarded synthetic API acceptance
 
-After the candidate is merged and its Supabase release succeeds, dispatch `.github/workflows/privacy-acceptance.yml` on main with `synthetic_fixtures_confirmation=CREATE_AND_DELETE_SYNTHETIC_FIXTURES_ONLY`. The production environment must provide `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY`. It serializes with releases and uses only newly created accounts/organizations carrying an exact per-run marker under the reserved `privacy-acceptance.invalid` domain.
+After the candidate is merged and its Supabase release succeeds, dispatch `.github/workflows/privacy-acceptance.yml` on main with `synthetic_fixtures_confirmation=CREATE_AND_DELETE_SYNTHETIC_FIXTURES_ONLY`. The case-sensitive GitHub environment `Production` must provide `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY`; the workflow checks those values before checkout or dependency setup and does not print them. It serializes with releases and uses only newly created accounts/organizations carrying an exact per-run marker under the reserved `privacy-acceptance.invalid` domain.
 
 The runner checks the lean export, CV permission/upload cleanup and retries, member/admin erasure, login closure, stale-token rejection and the surviving participant's data. It avoids email/calendar enqueue conditions and never calls AI or notification endpoints. Cleanup verifies exact ownership before deleting fixtures. A hard process termination can leave fixtures requiring restricted operator recovery; a failed cleanup is not a passing acceptance run.
 
 The workflow retains allowlisted outcome JSON and a job summary for 30 days, keyed to commit/run/attempt. Deployed AI rejection, actual browser rendering, pending/scheduled-session erasure and concurrent upload/withdrawal still require the separate checks below. No candidate production run has been performed as part of preparing this branch.
+
+## Retention report and apply modes
+
+The `data-retention` workflow has two deliberately separate modes on `main`:
+
+1. **Report** is a manual, read-only inventory. Choose `mode=report`; it counts database rows and stale private uploads that would be affected without deleting or changing them. It does not require `RETENTION_ENABLED`, but the `Production` environment must contain `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`. Save and review its count-only job summary. Unexpected counts are a stop condition.
+2. **Apply** changes data. Manual apply requires `mode=apply`, the exact confirmation `APPLY_APPROVED_RETENTION`, and the repository variable `RETENTION_ENABLED=true`. The nightly schedule is governed by the same switch. The Edge Function also rejects requests that omit the explicit `apply` mode, so a missing header cannot default to deletion.
+
+Before the first apply, obtain approved per-organization periods, name the retention owner, review a fresh report, verify the release containing the report RPC and updated Edge Function, and obtain the required environment approval. Do not put the service-role credential in repository variables, workflow inputs, logs or documentation. Keep `RETENTION_ENABLED` absent/false until that authorization exists. A successful report is not evidence that deletion operates; a successful apply with reviewed counts and resolved cleanup failures is required separately.
 
 ## Candidate verification
 
@@ -28,7 +37,7 @@ The workflow retains allowlisted outcome JSON and a job summary for 30 days, key
 | CV withdrawal / AI opt-out / erasure | Synthetic end-to-end permission, cleanup, retry and login tests; live acceptance only with explicitly designated test accounts | Baseline implementation exists; sprint and deployment proof pending |
 | Calendar providers | Requested/granted scope match, authorized redirects, one synthetic booking/update/cancel/disconnect per enabled provider, token revocation and rotation/reconnect drill | Pending configuration and verification |
 | AI | Current enable/model/overrides, prompt version, synthetic deterministic/live quality evidence, notice and human-review checks | Code reviewed; production settings/quality acceptance pending |
-| Retention | Approved per-org durations, enabled switch, dated successful sweep counts, cleanup failures resolved | Periods unapproved; latest known run skipped |
+| Retention | Approved per-org durations, reviewed read-only report, enabled switch, dated successful apply counts, cleanup failures resolved | Report/apply controls implemented in candidate; periods unapproved and apply disabled |
 | Rights and incident response | Named contacts, intake and escalation route, deadline assessment procedure and exercises | Owners/settings unapproved/pending |
 | Providers / source import | Contracts, regions, training/log retention, transfer review, import source/display authorization | Pending evidence |
 | Backup and restore | Verified coverage/expiry, RPO/RTO, restricted restore drill with erasure/restriction reapplication | Pending evidence |

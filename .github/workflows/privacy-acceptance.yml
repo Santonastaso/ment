@@ -19,10 +19,26 @@ concurrency:
 jobs:
   acceptance:
     if: github.ref == 'refs/heads/main' && inputs.synthetic_fixtures_confirmation == 'CREATE_AND_DELETE_SYNTHETIC_FIXTURES_ONLY'
-    environment: production
+    environment: Production
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
+      - name: Validate Production acceptance credentials
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo '::error::Production privacy acceptance credentials are not configured.'
+            exit 1
+          fi
+          if [ "$SUPABASE_ANON_KEY" = "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo '::error::Production privacy acceptance credentials are invalid.'
+            exit 1
+          fi
+          case "$SUPABASE_URL" in https://*.supabase.co) ;; *) echo '::error::SUPABASE_URL must be an HTTPS Supabase project URL.'; exit 1;; esac
       - uses: actions/checkout@v5
         with:
           ref: ${{ github.sha }}
