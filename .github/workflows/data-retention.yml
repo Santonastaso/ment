@@ -1,42 +1,142 @@
 name: data-retention
 
-# Applies each organisation's retention periods once a day (see migration
-# 0089). Off until the RETENTION_ENABLED repository variable is 'true'. Once
-# enabled, stale CV uploads are cleaned; other retention needs periods set
-# under Admin > Privacy.
+# Report mode is read-only and may be run manually before periods are approved.
+# Apply mode is destructive: scheduled/manual execution stays off until the
+# repository RETENTION_ENABLED variable is exactly "true".
 on:
   schedule:
     - cron: '40 3 * * *'
   workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Read-only report, or apply approved retention periods'
+        required: true
+        default: report
+        type: choice
+        options:
+          - report
+          - apply
+      apply_confirmation:
+        description: 'For apply only, type APPLY_APPROVED_RETENTION'
+        required: false
+        type: string
 
 permissions: {}
 
 jobs:
-  sweep:
-    # Manual dispatch is not an override for the kill switch. Restrict the
-    # production credentialed job to the default branch as well.
-    if: github.ref == 'refs/heads/main' && vars.RETENTION_ENABLED == 'true'
+  validate-dispatch:
     runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Validate requested mode
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          MODE: ${{ inputs.mode }}
+          APPLY_CONFIRMATION: ${{ inputs.apply_confirmation }}
+          RETENTION_ENABLED: ${{ vars.RETENTION_ENABLED }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = 'schedule' ]; then exit 0; fi
+          if [ "$MODE" = 'report' ]; then exit 0; fi
+          if [ "$MODE" != 'apply' ] || [ "$APPLY_CONFIRMATION" != 'APPLY_APPROVED_RETENTION' ]; then
+            echo '::error::Apply requires the exact confirmation APPLY_APPROVED_RETENTION.'
+            exit 1
+          fi
+          if [ "$RETENTION_ENABLED" != 'true' ]; then
+            echo '::error::Retention apply is disabled by RETENTION_ENABLED.'
+            exit 1
+          fi
+          exit 0
+
+  report:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.mode == 'report'
+    needs: validate-dispatch
+    environment: Production
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     concurrency:
       group: data-retention-production
       cancel-in-progress: false
-    timeout-minutes: 10
     steps:
-      - name: Apply retention periods
+      - name: Validate Production retention credentials
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           set -euo pipefail
           if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
-            echo '::error::Configure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.'
+            echo '::error::Production retention credentials are not configured.'
             exit 1
           fi
-          curl --silent --show-error --fail-with-body --max-time 300 \
+          case "$SUPABASE_URL" in https://*.supabase.co) ;; *) echo '::error::SUPABASE_URL must be an HTTPS Supabase project URL.'; exit 1;; esac
+      - name: Preview eligible retention records
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          status=$(curl --silent --show-error --max-time 300 --output retention-response.json --write-out '%{http_code}' \
             --request POST \
             --header "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
             --header 'Content-Type: application/json' \
-            "$SUPABASE_URL/functions/v1/retention-sweep"
+            --header 'x-retention-mode: report' \
+            "$SUPABASE_URL/functions/v1/retention-sweep")
+          if [ "$status" != '200' ]; then
+            echo "::error::Retention report failed with HTTP $status."
+            exit 1
+          fi
+          jq -e '.mode == "report" and
+            ((keys | sort) == (["mode", "organizations_configured", "messages", "sessions_cleared", "searches", "reflections", "audit_logs", "profile_drafts", "notifications", "ai_runs", "outreach_targets", "invitations", "meeting_benefits", "accounts_eligible", "auth_cleanup_pending", "stale_uploads_eligible", "stale_uploads_undated"] | sort)) and
+            ([to_entries[] | select(.key != "mode") | .value | type] | all(. == "number"))' retention-response.json >/dev/null
+          echo '## Read-only retention report' >> "$GITHUB_STEP_SUMMARY"
+          jq -r 'to_entries[] | "- \(.key): \(.value)"' retention-response.json >> "$GITHUB_STEP_SUMMARY"
+
+  apply:
+    if: >-
+      github.ref == 'refs/heads/main' && vars.RETENTION_ENABLED == 'true' &&
+      (github.event_name == 'schedule' ||
+       (github.event_name == 'workflow_dispatch' && inputs.mode == 'apply' && inputs.apply_confirmation == 'APPLY_APPROVED_RETENTION'))
+    needs: [validate-dispatch]
+    environment: Production
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: data-retention-production
+      cancel-in-progress: false
+    steps:
+      - name: Validate Production retention credentials
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo '::error::Production retention credentials are not configured.'
+            exit 1
+          fi
+          case "$SUPABASE_URL" in https://*.supabase.co) ;; *) echo '::error::SUPABASE_URL must be an HTTPS Supabase project URL.'; exit 1;; esac
+      - name: Apply approved retention periods
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          status=$(curl --silent --show-error --max-time 300 --output retention-response.json --write-out '%{http_code}' \
+            --request POST \
+            --header "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            --header 'Content-Type: application/json' \
+            --header 'x-retention-mode: apply' \
+            "$SUPABASE_URL/functions/v1/retention-sweep")
+          if [ "$status" != '200' ]; then
+            echo "::error::Retention apply failed with HTTP $status."
+            exit 1
+          fi
+          jq -e '.mode == "apply" and
+            ((keys | sort) == (["mode", "messages", "sessions_cleared", "searches", "reflections", "audit_logs", "profile_drafts", "notifications", "ai_runs", "outreach_targets", "invitations", "meeting_benefits", "accounts_erased", "logins_closed", "auth_cleanup_pending", "stale_uploads_removed", "stale_uploads_undated", "stale_upload_cleanup_failed", "account_upload_cleanup_failed", "account_erasure_deferred"] | sort)) and
+            ([to_entries[] | select(.key != "mode") | .value | type] | all(. == "number" or . == "boolean"))' retention-response.json >/dev/null
+          echo '## Retention apply result (counts only)' >> "$GITHUB_STEP_SUMMARY"
+          jq -r 'to_entries[] | "- \(.key): \(.value)"' retention-response.json >> "$GITHUB_STEP_SUMMARY"
+
   retention-state:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
@@ -45,10 +145,13 @@ jobs:
       - name: Report retention switch state
         env:
           RETENTION_ENABLED: ${{ vars.RETENTION_ENABLED }}
+          REQUESTED_MODE: ${{ inputs.mode }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           if [ "$RETENTION_ENABLED" = 'true' ]; then
-            echo 'Retention sweep is enabled.' >> "$GITHUB_STEP_SUMMARY"
+            echo 'Retention apply is enabled.' >> "$GITHUB_STEP_SUMMARY"
           else
-            echo '::warning::Retention sweep skipped: RETENTION_ENABLED is not true.'
-            echo 'Retention sweep is skipped until the owner sets RETENTION_ENABLED to true.' >> "$GITHUB_STEP_SUMMARY"
+            echo '::warning::Retention apply skipped: RETENTION_ENABLED is not true.'
+            echo 'Retention apply is disabled. Manual report mode remains read-only.' >> "$GITHUB_STEP_SUMMARY"
           fi
+          echo "Event: $EVENT_NAME; requested mode: ${REQUESTED_MODE:-scheduled apply}." >> "$GITHUB_STEP_SUMMARY"

@@ -50,7 +50,7 @@ export async function removeUserProfileUploads(storage, userId) {
 /** Remove transient CV uploads older than cutoff, including uploads for active accounts.
  * Listing completes before deletion so changing page offsets cannot hide objects.
  */
-export async function removeStaleProfileUploads(storage, cutoff) {
+async function findStaleProfileUploads(storage, cutoff) {
   const bucket = storage.from('profile-uploads');
   const cutoffMs = new Date(cutoff).getTime();
   if (!Number.isFinite(cutoffMs)) throw new Error('profile_upload_invalid_cutoff');
@@ -86,6 +86,18 @@ export async function removeStaleProfileUploads(storage, cutoff) {
   }
 
   await scan('');
+  return { paths: stalePaths, undated };
+}
+
+/** Count transient uploads eligible for removal without changing Storage. */
+export async function inspectStaleProfileUploads(storage, cutoff) {
+  const { paths, undated } = await findStaleProfileUploads(storage, cutoff);
+  return { eligible: paths.length, undated };
+}
+
+export async function removeStaleProfileUploads(storage, cutoff) {
+  const bucket = storage.from('profile-uploads');
+  const { paths: stalePaths, undated } = await findStaleProfileUploads(storage, cutoff);
   for (let offset = 0; offset < stalePaths.length; offset += DELETE_BATCH_SIZE) {
     const { error } = await bucket.remove(stalePaths.slice(offset, offset + DELETE_BATCH_SIZE));
     if (error) throw new Error('profile_upload_remove_failed');

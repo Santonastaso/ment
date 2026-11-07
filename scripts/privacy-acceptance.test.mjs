@@ -161,7 +161,7 @@ test('manual workflow has main/environment gate, no automatic triggers, and seri
   const workflow = await readFile(new URL('../.github/workflows/privacy-acceptance.yml', import.meta.url), 'utf8');
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /github.ref == 'refs\/heads\/main'/);
-  assert.match(workflow, /environment: production/);
+  assert.match(workflow, /environment: Production/);
   assert.match(workflow, /group: release-supabase-production/);
   assert.match(workflow, /cancel-in-progress: false/);
   assert.ok(!/^\s+(push|pull_request|schedule):/m.test(workflow));
@@ -171,6 +171,13 @@ test('manual workflow has main/environment gate, no automatic triggers, and seri
   assert.match(workflow, /if: always\(\)\s+env:[\s\S]*?--summarize/);
   assert.match(workflow, /if: always\(\)\s+uses: actions\/upload-artifact@v4/);
   assert.match(workflow, /path: \.privacy-acceptance\/acceptance.json/);
+  const preflight = workflow.indexOf('name: Validate Production acceptance credentials');
+  const checkout = workflow.indexOf('uses: actions/checkout@v5');
+  assert.ok(preflight > 0);
+  assert.ok(checkout > preflight);
+  assert.ok(workflow.indexOf('name: Install local test dependencies') > preflight);
+  assert.match(workflow.slice(preflight, checkout), /SUPABASE_ANON_KEY:[\s\S]*SUPABASE_SERVICE_ROLE_KEY:/);
+  assert.doesNotMatch(workflow.slice(preflight, checkout), /echo.*\$SUPABASE_/);
 });
 
 test('acceptance evidence allowlists values and never copies payloads or credentials into JSON or summary', () => {

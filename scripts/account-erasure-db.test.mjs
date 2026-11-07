@@ -214,12 +214,14 @@ test('retention deletes nothing until periods are set, then only what is older t
       create table meeting_benefits(user_id uuid, created_at timestamptz default now());
     `);
     await db.exec(await migration('20261105120000_0101_more_retention_categories.sql'));
+    await db.exec(await migration('20261107100000_0107_retention_report.sql'));
     for (const role of ['anon', 'authenticated']) {
       assert.equal((await one(`select has_function_privilege('${role}', 'public.run_data_retention()', 'execute') value`)).value, false);
       assert.equal((await one(`select has_function_privilege('${role}', 'public.retention_account_candidates()', 'execute') value`)).value, false);
       assert.equal((await one(`select has_function_privilege('${role}', 'public.run_retention_account_erasure(uuid[])', 'execute') value`)).value, false);
       assert.equal((await one(`select has_function_privilege('${role}', 'public.retention_auth_cleanup_candidates()', 'execute') value`)).value, false);
       assert.equal((await one(`select has_function_privilege('${role}', 'public.complete_account_auth_cleanup(uuid)', 'execute') value`)).value, false);
+      assert.equal((await one(`select has_function_privilege('${role}', 'public.report_data_retention()', 'execute') value`)).value, false);
     }
 
     // No periods: nothing goes.
@@ -227,6 +229,11 @@ test('retention deletes nothing until periods are set, then only what is older t
     assert.deepEqual(idle, { messages: 0, sessions_cleared: 0, searches: 0, reflections: 0, audit_logs: 0,
       profile_drafts: 0, notifications: 0, ai_runs: 0, outreach_targets: 0, invitations: 0, meeting_benefits: 0,
       erased_user_ids: [] });
+    assert.deepEqual((await one('select report_data_retention() value')).value, {
+      organizations_configured: 0, messages: 0, sessions_cleared: 0, searches: 0, reflections: 0,
+      audit_logs: 0, profile_drafts: 0, notifications: 0, ai_runs: 0, outreach_targets: 0,
+      invitations: 0, meeting_benefits: 0, accounts_eligible: 0, auth_cleanup_pending: 0,
+    });
     assert.equal(await count('session_messages'), 2);
 
     // An admin sets the periods for their own organisation; members cannot.
@@ -252,6 +259,14 @@ test('retention deletes nothing until periods are set, then only what is older t
 
     const candidates = (await one('select retention_account_candidates() value')).value;
     assert.deepEqual(candidates, [leaver]);
+    const preview = (await one('select report_data_retention() value')).value;
+    assert.deepEqual(preview, {
+      organizations_configured: 1, messages: 2, sessions_cleared: 1, searches: 1, reflections: 1,
+      audit_logs: 1, profile_drafts: 1, notifications: 1, ai_runs: 1, outreach_targets: 1,
+      invitations: 1, meeting_benefits: 1, accounts_eligible: 1, auth_cleanup_pending: 0,
+    });
+    assert.equal(await count('session_messages'), 2, 'report mode does not mutate eligible rows');
+    assert.equal((await one('select name from profiles where id = $1', [leaver])).name, 'Long Gone');
     const swept = (await one('select run_data_retention() value')).value;
     assert.deepEqual(swept, { messages: 2, sessions_cleared: 1, searches: 1, reflections: 1, audit_logs: 1,
       profile_drafts: 1, notifications: 1, ai_runs: 1, outreach_targets: 1, invitations: 1, meeting_benefits: 1,

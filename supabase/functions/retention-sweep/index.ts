@@ -4,7 +4,7 @@
 // uploads older than seven days are also removed, even with no periods set.
 
 import { adminClient, closeErasedLogin, corsHeaders, generateTempPassword, jsonError, jsonOk } from '../_shared/index.ts';
-import { removeStaleProfileUploads, removeUserProfileUploads } from '../_shared/profile-uploads.mjs';
+import { inspectStaleProfileUploads, removeStaleProfileUploads, removeUserProfileUploads } from '../_shared/profile-uploads.mjs';
 
 const STALE_UPLOAD_DAYS = 7;
 
@@ -23,8 +23,31 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return jsonError('method_not_allowed', 405);
   if (!hasServiceRole(req)) return jsonError('service_role_required', 403);
+  const mode = req.headers.get('x-retention-mode');
+  if (mode !== 'report' && mode !== 'apply') return jsonError('retention_mode_required', 400);
 
   const sb = adminClient();
+  if (mode === 'report') {
+    const { data, error } = await sb.rpc('report_data_retention');
+    if (error) {
+      console.error(JSON.stringify({ event: 'retention_report_failed', stage: 'database', code: error.code || '' }));
+      return jsonError('retention_report_failed', 500);
+    }
+    try {
+      const stale = await inspectStaleProfileUploads(
+        sb.storage, new Date(Date.now() - STALE_UPLOAD_DAYS * 24 * 60 * 60 * 1000),
+      );
+      const summary = { mode: 'report', ...data, stale_uploads_eligible: stale.eligible,
+        stale_uploads_undated: stale.undated };
+      console.log(JSON.stringify({ event: 'retention_report_done', ...summary }));
+      return jsonOk(summary);
+    } catch (error) {
+      console.error(JSON.stringify({ event: 'retention_report_failed', stage: 'stale_profile_uploads',
+        code: error instanceof Error ? error.message : 'unknown' }));
+      return jsonError('retention_report_failed', 500);
+    }
+  }
+
   const { data: candidates, error: candidateError } = await sb.rpc('retention_account_candidates');
   if (candidateError) {
     console.error(JSON.stringify({ event: 'retention_failed', stage: 'account_candidates', code: candidateError.code || '' }));
@@ -91,7 +114,7 @@ Deno.serve(async (req) => {
     }
   }
   // Counts only: which accounts were erased is not logged.
-  const summary = { ...data, erased_user_ids: undefined, accounts_erased: erased.length,
+  const summary = { mode: 'apply', ...data, erased_user_ids: undefined, accounts_erased: erased.length,
     logins_closed: loginsClosed, auth_cleanup_pending: authCleanupIds.length - loginsClosed,
     stale_uploads_removed: staleUploads.removed, stale_uploads_undated: staleUploads.undated,
     stale_upload_cleanup_failed: staleUploadFailed, account_upload_cleanup_failed: !accountUploadsReady,
