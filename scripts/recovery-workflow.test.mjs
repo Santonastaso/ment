@@ -26,7 +26,8 @@ test('recovery drill isolates restore and reapplies erasure before evidence', as
   assert.ok(restore > 0 && reapply > restore && evidence > reapply);
   assert.match(workflow, /createdb.*ment_recovery/);
   assert.match(workflow, /erase_account_data/);
-  assert.match(workflow, /delete from auth\.users/);
+  assert.match(workflow, /update auth\.users/);
+  assert.match(workflow, /banned_until > now\(\)/);
   assert.match(workflow, /AI_PROCESSING_ENABLED: 'false'/);
   assert.match(workflow, /CALENDAR_SYNC_ENABLED: 'false'/);
   assert.match(workflow, /NOTIFICATIONS_ENABLED: 'false'/);

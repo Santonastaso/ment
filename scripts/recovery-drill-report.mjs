@@ -16,7 +16,7 @@ const evidence = {
     restored_only_to_isolated_database: 'passed',
     resurrection_detected_before_reapplication: 'passed',
     erasure_reapplied_before_access: 'passed',
-    auth_and_personal_rows_absent_after_reapplication: 'passed',
+    login_closed_and_personal_rows_absent_after_reapplication: 'passed',
     outbound_services_disabled: 'passed',
   },
   limitations: [

@@ -6,6 +6,7 @@ import json
 import os
 import pathlib
 import re
+import secrets
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -95,14 +96,20 @@ def main():
     user_id = read_decision(args.decision_file)
     if args.mode == "erase":
         request(base_url, service_key, "/rest/v1/rpc/erase_account_data", "POST", {"p_user_id": user_id})
-        request(base_url, service_key, f"/auth/v1/admin/users/{user_id}", "DELETE")
+        request(base_url, service_key, f"/auth/v1/admin/users/{user_id}", "PUT", {
+            "email": f"erased-{user_id}@erased.invalid",
+            "email_confirm": True,
+            "password": secrets.token_urlsafe(48),
+            "user_metadata": {},
+            "ban_duration": "876000h",
+        })
         request(base_url, service_key, "/rest/v1/rpc/complete_account_auth_cleanup", "POST", {"p_user_id": user_id})
         print("Applied the synthetic erasure decision to the source database")
         return
 
-    status, _ = request(base_url, service_key, f"/auth/v1/admin/users/{user_id}", allow=(404,))
-    if status != 404:
-        fail("Synthetic Auth identity survived erasure")
+    _, auth_user = request(base_url, service_key, f"/auth/v1/admin/users/{user_id}")
+    if auth_user.get("email") != f"erased-{user_id}@erased.invalid" or not auth_user.get("banned_until"):
+        fail("Synthetic login was not scrubbed and disabled")
     _, profiles = request(
         base_url,
         service_key,

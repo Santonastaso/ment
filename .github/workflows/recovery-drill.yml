@@ -88,20 +88,34 @@ jobs:
             --command "select count(*) from auth.users where id = '$user_id'::uuid and exists (select 1 from public.profiles where id = '$user_id'::uuid and erased_at is null)")"
           test "$restored" = '1'
           docker exec "$db_container" psql --set ON_ERROR_STOP=1 --username postgres --dbname ment_recovery \
-            --command "select public.erase_account_data('$user_id'::uuid); delete from auth.users where id = '$user_id'::uuid; select public.complete_account_auth_cleanup('$user_id'::uuid);"
+            --command "
+              select public.erase_account_data('$user_id'::uuid);
+              update auth.users set
+                email = 'erased-$user_id@erased.invalid',
+                encrypted_password = crypt(gen_random_uuid()::text || gen_random_uuid()::text, gen_salt('bf')),
+                raw_user_meta_data = '{}'::jsonb,
+                banned_until = now() + interval '100 years',
+                confirmation_token = '', recovery_token = '', email_change = '', email_change_token_new = '',
+                reauthentication_token = '', updated_at = now()
+              where id = '$user_id'::uuid;
+              select public.complete_account_auth_cleanup('$user_id'::uuid);"
           remaining="$(docker exec "$db_container" psql -At --username postgres --dbname ment_recovery --command "
             select
-              (select count(*) from auth.users where id = '$user_id'::uuid) +
               (select count(*) from public.skills where user_id = '$user_id'::uuid) +
               (select count(*) from public.notification_outbox where user_id = '$user_id'::uuid) +
               (select count(*) from public.calendar_connections where user_id = '$user_id'::uuid);")"
           test "$remaining" = '0'
+          login_closed="$(docker exec "$db_container" psql -At --username postgres --dbname ment_recovery --command "
+            select count(*) from auth.users where id = '$user_id'::uuid
+              and email = 'erased-$user_id@erased.invalid' and banned_until > now()
+              and raw_user_meta_data = '{}'::jsonb;")"
+          test "$login_closed" = '1'
           tombstone="$(docker exec "$db_container" psql -At --username postgres --dbname ment_recovery --command "
             select count(*) from public.profiles
             where id = '$user_id'::uuid and name = 'Former member' and erased_at is not null
               and deactivated_at is not null and ai_opt_out and job_title = '' and bio = '';")"
           test "$tombstone" = '1'
-          echo 'Synthetic restore was isolated and the completed erasure was reapplied before access.'
+          echo 'Synthetic restore was isolated and the completed erasure and login closure were reapplied before access.'
       - name: Write sanitized drill evidence
         if: success()
         env:
