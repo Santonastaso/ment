@@ -2,13 +2,15 @@
 
 This is an engineering record, not legal advice.
 
-## Operating records and evidence (2026-11-06)
+## Operating records and evidence (2026-11-09)
 
 The [draft privacy operating pack](privacy/README.md) records the AI system, security measures, providers, processing activities, incident and rights procedures, backup/deletion limits, production acceptance and [commit-specific evidence](privacy/EVIDENCE_LEDGER.md). Named owners, retention periods, provider account settings and controller/legal decisions remain pending; these drafts are not a compliance certification.
 
-Baseline main `df0d36f024a3fbcfa0b56b9127ebbcb9da7d79a6` passed [CI run 42031584583](https://github.com/Santonastaso/ment/actions/runs/42031584583), including Supabase migrations/deploy and production lint/RLS. Connected job metadata confirms success; no success artifact existed in that historical run. The revised CI retains allowlisted outcome artifacts for both success and failure, keyed to tested commit/run/attempt, for 30 days. Raw browser artifacts are no longer uploaded; CI traces are disabled and production lint/RLS output is suppressed. This evidence is engineering verification, not production privacy acceptance.
+Released main `a9453c1893d317b5750fbb5428207b9b14fdb10f` passed [CI/release run 42624769421](https://github.com/Santonastaso/ment/actions/runs/42624769421), including build/browser, database, Edge, secret scan, Supabase production release and verification evidence. Its Vercel production deployment reported READY. The CI retains allowlisted outcome artifacts keyed to tested commit/run/attempt for 30 days; raw browser artifacts are not uploaded, traces are disabled and production lint/RLS output is suppressed. This is engineering verification, not legal acceptance.
 
-The latest known [retention run 42019067368](https://github.com/Santonastaso/ment/actions/runs/42019067368) on November 5 skipped its sweep; retention is not evidenced as operating. The candidate sprint requires Terms/Privacy acceptance to continue and narrows exports to own content/session metadata, excluding suggested-profile snapshots and other-author free text. Those changes require candidate-specific tests and deployment evidence. Required notice/Terms acceptance is separate from optional CV permission and does not establish a lawful basis by itself.
+The guarded [synthetic production acceptance run 42649993249, attempt 2](https://github.com/Santonastaso/ment/actions/runs/42649993249) passed lean export, CV withdrawal/cleanup and retry, member/admin erasure, login closure, stale-token rejection, surviving-participant data and fixture cleanup. It did not test deployed AI, browser rendering, pending/scheduled-session erasure or the concurrent CV upload/withdrawal race. Required notice/Terms acceptance remains separate from optional CV permission and does not establish a lawful basis by itself.
+
+The [read-only retention report 42651920105](https://github.com/Santonastaso/ment/actions/runs/42651920105) passed with no configured organizations/periods, zero eligible records in configured database categories and five stale uploads eligible. Apply was skipped and `RETENTION_ENABLED` remains disabled, so nothing was deleted. Retention is therefore safely reportable but not evidenced as operating in apply mode.
 
 The technical review verified `RETENTION_ENABLED` is absent. The user confirms staging has not been set up: November 6 hosted AI [evaluation run 42201028926](https://github.com/Santonastaso/ment/actions/runs/42201028926) failed with `Missing staging eval configuration` before model calls, yielding no quality result. The [staging setup runbook](privacy/PRODUCTION_ACCEPTANCE.md#hosted-ai-evaluation-staging-setup-blocker) lists the separate project, approved dummy user and exact environment variables/secret required. Provider DPA signing status remains unknown.
 
@@ -22,7 +24,7 @@ The technical review verified `RETENTION_ENABLED` is absent. The user confirms s
 - Calendar OAuth tokens are encrypted with AES-GCM before storage and are never readable by browser clients.
 - Persisted audit events, private reflections/ratings, account deactivation, profile editing, and documented data-source provenance.
 - Best-effort content-free AI run telemetry records successful and failed processing; it still contains user/organization IDs and is personal data. The admin view is limited by organization-scoped RLS. Edge rate-limit counters store only service-keyed HMAC digests and are inaccessible to member clients.
-- Members can export their own account and activity data, withdraw future CV processing permission, and request account erasure. The candidate withdrawal endpoint removes CV drafts and private uploads, reports partial failure for retry, and uses database guards to prevent later uploads/drafts without fresh permission. Production verification is pending deployment.
+- Members can export their own account and activity data, withdraw future CV processing permission, and request account erasure. The released withdrawal endpoint removes CV drafts and private uploads, reports partial failure for retry, and uses database guards to prevent later uploads/drafts without fresh permission. The guarded synthetic production acceptance passed; provider erasure and concurrent-race coverage remain separate.
 - Organization admins can configure retention periods for conversations, searches, reflections, audit logs, inactive accounts, profile drafts, notifications, AI telemetry, outreach records, invitations, and meeting-benefit answers. No period is set by the migration. The daily sweep is gated by `RETENTION_ENABLED=true`; the workflow reports when it is disabled.
 
 ## Product transparency
@@ -43,4 +45,4 @@ The technical review verified `RETENTION_ENABLED` is absent. The user confirms s
 ## Recommended evidence before launch
 
 - Exported RLS/security test results, a completed DPIA screening, provider DPAs, deletion/export test, invitation abuse test, OAuth token rotation test, and a signed staging-import approval.
-- A production check of CV withdrawal, the data export, and an enabled retention sweep after deployment.
+- Browser-level production spot-checks for Terms/Privacy, “Former member”, AI notices and language; a concurrent CV upload/withdrawal test; and an authorized retention apply only after periods and an owner are approved.

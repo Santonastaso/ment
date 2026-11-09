@@ -4,11 +4,11 @@ Release operator, product acceptor, privacy/controller reviewer, security review
 
 ## Guarded synthetic API acceptance
 
-After the candidate is merged and its Supabase release succeeds, dispatch `.github/workflows/privacy-acceptance.yml` on main with `synthetic_fixtures_confirmation=CREATE_AND_DELETE_SYNTHETIC_FIXTURES_ONLY`. The case-sensitive GitHub environment `Production` must provide `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY`; the workflow checks those values before checkout or dependency setup and does not print them. It serializes with releases and uses only newly created accounts/organizations carrying an exact per-run marker under the reserved `privacy-acceptance.invalid` domain.
+After a privacy-affecting release succeeds, dispatch `.github/workflows/privacy-acceptance.yml` on main with `synthetic_fixtures_confirmation=CREATE_AND_DELETE_SYNTHETIC_FIXTURES_ONLY`. The case-sensitive GitHub environment `Production` must provide `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY`; the workflow checks those values before checkout or dependency setup and does not print them. It serializes with releases and uses only newly created accounts/organizations carrying an exact per-run marker under the reserved `privacy-acceptance.invalid` domain.
 
 The runner checks the lean export, CV permission/upload cleanup and retries, member/admin erasure, login closure, stale-token rejection and the surviving participant's data. It avoids email/calendar enqueue conditions and never calls AI or notification endpoints. Cleanup verifies exact ownership before deleting fixtures. A hard process termination can leave fixtures requiring restricted operator recovery; a failed cleanup is not a passing acceptance run.
 
-The workflow retains allowlisted outcome JSON and a job summary for 30 days, keyed to commit/run/attempt. Deployed AI rejection, actual browser rendering, pending/scheduled-session erasure and concurrent upload/withdrawal still require the separate checks below. No candidate production run has been performed as part of preparing this branch.
+The workflow retains allowlisted outcome JSON and a job summary for 30 days, keyed to commit/run/attempt. Main [run 42649993249, attempt 2](https://github.com/Santonastaso/ment/actions/runs/42649993249) passed on 2026-11-09 for released revision `a9453c1`; guarded cleanup succeeded. Deployed AI rejection, actual browser rendering, pending/scheduled-session erasure and concurrent upload/withdrawal still require the separate checks below.
 
 ## Retention report and apply modes
 
@@ -32,12 +32,12 @@ Before the first apply, obtain approved per-organization periods, name the reten
 
 | Check | Acceptance evidence | Current state |
 | --- | --- | --- |
-| Required Terms/Privacy acceptance | Candidate-version review blocks continuation until server-recorded acceptance; refresh/retry cannot bypass it; optional CV permission remains separate | Implemented in candidate; production verification pending |
-| Lean member export | Own content/session metadata retained; suggested-profile snapshots and other-author free text excluded; secrets and other-party private fields absent | Implemented in candidate; production verification pending |
-| CV withdrawal / AI opt-out / erasure | Synthetic end-to-end permission, cleanup, retry and login tests; live acceptance only with explicitly designated test accounts | Baseline implementation exists; sprint and deployment proof pending |
+| Required Terms/Privacy acceptance | Current-version review blocks continuation until server-recorded acceptance; refresh/retry cannot bypass it; optional CV permission remains separate | Released and CI-verified; browser production spot-check pending |
+| Lean member export | Own content/session metadata retained; suggested-profile snapshots and other-author free text excluded; secrets and other-party private fields absent | Synthetic production acceptance passed; manual file-format spot-check pending |
+| CV withdrawal / AI opt-out / erasure | Synthetic end-to-end permission, cleanup, retry and login tests; live acceptance only with explicitly designated test accounts | Synthetic production acceptance passed; deployed AI/browser/race checks remain |
 | Calendar providers | Requested/granted scope match, authorized redirects, one synthetic booking/update/cancel/disconnect per enabled provider, token revocation and rotation/reconnect drill | Pending configuration and verification |
 | AI | Current enable/model/overrides, prompt version, synthetic deterministic/live quality evidence, notice and human-review checks | Code reviewed; production settings/quality acceptance pending |
-| Retention | Approved per-org durations, reviewed read-only report, enabled switch, dated successful apply counts, cleanup failures resolved | Report/apply controls implemented in candidate; periods unapproved and apply disabled |
+| Retention | Approved per-org durations, reviewed read-only report, enabled switch, dated successful apply counts, cleanup failures resolved | Production report passed on 2026-11-09; no organizations configured, five stale uploads eligible, periods unapproved and apply disabled |
 | Rights and incident response | Named contacts, intake and escalation route, deadline assessment procedure and exercises | Owners/settings unapproved/pending |
 | Providers / source import | Contracts, regions, training/log retention, transfer review, import source/display authorization | Pending evidence |
 | Backup and restore | Synthetic local backup/restore workflow rehearses erasure reapplication without provider credentials; managed database/Storage coverage, expiry, RPO/RTO and isolated provider restore still require evidence | Code-backed rehearsal added; provider evidence pending |
