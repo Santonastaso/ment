@@ -26,6 +26,7 @@ test('recovery drill isolates restore and reapplies erasure before evidence', as
   assert.ok(restore > 0 && reapply > restore && evidence > reapply);
   assert.match(workflow, /createdb.*ment_recovery/);
   assert.match(workflow, /pg_restore --list.*grep -v.*EXTENSION - pg_cron/s);
+  assert.match(workflow, /restore manifest still contains pg_cron/);
   assert.match(workflow, /--use-list \/tmp\/ment-restore\.list/);
   assert.match(workflow, /erase_account_data/);
   assert.match(workflow, /update auth\.users/);
