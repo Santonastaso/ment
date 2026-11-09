@@ -110,11 +110,6 @@ Deno.serve(async (req) => {
   let ctx;
   try { ctx = await requireUser(req); } catch (r) { return r as Response; }
 
-  // Objection is the first data-processing decision. An opted-out member
-  // must not depend on rate-limit state and must never reach request parsing,
-  // Storage, document extraction or the model provider.
-  if (await aiOptedOut(ctx.sb, ctx.user.id)) return jsonError('ai_opted_out', 403);
-
   try {
     if (!await enforceRateLimit(ctx.sb, 'profile-ingest', ctx.user.id, 10, 3600)) {
       return jsonError('rate_limited', 429);
@@ -122,6 +117,10 @@ Deno.serve(async (req) => {
   } catch {
     return jsonError('rate_limit_unavailable', 503);
   }
+
+  // Rate limiting is security bookkeeping only. Opted-out members still stop
+  // before request parsing, Storage, document extraction or the AI provider.
+  if (await aiOptedOut(ctx.sb, ctx.user.id)) return jsonError('ai_opted_out', 403);
 
   const body = await req.json().catch(() => ({}));
   const storagePath = (body.storage_path || '').toString();

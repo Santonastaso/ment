@@ -76,6 +76,16 @@ test('HTTP errors and redirects cannot leak server data, credentials or arbitrar
   assert.equal(calls, 1);
 });
 
+test('HTTP client preserves only the safe CV-consent rejection category', async () => {
+  const consentApi = client(config, async () => json({ message: 'cv_consent_required', private: 'secret' }, 400));
+  await assert.rejects(consentApi('/storage/v1/object/profile-uploads/member/cv.pdf'), error =>
+    error.message === 'request_failed' && error.category === 'cv_consent_required' &&
+    !JSON.stringify(error).includes('secret'));
+  const outageApi = client(config, async () => json({ message: 'database unavailable' }, 503));
+  await assert.rejects(outageApi('/storage/v1/object/profile-uploads/member/cv.pdf'), error =>
+    error.message === 'request_failed' && error.category === 'http_error');
+});
+
 // A deliberately small fake service exercises partial setup, the finally path,
 // ambiguous creation, and cleanup refusals without opening any network sockets.
 function setupFailureService({ foreign = false, ambiguous = false, storageFails = false } = {}) {
@@ -135,17 +145,18 @@ test('failed storage cleanup preserves Auth identity for recovery and returns a 
   assert.ok(!fake.deletes.some(p => p.startsWith('/rest/v1/organizations')));
 });
 
-test('local real profile-ingest handler rejects opted-out fixtures before provider or storage calls', async () => {
+test('local real profile-ingest handler rate-limits then rejects opted-out fixtures before provider or storage calls', async () => {
   const source = await readFile(new URL('../supabase/functions/profile-ingest/index.ts', import.meta.url), 'utf8');
   const auth = await readFile(new URL('../supabase/functions/_shared/auth.ts', import.meta.url), 'utf8');
   const helper = auth.slice(auth.indexOf('export async function aiOptedOut'), auth.indexOf('export async function requireAdmin'));
-  let providerCalls = 0; let storageCalls = 0; let handler;
+  let providerCalls = 0; let storageCalls = 0; let rateLimitCalls = 0; let handler;
   for (const result of [{ data: { ai_opt_out: true }, error: null }, { data: null, error: {} }, { data: null, error: null }]) {
     const sb = { from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => result }) }) }),
       storage: { from: () => { storageCalls++; throw new Error('storage forbidden'); } } };
     const aiOptedOut = runInNewContext(stripTypeScriptTypes(helper.replace('export ', '')) + '\naiOptedOut;');
     const sandbox = { Deno: { serve: fn => { handler = fn; } }, Response, Buffer, TextDecoder,
-      corsHeaders: {}, requireUser: async () => ({ user: { id: 'synthetic' }, sb }), enforceRateLimit: async () => true,
+      corsHeaders: {}, requireUser: async () => ({ user: { id: 'synthetic' }, sb }),
+      enforceRateLimit: async () => { rateLimitCalls++; return true; },
       aiOptedOut, jsonError: (error, status) => json({ error }, status),
       mistralJson: async () => { providerCalls++; throw new Error('provider forbidden'); },
       fetch: () => { throw new Error('network forbidden'); } };
@@ -154,19 +165,19 @@ test('local real profile-ingest handler rejects opted-out fixtures before provid
     const response = await handler(new Request('https://local.invalid', { method: 'POST', body: '{}' }));
     assert.equal(response.status, 403); assert.deepEqual(await response.json(), { error: 'ai_opted_out' });
   }
-  assert.equal(providerCalls, 0); assert.equal(storageCalls, 0);
+  assert.equal(rateLimitCalls, 3); assert.equal(providerCalls, 0); assert.equal(storageCalls, 0);
 });
 
-test('local real reflection handler skips opted-out text before rate-limit or provider calls', async () => {
+test('local real reflection handler rate-limits then skips opted-out text before loading or provider calls', async () => {
   const source = await readFile(new URL('../supabase/functions/reflection-classify/index.ts', import.meta.url), 'utf8');
   const auth = await readFile(new URL('../supabase/functions/_shared/auth.ts', import.meta.url), 'utf8');
   const helper = auth.slice(auth.indexOf('export async function aiOptedOut'), auth.indexOf('export async function requireAdmin'));
   const aiOptedOut = runInNewContext(stripTypeScriptTypes(helper.replace('export ', '')) + '\naiOptedOut;');
   let providerCalls = 0; let rateLimitCalls = 0; let handler;
-  const reflection = { id: 17, user_id: 'synthetic', support_needed: 'private gap', managed_well: 'private strength' };
+  const reflection = { id: 17 };
   const sb = {
     from(table) {
-      if (table === 'reflection_logs') return { select: () => ({ eq: () => ({ eq: () => ({ single: async () => ({ data: reflection, error: null }) }) }) }) };
+      if (table === 'reflection_logs') throw new Error('reflection loading forbidden');
       if (table === 'profiles') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { ai_opt_out: true }, error: null }) }) }) };
       throw new Error('unexpected_table');
     },
@@ -188,7 +199,7 @@ test('local real reflection handler skips opted-out text before rate-limit or pr
   }));
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { id: reflection.id, extracted_gaps: [], extracted_strengths: [], skipped: 'ai_opted_out' });
-  assert.equal(rateLimitCalls, 0); assert.equal(providerCalls, 0);
+  assert.equal(rateLimitCalls, 1); assert.equal(providerCalls, 0);
 });
 
 test('manual workflow has main/environment gate, no automatic triggers, and serializes with release', async () => {

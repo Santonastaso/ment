@@ -113,11 +113,17 @@ export function client(config, transport = fetch) {
           Prefer: 'return=representation' },
         body: body === undefined ? undefined : raw ? body : JSON.stringify(body),
       });
-      const data = await response.json().catch(() => null);
-      // Never put server bodies, identifiers, URLs or errors in logs/exceptions.
-      if (!response.ok && !allow.includes(response.status)) throw new Error('request_failed');
-      return { status: response.status, data };
     } catch { throw new Error('request_failed'); }
+    const data = await response.json().catch(() => null);
+    if (!response.ok && !allow.includes(response.status)) {
+      // Preserve only the one safe machine-readable reason needed by the
+      // concurrency check. Never copy server bodies, identifiers or URLs.
+      const failure = new Error('request_failed');
+      failure.category = [data?.message, data?.error, data?.code].includes('cv_consent_required')
+        ? 'cv_consent_required' : 'http_error';
+      throw failure;
+    }
+    return { status: response.status, data };
   };
 }
 
@@ -267,11 +273,22 @@ export async function runAcceptance(config, { transport = fetch } = {}) {
     check(stage);
     stage = 'concurrent_cv_upload_withdrawal';
     const racePaths = Array.from({ length: 8 }, (_, index) => `${member.id}/race-${index}-${f.run}.pdf`);
-    const race = await Promise.allSettled([
-      ...racePaths.map(path => upload(member, path)),
+    const raceUpload = async path => {
+      try {
+        await upload(member, path);
+        return 'uploaded';
+      } catch (error) {
+        if (error?.category === 'cv_consent_required') return 'consent_rejected';
+        throw error;
+      }
+    };
+    const race = await Promise.all([
+      ...racePaths.map(raceUpload),
       api('/functions/v1/withdraw-cv-consent', { method: 'POST', body: {}, token: member.token }),
     ]);
-    ensure(race.every(result => result.status === 'fulfilled' || result.reason?.message === 'request_failed'));
+    const uploadOutcomes = race.slice(0, racePaths.length);
+    ensure(uploadOutcomes.length === racePaths.length &&
+      uploadOutcomes.every(outcome => outcome === 'uploaded' || outcome === 'consent_rejected'));
     // A second idempotent pass closes any upload that was already authorized
     // while withdrawal was waiting on the consent row lock.
     const settled = await api('/functions/v1/withdraw-cv-consent', { method: 'POST', body: {}, token: member.token });
