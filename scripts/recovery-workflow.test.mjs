@@ -25,6 +25,8 @@ test('recovery drill isolates restore and reapplies erasure before evidence', as
   const evidence = workflow.indexOf('Write sanitized drill evidence');
   assert.ok(restore > 0 && reapply > restore && evidence > reapply);
   assert.match(workflow, /createdb.*ment_recovery/);
+  assert.match(workflow, /createdb.*--owner supabase_admin/);
+  assert.match(workflow, /pg_restore.*--username supabase_admin/s);
   assert.match(workflow, /pg_restore --list.*grep -v.*EXTENSION - pg_cron/s);
   assert.match(workflow, /restore manifest still contains pg_cron/);
   assert.match(workflow, /--use-list \/tmp\/ment-restore\.list/);

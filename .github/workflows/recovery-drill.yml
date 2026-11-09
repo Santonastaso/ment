@@ -74,7 +74,7 @@ jobs:
           db_container="$(docker ps --format '{{.Names}}' --filter 'name=supabase_db_' | head -n 1)"
           test -n "$db_container"
           docker exec "$db_container" dropdb --if-exists --username postgres ment_recovery
-          docker exec "$db_container" createdb --username postgres --template template0 ment_recovery
+          docker exec "$db_container" createdb --username postgres --owner supabase_admin --template template0 ment_recovery
           # Supabase pins pg_cron to the source `postgres` database. Exclude only
           # that scheduler extension; application schema and data still restore.
           docker exec "$db_container" sh -c \
@@ -84,7 +84,7 @@ jobs:
             exit 1
           fi
           docker exec "$db_container" pg_restore --exit-on-error --no-owner --no-privileges \
-            --use-list /tmp/ment-restore.list --username postgres --dbname ment_recovery "$BACKUP_FILE"
+            --use-list /tmp/ment-restore.list --username supabase_admin --dbname ment_recovery "$BACKUP_FILE"
       - name: Reapply the erasure decision before any access
         env:
           DECISION_FILE: ${{ runner.temp }}/synthetic-erasure-decision.json
