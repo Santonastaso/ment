@@ -40,7 +40,7 @@ Before the first apply, obtain approved per-organization periods, name the reten
 | Retention | Approved per-org durations, reviewed read-only report, enabled switch, dated successful apply counts, cleanup failures resolved | Report/apply controls implemented in candidate; periods unapproved and apply disabled |
 | Rights and incident response | Named contacts, intake and escalation route, deadline assessment procedure and exercises | Owners/settings unapproved/pending |
 | Providers / source import | Contracts, regions, training/log retention, transfer review, import source/display authorization | Pending evidence |
-| Backup and restore | Verified coverage/expiry, RPO/RTO, restricted restore drill with erasure/restriction reapplication | Pending evidence |
+| Backup and restore | Synthetic local backup/restore workflow rehearses erasure reapplication without provider credentials; managed database/Storage coverage, expiry, RPO/RTO and isolated provider restore still require evidence | Code-backed rehearsal added; provider evidence pending |
 
 Record decisions as **pass**, **fail**, **pending**, **not applicable with rationale**, or **accepted residual risk with named authority and date**. Do not silently turn unknowns into passes or treat engineering tests as legal sign-off. Controller review should determine any required legal assessment and public wording; no arbitrary certification is prescribed by this draft.
 

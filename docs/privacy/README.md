@@ -10,6 +10,7 @@ Prepared 2026-11-06 against baseline `df0d36f024a3fbcfa0b56b9127ebbcb9da7d79a6` 
 | [Processing register](PROCESSING_REGISTER.md) | Draft purposes, subjects, recipients and retention decisions |
 | [Incident response](INCIDENT_RESPONSE.md) | Draft response process and notification assessment |
 | [Rights and deletion](RIGHTS_AND_DELETION.md) | Requests, exports, withdrawal and backup limitations |
+| [Backup and recovery](BACKUP_AND_RECOVERY.md) | Synthetic purge-on-restore drill and provider restore runbook |
 | [Production acceptance](PRODUCTION_ACCEPTANCE.md) | Concrete checks, evidence rules and unresolved acceptance items |
 | [Evidence ledger](EVIDENCE_LEDGER.md) | Commit-specific historical and current verification |
 | [Sprint status](SPRINT_STATUS.md) | Implemented work, verification and remaining gates |

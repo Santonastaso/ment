@@ -1,0 +1,120 @@
+name: Synthetic backup recovery drill
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      synthetic_recovery_confirmation:
+        description: 'Type RESTORE_SYNTHETIC_LOCAL_DATA_ONLY (never connects to production)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: synthetic-backup-recovery-drill
+  cancel-in-progress: false
+
+jobs:
+  recovery-drill:
+    if: >-
+      github.event_name == 'pull_request' ||
+      (github.ref == 'refs/heads/main' && inputs.synthetic_recovery_confirmation == 'RESTORE_SYNTHETIC_LOCAL_DATA_ONLY')
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      AI_PROCESSING_ENABLED: 'false'
+      CALENDAR_SYNC_ENABLED: 'false'
+      NOTIFICATIONS_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+      - uses: supabase/setup-cli@v3
+        with:
+          version: 2.119.0
+      - name: Start a disposable local stack
+        run: supabase start -x studio,imgproxy,inbucket,logflare,vector,edge-runtime,supavisor
+      - name: Seed a synthetic pre-erasure account
+        env:
+          DECISION_FILE: ${{ runner.temp }}/synthetic-erasure-decision.json
+        run: |
+          set -euo pipefail
+          local_env="$(supabase status -o env)"
+          export SUPABASE_URL="$(sed -n 's/^API_URL="\([^"]*\)"$/\1/p' <<< "$local_env")"
+          export SUPABASE_SERVICE_ROLE_KEY="$(sed -n 's/^SERVICE_ROLE_KEY="\([^"]*\)"$/\1/p' <<< "$local_env")"
+          test -n "$SUPABASE_URL" && test -n "$SUPABASE_SERVICE_ROLE_KEY"
+          python3 scripts/recovery-drill.py seed "$DECISION_FILE"
+      - name: Back up the synthetic database before erasure
+        env:
+          BACKUP_FILE: /tmp/ment-pre-erasure.dump
+        run: |
+          set -euo pipefail
+          db_container="$(docker ps --format '{{.Names}}' --filter 'name=supabase_db_' | head -n 1)"
+          test -n "$db_container"
+          docker exec "$db_container" pg_dump --format=custom --no-owner --no-privileges \
+            --username postgres --dbname postgres --file "$BACKUP_FILE"
+      - name: Erase the source account and verify closure
+        env:
+          DECISION_FILE: ${{ runner.temp }}/synthetic-erasure-decision.json
+        run: |
+          set -euo pipefail
+          local_env="$(supabase status -o env)"
+          export SUPABASE_URL="$(sed -n 's/^API_URL="\([^"]*\)"$/\1/p' <<< "$local_env")"
+          export SUPABASE_SERVICE_ROLE_KEY="$(sed -n 's/^SERVICE_ROLE_KEY="\([^"]*\)"$/\1/p' <<< "$local_env")"
+          python3 scripts/recovery-drill.py erase "$DECISION_FILE"
+          python3 scripts/recovery-drill.py verify-erased "$DECISION_FILE"
+      - name: Restore the pre-erasure backup in isolation
+        env:
+          BACKUP_FILE: /tmp/ment-pre-erasure.dump
+        run: |
+          set -euo pipefail
+          db_container="$(docker ps --format '{{.Names}}' --filter 'name=supabase_db_' | head -n 1)"
+          test -n "$db_container"
+          docker exec "$db_container" dropdb --if-exists --username postgres ment_recovery
+          docker exec "$db_container" createdb --username postgres --template template0 ment_recovery
+          docker exec "$db_container" pg_restore --exit-on-error --no-owner --no-privileges \
+            --username postgres --dbname ment_recovery "$BACKUP_FILE"
+      - name: Reapply the erasure decision before any access
+        env:
+          DECISION_FILE: ${{ runner.temp }}/synthetic-erasure-decision.json
+        run: |
+          set -euo pipefail
+          user_id="$(jq -er '.user_id | select(test("^[0-9a-f-]{36}$"))' "$DECISION_FILE")"
+          db_container="$(docker ps --format '{{.Names}}' --filter 'name=supabase_db_' | head -n 1)"
+          restored="$(docker exec "$db_container" psql -At --username postgres --dbname ment_recovery \
+            --command "select count(*) from auth.users where id = '$user_id'::uuid and exists (select 1 from public.profiles where id = '$user_id'::uuid and erased_at is null)")"
+          test "$restored" = '1'
+          docker exec "$db_container" psql --set ON_ERROR_STOP=1 --username postgres --dbname ment_recovery \
+            --command "select public.erase_account_data('$user_id'::uuid); delete from auth.users where id = '$user_id'::uuid; select public.complete_account_auth_cleanup('$user_id'::uuid);"
+          remaining="$(docker exec "$db_container" psql -At --username postgres --dbname ment_recovery --command "
+            select
+              (select count(*) from auth.users where id = '$user_id'::uuid) +
+              (select count(*) from public.skills where user_id = '$user_id'::uuid) +
+              (select count(*) from public.notification_outbox where user_id = '$user_id'::uuid) +
+              (select count(*) from public.calendar_connections where user_id = '$user_id'::uuid);")"
+          test "$remaining" = '0'
+          tombstone="$(docker exec "$db_container" psql -At --username postgres --dbname ment_recovery --command "
+            select count(*) from public.profiles
+            where id = '$user_id'::uuid and name = 'Former member' and erased_at is not null
+              and deactivated_at is not null and ai_opt_out and job_title = '' and bio = '';")"
+          test "$tombstone" = '1'
+          echo 'Synthetic restore was isolated and the completed erasure was reapplied before access.'
+      - name: Write sanitized drill evidence
+        if: success()
+        env:
+          EVIDENCE_FILE: ${{ runner.temp }}/recovery-evidence.json
+        run: node scripts/recovery-drill-report.mjs "$EVIDENCE_FILE"
+      - name: Retain sanitized drill evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: synthetic-recovery-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
+          path: ${{ runner.temp }}/recovery-evidence.json
+          retention-days: 30
+          if-no-files-found: error
+      - name: Stop local services
+        if: always()
+        run: supabase stop --no-backup
