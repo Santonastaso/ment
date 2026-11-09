@@ -92,10 +92,10 @@ jobs:
           set -euo pipefail
           user_id="$(jq -er '.user_id | select(test("^[0-9a-f-]{36}$"))' "$DECISION_FILE")"
           db_container="$(docker ps --format '{{.Names}}' --filter 'name=supabase_db_' | head -n 1)"
-          restored="$(docker exec "$db_container" psql -At --username postgres --dbname ment_recovery \
+          restored="$(docker exec "$db_container" psql -At --username supabase_admin --dbname ment_recovery \
             --command "select count(*) from auth.users where id = '$user_id'::uuid and exists (select 1 from public.profiles where id = '$user_id'::uuid and erased_at is null)")"
           test "$restored" = '1'
-          docker exec "$db_container" psql --set ON_ERROR_STOP=1 --username postgres --dbname ment_recovery \
+          docker exec "$db_container" psql --set ON_ERROR_STOP=1 --username supabase_admin --dbname ment_recovery \
             --command "
               select public.erase_account_data('$user_id'::uuid);
               update auth.users set
@@ -107,18 +107,18 @@ jobs:
                 reauthentication_token = '', updated_at = now()
               where id = '$user_id'::uuid;
               select public.complete_account_auth_cleanup('$user_id'::uuid);"
-          remaining="$(docker exec "$db_container" psql -At --username postgres --dbname ment_recovery --command "
+          remaining="$(docker exec "$db_container" psql -At --username supabase_admin --dbname ment_recovery --command "
             select
               (select count(*) from public.skills where user_id = '$user_id'::uuid) +
               (select count(*) from public.notification_outbox where user_id = '$user_id'::uuid) +
               (select count(*) from public.calendar_connections where user_id = '$user_id'::uuid);")"
           test "$remaining" = '0'
-          login_closed="$(docker exec "$db_container" psql -At --username postgres --dbname ment_recovery --command "
+          login_closed="$(docker exec "$db_container" psql -At --username supabase_admin --dbname ment_recovery --command "
             select count(*) from auth.users where id = '$user_id'::uuid
               and email = 'erased-$user_id@erased.invalid' and banned_until > now()
               and raw_user_meta_data = '{}'::jsonb;")"
           test "$login_closed" = '1'
-          tombstone="$(docker exec "$db_container" psql -At --username postgres --dbname ment_recovery --command "
+          tombstone="$(docker exec "$db_container" psql -At --username supabase_admin --dbname ment_recovery --command "
             select count(*) from public.profiles
             where id = '$user_id'::uuid and name = 'Former member' and erased_at is not null
               and deactivated_at is not null and ai_opt_out and job_title = '' and bio = '';")"

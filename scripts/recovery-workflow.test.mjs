@@ -27,6 +27,7 @@ test('recovery drill isolates restore and reapplies erasure before evidence', as
   assert.match(workflow, /createdb.*ment_recovery/);
   assert.match(workflow, /createdb.*--username supabase_admin/);
   assert.match(workflow, /pg_restore.*--username supabase_admin/s);
+  assert.equal((workflow.match(/psql[^\n]*--username supabase_admin --dbname ment_recovery/g) || []).length, 5);
   assert.match(workflow, /pg_restore --list.*grep -v.*EXTENSION - pg_cron/s);
   assert.match(workflow, /TABLE DATA\|SEQUENCE SET\) cron/);
   assert.match(workflow, /restore manifest still contains pg_cron/);
