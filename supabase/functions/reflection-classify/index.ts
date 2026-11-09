@@ -13,6 +13,7 @@ Deno.serve(async (req) => {
 
   let ctx;
   try { ctx = await requireUser(req); } catch (r) { return r as Response; }
+
   try {
     if (!await enforceRateLimit(ctx.sb, 'reflection-classify', ctx.user.id, 20, 3600)) {
       return jsonError('rate_limited', 429);
@@ -29,6 +30,12 @@ Deno.serve(async (req) => {
     return jsonError('reflection_log_id_required');
   }
 
+  // Rate limiting is security bookkeeping only. Opted-out members stop before
+  // their reflection is loaded, classified, sent to a provider or recorded.
+  if (await aiOptedOut(ctx.sb, ctx.user.id)) {
+    return jsonOk({ id: reflectionId, extracted_gaps: [], extracted_strengths: [], skipped: 'ai_opted_out' });
+  }
+
   const { data: log, error } = await ctx.sb
     .from('reflection_logs')
     .select('*')
@@ -41,11 +48,6 @@ Deno.serve(async (req) => {
       : jsonError(`read_failed: ${error.message}`, 500);
   }
   if (!log) return jsonError('not_found', 404);
-
-  // Opted out of AI: the reflection is kept as written, with no tags.
-  if (await aiOptedOut(ctx.sb, ctx.user.id)) {
-    return jsonOk({ id: reflectionId, extracted_gaps: [], extracted_strengths: [], skipped: 'ai_opted_out' });
-  }
 
   let result;
   const startedAt = Date.now();

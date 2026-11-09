@@ -58,3 +58,31 @@ test('a failed review lookup cannot bypass the gate and an older version needs r
   await expect(prompt.getByRole('checkbox')).toBeVisible();
   await expect(prompt.getByRole('button', { name: 'Accept and continue' })).toBeDisabled();
 });
+
+test('a surviving participant sees an erased account only as Former member', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.fixture.sessions[0] = {
+      ...window.fixture.sessions[0],
+      mentor: {
+        id: window.fixture.sessions[0].mentor_id,
+        name: 'Former member',
+        job_title: null,
+        location: null,
+        erased_at: '2026-11-09T12:00:00Z',
+      },
+    };
+    window.fixture.messages['/sessions/1/messages'] = [{
+      id: 1,
+      sender_id: window.fixture.sessions[0].mentor_id,
+      body: 'A retained shared message',
+      created_at: '2026-11-08T10:00:00Z',
+    }];
+  });
+  await page.goto('/conversations?session=1');
+  const row = page.locator('.conversation-list-item').filter({ hasText: 'Former member' });
+  await expect(row).toBeVisible();
+  await expect(page.locator('.conversation-header strong')).toHaveText('Former member');
+  await expect(page.locator('.conversation-messages')).toContainText('A retained shared message');
+  await expect(page.locator('.conversations-shell')).not.toContainText('Peer 1');
+  await expect(page.locator('.conversations-shell')).not.toContainText('Financial Analyst');
+});

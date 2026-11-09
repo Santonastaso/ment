@@ -71,9 +71,19 @@ test('HTTP errors and redirects cannot leak server data, credentials or arbitrar
   });
   await assert.rejects(api('/rest/v1/profiles'), { message: 'request_failed' });
   for (const path of ['https://evil.test', '/rest/v1/../auth', '/functions/v1/https://evil.test',
-    '/functions/v1/profile-ingest', '/functions/v1/discovery-assistant', '/functions/v1/send-notification-outbox'])
+    '/functions/v1/discovery-assistant', '/functions/v1/send-notification-outbox', '/functions/v1/unknown'])
     await assert.rejects(api(path));
   assert.equal(calls, 1);
+});
+
+test('HTTP client preserves only the safe CV-consent rejection category', async () => {
+  const consentApi = client(config, async () => json({ message: 'cv_consent_required', private: 'secret' }, 400));
+  await assert.rejects(consentApi('/storage/v1/object/profile-uploads/member/cv.pdf'), error =>
+    error.message === 'request_failed' && error.category === 'cv_consent_required' &&
+    !JSON.stringify(error).includes('secret'));
+  const outageApi = client(config, async () => json({ message: 'database unavailable' }, 503));
+  await assert.rejects(outageApi('/storage/v1/object/profile-uploads/member/cv.pdf'), error =>
+    error.message === 'request_failed' && error.category === 'http_error');
 });
 
 // A deliberately small fake service exercises partial setup, the finally path,
@@ -135,17 +145,18 @@ test('failed storage cleanup preserves Auth identity for recovery and returns a 
   assert.ok(!fake.deletes.some(p => p.startsWith('/rest/v1/organizations')));
 });
 
-test('local real profile-ingest handler rejects opted-out fixtures before provider or storage calls', async () => {
+test('local real profile-ingest handler rate-limits then rejects opted-out fixtures before provider or storage calls', async () => {
   const source = await readFile(new URL('../supabase/functions/profile-ingest/index.ts', import.meta.url), 'utf8');
   const auth = await readFile(new URL('../supabase/functions/_shared/auth.ts', import.meta.url), 'utf8');
   const helper = auth.slice(auth.indexOf('export async function aiOptedOut'), auth.indexOf('export async function requireAdmin'));
-  let providerCalls = 0; let storageCalls = 0; let handler;
+  let providerCalls = 0; let storageCalls = 0; let rateLimitCalls = 0; let handler;
   for (const result of [{ data: { ai_opt_out: true }, error: null }, { data: null, error: {} }, { data: null, error: null }]) {
     const sb = { from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => result }) }) }),
       storage: { from: () => { storageCalls++; throw new Error('storage forbidden'); } } };
     const aiOptedOut = runInNewContext(stripTypeScriptTypes(helper.replace('export ', '')) + '\naiOptedOut;');
     const sandbox = { Deno: { serve: fn => { handler = fn; } }, Response, Buffer, TextDecoder,
-      corsHeaders: {}, requireUser: async () => ({ user: { id: 'synthetic' }, sb }), enforceRateLimit: async () => true,
+      corsHeaders: {}, requireUser: async () => ({ user: { id: 'synthetic' }, sb }),
+      enforceRateLimit: async () => { rateLimitCalls++; return true; },
       aiOptedOut, jsonError: (error, status) => json({ error }, status),
       mistralJson: async () => { providerCalls++; throw new Error('provider forbidden'); },
       fetch: () => { throw new Error('network forbidden'); } };
@@ -154,7 +165,41 @@ test('local real profile-ingest handler rejects opted-out fixtures before provid
     const response = await handler(new Request('https://local.invalid', { method: 'POST', body: '{}' }));
     assert.equal(response.status, 403); assert.deepEqual(await response.json(), { error: 'ai_opted_out' });
   }
-  assert.equal(providerCalls, 0); assert.equal(storageCalls, 0);
+  assert.equal(rateLimitCalls, 3); assert.equal(providerCalls, 0); assert.equal(storageCalls, 0);
+});
+
+test('local real reflection handler rate-limits then skips opted-out text before loading or provider calls', async () => {
+  const source = await readFile(new URL('../supabase/functions/reflection-classify/index.ts', import.meta.url), 'utf8');
+  const auth = await readFile(new URL('../supabase/functions/_shared/auth.ts', import.meta.url), 'utf8');
+  const helper = auth.slice(auth.indexOf('export async function aiOptedOut'), auth.indexOf('export async function requireAdmin'));
+  const aiOptedOut = runInNewContext(stripTypeScriptTypes(helper.replace('export ', '')) + '\naiOptedOut;');
+  let providerCalls = 0; let rateLimitCalls = 0; let handler;
+  const reflection = { id: 17 };
+  const sb = {
+    from(table) {
+      if (table === 'reflection_logs') throw new Error('reflection loading forbidden');
+      if (table === 'profiles') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { ai_opt_out: true }, error: null }) }) }) };
+      throw new Error('unexpected_table');
+    },
+  };
+  const sandbox = {
+    Deno: { serve: fn => { handler = fn; } }, Response,
+    corsHeaders: {}, requireUser: async () => ({ user: { id: 'synthetic' }, sb }), aiOptedOut,
+    normalizeLang: () => 'en', jsonError: (error, status = 400) => json({ error }, status),
+    jsonOk: body => json(body),
+    enforceRateLimit: async () => { rateLimitCalls++; return true; },
+    mistralJson: async () => { providerCalls++; throw new Error('provider forbidden'); },
+    recordAiRun: async () => { throw new Error('telemetry forbidden'); },
+    aiErrorResponse: () => ({ message: 'forbidden', status: 500 }),
+  };
+  const withoutImports = source.replace(/^import[\s\S]*?from ['"][^'"]+['"];\r?\n/gm, '');
+  runInNewContext(stripTypeScriptTypes(withoutImports), sandbox);
+  const response = await handler(new Request('https://local.invalid', {
+    method: 'POST', body: JSON.stringify({ reflection_log_id: reflection.id, lang: 'en' }),
+  }));
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { id: reflection.id, extracted_gaps: [], extracted_strengths: [], skipped: 'ai_opted_out' });
+  assert.equal(rateLimitCalls, 1); assert.equal(providerCalls, 0);
 });
 
 test('manual workflow has main/environment gate, no automatic triggers, and serializes with release', async () => {
@@ -189,8 +234,9 @@ test('acceptance evidence allowlists values and never copies payloads or credent
   const env = { GITHUB_RUN_ID: '1234', GITHUB_RUN_ATTEMPT: '2', GITHUB_SHA: 'a'.repeat(40), PRIVACY_EXECUTION_OUTCOME: 'success',
     SUPABASE_SERVICE_ROLE_KEY: 'private-credential' };
   const report = acceptanceArtifact({ failed: 0, cleanup_errors: 0,
-    passed: ['export_v2', 'cv_withdrawal', 'member_erasure', 'admin_erasure', 'no_notifications'],
-    skipped: ['deployed_ai_provider_boundary'], body: 'private@example.com', credentials: env.SUPABASE_SERVICE_ROLE_KEY }, env);
+    passed: ['deployed_ai_provider_boundary', 'export_v2', 'concurrent_cv_upload_withdrawal', 'cv_withdrawal',
+      'member_erasure', 'admin_erasure', 'pending_scheduled_session_erasure', 'no_notifications'],
+    skipped: ['browser_former_member_rendering'], body: 'private@example.com', credentials: env.SUPABASE_SERVICE_ROLE_KEY }, env);
   assert.equal(report.result, 'passed_with_skips');
   assert.equal(report.run_id, '1234'); assert.equal(report.commit, env.GITHUB_SHA);
   assert.equal(report.retention_days, 30); assert.equal(report.provisional, true);

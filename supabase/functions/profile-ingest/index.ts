@@ -109,6 +109,7 @@ Deno.serve(async (req) => {
 
   let ctx;
   try { ctx = await requireUser(req); } catch (r) { return r as Response; }
+
   try {
     if (!await enforceRateLimit(ctx.sb, 'profile-ingest', ctx.user.id, 10, 3600)) {
       return jsonError('rate_limited', 429);
@@ -117,6 +118,8 @@ Deno.serve(async (req) => {
     return jsonError('rate_limit_unavailable', 503);
   }
 
+  // Rate limiting is security bookkeeping only. Opted-out members still stop
+  // before request parsing, Storage, document extraction or the AI provider.
   if (await aiOptedOut(ctx.sb, ctx.user.id)) return jsonError('ai_opted_out', 403);
 
   const body = await req.json().catch(() => ({}));
