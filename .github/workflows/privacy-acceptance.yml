@@ -24,6 +24,7 @@ jobs:
     timeout-minutes: 25
     steps:
       - name: Validate Production acceptance credentials
+        id: credentials
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
@@ -40,6 +41,7 @@ jobs:
           fi
           case "$SUPABASE_URL" in https://*.supabase.co) ;; *) echo '::error::SUPABASE_URL must be an HTTPS Supabase project URL.'; exit 1;; esac
       - uses: actions/checkout@v5
+        id: checkout
         with:
           ref: ${{ github.sha }}
       - uses: actions/setup-node@v5
@@ -59,10 +61,44 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: node scripts/privacy-acceptance.mjs --execute > privacy-acceptance-report.json
       - name: Prepare sanitized acceptance artifact and job summary
-        if: always()
+        if: always() && steps.checkout.outcome == 'success'
         env:
           PRIVACY_EXECUTION_OUTCOME: ${{ steps.acceptance.outcome }}
         run: node scripts/privacy-acceptance.mjs --summarize
+      - name: Prepare sanitized pre-checkout failure evidence
+        if: always() && steps.checkout.outcome != 'success'
+        env:
+          PREFLIGHT_OUTCOME: ${{ steps.credentials.outcome }}
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const preflightFailed = process.env.PREFLIGHT_OUTCOME === 'failure';
+          const report = {
+            schema: 'ment-privacy-acceptance-1',
+            provisional: true,
+            retention_days: 30,
+            run_id: process.env.GITHUB_RUN_ID,
+            run_attempt: process.env.GITHUB_RUN_ATTEMPT,
+            commit: process.env.GITHUB_SHA,
+            execution_outcome: 'failure',
+            report_status: 'available',
+            result: 'failed',
+            passed: [],
+            skipped: [],
+            failed: 1,
+            cleanup_errors: 0,
+            failed_stage: preflightFailed ? 'preflight' : 'setup',
+          };
+          fs.mkdirSync('.privacy-acceptance', { recursive: true });
+          fs.writeFileSync('.privacy-acceptance/acceptance.json', `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, [
+            '### Synthetic privacy acceptance (provisional)',
+            '',
+            `Result: failed; stage: ${report.failed_stage}.`,
+            'No synthetic fixtures were created and no production acceptance checks ran.',
+            '',
+          ].join('\n'));
+          NODE
       - name: Retain provisional sanitized acceptance report
         if: always()
         uses: actions/upload-artifact@v4
