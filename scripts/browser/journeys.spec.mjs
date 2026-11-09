@@ -986,6 +986,11 @@ test('onboarding to discovery, request, acceptance, chat and meeting', async ({ 
   await expect(page.getByRole('button', { name: 'Send request', exact: true })).toBeDisabled();
   await inviteTitle.fill('Financial modelling basics');
   const draftBox = await page.locator('.discovery-draft').boundingBox();
+  const draftTextareaStyle = await page.getByRole('textbox', { name: 'Suggested draft' }).evaluate(element => ({
+    borderRadius: getComputedStyle(element).borderRadius,
+    paddingLeft: getComputedStyle(element).paddingLeft,
+  }));
+  expect(draftTextareaStyle).toEqual({ borderRadius: '0px', paddingLeft: '0px' });
   const sendBox = await page.getByRole('button', { name: 'Send request', exact: true }).boundingBox();
   const backBox = await page.getByRole('button', { name: 'Back to matches' }).boundingBox();
   expect(Math.abs(draftBox.x + draftBox.width - sendBox.x - sendBox.width)).toBeLessThan(2);

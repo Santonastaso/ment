@@ -680,7 +680,7 @@ export default function DiscoveryFlow() {
                 <span>{t('components.sessionRequest.requestTitle')}</span>
                 <input type="text" data-control-radius-exempt value={requestTitle} maxLength={120} onChange={event => setRequestTitle(event.target.value)} disabled={stage === 'sent' || sending || !!pendingRequest} />
               </label>
-              <textarea value={draft} onChange={event => setDraft(event.target.value)} disabled={stage === 'sent' || sending || !!pendingRequest} aria-label={copy.suggested} />
+              <textarea data-control-radius-exempt value={draft} onChange={event => setDraft(event.target.value)} disabled={stage === 'sent' || sending || !!pendingRequest} aria-label={copy.suggested} />
               {stage !== 'sent' && <p className="discovery-ai-note is-draft" data-testid="discovery-draft-ai-note">{copy.draftNote}</p>}
             </div>
             {stage === 'reachout' ? (
