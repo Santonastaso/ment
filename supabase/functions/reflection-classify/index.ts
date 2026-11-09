@@ -13,13 +13,6 @@ Deno.serve(async (req) => {
 
   let ctx;
   try { ctx = await requireUser(req); } catch (r) { return r as Response; }
-  try {
-    if (!await enforceRateLimit(ctx.sb, 'reflection-classify', ctx.user.id, 20, 3600)) {
-      return jsonError('rate_limited', 429);
-    }
-  } catch {
-    return jsonError('rate_limit_unavailable', 503);
-  }
 
   const body = await req.json().catch(() => ({}));
   const lang = normalizeLang(body.lang);
@@ -45,6 +38,16 @@ Deno.serve(async (req) => {
   // Opted out of AI: the reflection is kept as written, with no tags.
   if (await aiOptedOut(ctx.sb, ctx.user.id)) {
     return jsonOk({ id: reflectionId, extracted_gaps: [], extracted_strengths: [], skipped: 'ai_opted_out' });
+  }
+
+  // Only AI-bound work consumes the AI rate limit. Opted-out reflections
+  // return above before rate-limit storage or provider code is touched.
+  try {
+    if (!await enforceRateLimit(ctx.sb, 'reflection-classify', ctx.user.id, 20, 3600)) {
+      return jsonError('rate_limited', 429);
+    }
+  } catch {
+    return jsonError('rate_limit_unavailable', 503);
   }
 
   let result;

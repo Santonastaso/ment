@@ -11,9 +11,9 @@ export const CONFIRMATION = 'CREATE_AND_DELETE_SYNTHETIC_FIXTURES_ONLY';
 export const fixtureEmail = (f, role) => `${PREFIX}${f.run.replaceAll('-', '')}-${role}@${DOMAIN}`;
 const ensure = (ok) => { if (!ok) throw new Error('acceptance_failed'); };
 const uuid = value => /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(value);
-const CHECKS = ['export_v2', 'cv_withdrawal', 'member_erasure', 'admin_erasure', 'no_notifications'];
-const SKIPS = ['deployed_ai_provider_boundary', 'browser_former_member_rendering',
-  'pending_scheduled_session_erasure', 'concurrent_cv_upload_withdrawal'];
+const CHECKS = ['deployed_ai_provider_boundary', 'export_v2', 'concurrent_cv_upload_withdrawal',
+  'cv_withdrawal', 'member_erasure', 'admin_erasure', 'pending_scheduled_session_erasure', 'no_notifications'];
+const SKIPS = ['browser_former_member_rendering'];
 
 export function acceptanceArtifact(input, env) {
   // Rebuild every field. Never spread a report, environment, error, or payload
@@ -103,7 +103,7 @@ export function client(config, transport = fetch) {
     // Hard network boundary, including redirects; never accept an arbitrary URL.
     ensure(/^\/(rest|auth|storage|functions)\/v1\//.test(path));
     ensure(!path.includes('..') && !path.includes('://'));
-    if (path.startsWith('/functions/')) ensure(/^\/functions\/v1\/(withdraw-cv-consent|delete-account)$/.test(path));
+    if (path.startsWith('/functions/')) ensure(/^\/functions\/v1\/(withdraw-cv-consent|delete-account|profile-ingest|reflection-classify)$/.test(path));
     let response;
     try {
       response = await transport(config.url + path, {
@@ -148,8 +148,7 @@ export async function runAcceptance(config, { transport = fetch } = {}) {
   const rows = async path => (await api(`/rest/v1/${path}`)).data;
   const insert = async (table, body) => (await api(`/rest/v1/${table}`, { method: 'POST', body })).data;
   const rpc = async (name, body, token) => (await api(`/rest/v1/rpc/${name}`, { method: 'POST', body, token })).data;
-  const report = { passed: [], failed: 0, cleanup_errors: 0, skipped: ['deployed_ai_provider_boundary',
-    'browser_former_member_rendering', 'pending_scheduled_session_erasure', 'concurrent_cv_upload_withdrawal'] };
+  const report = { passed: [], failed: 0, cleanup_errors: 0, skipped: ['browser_former_member_rendering'] };
   let stage = 'setup';
   const check = name => { report.passed.push(name); };
   const verifyUser = async u => {
@@ -207,6 +206,25 @@ export async function runAcceptance(config, { transport = fetch } = {}) {
       u.token = login.data.access_token;
     }
     const [member, peer, target, admin] = f.users;
+    stage = 'deployed_ai_provider_boundary';
+    const memberReflection = (await insert('reflection_logs', {
+      user_id: member.id, support_needed: 'synthetic-private-gap', managed_well: 'synthetic-private-strength',
+    }))[0];
+    const aiRunsBefore = await rows(`ai_runs?user_id=eq.${member.id}&select=id`);
+    const ingestBlocked = await api('/functions/v1/profile-ingest', {
+      method: 'POST', body: { storage_path: `${member.id}/must-not-be-read.pdf`, lang: 'en' },
+      token: member.token, allow: [403],
+    });
+    ensure(ingestBlocked.status === 403 && ingestBlocked.data?.error === 'ai_opted_out');
+    const reflectionSkipped = await api('/functions/v1/reflection-classify', {
+      method: 'POST', body: { reflection_log_id: memberReflection.id, lang: 'en' }, token: member.token,
+    });
+    ensure(reflectionSkipped.data?.id === memberReflection.id && reflectionSkipped.data?.skipped === 'ai_opted_out' &&
+      Array.isArray(reflectionSkipped.data.extracted_gaps) && reflectionSkipped.data.extracted_gaps.length === 0 &&
+      Array.isArray(reflectionSkipped.data.extracted_strengths) && reflectionSkipped.data.extracted_strengths.length === 0);
+    ensure((await rows(`ai_runs?user_id=eq.${member.id}&select=id`)).length === aiRunsBefore.length);
+    check(stage);
+
     stage = 'export_v2';
     for (const u of [member, peer, target]) {
       await rpc('record_consent', { p_purpose: 'ai_profile_import', p_text_version: 'synthetic-acceptance-v1', p_locale: 'en' }, u.token);
@@ -215,14 +233,22 @@ export async function runAcceptance(config, { transport = fetch } = {}) {
       for (const path of paths(u)) await upload(u, path);
     }
     for (const u of [member, target]) {
-      const session = (await insert('sessions', { mentor_id: peer.id, mentee_id: u.id,
-        title: f.org.slug, status: 'completed', scheduled_at: null,
-        reflection: 'synthetic-own-reflection', mentor_reflection: 'synthetic-peer-reflection',
-        outbound_message: 'synthetic-request', pre_session_question: 'synthetic-question',
-        topics: ['synthetic-hidden-topic'], mentee_rating: 5, mentor_rating: 3 }))[0];
-      f.sessions.push({ id: session.id, mentor_id: peer.id, mentee_id: u.id });
-      await insert('session_messages', [{ session_id: session.id, sender_id: u.id, body: 'synthetic-own-message' },
-        { session_id: session.id, sender_id: peer.id, body: 'synthetic-peer-message' }]);
+      for (const status of ['completed', 'pending', 'scheduled']) {
+        // Pending is inserted as completed and changed directly so this synthetic
+        // check cannot enqueue a request email. Scheduled is >24h away, outside
+        // the reminder window, and no calendar connection exists.
+        const initialStatus = status === 'pending' ? 'completed' : status;
+        const scheduledAt = status === 'scheduled' ? new Date(Date.now() + 30 * 86_400_000).toISOString() : null;
+        const session = (await insert('sessions', { mentor_id: peer.id, mentee_id: u.id,
+          title: `${f.org.slug}-${status}`, status: initialStatus, scheduled_at: scheduledAt,
+          reflection: 'synthetic-own-reflection', mentor_reflection: 'synthetic-peer-reflection',
+          outbound_message: 'synthetic-request', pre_session_question: 'synthetic-question',
+          topics: ['synthetic-hidden-topic'], mentee_rating: 5, mentor_rating: 3 }))[0];
+        if (status === 'pending') await api(`/rest/v1/sessions?id=eq.${session.id}`, { method: 'PATCH', body: { status } });
+        f.sessions.push({ id: session.id, mentor_id: peer.id, mentee_id: u.id, status });
+        await insert('session_messages', [{ session_id: session.id, sender_id: u.id, body: 'synthetic-own-message' },
+          { session_id: session.id, sender_id: peer.id, body: 'synthetic-peer-message' }]);
+      }
     }
     await insert('discovery_threads', { user_id: member.id, turns: [
       { role: 'user', content: 'synthetic-search', matches: [{ name: 'synthetic-hidden-snapshot' }] },
@@ -230,21 +256,35 @@ export async function runAcceptance(config, { transport = fetch } = {}) {
     const exported = await rpc('export_my_data', {}, member.token);
     ensure(exported?.format === 'ment-export-2' && exported.profile.id === member.id);
     ensure(exported.auth_account.email === member.email && exported.profile_drafts.length === 1);
-    ensure(exported.sessions.length === 1 && exported.sessions[0].reflection === 'synthetic-own-reflection');
-    ensure(exported.session_messages_sent.length === 1 && exported.session_messages_sent[0].body === 'synthetic-own-message');
+    ensure(exported.sessions.length === 3 && exported.sessions.every(s => s.reflection === 'synthetic-own-reflection'));
+    ensure(exported.session_messages_sent.length === 3 && exported.session_messages_sent.every(m => m.body === 'synthetic-own-message'));
     ensure(exported.discovery_threads.length === 1 && exported.discovery_threads[0].messages_sent.length === 1 &&
       exported.discovery_threads[0].messages_sent[0].content === 'synthetic-search');
-    for (const key of ['mentor_reflection', 'mentor_rating', 'route_token', 'meeting_url', 'topics', 'idempotency_key'])
-      ensure(!(key in exported.sessions[0]));
+    for (const session of exported.sessions) for (const key of ['mentor_reflection', 'mentor_rating', 'route_token', 'meeting_url', 'topics', 'idempotency_key'])
+      ensure(!(key in session));
     for (const sentinel of ['synthetic-peer-reflection', 'synthetic-hidden-snapshot', 'synthetic-hidden-suggestion', peer.email])
       ensure(!JSON.stringify(exported).includes(sentinel));
     check(stage);
+    stage = 'concurrent_cv_upload_withdrawal';
+    const racePaths = Array.from({ length: 8 }, (_, index) => `${member.id}/race-${index}-${f.run}.pdf`);
+    const race = await Promise.allSettled([
+      ...racePaths.map(path => upload(member, path)),
+      api('/functions/v1/withdraw-cv-consent', { method: 'POST', body: {}, token: member.token }),
+    ]);
+    ensure(race.every(result => result.status === 'fulfilled' || result.reason?.message === 'request_failed'));
+    // A second idempotent pass closes any upload that was already authorized
+    // while withdrawal was waiting on the consent row lock.
+    const settled = await api('/functions/v1/withdraw-cv-consent', { method: 'POST', body: {}, token: member.token });
+    ensure(settled.data?.cleanup_complete === true && Number.isInteger(settled.data.uploads_removed));
+    await noUploads(member);
+    check(stage);
+
     stage = 'cv_withdrawal';
     for (let attempt = 0; attempt < 2; attempt++) {
       ensure(await verifyUser(member));
       const { data } = await api('/functions/v1/withdraw-cv-consent', { method: 'POST', body: {}, token: member.token });
       ensure(data?.cleanup_complete === true && Number.isInteger(data.uploads_removed) && data.uploads_removed >= 0);
-      ensure(Number.isInteger(data.withdrawn) && (attempt === 0 ? data.withdrawn >= 1 : data.withdrawn === 0));
+      ensure(Number.isInteger(data.withdrawn) && data.withdrawn === 0);
     }
     ensure((await rows(`profile_drafts?user_id=eq.${member.id}&source=eq.cv&select=id`)).length === 0);
     const consents = await rows(`consent_records?user_id=eq.${member.id}&purpose=eq.ai_profile_import&select=withdrawn_at`);
@@ -261,13 +301,13 @@ export async function runAcceptance(config, { transport = fetch } = {}) {
     await noUploads(member);
     const peerExport = await rpc('export_my_data', {}, peer.token);
     ensure(peerExport.profile_drafts.length === 1 && peerExport.consents.some(c => !c.withdrawn_at));
-    ensure(peerExport.format === 'ment-export-2' && peerExport.auth_account.email === peer.email && peerExport.sessions.length === 2);
+    ensure(peerExport.format === 'ment-export-2' && peerExport.auth_account.email === peer.email && peerExport.sessions.length === 6);
     for (const session of peerExport.sessions) {
       ensure(session.mentor_reflection === 'synthetic-peer-reflection');
       for (const key of ['reflection', 'mentee_rating', 'title', 'outbound_message', 'pre_session_question', 'topics', 'meeting_url', 'route_token'])
         ensure(!(key in session));
     }
-    ensure(peerExport.session_messages_sent.length === 2 && peerExport.session_messages_sent.every(m => m.body === 'synthetic-peer-message'));
+    ensure(peerExport.session_messages_sent.length === 6 && peerExport.session_messages_sent.every(m => m.body === 'synthetic-peer-message'));
     for (const path of paths(peer)) {
       const listed = await api('/storage/v1/object/list/profile-uploads', { method: 'POST', body: {
         prefix: path.slice(0, path.lastIndexOf('/')), search: path.split('/').at(-1), limit: 100 } });
@@ -297,12 +337,21 @@ export async function runAcceptance(config, { transport = fetch } = {}) {
       await noUploads(u);
       for (const table of ['profile_drafts', 'consent_records', 'discovery_threads'])
         ensure((await rows(`${table}?user_id=eq.${u.id}&select=id`)).length === 0);
-      const shared = f.sessions.find(s => s.mentee_id === u.id);
-      await verifyErasedSession(api, shared, peer);
-      const messages = await rows(`session_messages?session_id=eq.${shared.id}&select=sender_id,body`);
-      ensure(messages.length === 1 && messages[0].sender_id === peer.id && messages[0].body === 'synthetic-peer-message');
+      const shared = f.sessions.filter(s => s.mentee_id === u.id);
+      ensure(shared.length === 3);
+      for (const session of shared) {
+        await verifyErasedSession(api, session, peer);
+        const messages = await rows(`session_messages?session_id=eq.${session.id}&select=sender_id,body`);
+        ensure(messages.length === 1 && messages[0].sender_id === peer.id && messages[0].body === 'synthetic-peer-message');
+      }
       check(stage);
     }
+    stage = 'pending_scheduled_session_erasure';
+    for (const session of f.sessions.filter(s => s.status !== 'completed')) {
+      const rowsAfter = await rows(`sessions?id=eq.${session.id}&select=status,outbound_message,pre_session_question`);
+      ensure(rowsAfter.length === 1 && rowsAfter[0].status === 'cancelled' && rowsAfter[0].outbound_message === '' && rowsAfter[0].pre_session_question === '');
+    }
+    check(stage);
     stage = 'no_notifications';
     ensure((await rows(`notification_outbox?user_id=in.(${f.users.map(u => u.id).join(',')})&select=id`)).length === 0);
     check(stage);
