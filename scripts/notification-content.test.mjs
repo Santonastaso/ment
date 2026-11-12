@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { isDeliverable, isDeliverableEmail, messageFor } from '../supabase/functions/_shared/notification-content.mjs';
+import { formatMeetingTime, isDeliverable, isDeliverableEmail, messageFor } from '../supabase/functions/_shared/notification-content.mjs';
 
 const now = Date.parse('2026-09-29T12:00:00Z');
 const mentor = 'mentor-id';
@@ -11,7 +11,10 @@ const row = (topic, user_id, payload = { session_id: 42 }, created_at = '2026-09
 
 test('templates link to the conversation without trusting user text', () => {
   const message = messageFor('session_request_received', { session_id: 42 }, 'https://ment-labs.com', 'abcdefghijklmnop');
-  assert.equal(message.subject, 'You have a new MENT request');
+  assert.equal(message.subject, 'Someone would like your advice on MENT');
+  assert.match(message.text, /^Hello,/);
+  assert.match(message.text, /View the request: https:\/\/ment-labs.com\/c\/abcdefghijklmnop/);
+  assert.match(message.text, /Privacy notice: https:\/\/ment-labs.com\/privacy/);
   assert.match(message.text, /\/c\/abcdefghijklmnop/);
   assert.doesNotMatch(messageFor('session_request_received', { session_id: 42 }, 'https://ment-labs.com').text, /session=42/);
   assert.equal(messageFor('session_request_received', { session_id: 'bad' }, 'https://ment-labs.com'), null);
@@ -64,4 +67,12 @@ test('reserved and configured test domains never reach the email provider', () =
   assert.equal(isDeliverableEmail('demo@example.test'), false);
   assert.equal(isDeliverableEmail('demo@ment.io', ['ment.io']), false);
   assert.equal(isDeliverableEmail('not-an-email'), false);
+});
+
+test('meeting times are shown in Paris time, with summer time', () => {
+  assert.equal(formatMeetingTime(new Date('2026-11-12T14:30:00Z')), 'Thursday 12 November 2026 at 15:30 CET');
+  assert.equal(formatMeetingTime(new Date('2026-07-01T09:05:00Z')), 'Wednesday 1 July 2026 at 11:05 CEST');
+  const reminder = messageFor('meeting_reminder', { session_id: 42, scheduled_at: '2026-11-12T14:30:00Z' }, 'https://ment-labs.com', 'abcdefghijklmnop');
+  assert.match(reminder.text, /Thursday 12 November 2026 at 15:30 CET/);
+  assert.doesNotMatch(reminder.text, /GMT|UTC/);
 });
