@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { isDeliverable, messageFor } from '../supabase/functions/_shared/notification-content.mjs';
+import { isDeliverable, isDeliverableEmail, messageFor } from '../supabase/functions/_shared/notification-content.mjs';
 
 const now = Date.parse('2026-09-29T12:00:00Z');
 const mentor = 'mentor-id';
@@ -41,4 +41,27 @@ test('reminder is discarded after rescheduling or cancellation', () => {
 test('old queued mail is not sent during first enablement', () => {
   assert.equal(isDeliverable(row('reflection_reminder', mentor, {}, '2026-09-20T12:00:00Z'), null, now), false);
   assert.equal(isDeliverable(row('session_request_received', mentor, undefined, '2026-09-26T12:00:00Z'), session, now), false);
+});
+
+test('message notification contains no member-written content and expires once read', () => {
+  const payload = { session_id: 42, message_id: 9 };
+  const notification = row('session_message_received', mentor, payload);
+  const message = {
+    id: 9, session_id: 42, sender_id: mentee, kind: 'message',
+    created_at: '2026-09-29T11:00:00Z', last_read_at: null,
+  };
+  const content = messageFor('session_message_received', payload, 'https://ment-labs.com', 'abcdefghijklmnop');
+  assert.match(content.text, /\/c\/abcdefghijklmnop/);
+  assert.doesNotMatch(content.text, /private words/i);
+  assert.equal(isDeliverable(notification, session, now, message), true);
+  assert.equal(isDeliverable(notification, session, now, { ...message, last_read_at: message.created_at }), false);
+  assert.equal(isDeliverable(notification, session, now, { ...message, sender_id: mentor }), false);
+});
+
+test('reserved and configured test domains never reach the email provider', () => {
+  assert.equal(isDeliverableEmail('member@essec.edu', ['ment.io']), true);
+  assert.equal(isDeliverableEmail('demo@ment.invalid'), false);
+  assert.equal(isDeliverableEmail('demo@example.test'), false);
+  assert.equal(isDeliverableEmail('demo@ment.io', ['ment.io']), false);
+  assert.equal(isDeliverableEmail('not-an-email'), false);
 });
