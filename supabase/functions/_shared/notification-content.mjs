@@ -10,7 +10,7 @@ export function formatMeetingTime(date) {
 // Every email is plain text: a greeting, a short paragraph, one link and the
 // same footer. None names the other member or quotes anything they wrote.
 function email(subject, paragraphs, action, link, origin) {
-  const footer = `You're receiving this because you have a MENT account with ESSEC. You can change your email settings in your profile: ${origin}/profile\nMENT · ESSEC mentoring platform · Privacy notice: ${origin}/privacy`;
+  const footer = `You're receiving this because you have a MENT account. You can change your email settings in your profile: ${origin}/profile\nMENT · Mentoring platform · Privacy notice: ${origin}/privacy`;
   return {
     subject,
     text: ['Hello,', ...paragraphs, `${action}: ${link}`, 'The MENT team', '—', footer].join('\n\n'),
@@ -30,7 +30,7 @@ export function messageFor(topic, payload, origin, routeToken) {
   if (topic === 'session_request_received') return email(
     'Someone would like your advice on MENT',
     [
-      "A member of the ESSEC community has sent you a request on MENT. They'd value your experience, and a short conversation can make a real difference.",
+      "A member of your community has sent you a request on MENT. They'd value your experience, and a short conversation can make a real difference.",
       'Take a look and reply when you can. Requests stay open for 7 days.',
     ],
     'View the request', sessionLink, origin,
