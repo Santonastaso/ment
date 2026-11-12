@@ -1,11 +1,14 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-import { isDeliverable, messageFor } from '../_shared/notification-content.mjs';
+import { isDeliverable, isDeliverableEmail, messageFor } from '../_shared/notification-content.mjs';
 
 const url = Deno.env.get('SUPABASE_URL')!;
 const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const resendKey = Deno.env.get('RESEND_API_KEY');
 const from = Deno.env.get('NOTIFICATION_FROM_EMAIL');
 const appOrigin = Deno.env.get('APP_ORIGIN');
+const reflectionEmailsEnabled = Deno.env.get('REFLECTION_EMAILS_ENABLED') === 'true';
+const blockedDomains = (Deno.env.get('NOTIFICATION_BLOCKED_DOMAINS') || 'ment.invalid,dummy.ment.io,ment.io')
+  .split(',').map(value => value.trim()).filter(Boolean);
 const sb = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
 function json(payload: unknown, status = 200) {
@@ -78,6 +81,10 @@ Deno.serve(async (req) => {
 
     const payload = row.payload && typeof row.payload === 'object' && !Array.isArray(row.payload)
       ? row.payload as Record<string, unknown> : {};
+    if (row.topic === 'reflection_reminder' && !reflectionEmailsEnabled) {
+      await fail('topic_disabled');
+      continue;
+    }
     let session = null;
     if (row.topic !== 'reflection_reminder') {
       const sessionId = Number(payload.session_id);
@@ -85,8 +92,21 @@ Deno.serve(async (req) => {
         .select('mentor_id, mentee_id, status, scheduled_at, route_token').eq('id', sessionId).maybeSingle();
       session = data;
     }
+    let message = null;
+    if (row.topic === 'session_message_received') {
+      const messageId = Number(payload.message_id);
+      if (Number.isSafeInteger(messageId) && messageId > 0) {
+        const { data } = await sb.from('session_messages')
+          .select('id, session_id, sender_id, kind, created_at').eq('id', messageId).maybeSingle();
+        if (data) {
+          const { data: read } = await sb.from('session_reads')
+            .select('last_read_at').eq('session_id', data.session_id).eq('user_id', row.user_id).maybeSingle();
+          message = { ...data, last_read_at: read?.last_read_at || null };
+        }
+      }
+    }
     const content = messageFor(row.topic, payload, appOrigin, session?.route_token);
-    if (!content || !isDeliverable({ ...row, payload }, session)) {
+    if (!content || !isDeliverable({ ...row, payload }, session, Date.now(), message)) {
       await fail('not_deliverable');
       continue;
     }
@@ -99,8 +119,8 @@ Deno.serve(async (req) => {
       sb.auth.admin.getUserById(row.user_id),
     ]);
     const email = profile?.notification_email || authUser?.user?.email;
-    if (!email) {
-      await fail('recipient_email_missing');
+    if (!isDeliverableEmail(email, blockedDomains)) {
+      await fail(email ? 'recipient_email_blocked' : 'recipient_email_missing');
       continue;
     }
 
