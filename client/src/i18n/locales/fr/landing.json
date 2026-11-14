@@ -35,7 +35,7 @@
   "landing.audiences.schools.body": "Un canal qui appartient à l'école, avec des rapports agrégés en temps réel sur l'activité et les compétences les plus demandées. Aucune personne n'y est jamais identifiable.",
   "landing.control.title": "L'IA suggère. Les personnes décident.",
   "landing.control.body": "Ment comprend votre demande et suggère des personnes, avec la raison de chaque suggestion. Vous choisissez qui contacter, adaptez le message et l'envoyez vous-même.",
-  "landing.control.point1": "Les noms ne sont jamais transmis à l'IA.",
+  "landing.control.point1": "Les noms des personnes suggérées ne sont jamais transmis à l'IA.",
   "landing.control.point2": "Chacun peut désactiver l'IA, télécharger ou supprimer ses données.",
   "landing.control.point3": "Les universités voient l'activité de façon agrégée, jamais les individus.",
   "landing.control.demo.caption": "Côté alumni",

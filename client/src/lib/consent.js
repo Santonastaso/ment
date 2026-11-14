@@ -4,5 +4,5 @@
 export const CONSENT_VERSIONS = {
   ai_profile_import: '2026-10-19',
   // The effective date of the Terms and Privacy notice (legal.effectiveDate).
-  terms_privacy: '2026-09-08',
+  terms_privacy: '2026-11-14',
 };

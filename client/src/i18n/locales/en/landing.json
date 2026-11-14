@@ -35,7 +35,7 @@
   "landing.audiences.schools.body": "A channel the school owns, with live aggregate reports on activity and on the skills students ask for most. No individual is ever shown.",
   "landing.control.title": "AI suggests. People decide.",
   "landing.control.body": "Ment reads what you ask and suggests people, with the reason each one fits. You choose who to contact, edit the note and send it yourself.",
-  "landing.control.point1": "Names are never sent to the AI.",
+  "landing.control.point1": "Names of the people it suggests are never sent to the AI.",
   "landing.control.point2": "Anyone can switch the AI off, or download or delete their data.",
   "landing.control.point3": "Universities see activity in aggregate, never individuals.",
   "landing.control.demo.caption": "The alumni side",
