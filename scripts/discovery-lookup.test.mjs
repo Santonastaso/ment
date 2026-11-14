@@ -444,6 +444,16 @@ test('Mistral reading a follow-up as a new subject starts a new search', async (
   assert.doesNotMatch(payload(fixture, 1).request, /^marketing alumni; /, 'the old search is not carried over');
 });
 
+test('a phrase the code recognises keeps its rule, whatever Mistral reads', async () => {
+  const london = marketerIn('london', 'London'); const dubai = marketerIn('dubai', 'Dubai');
+  const fixture = withLocations(discoveryFixture({ candidates: [london, dubai], turns: shownMarketing(dubai), responses: [
+    clarify({ follow_up: 'narrow' }),
+    { outcome: 'matches', matches: [{ profile_id: london.id, confidence: 0.9, reasons: ['Marketing.'], matched_expertise: ['growth marketing'] }] },
+  ] }), ['London', 'Dubai']);
+  await say(fixture, 'none of these are relevant', 'thread');
+  assert.deepEqual(offered(fixture, 1), [london.id], 'pushback still leaves out the people already shown');
+});
+
 test('before any people are shown, Mistral is told nothing was shown', async () => {
   const fixture = discoveryFixture({ candidates: [finance], responses: [clarify({ named_subject: 'finance' })] });
   await say(fixture, 'someone in finance');

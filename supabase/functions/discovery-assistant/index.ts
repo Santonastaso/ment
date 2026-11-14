@@ -1127,9 +1127,12 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
       const switching = SWITCH_PATTERN.test(latestRaw.toLowerCase());
       const followUpValue = cleanText(result.value?.follow_up, 10).toLowerCase();
       const modelFollowUp = lastShown && ['narrow', 'more', 'reject', 'new'].includes(followUpValue) ? followUpValue : '';
-      // Mistral judges whether the message is about the people shown or a new
-      // subject; the word comparison below only decides when it did not say.
-      const topicShift = modelFollowUp ? modelFollowUp === 'new' : latestSubjectWords.length > 0 && (
+      // The code's own rules come first. Mistral's reading of the follow-up is
+      // used only for a message none of those rules recognises, such as
+      // "any close match in Europe?": it fills a gap, it does not take over.
+      const phraseRecognised = Boolean(messageIntent(latestRaw, Boolean(lastShown), false));
+      const contextOnly = modelFollowUp && !phraseRecognised && !switching ? modelFollowUp : '';
+      const topicShift = contextOnly ? contextOnly === 'new' : latestSubjectWords.length > 0 && (
         (Boolean(lastShown) && !answeringOurQuestion && latestSubjectWords.some((word) => !sameTopic(word)))
         || (answeringOurQuestion && switching));
       const groundedInLatest = (value: string) => contentWords(value).some((word) => latestContent.includes(word));
@@ -1236,11 +1239,9 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
       }
       const namesSomething = meaningfulLatest.length > 0 || namesPlace;
       const patternIntent = messageIntent(latestRaw, Boolean(lastShown), namesSomething);
-      // Greetings, thanks and the choices we offered keep their own handling;
-      // otherwise Mistral's reading of the follow-up wins over the phrase lists.
-      const KEEP_PATTERN = ['greeting', 'thanks', 'smalltalk', 'closest', 'ask_me'];
+      // A recognised phrase decides; Mistral's reading fills in only when none did.
       const MODEL_INTENT: Record<string, string> = { narrow: 'refine', more: 'more', reject: 'reject', new: '' };
-      const detected = modelFollowUp && !KEEP_PATTERN.includes(patternIntent) ? MODEL_INTENT[modelFollowUp] : patternIntent;
+      const detected = patternIntent || (contextOnly ? MODEL_INTENT[contextOnly] : '');
       // Pushback stays pushback; any other follow-up naming a new subject is a
       // fresh search rather than a refinement of the old one.
       // Pushback about the place is the earlier request asked again, not a
