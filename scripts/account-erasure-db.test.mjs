@@ -155,13 +155,14 @@ test('a member who opts out of AI is never sent to the model as a candidate', as
   try {
     await db.exec(SCHEMA);
     await db.exec(`
-      insert into profiles(id, organization_id, name, job_title, department) values
-        ('${leaver}', '${org}', 'Asker', 'Student', 'Finance'),
-        ('${mentor}', '${org}', 'Valuation Expert', 'Partner', 'Finance'),
-        ('${friend}', '${org}', 'Private Expert', 'Director', 'Strategy');
+      insert into profiles(id, organization_id, name, job_title, department, location) values
+        ('${leaver}', '${org}', 'Asker', 'Student', 'Finance', 'Rome'),
+        ('${mentor}', '${org}', 'Valuation Expert', 'Partner', 'Finance', 'Paris'),
+        ('${friend}', '${org}', 'Private Expert', 'Director', 'Strategy', 'Milan');
       insert into skills(user_id, skill) values ('${mentor}', 'Valuation'), ('${friend}', 'Valuation');
     `);
     await db.exec(await migration('20261019110000_0087_ai_opt_out_and_account_erasure.sql'));
+    await db.exec(await migration('20261114100000_0109_coverage_locations_again.sql'));
     const names = async () => (await one('select discovery_candidates($1, $2, $3) value', [org, leaver, 'valuation'])).value.map(p => p.name).sort();
     const coverage = async () => (await one('select discovery_network_coverage($1, $2) value', [org, leaver])).value;
     assert.deepEqual(await names(), ['Private Expert', 'Valuation Expert']);
@@ -172,6 +173,9 @@ test('a member who opts out of AI is never sent to the model as a candidate', as
     const after = await coverage();
     assert.equal(after.member_count, 1);
     assert.deepEqual(after.departments, ['Finance']);
+    // The cities the assistant checks a named place against: an opted-out
+    // member's city is left out, everyone else's is there.
+    assert.deepEqual(after.locations, ['Paris']);
     // The member can switch it themselves; nothing else on the row opened up.
     assert.equal((await one("select has_column_privilege('authenticated', 'public.profiles', 'ai_opt_out', 'update') value")).value, true);
     assert.equal((await one("select has_column_privilege('authenticated', 'public.profiles', 'erased_at', 'update') value")).value, false);
