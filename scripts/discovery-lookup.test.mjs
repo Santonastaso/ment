@@ -411,6 +411,45 @@ test('"what about IB in Europe" after results narrows them to European cities', 
   assert.deepEqual(result.matches.map((m) => m.id), [london.id]);
 });
 
+// Whether a follow-up is about the people shown or a new subject is Mistral's
+// reading of the conversation, not a list of phrases.
+const marketerIn = (id, location) => ({ ...finance, id, name: `Marketer ${id}`, department: 'Marketing', job_title: 'Growth Marketer', skills: ['growth marketing'], location });
+const shownMarketing = (person) => [
+  { role: 'user', content: 'Alumni working in marketing in Paris' },
+  { role: 'assistant', kind: 'matches', framed: true, content: 'Here is someone.', search_request: 'marketing alumni', department: 'Marketing', location: '',
+    matches: [{ id: person.id, name: person.name }] },
+];
+
+test('Mistral reads "any close match in Europe?" as narrowing the search on screen', async () => {
+  const london = marketerIn('london', 'London'); const dubai = marketerIn('dubai', 'Dubai');
+  const fixture = withLocations(discoveryFixture({ candidates: [london, dubai], turns: shownMarketing(dubai), responses: [
+    clarify({ named_location: 'Europe', follow_up: 'narrow' }),
+    { outcome: 'matches', matches: [{ profile_id: london.id, confidence: 0.9, reasons: ['Marketing in London.'], matched_expertise: ['growth marketing'] }] },
+  ] }), ['London', 'Dubai']);
+  const result = await say(fixture, 'any close match in Europe? I am interested in European trends.', 'thread');
+  assert.equal(payload(fixture, 0).shown_search, 'marketing alumni', 'Mistral is told what was shown, without names');
+  assert.doesNotMatch(`${result.message} ${result.clarification} ${result.no_match_reason}`, /close match|trends/i);
+  assert.deepEqual(offered(fixture, 1), [london.id], 'only European cities reach the matcher');
+  assert.match(payload(fixture, 1).request, /^marketing alumni; /, 'it builds on the earlier search');
+});
+
+test('Mistral reading a follow-up as a new subject starts a new search', async () => {
+  const london = marketerIn('london', 'London');
+  const builder = { ...finance, id: 'build', name: 'Builder', department: 'Operations', job_title: 'Site Manager', skills: ['construction management'], location: 'London' };
+  const fixture = withLocations(discoveryFixture({ candidates: [london, builder], turns: shownMarketing(london), responses: [
+    clarify({ named_subject: 'construction', follow_up: 'new' }),
+    { outcome: 'matches', matches: [{ profile_id: builder.id, confidence: 0.9, reasons: ['Construction.'], matched_expertise: ['construction management'] }] },
+  ] }), ['London']);
+  await say(fixture, 'and someone who knows construction?', 'thread');
+  assert.doesNotMatch(payload(fixture, 1).request, /^marketing alumni; /, 'the old search is not carried over');
+});
+
+test('before any people are shown, Mistral is told nothing was shown', async () => {
+  const fixture = discoveryFixture({ candidates: [finance], responses: [clarify({ named_subject: 'finance' })] });
+  await say(fixture, 'someone in finance');
+  assert.equal(payload(fixture, 0).shown_search, null);
+});
+
 test('a region named without the model extracting it still filters', async () => {
   const london = banker('london', 'London'); const dubai = banker('dubai', 'Dubai');
   const fixture = withLocations(discoveryFixture({ candidates: [london, dubai], responses: [

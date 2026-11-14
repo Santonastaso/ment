@@ -91,6 +91,9 @@ type ClarificationResult = {
   matching_terms?: string[];
   nearest_terms?: string[];
   subject_label?: string;
+  // How the latest message relates to the people already shown. Mistral reads
+  // this from the conversation; fixed phrase lists only stand in when it is missing.
+  follow_up?: string;
   parts?: unknown;
 };
 
@@ -899,6 +902,9 @@ async function handle(req: Request): Promise<Response> {
     const conversation = conversationFromTurns(priorTurns, query)
       .map((turn) => (turn.role === 'user' ? { ...turn, content: expandAbbreviations(turn.content) } : turn));
     const hasClarified = priorTurns.some((turn) => turn.role === 'assistant' && turn.kind === 'clarification');
+    // The search behind the people last shown, in the matcher's words (no names),
+    // so Mistral can tell a follow-up about them from a new request.
+    const shownSearch = cleanText([...priorTurns].reverse().find((turn) => turn.role === 'assistant' && turn.kind === 'matches')?.search_request, 300);
     answeredClarification = hasClarified;
     const startedAt = Date.now();
     try {
@@ -949,6 +955,7 @@ Do not broaden explicit professions or domains into adjacent ones. For example, 
 "named_location": the city, country or region the user wants people in, copied exactly as they wrote it, or empty. Never a place they ruled out. Copy it even when you believe nobody is there; the application does that check. Words that only look like places ("in realtà", "this is not what I want") are not places.
 "ruled_out_places": every place the user does NOT want people in ("not in London", "pas en France", "tranne Milano", "outside the UK"), each copied exactly as they wrote it. Read every turn: a place ruled out earlier stays ruled out until the user asks for it or says anywhere is fine. Saying of the people shown that they are not somewhere ("they are not in China") is a complaint that they wanted that place, not a ruling out. [] when none.
 "exclude_locations": every entry of coverage.locations that lies in a place listed in ruled_out_places, copied exactly from the coverage: the city itself, or each listed city inside a ruled-out country or region. [] when none.
+"follow_up": only when "shown_search" is not null, meaning people were already shown for that search: how the latest message relates to it. "narrow" when it keeps the same subject and adds or changes a detail, such as a place, seniority, experience or employer, or asks for close or similar matches ("any close match in Europe?", "someone more senior?"). "more" when it asks for more or other people for the same search. "reject" when it says the people shown are wrong. "new" when it names a different field, role or skill to look for. Words that describe the search itself, such as close match, similar, options or trends, are never a new subject. Empty when shown_search is null.
 "subject_label": a short, natural phrase in the reply language that completes the sentence "I couldn't find ___ here", describing what the user is looking for in their own terms -- for example "anyone in construction" or "a CFO who is still a student". At most eight words. Never add a place, language or detail they did not give. Empty when they named nothing.
 "parts": the request split into what they want ONE person to be. Copy each value from the user's own words, in their language:
   "role": the job or title they asked for, or empty.
@@ -962,8 +969,8 @@ Do not broaden explicit professions or domains into adjacent ones. For example, 
 The language the user writes in is never a place: French words do not mean France.
 Every term you return is checked against the coverage and anything not found there is discarded, so copy exactly and never invent one. The examples in these instructions illustrate shape only: never reuse their wording or their subject in anything you return.
 
-Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one concise question or empty string","search_request":"concise grounded request or empty string","no_match_reason":"one plain sentence, or empty string","named_subject":"as written, or empty string","matching_terms":["exact coverage term"],"nearest_terms":["exact coverage term"],"named_location":"as written, or empty string","ruled_out_places":["as written"],"exclude_locations":["exact coverage location"],"subject_label":"short phrase, or empty string","parts":{"role":"","seniority":"","field":"","department":"","company":"","skills":[],"exclude":[],"conflict":[]}}.`,
-        user: JSON.stringify({ conversation, coverage, answered: hasClarified, lexical_hits: hits }),
+Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one concise question or empty string","search_request":"concise grounded request or empty string","no_match_reason":"one plain sentence, or empty string","named_subject":"as written, or empty string","matching_terms":["exact coverage term"],"nearest_terms":["exact coverage term"],"named_location":"as written, or empty string","ruled_out_places":["as written"],"exclude_locations":["exact coverage location"],"subject_label":"short phrase, or empty string","follow_up":"narrow"|"more"|"reject"|"new"|"","parts":{"role":"","seniority":"","field":"","department":"","company":"","skills":[],"exclude":[],"conflict":[]}}.`,
+        user: JSON.stringify({ conversation, coverage, answered: hasClarified, lexical_hits: hits, shown_search: shownSearch || null }),
         temperature: 0.1,
         maxTokens: 800,
       }).catch((error) => {
@@ -1118,7 +1125,11 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
       const sameTopic = (word: string) => topicWords.some((known) => known === word
         || (known.length >= 5 && word.length >= 5 && known.slice(0, 5) === word.slice(0, 5)));
       const switching = SWITCH_PATTERN.test(latestRaw.toLowerCase());
-      const topicShift = latestSubjectWords.length > 0 && (
+      const followUpValue = cleanText(result.value?.follow_up, 10).toLowerCase();
+      const modelFollowUp = lastShown && ['narrow', 'more', 'reject', 'new'].includes(followUpValue) ? followUpValue : '';
+      // Mistral judges whether the message is about the people shown or a new
+      // subject; the word comparison below only decides when it did not say.
+      const topicShift = modelFollowUp ? modelFollowUp === 'new' : latestSubjectWords.length > 0 && (
         (Boolean(lastShown) && !answeringOurQuestion && latestSubjectWords.some((word) => !sameTopic(word)))
         || (answeringOurQuestion && switching));
       const groundedInLatest = (value: string) => contentWords(value).some((word) => latestContent.includes(word));
@@ -1224,7 +1235,12 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
         return answer({ matches: [], clarification: reply, suggestions: choices, thread_id: threadId });
       }
       const namesSomething = meaningfulLatest.length > 0 || namesPlace;
-      const detected = messageIntent(latestRaw, Boolean(lastShown), namesSomething);
+      const patternIntent = messageIntent(latestRaw, Boolean(lastShown), namesSomething);
+      // Greetings, thanks and the choices we offered keep their own handling;
+      // otherwise Mistral's reading of the follow-up wins over the phrase lists.
+      const KEEP_PATTERN = ['greeting', 'thanks', 'smalltalk', 'closest', 'ask_me'];
+      const MODEL_INTENT: Record<string, string> = { narrow: 'refine', more: 'more', reject: 'reject', new: '' };
+      const detected = modelFollowUp && !KEEP_PATTERN.includes(patternIntent) ? MODEL_INTENT[modelFollowUp] : patternIntent;
       // Pushback stays pushback; any other follow-up naming a new subject is a
       // fresh search rather than a refinement of the old one.
       // Pushback about the place is the earlier request asked again, not a
