@@ -110,22 +110,22 @@ test('a request outside the network stays a clean no-match with no question', as
   assert.equal(result.matches.length, 0);
 });
 
-test('a refused default model falls back to the configured one instead of failing', async () => {
+test('discovery never falls back to a configured 3B model', async () => {
   const fixture = discoveryFixture({ responses: [
     { decision: 'ready', search_request: 'Financial modelling', named_subject: 'Financial modelling' }, directMatch,
   ] });
-  const served = fixture.fetch.bind(fixture);
+  fixture.env.MISTRAL_MODEL = 'ministral-3b-latest';
   const tried = [];
   fixture.fetch = async (url, options) => {
     const { model } = JSON.parse(options.body);
     tried.push(model);
-    if (model === 'mistral-small-latest') return new Response('{"message":"quota"}', { status: 429 });
-    return served(url, options);
+    return new Response('{"message":"quota"}', { status: 429 });
   };
-  const result = await chat(fixture, 'help with Financial modelling');
-  assert.equal(result.matches.length, 1);
+  const response = await run(fixture, { action: 'chat', query: 'help with Financial modelling', lang: 'en' });
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).error, 'ai_rate_limited');
   assert.ok(tried.includes('mistral-small-latest'), 'the preferred model is tried first');
-  assert.ok(tried.includes('fixture-model'), 'then the configured model answers');
+  assert.ok(!tried.includes('fixture-model'), 'the configured 3B-class fallback is not called');
 });
 
 test('a vague request is asked a question even when the model invents a subject', async () => {
