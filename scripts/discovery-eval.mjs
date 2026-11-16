@@ -9,6 +9,9 @@ const run = await discoveryHandler();
 // Which places to leave out is read by the model, so it is checked against the model: finance people, one per city.
 const inCities = cities => cities.map(city => ({ id: city, name: `${city} Person`, job_title: 'Financial Analyst', department: 'Finance', program: 'MBA', skills: ['Financial modelling'], location: city }));
 const shown = (...cities) => ({ role: 'assistant', kind: 'matches', framed: true, content: 'Here are some people.', search_request: 'finance', department: 'Finance', location: '', matches: inCities(cities).map(({ id, name, location }) => ({ id, name, location })) });
+const marketingIn = cities => cities.map(city => ({ id: `marketing-${city}`, name: `${city} Marketer`, job_title: 'Growth Marketer', department: 'Marketing', program: 'MBA', skills: ['growth marketing'], location: city }));
+const shownMarketing = (city) => ({ role: 'assistant', kind: 'matches', framed: true, content: 'Here is someone.', search_request: 'marketing alumni', department: 'Marketing', location: city,
+  matches: [{ id: `marketing-${city}`, name: `${city} Marketer`, location: city }] });
 const asked = { role: 'user', content: 'someone in finance' };
 const only = (...cities) => result => { const got = result.matches.map(match => match.location); assert.ok(got.length > 0 && got.every(city => cities.includes(city)), got.join(', ')); };
 const cases = [
@@ -18,6 +21,12 @@ const cases = [
   { name: 'an exclusion holds on a later turn', cities: ['London', 'Paris', 'Milan'], turns: [asked, shown('London'), { role: 'user', content: 'not in London' }, shown('Paris')], body: { query: 'more options', lang: 'en', thread_id: 'thread' }, check: only('Paris', 'Milan') },
   { name: 'an exclusion ends when the place is asked for', cities: ['London', 'Paris'], turns: [asked, shown('London'), { role: 'user', content: 'not in London' }, shown('Paris')], body: { query: 'actually London is fine, show me London', lang: 'en', thread_id: 'thread' }, check: only('London') },
   { name: 'a complaint is a request for the place', cities: ['London', 'Paris'], turns: [asked, shown('Paris')], body: { query: 'they are not in London', lang: 'en', thread_id: 'thread' }, check: only('London') },
+  { name: 'anywhere removes the old place but keeps marketing', locations: ['Paris', 'London'], candidates: marketingIn(['Paris', 'London']),
+    turns: [{ role: 'user', content: 'marketing in Paris' }, shownMarketing('Paris')], body: { query: 'anywhere is fine', lang: 'en', thread_id: 'thread' },
+    check: result => { assert.equal(result.understood.department, 'Marketing'); assert.equal(result.understood.location, ''); } },
+  { name: 'a pronoun follow-up changes place but keeps marketing', locations: ['Paris', 'London'], candidates: marketingIn(['Paris', 'London']),
+    turns: [{ role: 'user', content: 'marketing in Paris' }, shownMarketing('Paris')], body: { query: 'which of them is in London?', lang: 'en', thread_id: 'thread' },
+    check: result => { assert.equal(result.understood.department, 'Marketing'); assert.equal(result.understood.location, 'London'); assert.ok(result.matches.every(match => match.location === 'London')); } },
   { name: 'an ordinary "not" rules out no place', cities: ['London', 'Paris'], turns: [asked, shown('London')], body: { query: 'more options, not the same person', lang: 'en', thread_id: 'thread' }, check: result => assert.deepEqual((result.understood?.exclude || []).filter(word => ['london', 'paris'].includes(word)), []) },
   { name: 'broad field asks one short question', body: { query: 'finance', lang: 'en' }, check: result => assert.ok(result.clarification && result.clarification.split(/\s+/).length <= 20) },
   { name: 'French clarification', body: { query: 'finance', lang: 'fr' }, check: result => assert.match(result.clarification, /vous|quel|souhait|cherch|besoin|voulez|pr[eé]f[eé]r/i) },
@@ -29,10 +38,11 @@ const cases = [
 ];
 let failures = 0;
 for (const scenario of cases) {
-  const fixture = discoveryFixture({ live: true, turns: scenario.turns, ...(scenario.cities ? { candidates: inCities(scenario.cities) } : {}) });
-  if (scenario.cities) {
+  const fixture = discoveryFixture({ live: true, turns: scenario.turns, ...(scenario.candidates ? { candidates: scenario.candidates } : scenario.cities ? { candidates: inCities(scenario.cities) } : {}) });
+  const locations = scenario.locations || scenario.cities;
+  if (locations) {
     const rpc = fixture.sb.rpc;
-    fixture.sb.rpc = async (name, args) => { const result = await rpc(name, args); if (name === 'discovery_network_coverage') result.data.locations = scenario.cities; return result; };
+    fixture.sb.rpc = async (name, args) => { const result = await rpc(name, args); if (name === 'discovery_network_coverage') result.data.locations = locations; return result; };
   }
   try {
     const response = await run(fixture, { action: 'chat', ...scenario.body });
