@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { conversationState, CONVERSATION_FILTERS, requestText, resumableSearch, clearSentDraft, canCompleteMeeting, meetingFeedback } from '../client/src/lib/conversations.mjs';
+import { conversationState, CONVERSATION_FILTERS, requestText, resumableSearch, clearSentDraft, canCompleteMeeting, meetingFeedback, conversationThreads, peerConversationSessions, conversationUnreadCount } from '../client/src/lib/conversations.mjs';
 
 const now = Date.parse('2026-10-01T12:00:00Z');
 test('Home and Messages use identical request and meeting states', () => {
@@ -28,6 +28,17 @@ test('meeting feedback is private to the participant and completion is not re-st
   assert.equal(canCompleteMeeting({ ...meeting, status: 'pending' }, now), false);
   assert.deepEqual(meetingFeedback(meeting, ' Useful ', 4), { status: 'completed', mentor_reflection: 'Useful', mentor_rating: 4 });
   assert.deepEqual(meetingFeedback({ ...meeting, isMentor: false, viewer_completed: true }, '', null), { reflection: null, mentee_rating: null });
+});
+
+test('repeated mentoring sessions form one peer conversation', () => {
+  const sessions = [
+    { id: 1, mentor_id: 'mentor', mentee_id: 'viewer', created_at: '2026-09-01', last_activity_at: '2026-09-02' },
+    { id: 2, mentor_id: 'mentor', mentee_id: 'viewer', created_at: '2026-10-01', last_activity_at: '2026-10-02' },
+    { id: 3, mentor_id: 'other', mentee_id: 'viewer', created_at: '2026-09-15', last_activity_at: '2026-09-16' },
+  ];
+  assert.deepEqual(conversationThreads(sessions, 'viewer').map(session => session.id), [2, 3]);
+  assert.deepEqual(peerConversationSessions(sessions, sessions[0], 'viewer').map(session => session.id), [2, 1]);
+  assert.equal(conversationUnreadCount(peerConversationSessions(sessions, sessions[0], 'viewer'), { 1: 2, 2: 3 }), 5);
 });
 test('internal criteria stay private and only unfinished searches resume', () => {
   assert.equal(requestText('{"role":"finance"}', 'Finance advice'), 'Finance advice');

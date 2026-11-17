@@ -14,13 +14,47 @@ export function conversationState(session, now = Date.now()) {
 }
 
 export const CONVERSATION_FILTERS = [
-  { key: 'all', label: 'conversations.filter.all', match: () => true, groups: true },
-  { key: 'needs', label: 'conversations.filter.needsYou', match: state => state === 'needs' },
-  { key: 'waiting', label: 'conversations.filter.waiting', match: state => state === 'waiting' },
-  { key: 'scheduled', label: 'conversations.filter.scheduled', match: state => state === 'scheduled' },
-  { key: 'past', label: 'conversations.filter.past', match: state => state === 'past' || state === 'closed' },
+  { key: 'all', label: 'conversations.filter.all', match: (_state, session) => !session?.conversation_archived, groups: true },
+  { key: 'needs', label: 'conversations.filter.needsYou', match: (state, session) => !session?.conversation_archived && state === 'needs' },
+  { key: 'waiting', label: 'conversations.filter.waiting', match: (state, session) => !session?.conversation_archived && state === 'waiting' },
+  { key: 'scheduled', label: 'conversations.filter.scheduled', match: (state, session) => !session?.conversation_archived && state === 'scheduled' },
+  { key: 'past', label: 'conversations.filter.past', match: (state, session) => !session?.conversation_archived && (state === 'past' || state === 'closed') },
   { key: 'groups', label: 'nav.groups', match: () => false, groups: true },
+  { key: 'archived', label: 'conversations.filter.archived', match: (_state, session) => !!session?.conversation_archived },
 ];
+
+export function conversationPeerId(session, viewerId) {
+  if (!session || !viewerId) return null;
+  return session.mentor_id === viewerId ? session.mentee_id : session.mentor_id;
+}
+
+function newestSessionsFirst(sessions) {
+  return sessions.map((session, index) => ({ session, index, time: new Date(session.last_activity_at || session.created_at).getTime() }))
+    .sort((a, b) => Number.isFinite(a.time) && Number.isFinite(b.time) && a.time !== b.time ? b.time - a.time : a.index - b.index)
+    .map(item => item.session);
+}
+
+export function peerConversationSessions(sessions, session, viewerId) {
+  const peerId = conversationPeerId(session, viewerId);
+  if (!peerId) return [];
+  return newestSessionsFirst(sessions.filter(item => conversationPeerId(item, viewerId) === peerId));
+}
+
+export function conversationThreads(sessions, viewerId) {
+  const seen = new Set();
+  const threads = [];
+  for (const session of newestSessionsFirst(sessions)) {
+    const peerId = conversationPeerId(session, viewerId);
+    if (!peerId || seen.has(peerId)) continue;
+    seen.add(peerId);
+    threads.push(session);
+  }
+  return threads;
+}
+
+export function conversationUnreadCount(sessions, counts = {}) {
+  return sessions.reduce((total, session) => total + (counts[session.id] || 0), 0);
+}
 
 export function requestText(value, fallback = '') {
   const text = String(value || '').trim();

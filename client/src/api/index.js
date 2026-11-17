@@ -958,6 +958,16 @@ async function post(url, body = {}, opts = {}) {
     return ok({ id, read: true });
   }
 
+  if (/^\/sessions\/\d+\/archive$/.test(url)) {
+    const id = Number(url.split('/')[2]);
+    const { error } = await supabase.rpc('set_peer_conversation_archived', {
+      p_session_id: id,
+      p_archived: Boolean(body.archived),
+    });
+    if (error) throw new ApiError(error.message, 404);
+    return ok({ id, archived: Boolean(body.archived) });
+  }
+
   if (/^\/sessions\/\d+\/acknowledge$/.test(url)) {
     const id = Number(url.split('/')[2]);
     const { error } = await supabase.rpc('acknowledge_session', { p_session_id: id });

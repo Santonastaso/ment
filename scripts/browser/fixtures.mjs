@@ -78,7 +78,14 @@ function fixtureApi(state, ApiError) {
       if (path.startsWith('/skills/suggest')) return [];
       if (/^\/(sessions|groups)\/\d+\/messages/.test(path)) {
         const [messagePath] = path.split('?');
-        const rows = state.messages[messagePath] || [];
+        const sessionId = Number(messagePath.split('/')[2]);
+        const selected = messagePath.startsWith('/sessions/') && state.sessions.find(session => session.id === sessionId);
+        const peerId = selected && (selected.mentor_id === state.user.id ? selected.mentee_id : selected.mentor_id);
+        const rows = selected ? state.sessions
+          .filter(session => (session.mentor_id === state.user.id ? session.mentee_id : session.mentor_id) === peerId)
+          .flatMap(session => (state.messages[`/sessions/${session.id}/messages`] || []).map(message => ({ ...message, session_id: session.id })))
+          .sort((a, b) => new Date(a.created_at) - new Date(b.created_at) || a.id - b.id)
+          : state.messages[messagePath] || [];
         return { messages: rows, hasMore: false };
       }
     }
@@ -104,6 +111,13 @@ function fixtureApi(state, ApiError) {
         const [, kind, id] = path.split('/');
         delete state.unread[kind === 'groups' ? 'groupMessages' : 'sessionMessages'][id];
         return {};
+      }
+      if (path.endsWith('/archive')) {
+        const session = state.sessions.find(item => item.id === Number(path.split('/')[2]));
+        const peerId = session.mentor_id === state.user.id ? session.mentee_id : session.mentor_id;
+        state.sessions.filter(item => (item.mentor_id === state.user.id ? item.mentee_id : item.mentor_id) === peerId)
+          .forEach(item => { item.conversation_archived = !!body.archived; });
+        return { id: session.id, archived: !!body.archived };
       }
       if (path.endsWith('/acknowledge')) { state.sessions.find(s => s.id === Number(path.split('/')[2])).mentee_acknowledged_at = new Date().toISOString(); return {}; }
       if (path === '/profile/ingest') {

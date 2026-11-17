@@ -213,6 +213,38 @@ test('Messages keeps the list and chat layout steady while switching conversatio
   await page.evaluate(() => window.fixture.pendingLoads.splice(0).forEach(resolve => resolve()));
 });
 
+test('repeated sessions stay in one restorable conversation', async ({ page }) => {
+  await page.goto('/groups');
+  await page.evaluate(() => {
+    const current = window.fixture.sessions.find(session => session.id === 1);
+    Object.assign(current, { created_at: '2026-11-10T10:00:00Z', last_activity_at: '2026-11-10T10:30:00Z' });
+    window.fixture.sessions.push({
+      ...current,
+      id: 3,
+      title: 'Earlier mentoring request',
+      status: 'completed',
+      viewer_completed: true,
+      created_at: '2026-10-10T10:00:00Z',
+      last_activity_at: '2026-10-10T10:30:00Z',
+    });
+    window.fixture.messages['/sessions/1/messages'] = [{ id: 11, session_id: 1, sender_id: 'viewer', kind: 'message', body: 'Current session', created_at: '2026-11-10T10:30:00Z' }];
+    window.fixture.messages['/sessions/3/messages'] = [{ id: 9, session_id: 3, sender_id: 'peer-1', kind: 'message', body: 'Earlier session', created_at: '2026-10-10T10:30:00Z' }];
+  });
+
+  await page.locator('nav').getByRole('link', { name: /^Messages/ }).click();
+  await expect(page.locator('.conversation-list-item')).toHaveCount(3);
+  await expect(page.locator('.conversation-request-card')).toHaveCount(2);
+  await expect(page.getByText('Earlier session', { exact: true })).toBeVisible();
+  await expect(page.locator('.conversation-message').getByText('Current session', { exact: true })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Archive conversation' }).click();
+  await expect(page).toHaveURL(/filter=archived/);
+  await expect(page.locator('.conversation-list-item').filter({ hasText: 'Peer 1' })).toBeVisible();
+  await page.locator('.conversation-list-item').filter({ hasText: 'Peer 1' }).click();
+  await page.getByRole('button', { name: 'Restore conversation' }).click();
+  await expect(page.getByRole('button', { name: 'Archive conversation' })).toBeVisible();
+});
+
 test('Home greeting stays static', async ({ page }) => {
   await page.clock.install();
   await page.goto('/');
