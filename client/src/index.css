@@ -345,6 +345,7 @@ input[type="checkbox"], input[type="radio"] { width: 16px; height: 16px; flex-sh
 .floating-field .directory-filter { height: auto; min-height: 0; justify-content: space-between; border: 0; background: transparent; padding: 22px 12px 6px; font-size: var(--type-label); }
 /* Extra head room so the caption clears the first line of prose. */
 .floating-field textarea { min-height: 78px; padding-top: 28px; resize: vertical; }
+.floating-field textarea[data-auto-grow] { overflow-y: hidden; resize: none; }
 /* The label occupies the placeholder's position until the field is focused,
    so showing both at once overlaps them. Reveal the placeholder only once the
    label has moved out of the way. */

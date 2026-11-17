@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { conversationState, CONVERSATION_FILTERS, requestText, resumableSearch, clearSentDraft, canCompleteMeeting, meetingFeedback } from '../client/src/lib/conversations.mjs';
+import { conversationState, conversationListItems, CONVERSATION_FILTERS, requestText, resumableSearch, clearSentDraft, canCompleteMeeting, meetingFeedback } from '../client/src/lib/conversations.mjs';
 
 const now = Date.parse('2026-10-01T12:00:00Z');
 test('Home and Messages use identical request and meeting states', () => {
@@ -18,6 +18,23 @@ test('sending clears only the original thread draft and never newer typing', () 
   assert.deepEqual(clearSentDraft(drafts, 'session:1', 'Send A'), { 'group:1': 'Keep B' });
   assert.equal(clearSentDraft(drafts, 'session:1', 'Earlier A'), drafts);
   assert.equal(drafts['session:1'], 'Send A');
+});
+
+test('the conversation list mixes active groups with direct chats by latest activity', () => {
+  const sessions = [
+    { id: 1, status: 'pending', isMentor: false, updated_at: '2026-10-03T10:00:00Z' },
+    { id: 2, status: 'completed', updated_at: '2026-10-01T10:00:00Z' },
+  ];
+  const groups = [
+    { id: 7, latest_message_at: '2026-10-04T10:00:00Z' },
+    { id: 8, created_at: '2026-10-02T10:00:00Z' },
+  ];
+
+  assert.deepEqual(conversationListItems(sessions, groups, 'all').map(item => `${item.kind}:${item.data.id}`), [
+    'group:7', 'session:1', 'group:8', 'session:2',
+  ]);
+  assert.deepEqual(conversationListItems(sessions, groups, 'groups').map(item => item.data.id), [7, 8]);
+  assert.deepEqual(conversationListItems(sessions, groups, 'waiting').map(item => item.data.id), [1]);
 });
 
 test('meeting feedback is private to the participant and completion is not re-stamped', () => {

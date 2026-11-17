@@ -260,6 +260,51 @@ test('profile overview shows saved skills before the first session and CV can up
   expect(saved.career[0].role).toBe('Engineer');
 });
 
+test('Experience descriptions grow with their content without a resize handle or inner scrollbar', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => {
+    window.fixture.profile = {
+      ...window.fixture.user,
+      skills: [],
+      career: [{ id: 7, role: 'Analyst', department: 'Finance', company: 'Ment', description: 'A short description.' }],
+    };
+  });
+  await page.locator('.app-sidebar').getByRole('link', { name: 'My profile' }).click();
+  await page.getByRole('tab', { name: 'Experience' }).click();
+  await page.getByRole('button', { name: 'Edit' }).click();
+  const description = page.locator('.career-entry-form textarea');
+  await description.fill(Array.from({ length: 8 }, (_, index) => `Line ${index + 1}: a detailed account of the work and its impact.`).join('\n'));
+  const box = await description.evaluate(element => ({
+    height: element.getBoundingClientRect().height,
+    scrollHeight: element.scrollHeight,
+    overflowY: getComputedStyle(element).overflowY,
+    resize: getComputedStyle(element).resize,
+  }));
+  expect(box.height).toBeGreaterThanOrEqual(box.scrollHeight);
+  expect(box.overflowY).toBe('hidden');
+  expect(box.resize).toBe('none');
+});
+
+test('Messages mixes active groups into recent conversations and keeps Italian filters even', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => {
+    window.fixture.sessions[0].updated_at = '2026-11-15T10:00:00Z';
+    window.fixture.sessions[1].updated_at = '2026-11-13T10:00:00Z';
+    window.fixture.groups[0].latest_message_at = '2026-11-16T10:00:00Z';
+  });
+  await page.locator('.app-sidebar a[href="/conversations"]').click();
+  await expect(page.locator('.conversation-list-item')).toHaveCount(3);
+  const names = await page.locator('.conversation-list-item strong').allTextContents();
+  expect(names.slice(0, 3)).toEqual(['Test Group', 'Peer 1', 'Peer 2']);
+  await page.locator('.app-sidebar').getByRole('button', { name: 'Viewer Student' }).click();
+  await page.getByTestId('lang-it').click();
+  const widths = await page.locator('.conversation-filters button').evaluateAll(buttons =>
+    buttons.map(button => Math.round(button.getBoundingClientRect().width)));
+  expect(new Set(widths).size).toBe(1);
+  await expect(page.getByRole('button', { name: /Da gestire/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /In programma/ })).toBeVisible();
+});
+
 test('Messages rail moves smoothly and compact menus remain usable', async ({ page }) => {
   await page.goto('/conversations?session=1');
   await expect(page.locator('.conversation-messages')).toBeVisible();

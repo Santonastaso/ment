@@ -22,6 +22,27 @@ export const CONVERSATION_FILTERS = [
   { key: 'groups', label: 'nav.groups', match: () => false, groups: true },
 ];
 
+function activityTime(item) {
+  const value = item.kind === 'group'
+    ? item.data.latest_message_at || item.data.created_at
+    : item.data.updated_at || item.data.last_activity_at || item.data.created_at;
+  const parsed = Date.parse(value || '');
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+export function conversationListItems(sessions = [], groups = [], filter = 'all') {
+  const option = CONVERSATION_FILTERS.find(item => item.key === filter) || CONVERSATION_FILTERS[0];
+  const sessionItems = sessions
+    .filter(session => option.match(conversationState(session)))
+    .map((data, sourceIndex) => ({ kind: 'session', data, sourceIndex }));
+  const groupItems = option.groups
+    ? groups.map((data, sourceIndex) => ({ kind: 'group', data, sourceIndex: sessions.length + sourceIndex }))
+    : [];
+
+  return [...sessionItems, ...groupItems].sort((left, right) =>
+    activityTime(right) - activityTime(left) || left.sourceIndex - right.sourceIndex);
+}
+
 export function requestText(value, fallback = '') {
   const text = String(value || '').trim();
   // Search criteria belong to the matcher, never to the conversation UI.

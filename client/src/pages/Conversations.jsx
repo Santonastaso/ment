@@ -15,7 +15,7 @@ import MeetingFeedback from '../components/MeetingFeedback.jsx';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog.jsx';
 import { cn } from '@/lib/utils';
 import { supabase } from '../lib/supabase.js';
-import { CONVERSATION_FILTERS as FILTERS, conversationState as rowState, isExpired, requestText, clearSentDraft } from '../lib/conversations.mjs';
+import { CONVERSATION_FILTERS as FILTERS, conversationListItems, conversationState as rowState, isExpired, requestText, clearSentDraft } from '../lib/conversations.mjs';
 import { homeCopy } from '../components/demo/homeCopy.js';
 import SessionRequestModal from '../components/SessionRequestModal.jsx';
 import TimeSlotSelect from '../components/TimeSlotSelect.jsx';
@@ -153,12 +153,7 @@ export default function Conversations() {
       document.removeEventListener('keydown', closeOnEscape);
     };
   }, [railMenu]);
-  // Sessions the current filter admits, newest meeting first.
-  const visibleSessions = useMemo(() => {
-    const match = FILTERS.find(option => option.key === filter)?.match ?? (() => true);
-    return sessions.filter(session => match(rowState(session)));
-  }, [sessions, filter]);
-  const showGroups = FILTERS.find(option => option.key === filter)?.groups === true;
+  const visibleItems = useMemo(() => conversationListItems(sessions, groups, filter), [sessions, groups, filter]);
 
   const [messages, setMessages] = useState([]);
   const [loadedThreadKey, setLoadedThreadKey] = useState('');
@@ -628,7 +623,22 @@ export default function Conversations() {
             <Link to="/explorer">{t('conversations.findPeople')}</Link>
           </div>
         ) : <>
-          {visibleSessions.map((session) => {
+          {visibleItems.map((item) => {
+            if (item.kind === 'group') {
+              const group = item.data;
+              const unreadCount = unreadCounts.groupMessages[group.id] || 0;
+              return (
+                <button key={`group-${group.id}`} type="button" onClick={() => selectThread('group', group.id)} className={cn('conversation-list-item', group.id === selectedGroupId && 'is-active')}>
+                  <Avatar className="size-9"><AvatarFallback className="text-secondary-foreground"><UsersRound className="size-4" /></AvatarFallback></Avatar>
+                  <span className="min-w-0">
+                    <span className="conversation-list-top"><strong>{group.name}</strong></span>
+                    <small>{group.latest_message || group.description || t('nav.groups')}</small>
+                  </span>
+                  {unreadCount > 0 && <span className="conversation-unread-badge" aria-label={t('conversations.unreadCount', { count: unreadCount })}>{unreadCount > 99 ? '99+' : unreadCount}</span>}
+                </button>
+              );
+            }
+            const session = item.data;
             const peer = otherPerson(session, user?.id);
             const state = rowState(session);
             const unreadCount = unreadCounts.sessionMessages[session.id] || 0;
@@ -647,19 +657,7 @@ export default function Conversations() {
             </button>
           );
         })}
-        {showGroups && groups.map((group) => (
-          <button key={`group-${group.id}`} type="button" onClick={() => selectThread('group', group.id)} className={cn('conversation-list-item', group.id === selectedGroupId && 'is-active')}>
-            <Avatar className="size-9"><AvatarFallback className="text-secondary-foreground"><UsersRound className="size-4" /></AvatarFallback></Avatar>
-            <span className="min-w-0">
-              <span className="conversation-list-top">
-                <strong>{group.name}</strong>
-              </span>
-            <small>{group.latest_message || group.description || t('nav.groups')}</small>
-          </span>
-          {(unreadCounts.groupMessages[group.id] || 0) > 0 && <span className="conversation-unread-badge" aria-label={t('conversations.unreadCount', { count: unreadCounts.groupMessages[group.id] })}>{unreadCounts.groupMessages[group.id] > 99 ? '99+' : unreadCounts.groupMessages[group.id]}</span>}
-        </button>
-        ))}
-        {!visibleSessions.length && !(showGroups && groups.length) && filter !== 'all' && (
+        {!visibleItems.length && filter !== 'all' && (
           <p className="conversation-list-empty">{t('conversations.filter.empty')}</p>
         )}
         </>}
