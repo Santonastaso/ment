@@ -614,6 +614,8 @@ test('a proposed time is checked again before sending a request', async ({ page 
   await page.getByRole('button', { name: 'Request session' }).first().click();
   const dialog = page.getByRole('dialog', { name: 'Request session' });
   await expect(dialog.getByText('1 / 4')).toBeVisible();
+  await expect(dialog.getByText('Peer Mentor', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('To', { exact: true }).locator('..')).toContainText('Financial Analyst');
   await expect(dialog.getByText('Availability and request limits are checked again when you send.')).toHaveCount(0);
   await expect(dialog.getByText(/Pick one or more topics from .*strengths/)).toHaveCount(0);
   await dialog.getByRole('button', { name: 'Skip' }).click();
@@ -631,13 +633,31 @@ test('a proposed time is checked again before sending a request', async ({ page 
   expect((await timeField.boundingBox()).width).toBeLessThan(200);
   await dialog.getByRole('button', { name: 'Review request' }).click();
   await expect(dialog.getByText('Review your request')).toBeVisible();
-  await expect(dialog.getByText('with Bob Taylor · Engineering')).toHaveCount(0);
+  await expect(dialog.getByText('Drafted with AI. Review and edit it before sending.')).toBeVisible();
   const now = await page.evaluate(() => Date.now());
   await page.clock.setFixedTime(new Date(now + 40 * 60 * 1000));
   await dialog.getByRole('button', { name: 'Confirm and send' }).click();
   await expect(dialog.getByRole('alert')).toHaveText('Choose a date and time at least one hour from now.');
   await expect(dialog.getByText('3 / 4')).toBeVisible();
   expect(await page.evaluate(() => window.fixture.calls.some(call => call.method === 'post' && call.path === '/sessions'))).toBe(false);
+});
+
+test('the Italian request flow uses clear meeting language and discloses its AI draft', async ({ page }) => {
+  await page.goto('/explorer');
+  await page.locator('.app-sidebar').getByRole('button', { name: 'Viewer Student' }).click();
+  await page.getByTestId('lang-it').click();
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Richiedi un incontro' }).first().click();
+  const dialog = page.getByRole('dialog', { name: 'Richiedi un incontro' });
+  await expect(dialog.getByLabel('Passaggio 1 di 4')).toBeVisible();
+  await expect(dialog.getByText('Peer Mentor', { exact: true })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Continua senza selezionare' }).click();
+  await expect(dialog.getByText('Qual è la tua domanda?')).toBeVisible();
+  await dialog.getByRole('textbox').fill('Come posso prepararmi per un colloquio?');
+  await dialog.getByRole('button', { name: 'Avanti' }).click();
+  await dialog.getByRole('button', { name: 'Controlla la richiesta' }).click();
+  await expect(dialog.getByText('Bozza generata con l’IA. Rileggila e modificala prima dell’invio.')).toBeVisible();
+  await expect(dialog.getByText('La richiesta verrà inviata solo dopo la conferma.')).toBeVisible();
 });
 
 test('Quick reflection opens a card without shifting the profile and preserves drafts', async ({ page }) => {

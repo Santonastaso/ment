@@ -290,18 +290,13 @@ input[type="checkbox"], input[type="radio"] { width: 16px; height: 16px; flex-sh
 .onboarding-step-content, .session-step-content { animation: contentEnter var(--motion-content) var(--motion-ease) both; }
 .profile-tab-content, .conversation-thread, .onboarding-step-content, .session-step-content { position: relative; }
 .user-menu-panel { animation: contentEnter var(--motion-panel) var(--motion-ease) both; }
-.session-request-backdrop { overscroll-behavior: contain; animation: backdropEnter var(--motion-panel) ease-out both; }
-.session-request-modal { animation: pageEnter var(--motion-panel) var(--motion-ease) both; }
-.session-request-modal { max-height: calc(100vh - 2rem); max-height: calc(100dvh - 2rem); }
 .session-modal-scroll { overscroll-behavior: contain; scrollbar-gutter: stable; }
-@keyframes backdropEnter { from { background-color: transparent; } to { background-color: rgb(0 0 0 / .2); } }
 
 [data-slot="dialog-overlay"] { transition: opacity var(--motion-panel) var(--motion-ease); }
 [data-slot="dialog-overlay"][data-starting-style], [data-slot="dialog-overlay"][data-ending-style] { opacity: 0; }
 [data-slot="dialog-content"] { transition: opacity var(--motion-panel) var(--motion-ease), scale var(--motion-panel) var(--motion-ease); }
 [data-slot="dialog-content"][data-starting-style], [data-slot="dialog-content"][data-ending-style] { opacity: 0; scale: .97; }
 .app-modal-overlay { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; align-items: safe center; justify-content: center; overflow-y: auto; padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left)); overscroll-behavior: contain; }
-.session-request-backdrop { position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; }
 .app-modal-panel, .app-dialog-popup { min-height: 0; max-height: calc(100vh - 2rem); max-height: calc(100dvh - 2rem); overscroll-behavior: contain; }
 .app-modal-panel { flex-shrink: 1; border-radius: var(--dialog-radius); }
 .app-modal-panel > :is(.session-modal-scroll, .overflow-y-auto) { min-height: 0; }
@@ -320,7 +315,7 @@ input[type="checkbox"], input[type="radio"] { width: 16px; height: 16px; flex-sh
 @media (prefers-reduced-motion: reduce) {
   .availability-switch, .availability-switch::after { transition: none; }
   :root { --motion-page: 0ms; --motion-content: 0ms; --motion-tab: 0ms; --motion-panel: 0ms; --motion-control: 0ms; }
-  .page-transition, .profile-tab-content, .profile-tab-content.profile-tab-enter-forward, .profile-tab-content.profile-tab-enter-backward, .capacity-fill, .directory-results, .directory-results[data-loading="true"]::before, .conversation-thread, .onboarding-step-content, .session-step-content, .user-menu-panel, .session-request-backdrop, .session-request-modal { animation: none; }
+  .page-transition, .profile-tab-content, .profile-tab-content.profile-tab-enter-forward, .profile-tab-content.profile-tab-enter-backward, .capacity-fill, .directory-results, .directory-results[data-loading="true"]::before, .conversation-thread, .onboarding-step-content, .session-step-content, .user-menu-panel { animation: none; }
   .directory-results { transition: none; }
   [data-slot="dialog-overlay"], [data-slot="dialog-content"] { transition: none; }
   [data-slot="button"], [data-slot="input"], [data-slot="textarea"] { transition-duration: 0ms; }
