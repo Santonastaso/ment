@@ -15,7 +15,7 @@ import MeetingFeedback from '../components/MeetingFeedback.jsx';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog.jsx';
 import { cn } from '@/lib/utils';
 import { supabase } from '../lib/supabase.js';
-import { CONVERSATION_FILTERS as FILTERS, conversationState as rowState, isExpired, requestText, clearSentDraft, conversationThreads, peerConversationSessions, conversationUnreadCount } from '../lib/conversations.mjs';
+import { CONVERSATION_FILTERS as FILTERS, conversationState as rowState, isExpired, requestText, clearSentDraft, conversationThreads, peerConversationSessions, conversationUnreadCount, supportsPeerConversationHistory } from '../lib/conversations.mjs';
 import { homeCopy } from '../components/demo/homeCopy.js';
 import SessionRequestModal from '../components/SessionRequestModal.jsx';
 import TimeSlotSelect from '../components/TimeSlotSelect.jsx';
@@ -158,6 +158,7 @@ export default function Conversations() {
   // One inbox row per person. Individual session records remain intact and are
   // rendered together inside the thread.
   const conversationList = useMemo(() => conversationThreads(sessions, user?.id), [sessions, user?.id]);
+  const peerHistoryAvailable = supportsPeerConversationHistory(sessions);
   const visibleSessions = useMemo(() => {
     const match = FILTERS.find(option => option.key === filter)?.match ?? (() => true);
     return conversationList.filter(session => match(rowState(session), session));
@@ -710,9 +711,9 @@ export default function Conversations() {
               <Avatar className="size-9"><AvatarFallback style={{ backgroundColor: STATE_FILL[rowState(selected)] }}>{initials(person?.name)}</AvatarFallback></Avatar>
               <div className="conversation-header-person"><strong>{person?.name}</strong><span>{selected.status === 'pending' && !isExpired(selected) && selected.isMentee ? t('conversations.requestSent') : stateLabel(selected, rowState(selected), t)}</span></div>
               <div className="conversation-header-actions">
-                <Button type="button" variant="ghost" size="icon" disabled={archiving} onClick={toggleArchive} aria-label={t(selected.conversation_archived ? 'conversations.restore' : 'conversations.archive')} title={t(selected.conversation_archived ? 'conversations.restore' : 'conversations.archive')}>
+                {peerHistoryAvailable && <Button type="button" variant="ghost" size="icon" disabled={archiving} onClick={toggleArchive} aria-label={t(selected.conversation_archived ? 'conversations.restore' : 'conversations.archive')} title={t(selected.conversation_archived ? 'conversations.restore' : 'conversations.archive')}>
                   {selected.conversation_archived ? <ArchiveRestore aria-hidden="true" /> : <Archive aria-hidden="true" />}
-                </Button>
+                </Button>}
                 <Button type="button" variant="ghost" size="icon" onClick={() => setOverviewOpen(true)} aria-label={t('conversations.requestDetails')} title={t('conversations.requestDetails')} aria-haspopup="dialog"><Info aria-hidden="true" /></Button>
               </div>
             </header>}

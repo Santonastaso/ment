@@ -165,7 +165,7 @@ function fixtureApi(state, ApiError) {
         if (body.thread_id && state.threadSession != null && state.threadSession !== row?.id) throw new ApiError('thread_already_linked', 400);
         if (!row) {
           const id = Math.max(2, ...state.sessions.map(session => session.id)) + 1;
-          row = { ...body, outbound_message: body.message, id, status: 'pending', mentor: state.peer, mentee: state.user, mentee_id: state.user.id, request_expires_at: new Date(Date.now() + 7 * 86400000).toISOString() };
+          row = { ...body, outbound_message: body.message, id, status: 'pending', mentor: state.peer, mentee: state.user, mentee_id: state.user.id, request_expires_at: new Date(Date.now() + 7 * 86400000).toISOString(), conversation_archived: false };
           state.sessions.push(row);
           state.messages[`/sessions/${id}/messages`] = [{ id: 1, sender_id: state.user.id, kind: 'request', body: body.message, created_at: new Date().toISOString() }];
         }
@@ -286,7 +286,7 @@ export const test = base.extend({
           { user_id: 'another-peer', role: 'member' },
         ] },
         groupProfiles: { [peer.id]: peer, 'another-peer': { id: 'another-peer', name: 'Another Member' } },
-        sessions: [1, 2].map(id => ({ id, status: 'scheduled', scheduled_at: '2026-01-01T12:00:00Z', title: `Meeting ${id}`, mentor_id: `peer-${id}`, mentee_id: user.id, mentor: { id: `peer-${id}`, name: `Peer ${id}` }, mentee: user })),
+        sessions: [1, 2].map(id => ({ id, status: 'scheduled', scheduled_at: '2026-01-01T12:00:00Z', title: `Meeting ${id}`, mentor_id: `peer-${id}`, mentee_id: user.id, mentor: { id: `peer-${id}`, name: `Peer ${id}` }, mentee: user, conversation_archived: false })),
       };
     }, { user, peer });
     let reactImport;

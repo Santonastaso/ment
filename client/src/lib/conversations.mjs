@@ -28,6 +28,10 @@ export function conversationPeerId(session, viewerId) {
   return session.mentor_id === viewerId ? session.mentee_id : session.mentor_id;
 }
 
+export function supportsPeerConversationHistory(sessions) {
+  return sessions.some(session => Object.prototype.hasOwnProperty.call(session, 'conversation_archived'));
+}
+
 function newestSessionsFirst(sessions) {
   return sessions.map((session, index) => ({ session, index, time: new Date(session.last_activity_at || session.created_at).getTime() }))
     .sort((a, b) => Number.isFinite(a.time) && Number.isFinite(b.time) && a.time !== b.time ? b.time - a.time : a.index - b.index)
@@ -35,12 +39,14 @@ function newestSessionsFirst(sessions) {
 }
 
 export function peerConversationSessions(sessions, session, viewerId) {
+  if (!supportsPeerConversationHistory(sessions)) return session ? [session] : [];
   const peerId = conversationPeerId(session, viewerId);
   if (!peerId) return [];
   return newestSessionsFirst(sessions.filter(item => conversationPeerId(item, viewerId) === peerId));
 }
 
 export function conversationThreads(sessions, viewerId) {
+  if (!supportsPeerConversationHistory(sessions)) return sessions;
   const seen = new Set();
   const threads = [];
   for (const session of newestSessionsFirst(sessions)) {
