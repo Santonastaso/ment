@@ -202,7 +202,7 @@ Confirmed and nearest terms steer **retrieval only** (`p_query`, and the floor's
 
 A request naming no subject and hitting nothing always gets one question, written by code from the network's departments if the model did not write one.
 
-Discovery now runs on `mistral-small-latest` by default (`FEATURE_MODEL_DEFAULTS` in `_shared/mistral.ts`); a `MISTRAL_MODEL_DISCOVERY_CLARIFY` / `_MATCH` secret still overrides it.
+Discovery clarification, matching, drafting and voice now run on `mistral-small-latest` by default (`FEATURE_MODEL_DEFAULTS` in `_shared/mistral.ts`). Feature-specific secrets can select another capable model, but a stale 3B override or fallback is rejected because it cannot reliably preserve conversational constraints. Successful effective models are recorded in `ai_runs`; rejected routing emits `mistral_model_rejected` without logging user text.
 
 ### Lookups belong in code
 

@@ -21,6 +21,6 @@ export default function CareerEntryFields({ value, onChange, required = true, de
     <Field label={t('profile.career.company')} value={value.company} onChange={event => change('company', event.target.value)} maxLength={160} />
     <div className="career-period"><span className="career-period-label">{t('profile.career.from')}</span><MonthYearPicker value={value.start_date} onChange={next => change('start_date', next)} /></div>
     <div className="career-period"><span className="career-period-label">{t('profile.career.to')} <em>{t('profile.career.toHint')}</em></span><MonthYearPicker value={value.end_date} onChange={next => change('end_date', next)} /></div>
-    <Field label={descriptionLabel || t('profile.career.description')} as="textarea" value={value.description || ''} onChange={event => change('description', event.target.value)} className="sm:col-span-2 lg:col-span-3" maxLength={2000} />
+    <Field label={descriptionLabel || t('profile.career.description')} as="textarea" autoGrow value={value.description || ''} onChange={event => change('description', event.target.value)} className="sm:col-span-2 lg:col-span-3" maxLength={2000} />
   </div>;
 }

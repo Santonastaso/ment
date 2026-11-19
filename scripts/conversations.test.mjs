@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { conversationState, CONVERSATION_FILTERS, requestText, resumableSearch, clearSentDraft, canCompleteMeeting, meetingFeedback } from '../client/src/lib/conversations.mjs';
+import { conversationState, conversationListItems, CONVERSATION_FILTERS, requestText, resumableSearch, clearSentDraft, canCompleteMeeting, meetingFeedback, conversationThreads, peerConversationSessions, conversationUnreadCount, supportsPeerConversationHistory } from '../client/src/lib/conversations.mjs';
 
 const now = Date.parse('2026-10-01T12:00:00Z');
 test('Home and Messages use identical request and meeting states', () => {
@@ -20,6 +20,23 @@ test('sending clears only the original thread draft and never newer typing', () 
   assert.equal(drafts['session:1'], 'Send A');
 });
 
+test('the conversation list mixes active groups with direct chats by latest activity', () => {
+  const sessions = [
+    { id: 1, status: 'pending', isMentor: false, updated_at: '2026-10-03T10:00:00Z' },
+    { id: 2, status: 'completed', updated_at: '2026-10-01T10:00:00Z' },
+  ];
+  const groups = [
+    { id: 7, latest_message_at: '2026-10-04T10:00:00Z' },
+    { id: 8, created_at: '2026-10-02T10:00:00Z' },
+  ];
+
+  assert.deepEqual(conversationListItems(sessions, groups, 'all').map(item => `${item.kind}:${item.data.id}`), [
+    'group:7', 'session:1', 'group:8', 'session:2',
+  ]);
+  assert.deepEqual(conversationListItems(sessions, groups, 'groups').map(item => item.data.id), [7, 8]);
+  assert.deepEqual(conversationListItems(sessions, groups, 'waiting').map(item => item.data.id), [1]);
+});
+
 test('meeting feedback is private to the participant and completion is not re-stamped', () => {
   const meeting = { status: 'scheduled', scheduled_at: '2026-09-30', isMentor: true };
   assert.equal(canCompleteMeeting(meeting, now), true);
@@ -28,6 +45,24 @@ test('meeting feedback is private to the participant and completion is not re-st
   assert.equal(canCompleteMeeting({ ...meeting, status: 'pending' }, now), false);
   assert.deepEqual(meetingFeedback(meeting, ' Useful ', 4), { status: 'completed', mentor_reflection: 'Useful', mentor_rating: 4 });
   assert.deepEqual(meetingFeedback({ ...meeting, isMentor: false, viewer_completed: true }, '', null), { reflection: null, mentee_rating: null });
+});
+
+test('repeated mentoring sessions form one peer conversation', () => {
+  const sessions = [
+    { id: 1, mentor_id: 'mentor', mentee_id: 'viewer', created_at: '2026-09-01', last_activity_at: '2026-09-02', conversation_archived: false },
+    { id: 2, mentor_id: 'mentor', mentee_id: 'viewer', created_at: '2026-10-01', last_activity_at: '2026-10-02', conversation_archived: false },
+    { id: 3, mentor_id: 'other', mentee_id: 'viewer', created_at: '2026-09-15', last_activity_at: '2026-09-16', conversation_archived: false },
+  ];
+  assert.deepEqual(conversationThreads(sessions, 'viewer').map(session => session.id), [2, 3]);
+  assert.deepEqual(peerConversationSessions(sessions, sessions[0], 'viewer').map(session => session.id), [2, 1]);
+  assert.equal(conversationUnreadCount(peerConversationSessions(sessions, sessions[0], 'viewer'), { 1: 2, 2: 3 }), 5);
+});
+
+test('the old session API remains usable while the migration rolls out', () => {
+  const sessions = [{ id: 1, mentor_id: 'mentor', mentee_id: 'viewer' }, { id: 2, mentor_id: 'mentor', mentee_id: 'viewer' }];
+  assert.equal(supportsPeerConversationHistory(sessions), false);
+  assert.deepEqual(conversationThreads(sessions, 'viewer'), sessions);
+  assert.deepEqual(peerConversationSessions(sessions, sessions[0], 'viewer'), [sessions[0]]);
 });
 test('internal criteria stay private and only unfinished searches resume', () => {
   assert.equal(requestText('{"role":"finance"}', 'Finance advice'), 'Finance advice');

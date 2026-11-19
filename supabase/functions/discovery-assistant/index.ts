@@ -8,7 +8,7 @@ import { departmentChoices, frameChat, frameExhausted, frameNarrow, frameNoMatch
 import { keepsFacts, repeats, sameOpening, VOICE_PROMPT, withoutRepeats } from './voice.ts';
 import { NO_PARTS, narrowStepwise, negatedWords, readParts, withoutExcluded, type Filter, type Parts } from './request.ts';
 
-const PROMPT_VERSION = 'discovery-v25';
+const PROMPT_VERSION = 'discovery-v26';
 
 // Written here rather than by the model, so the gap names the place the user
 // actually typed instead of drifting to a vaguer sentence about seniority.
@@ -91,6 +91,9 @@ type ClarificationResult = {
   matching_terms?: string[];
   nearest_terms?: string[];
   subject_label?: string;
+  // How the latest message relates to the people already shown. Mistral reads
+  // this from the conversation; fixed phrase lists only stand in when it is missing.
+  follow_up?: string;
   parts?: unknown;
 };
 
@@ -404,6 +407,25 @@ function preferredDepartments(departments: string[]) {
 function shownLocations(turn: Record<string, unknown> | undefined) {
   const matches = Array.isArray(turn?.matches) ? turn?.matches as Array<{ location?: string }> : [];
   return [...new Set(matches.map((match) => cleanText(match?.location, 80)).filter(Boolean))].slice(0, 2);
+}
+
+// The model needs the search state behind the cards, not the identities on
+// them. Keep this deliberately small and identity-free: it is enough to tell
+// whether a follow-up changes a constraint, asks for more, or starts over.
+function shownContext(turns: Array<Record<string, unknown>>) {
+  const shown = [...turns].reverse().find((turn) => turn.role === 'assistant' && turn.kind === 'matches');
+  if (!shown) return null;
+  const excluded = Array.isArray(shown.exclude_locations)
+    ? shown.exclude_locations.map((place) => cleanText(place, 80)).filter(Boolean).slice(0, 20)
+    : [];
+  return {
+    search_request: cleanText(shown.search_request, 300),
+    department: cleanText(shown.department, 80),
+    location: cleanText(shown.location, 80),
+    company: cleanText(shown.company, 80),
+    exclude_locations: excluded,
+    result_count: Array.isArray(shown.matches) ? shown.matches.length : 0,
+  };
 }
 
 // Wording only: when nothing was extracted, name the user's own unfamiliar
@@ -899,6 +921,10 @@ async function handle(req: Request): Promise<Response> {
     const conversation = conversationFromTurns(priorTurns, query)
       .map((turn) => (turn.role === 'user' ? { ...turn, content: expandAbbreviations(turn.content) } : turn));
     const hasClarified = priorTurns.some((turn) => turn.role === 'assistant' && turn.kind === 'clarification');
+    // The search behind the people last shown, without names or ids, so
+    // Mistral can tell a changed constraint from a new request.
+    const shownState = shownContext(priorTurns);
+    const shownSearch = shownState?.search_request || '';
     answeredClarification = hasClarified;
     const startedAt = Date.now();
     try {
@@ -949,6 +975,7 @@ Do not broaden explicit professions or domains into adjacent ones. For example, 
 "named_location": the city, country or region the user wants people in, copied exactly as they wrote it, or empty. Never a place they ruled out. Copy it even when you believe nobody is there; the application does that check. Words that only look like places ("in realtà", "this is not what I want") are not places.
 "ruled_out_places": every place the user does NOT want people in ("not in London", "pas en France", "tranne Milano", "outside the UK"), each copied exactly as they wrote it. Read every turn: a place ruled out earlier stays ruled out until the user asks for it or says anywhere is fine. Saying of the people shown that they are not somewhere ("they are not in China") is a complaint that they wanted that place, not a ruling out. [] when none.
 "exclude_locations": every entry of coverage.locations that lies in a place listed in ruled_out_places, copied exactly from the coverage: the city itself, or each listed city inside a ruled-out country or region. [] when none.
+"follow_up": only when "shown_context" is not null, meaning people were already shown for that search: how the latest message relates to it. "narrow" when it keeps the same subject and adds, changes or removes a detail, such as a place, seniority, experience or employer, or asks for close or similar matches ("any close match in Europe?", "someone more senior?", "anywhere is fine"). "more" when it asks for more or other people for the same search. "reject" when it says the people shown are wrong. "new" when it names a different field, role or skill to look for. Words that describe the search itself, such as close match, similar, options or trends, are never a new subject. Empty when shown_context is null.
 "subject_label": a short, natural phrase in the reply language that completes the sentence "I couldn't find ___ here", describing what the user is looking for in their own terms -- for example "anyone in construction" or "a CFO who is still a student". At most eight words. Never add a place, language or detail they did not give. Empty when they named nothing.
 "parts": the request split into what they want ONE person to be. Copy each value from the user's own words, in their language:
   "role": the job or title they asked for, or empty.
@@ -962,8 +989,9 @@ Do not broaden explicit professions or domains into adjacent ones. For example, 
 The language the user writes in is never a place: French words do not mean France.
 Every term you return is checked against the coverage and anything not found there is discarded, so copy exactly and never invent one. The examples in these instructions illustrate shape only: never reuse their wording or their subject in anything you return.
 
-Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one concise question or empty string","search_request":"concise grounded request or empty string","no_match_reason":"one plain sentence, or empty string","named_subject":"as written, or empty string","matching_terms":["exact coverage term"],"nearest_terms":["exact coverage term"],"named_location":"as written, or empty string","ruled_out_places":["as written"],"exclude_locations":["exact coverage location"],"subject_label":"short phrase, or empty string","parts":{"role":"","seniority":"","field":"","department":"","company":"","skills":[],"exclude":[],"conflict":[]}}.`,
-        user: JSON.stringify({ conversation, coverage, answered: hasClarified, lexical_hits: hits }),
+Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one concise question or empty string","search_request":"concise grounded request or empty string","no_match_reason":"one plain sentence, or empty string","named_subject":"as written, or empty string","matching_terms":["exact coverage term"],"nearest_terms":["exact coverage term"],"named_location":"as written, or empty string","ruled_out_places":["as written"],"exclude_locations":["exact coverage location"],"subject_label":"short phrase, or empty string","follow_up":"narrow"|"more"|"reject"|"new"|"","parts":{"role":"","seniority":"","field":"","department":"","company":"","skills":[],"exclude":[],"conflict":[]}}.`,
+        user: JSON.stringify({ conversation, coverage, answered: hasClarified, lexical_hits: hits,
+          shown_search: shownSearch || null, shown_context: shownState }),
         temperature: 0.1,
         maxTokens: 800,
       }).catch((error) => {
@@ -1118,7 +1146,14 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
       const sameTopic = (word: string) => topicWords.some((known) => known === word
         || (known.length >= 5 && word.length >= 5 && known.slice(0, 5) === word.slice(0, 5)));
       const switching = SWITCH_PATTERN.test(latestRaw.toLowerCase());
-      const topicShift = latestSubjectWords.length > 0 && (
+      const followUpValue = cleanText(result.value?.follow_up, 10).toLowerCase();
+      const modelFollowUp = lastShown && ['narrow', 'more', 'reject', 'new'].includes(followUpValue) ? followUpValue : '';
+      // The code's own rules come first. Mistral's reading of the follow-up is
+      // used only for a message none of those rules recognises, such as
+      // "any close match in Europe?": it fills a gap, it does not take over.
+      const phraseRecognised = Boolean(messageIntent(latestRaw, Boolean(lastShown), false));
+      const contextOnly = modelFollowUp && !phraseRecognised && !switching ? modelFollowUp : '';
+      const topicShift = contextOnly ? contextOnly === 'new' : latestSubjectWords.length > 0 && (
         (Boolean(lastShown) && !answeringOurQuestion && latestSubjectWords.some((word) => !sameTopic(word)))
         || (answeringOurQuestion && switching));
       const groundedInLatest = (value: string) => contentWords(value).some((word) => latestContent.includes(word));
@@ -1224,7 +1259,10 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
         return answer({ matches: [], clarification: reply, suggestions: choices, thread_id: threadId });
       }
       const namesSomething = meaningfulLatest.length > 0 || namesPlace;
-      const detected = messageIntent(latestRaw, Boolean(lastShown), namesSomething);
+      const patternIntent = messageIntent(latestRaw, Boolean(lastShown), namesSomething);
+      // A recognised phrase decides; Mistral's reading fills in only when none did.
+      const MODEL_INTENT: Record<string, string> = { narrow: 'refine', more: 'more', reject: 'reject', new: '' };
+      const detected = patternIntent || (contextOnly ? MODEL_INTENT[contextOnly] : '');
       // Pushback stays pushback; any other follow-up naming a new subject is a
       // fresh search rather than a refinement of the old one.
       // Pushback about the place is the earlier request asked again, not a
@@ -1275,7 +1313,7 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
           followUp = 'more';
           requiredDepartment = previousDepartment;
           companyFilter = cleanText(lastShown.company, 60);
-          if (!namedLocationFilter) {
+          if (!namedLocationFilter && !ANYWHERE.test(latestOriginal)) {
             namedLocationFilter = cleanText(lastShown.location, 80);
             locationCities = placeCities(namedLocationFilter, knownLocations);
           }
@@ -1288,7 +1326,7 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
           companyFilter = parts.company || cleanText(lastShown.company, 60);
           const textPlace = knownLocations.find((place) => wordsOf(place).every((word) => latestContent.includes(word)));
           if (!namedLocationFilter && textPlace) namedLocationFilter = textPlace;
-          if (!namedLocationFilter && !locationMissing) {
+          if (!namedLocationFilter && !locationMissing && !ANYWHERE.test(latestOriginal)) {
             namedLocationFilter = cleanText(lastShown.location, 80);
             locationCities = placeCities(namedLocationFilter, knownLocations);
           }
@@ -1296,6 +1334,13 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
         }
         anchorTerms = requiredDepartment ? [requiredDepartment] : [];
         constraintsOnly = false;
+        // The development payload must describe the effective search after
+        // carrying forward its subject and changing or removing a constraint.
+        understood = {
+          ...parts,
+          department: requiredDepartment,
+          location: ANYWHERE.test(latestOriginal) ? '' : namedLocation || namedLocationFilter,
+        };
       }
 
       // "Show me the closest" under a scoping question: run exactly the search
@@ -1712,6 +1757,7 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
         kind: 'matches', content: message, framed: true, search_request: requestForMatch,
         matches: refineFallback, nearest: true, department: requiredDepartment,
         location: locationFilterApplied ? namedLocationFilter : '',
+        exclude_locations: leaveOut,
       });
       return answer({ matches: refineFallback, clarification: '', nearest: true, message, no_match_reason: message, resolved_request: requestForMatch, thread_id: threadId, model: result.model });
     }
@@ -1759,6 +1805,7 @@ Confidence must be at least 0.75 for "matches" and at least 0.35 for "nearest", 
       department: requiredDepartment,
       location: locationFilterApplied ? namedLocationFilter : '',
       company: narrowed.active.includes('company') ? companyFilter : '',
+      exclude_locations: leaveOut,
       search_request: requestForMatch,
       matches: shown,
       nearest: isNear,
