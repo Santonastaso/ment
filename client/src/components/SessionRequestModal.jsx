@@ -5,16 +5,16 @@ import { useEffect, useRef } from 'react';
 import { homeCopy } from './demo/homeCopy.js';
 import { useT } from '../i18n/index.jsx';
 import { Button } from './ui/button.jsx';
-import Portal from './ui/portal.jsx';
-import { useModalA11y } from '../lib/useModalA11y.js';
+import { Avatar, AvatarFallback } from './ui/avatar.jsx';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from './ui/dialog.jsx';
 import { ChevronDown, X } from 'lucide-react';
 import TimeSlotSelect from './TimeSlotSelect.jsx';
+import { errorMessage } from '../lib/errors.mjs';
 
 const TOTAL_STEPS = 4;
 
 export default function SessionRequestModal({ mentor, onClose, onSuccess, initialQuestion = '', initialIntent = 'one_off' }) {
   const { t, lang } = useT();
-  const dialogRef = useModalA11y(true);
   const copy = homeCopy(lang);
   const [step, setStep] = useState(1);
   const [selectedTopics, setSelectedTopics] = useState([]);
@@ -22,6 +22,7 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
   const [intent, setIntent] = useState(initialIntent === 'ongoing' ? 'ongoing' : 'one_off');
   const [draft, setDraft] = useState('');
   const [draftEdited, setDraftEdited] = useState(false);
+  const [draftGeneratedByAi, setDraftGeneratedByAi] = useState(false);
   const [requestTitle, setRequestTitle] = useState(initialQuestion.slice(0, 80));
   const [topicsOpen, setTopicsOpen] = useState(false);
   const idempotencyKey = useRef(crypto.randomUUID());
@@ -32,14 +33,6 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
   const [submitting, setSubmitting] = useState(false);
   const [generatingDraft, setGeneratingDraft] = useState(false);
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    function handleEscape(event) {
-      if (event.key === 'Escape' && !submitting) onClose();
-    }
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
-  }, [onClose, submitting]);
 
   useEffect(() => {
     bodyRef.current?.scrollTo({ top: 0 });
@@ -68,10 +61,13 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
       setGeneratingDraft(true);
       try {
         const { data } = await api.post('/discovery/draft', { query: focus, person_id: mentor.id, variant: 0 });
-        setDraft(data.draft || '');
+        const generated = data.draft || '';
+        setDraft(generated);
+        setDraftGeneratedByAi(Boolean(generated));
       } catch {
         setDraft(focus);
         setDraftEdited(true);
+        setDraftGeneratedByAi(false);
         setError('');
       } finally {
         setGeneratingDraft(false);
@@ -156,7 +152,7 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
       const response = await api.post('/sessions', submittedPayload.current);
       onSuccess?.(response.data);
     } catch (e) {
-      setError(t('components.sessionRequest.errorGeneric'));
+      setError(errorMessage(e, t, t('components.sessionRequest.errorGeneric')));
       if (e.response?.status >= 400 && e.response?.status < 500) submittedPayload.current = null;
       submitLock.current = false;
     } finally {
@@ -164,19 +160,31 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
     }
   }
 
+  const mentorInitials = String(mentor?.name || '').split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || '?';
+  const mentorDetail = [mentor?.job_title || mentor?.current_role, mentor?.current_company].filter(Boolean).join(' · ');
+
   return (
-    <Portal>
-    <div className="app-modal-overlay session-request-backdrop bg-black/20">
-      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="session-request-title" className="app-modal-panel session-request-modal flex w-full max-w-[560px] flex-col overflow-hidden rounded-[var(--dialog-radius)] border border-[var(--border)] bg-card [box-shadow:var(--shadow-overlay)]">
+    <Dialog open onOpenChange={open => { if (!open && !submitting) onClose(); }}>
+      <DialogContent showCloseButton={false} className="app-modal-panel flex max-h-[min(760px,calc(100vh-2rem))] w-full max-w-[560px] flex-col gap-0 overflow-hidden p-0">
         <div className="flex-shrink-0 px-6 py-5">
           <div className="flex items-start justify-between gap-4">
-            <h2 id="session-request-title" className="text-xl font-semibold tracking-[-0.02em] text-foreground">{t('components.sessionRequest.title')}</h2>
+            <div>
+              <DialogTitle id="session-request-title" className="text-xl font-semibold tracking-[-0.02em] text-foreground">{t('components.sessionRequest.title')}</DialogTitle>
+              <DialogDescription className="mt-1 text-base">{stepTitle}</DialogDescription>
+            </div>
             <div className="flex shrink-0 items-center gap-3">
-              <span className="text-sm font-medium tabular-nums text-muted-foreground">{step} / {TOTAL_STEPS}</span>
+              <span className="text-sm font-medium tabular-nums text-muted-foreground" aria-label={t('components.sessionRequest.stepProgress', { step, total: TOTAL_STEPS })}>{step} / {TOTAL_STEPS}</span>
               <Button type="button" variant="ghost" size="icon-sm" disabled={submitting} aria-label={copy.close} title={copy.close} onClick={onClose}><X aria-hidden="true" /></Button>
             </div>
           </div>
-          <p className="mt-1 text-base text-muted-foreground">{stepTitle}</p>
+          <div className="mt-4 flex items-center gap-3 border-t border-[var(--border-subtle)] pt-4">
+            <Avatar className="size-9"><AvatarFallback>{mentorInitials}</AvatarFallback></Avatar>
+            <div className="min-w-0">
+              <span className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('components.sessionRequest.recipient')}</span>
+              <strong className="block truncate text-sm">{mentor?.name}</strong>
+              {mentorDetail && <span className="block truncate text-xs text-muted-foreground">{mentorDetail}</span>}
+            </div>
+          </div>
         </div>
 
         <div key={step} ref={bodyRef} className="session-modal-scroll session-step-content min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-5">
@@ -284,7 +292,8 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
           {step === 4 && (
             <div className="space-y-5 text-sm">
               <label className="block font-semibold">{t('components.sessionRequest.requestTitle')}<input className="input mt-1 font-normal" value={requestTitle} maxLength={120} disabled={submitting || !!submittedPayload.current} onChange={e => setRequestTitle(e.target.value)} /></label>
-              <label className="block font-semibold">{copy.message}<textarea className="input mt-1 min-h-40 resize-none font-normal" value={draft} maxLength={6000} disabled={submitting || !!submittedPayload.current} onChange={e => { setDraft(e.target.value); setDraftEdited(true); }} /></label>
+              <label className="block font-semibold">{copy.message}<textarea className="input mt-1 min-h-40 resize-none font-normal" value={draft} maxLength={6000} disabled={submitting || !!submittedPayload.current} aria-describedby={draftGeneratedByAi ? 'session-request-ai-note' : undefined} onChange={e => { setDraft(e.target.value); setDraftEdited(true); }} /></label>
+              {draftGeneratedByAi && <p id="session-request-ai-note" className="text-xs text-muted-foreground">{t('components.sessionRequest.draftAiNotice')}</p>}
               <section className="space-y-2" aria-label={t('components.sessionRequest.reviewTopics')}>
                 <Button
                   type="button"
@@ -354,8 +363,7 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
             </>
           )}
         </div>
-      </div>
-    </div>
-    </Portal>
+      </DialogContent>
+    </Dialog>
   );
 }

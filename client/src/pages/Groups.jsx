@@ -54,6 +54,7 @@ export default function Groups() {
     });
   }
   const isMine = group => group.joined || group.is_owner;
+  const isManager = group => Boolean(group?.is_manager ?? group?.is_owner);
   const shownGroups = groups.filter(group => (tab === 'mine') === Boolean(isMine(group)));
 
   async function load() {
@@ -81,7 +82,7 @@ export default function Groups() {
 
   useEffect(() => {
     const group = groups.find(item => item.id === Number(params.get('manage')));
-    if (!group?.is_owner) return;
+    if (!isManager(group)) return;
     setManageTarget(group);
     setMemberSearch('');
     setManageError('');
@@ -116,7 +117,7 @@ export default function Groups() {
     setError('');
     try {
       const { data: created } = await api.post('/groups', { name: name.trim(), description: description.trim() });
-      setManageTarget({ id: created.id, name: name.trim() });
+      setManageTarget({ id: created.id, name: name.trim(), is_owner: true, is_manager: true });
       setTab('mine');
       setMemberSearch('');
       setName('');
@@ -196,6 +197,20 @@ export default function Groups() {
     finally { setManageSaving(false); }
   }
 
+  async function changeAdmin(member, admin) {
+    if (!manageTarget?.is_owner || manageSaving) return;
+    setManageSaving(true); setManageError('');
+    try {
+      const { error: changeError } = await supabase.rpc('manage_group_admin', {
+        p_group_id: manageTarget.id, p_user_id: member.id, p_admin: admin,
+      });
+      if (changeError) throw changeError;
+      setRosterRevision(current => current + 1);
+      await load();
+    } catch { setManageError(t('groups.error.save')); }
+    finally { setManageSaving(false); }
+  }
+
   return (
     <PageShell className="gap-0">
       <h1 className="sr-only">{t('groups.pageTitle')}</h1>
@@ -247,8 +262,8 @@ export default function Groups() {
                   </span>
 
                   <span className="person-row-actions">
-                    {group.is_owner && group.pending_count > 0 && <Button type="button" variant="ghost" size="sm" onClick={() => openReview(group)}>{t('groups.requests', { count: group.pending_count })}</Button>}
-                    {group.is_owner && <Button type="button" variant="ghost" size="sm" onClick={() => { setManageTarget(group); setMemberSearch(''); setManageError(''); }}>{t('groups.manageMembers')}</Button>}
+                    {isManager(group) && group.pending_count > 0 && <Button type="button" variant="ghost" size="sm" onClick={() => openReview(group)}>{t('groups.requests', { count: group.pending_count })}</Button>}
+                    {isManager(group) && <Button type="button" variant="ghost" size="sm" onClick={() => { setManageTarget(group); setMemberSearch(''); setManageError(''); }}>{t('groups.manageMembers')}</Button>}
                     {group.joined && (
                       <Button variant="ghost" size="sm"
                         type="button"
@@ -333,7 +348,13 @@ export default function Groups() {
             </section>}
             <section className="grid max-h-64 gap-2 overflow-y-auto" aria-label={t('groups.members', { count: roster.members.length })}>
               <p className="label-meta">{t('groups.members', { count: roster.members.length })}</p>
-              {roster.members.map(member => <div key={member.id} className="flex items-center justify-between gap-3 border-b py-2"><span>{member.name}{member.is_owner && <small className="ml-2 text-muted-foreground">{t('groups.owner')}</small>}</span>{!member.is_owner && <Button type="button" variant="ghost" size="sm" disabled={manageSaving} onClick={() => changeMember(member, false)}>{t('groups.removeMember')}</Button>}</div>)}
+              {roster.members.map(member => <div key={member.id} className="flex items-center justify-between gap-3 border-b py-2">
+                <span>{member.name}{member.is_owner && <small className="ml-2 text-muted-foreground">{t('groups.owner')}</small>}{member.is_admin && <small className="ml-2 text-muted-foreground">{t('groups.admin')}</small>}</span>
+                {!member.is_owner && <span className="flex items-center gap-1">
+                  {roster.can_manage_admins && <Button type="button" variant="ghost" size="sm" disabled={manageSaving} onClick={() => changeAdmin(member, !member.is_admin)}>{t(member.is_admin ? 'groups.removeAdmin' : 'groups.makeAdmin')}</Button>}
+                  {(!member.is_admin || roster.can_manage_admins) && <Button type="button" variant="ghost" size="sm" disabled={manageSaving} onClick={() => changeMember(member, false)}>{t('groups.removeMember')}</Button>}
+                </span>}
+              </div>)}
             </section>
           </>}
           {manageError && <p role="alert" className="text-sm text-destructive">{manageError}</p>}

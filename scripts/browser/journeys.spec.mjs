@@ -48,6 +48,7 @@ test('invited member signs in, changes temporary password, imports CV, and finis
     };
     window.fixture.setUser(null);
   });
+  await page.getByRole('link', { name: 'Sign in' }).first().click();
   await expect(page).toHaveURL(/\/login$/);
   await page.getByRole('textbox', { name: 'Email' }).fill('invited@example.test');
   await page.getByLabel('Password', { exact: true }).fill('temporary-password-2026');
@@ -124,6 +125,7 @@ test('a saved password with failed reauthentication tells the member to sign in 
     window.fixture.failReauth = true;
     window.fixture.setUser(null);
   });
+  await page.getByRole('link', { name: 'Sign in' }).first().click();
   await page.getByRole('textbox', { name: 'Email' }).fill('invited@example.test');
   await page.getByLabel('Password', { exact: true }).fill('temporary-password-2026');
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
@@ -138,6 +140,7 @@ test('a saved password with failed reauthentication tells the member to sign in 
 test('password reset stays on Ment and accepts a recovery link', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => window.fixture.setUser(null));
+  await page.getByRole('link', { name: 'Sign in' }).first().click();
   await expect(page).toHaveURL(/\/login$/);
   await page.getByRole('textbox', { name: 'Email' }).fill('student@example.test');
   await page.getByRole('button', { name: 'Forgot password?' }).click();
@@ -213,6 +216,38 @@ test('Messages keeps the list and chat layout steady while switching conversatio
   await page.evaluate(() => window.fixture.pendingLoads.splice(0).forEach(resolve => resolve()));
 });
 
+test('repeated sessions stay in one restorable conversation', async ({ page }) => {
+  await page.goto('/groups');
+  await page.evaluate(() => {
+    const current = window.fixture.sessions.find(session => session.id === 1);
+    Object.assign(current, { created_at: '2026-11-10T10:00:00Z', last_activity_at: '2026-11-10T10:30:00Z' });
+    window.fixture.sessions.push({
+      ...current,
+      id: 3,
+      title: 'Earlier mentoring request',
+      status: 'completed',
+      viewer_completed: true,
+      created_at: '2026-10-10T10:00:00Z',
+      last_activity_at: '2026-10-10T10:30:00Z',
+    });
+    window.fixture.messages['/sessions/1/messages'] = [{ id: 11, session_id: 1, sender_id: 'viewer', kind: 'message', body: 'Current session', created_at: '2026-11-10T10:30:00Z' }];
+    window.fixture.messages['/sessions/3/messages'] = [{ id: 9, session_id: 3, sender_id: 'peer-1', kind: 'message', body: 'Earlier session', created_at: '2026-10-10T10:30:00Z' }];
+  });
+
+  await page.locator('nav').getByRole('link', { name: /^Messages/ }).click();
+  await expect(page.locator('.conversation-list-item')).toHaveCount(3);
+  await expect(page.locator('.conversation-request-card')).toHaveCount(2);
+  await expect(page.getByText('Earlier session', { exact: true })).toBeVisible();
+  await expect(page.locator('.conversation-message').getByText('Current session', { exact: true })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Archive conversation' }).click();
+  await expect(page).toHaveURL(/filter=archived/);
+  await expect(page.locator('.conversation-list-item').filter({ hasText: 'Peer 1' })).toBeVisible();
+  await page.locator('.conversation-list-item').filter({ hasText: 'Peer 1' }).click();
+  await page.getByRole('button', { name: 'Restore conversation' }).click();
+  await expect(page.getByRole('button', { name: 'Archive conversation' })).toBeVisible();
+});
+
 test('Home greeting stays static', async ({ page }) => {
   await page.clock.install();
   await page.goto('/');
@@ -258,6 +293,51 @@ test('profile overview shows saved skills before the first session and CV can up
   const saved = await page.evaluate(() => window.fixture.calls.find(call => call.path === '/users/me/onboarding').body);
   expect(saved.can_teach[0].skill).toBe('Architecture');
   expect(saved.career[0].role).toBe('Engineer');
+});
+
+test('Experience descriptions grow with their content without a resize handle or inner scrollbar', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => {
+    window.fixture.profile = {
+      ...window.fixture.user,
+      skills: [],
+      career: [{ id: 7, role: 'Analyst', department: 'Finance', company: 'Ment', description: 'A short description.' }],
+    };
+  });
+  await page.locator('.app-sidebar').getByRole('link', { name: 'My profile' }).click();
+  await page.getByRole('tab', { name: 'Experience' }).click();
+  await page.getByRole('button', { name: 'Edit' }).click();
+  const description = page.locator('.career-entry-form textarea');
+  await description.fill(Array.from({ length: 8 }, (_, index) => `Line ${index + 1}: a detailed account of the work and its impact.`).join('\n'));
+  const box = await description.evaluate(element => ({
+    height: element.getBoundingClientRect().height,
+    scrollHeight: element.scrollHeight,
+    overflowY: getComputedStyle(element).overflowY,
+    resize: getComputedStyle(element).resize,
+  }));
+  expect(box.height).toBeGreaterThanOrEqual(box.scrollHeight);
+  expect(box.overflowY).toBe('hidden');
+  expect(box.resize).toBe('none');
+});
+
+test('Messages mixes active groups into recent conversations and keeps Italian filters even', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => {
+    window.fixture.sessions[0].updated_at = '2026-11-15T10:00:00Z';
+    window.fixture.sessions[1].updated_at = '2026-11-13T10:00:00Z';
+    window.fixture.groups[0].latest_message_at = '2026-11-16T10:00:00Z';
+  });
+  await page.locator('.app-sidebar a[href="/conversations"]').click();
+  await expect(page.locator('.conversation-list-item')).toHaveCount(3);
+  const names = await page.locator('.conversation-list-item strong').allTextContents();
+  expect(names.slice(0, 3)).toEqual(['Test Group', 'Peer 1', 'Peer 2']);
+  await page.locator('.app-sidebar').getByRole('button', { name: 'Viewer Student' }).click();
+  await page.getByTestId('lang-it').click();
+  const widths = await page.locator('.conversation-filters button').evaluateAll(buttons =>
+    buttons.map(button => Math.round(button.getBoundingClientRect().width)));
+  expect(new Set(widths).size).toBe(1);
+  await expect(page.getByRole('button', { name: /Da gestire/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /In programma/ })).toBeVisible();
 });
 
 test('Messages rail moves smoothly and compact menus remain usable', async ({ page }) => {
@@ -614,6 +694,8 @@ test('a proposed time is checked again before sending a request', async ({ page 
   await page.getByRole('button', { name: 'Request session' }).first().click();
   const dialog = page.getByRole('dialog', { name: 'Request session' });
   await expect(dialog.getByText('1 / 4')).toBeVisible();
+  await expect(dialog.getByText('Peer Mentor', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('To', { exact: true }).locator('..')).toContainText('Financial Analyst');
   await expect(dialog.getByText('Availability and request limits are checked again when you send.')).toHaveCount(0);
   await expect(dialog.getByText(/Pick one or more topics from .*strengths/)).toHaveCount(0);
   await dialog.getByRole('button', { name: 'Skip' }).click();
@@ -631,13 +713,31 @@ test('a proposed time is checked again before sending a request', async ({ page 
   expect((await timeField.boundingBox()).width).toBeLessThan(200);
   await dialog.getByRole('button', { name: 'Review request' }).click();
   await expect(dialog.getByText('Review your request')).toBeVisible();
-  await expect(dialog.getByText('with Bob Taylor · Engineering')).toHaveCount(0);
+  await expect(dialog.getByText('Drafted with AI. Review and edit it before sending.')).toBeVisible();
   const now = await page.evaluate(() => Date.now());
   await page.clock.setFixedTime(new Date(now + 40 * 60 * 1000));
   await dialog.getByRole('button', { name: 'Confirm and send' }).click();
   await expect(dialog.getByRole('alert')).toHaveText('Choose a date and time at least one hour from now.');
   await expect(dialog.getByText('3 / 4')).toBeVisible();
   expect(await page.evaluate(() => window.fixture.calls.some(call => call.method === 'post' && call.path === '/sessions'))).toBe(false);
+});
+
+test('the Italian request flow uses clear meeting language and discloses its AI draft', async ({ page }) => {
+  await page.goto('/explorer');
+  await page.locator('.app-sidebar').getByRole('button', { name: 'Viewer Student' }).click();
+  await page.getByTestId('lang-it').click();
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Richiedi un incontro' }).first().click();
+  const dialog = page.getByRole('dialog', { name: 'Richiedi un incontro' });
+  await expect(dialog.getByLabel('Passaggio 1 di 4')).toBeVisible();
+  await expect(dialog.getByText('Peer Mentor', { exact: true })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Continua senza selezionare' }).click();
+  await expect(dialog.getByText('Qual è la tua domanda?')).toBeVisible();
+  await dialog.getByRole('textbox').fill('Come posso prepararmi per un colloquio?');
+  await dialog.getByRole('button', { name: 'Avanti' }).click();
+  await dialog.getByRole('button', { name: 'Controlla la richiesta' }).click();
+  await expect(dialog.getByText('Bozza generata con l’IA. Rileggila e modificala prima dell’invio.')).toBeVisible();
+  await expect(dialog.getByText('La richiesta verrà inviata solo dopo la conferma.')).toBeVisible();
 });
 
 test('Quick reflection opens a card without shifting the profile and preserves drafts', async ({ page }) => {
@@ -1049,10 +1149,7 @@ test('onboarding to discovery, request, acceptance, chat and meeting', async ({ 
   await dialog.getByTestId('meeting-benefit').getByRole('button', { name: 'Yes' }).click();
   await dialog.getByRole('button', { name: 'Save', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.fixture.benefits)).toEqual([{ path: '/sessions/3/benefit', answer: 'yes' }]);
-  // Marking a meeting complete offers the check-in that updates skills.
-  await expect(dialog.getByText('Update your skills?')).toBeVisible();
-  await expect(dialog.getByRole('button', { name: 'Start check-in' })).toBeVisible();
-  await dialog.getByRole('button', { name: 'Not now' }).click();
+  // Meeting feedback closes cleanly. The separate weekly check-in remains optional in Profile.
   await expect(dialog).toBeHidden();
   await page.getByRole('button', { name: 'Edit', exact: true }).click();
   await expect(dialog.getByRole('textbox')).toHaveValue('Useful conversation');
@@ -1599,7 +1696,8 @@ test('removing a long skill keeps the popup footer usable on a phone', async ({ 
 test('the landing page carries no unexplained folio labels', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => window.fixture.setUser(null));
-  await page.goto('/welcome');
+  await page.goto('/');
+  await expect(page).toHaveURL(new URL('/', page.url()).href);
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   await expect(page.getByText(/MENT \/ 0\d/)).toHaveCount(0);
   await expect(page.locator('.landing-hero-index, .landing-preview-folio')).toHaveCount(0);

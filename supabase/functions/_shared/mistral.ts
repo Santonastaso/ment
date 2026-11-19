@@ -24,9 +24,13 @@ export class AiProviderError extends Error {
 const FEATURE_MODEL_DEFAULTS: Record<string, string> = {
   discovery_clarify: 'mistral-small-latest',
   discovery_match: 'mistral-small-latest',
+  discovery_draft: 'mistral-small-latest',
   discovery_voice: 'mistral-small-latest',
   profile_ingest: 'mistral-small-latest',
 };
+
+const isDiscoveryFeature = (feature?: string) => Boolean(feature?.startsWith('discovery_'));
+const isThreeBModel = (model: string) => /(?:^|[-_])3b(?:[-_]|$)/i.test(model);
 
 function configuration(feature?: string) {
   const enabled = (Deno.env.get('AI_PROCESSING_ENABLED') || '').toLowerCase() === 'true';
@@ -34,11 +38,28 @@ function configuration(feature?: string) {
   const featureKey = feature ? `MISTRAL_MODEL_${feature.toUpperCase().replace(/[^A-Z0-9]+/g, '_')}` : '';
   const explicit = featureKey ? Deno.env.get(featureKey) || '' : '';
   const configured = Deno.env.get('MISTRAL_MODEL') || '';
-  const model = explicit || (feature && FEATURE_MODEL_DEFAULTS[feature]) || configured;
+  const featureDefault = (feature && FEATURE_MODEL_DEFAULTS[feature]) || '';
+  const requested = explicit || featureDefault || configured;
+  // Discovery clarification, ranking and writing all need contextual judgement.
+  // A 3B override caused real conversations to lose constraints and misread
+  // follow-ups, so an old project secret must not silently downgrade discovery.
+  const rejectedRequested = isDiscoveryFeature(feature) && isThreeBModel(requested);
+  const model = rejectedRequested && featureDefault ? featureDefault : requested;
   // A code default is a preference, not a requirement. If the account cannot
   // serve it -- quota, plan, outage -- fall back to the model already
-  // configured for this deployment rather than failing the user's request.
-  const fallbackModel = !explicit && configured && configured !== model ? configured : '';
+  // configured for this deployment, unless that would downgrade discovery to
+  // the 3B model that cannot reliably preserve conversational context.
+  const configuredFallback = !explicit && configured && configured !== model ? configured : '';
+  const rejectedFallback = isDiscoveryFeature(feature) && isThreeBModel(configuredFallback);
+  const fallbackModel = rejectedFallback ? '' : configuredFallback;
+  if (rejectedRequested || rejectedFallback) {
+    console.error(JSON.stringify({
+      event: 'mistral_model_rejected',
+      feature: feature || 'default',
+      rejected_model: rejectedRequested ? requested : configuredFallback,
+      using: model,
+    }));
+  }
   if (!enabled || !apiKey || !model) {
     console.error(JSON.stringify({
       event: 'mistral_configuration_error',

@@ -1,4 +1,4 @@
-import React, { useId } from 'react';
+import React, { useId, useLayoutEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { Dropdown } from '../DirectoryFilter.jsx';
 
@@ -20,19 +20,28 @@ export function Field({
   as = 'input',
   type = 'text',
   readOnly = false,
+  autoGrow = false,
   hint,
   className,
   children,
   ...props
 }) {
   const id = useId();
+  const textareaRef = useRef(null);
   const filled = as === 'select' || String(value ?? '').length > 0;
+
+  useLayoutEffect(() => {
+    if (as !== 'textarea' || !autoGrow || !textareaRef.current) return;
+    const textarea = textareaRef.current;
+    textarea.style.height = 'auto';
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  }, [as, autoGrow, value]);
 
   const control =
     as === 'select' ? (
       <Dropdown id={id} value={value} onChange={onChange} disabled={readOnly}>{children}</Dropdown>
     ) : as === 'textarea' ? (
-      <textarea id={id} value={value ?? ''} onChange={onChange} readOnly={readOnly} {...props} />
+      <textarea ref={textareaRef} id={id} value={value ?? ''} onChange={onChange} readOnly={readOnly} data-auto-grow={autoGrow || undefined} {...props} />
     ) : (
       <input id={id} type={type} value={value ?? ''} onChange={onChange} readOnly={readOnly} {...props} />
     );

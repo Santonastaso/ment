@@ -18,7 +18,7 @@ import { avatarTint } from '../../lib/avatarTint.js';
 const COPY = {
   en: {
     history: 'History', loadMore: 'Load more searches', retryHistory: 'Retry loading history', historyLoadError: 'We could not load your search history. Please try again.', archivedSearch: 'Archived', activeSearch: 'Active',
-    greeting: 'Hey {name}, would you like to meet today?', placeholder: 'Describe who could help', examples: ['Someone to help me prepare for consulting interviews', 'A finance professional who has worked in M&A', 'Alumni working in marketing in Paris'], resume: 'Resume search',
+    greeting: 'Hi {name}, what would you like help with today?', placeholder: 'Describe who could help', examples: ['Someone to help me prepare for consulting interviews', 'A finance professional who has worked in M&A', 'Alumni working in marketing in Paris'], resume: 'Resume search',
     finding: 'Having a look', chooseLead: 'Here are the people who fit.', chooseBold: 'Pick one and I will write the message.',
     why: 'Why this match', choose: 'Choose', selected: 'Selected', different: 'Ask for different people', browse: 'browse the full directory', notRight: 'Not quite right?', or: 'or',
     to: 'To', intro: "Here's a suggested intro. Edit anything, then send when it feels like you.", aiNote: 'Ment is an AI assistant and can make mistakes. You choose who to contact and what to send.', draftNote: 'Drafted by AI. Read it and make it yours before sending.', suggested: 'Suggested draft', send: 'Send request', regenerate: 'Regenerate',
@@ -26,7 +26,7 @@ const COPY = {
   },
   it: {
     history: 'Cronologia', loadMore: 'Carica altre ricerche', retryHistory: 'Riprova a caricare la cronologia', historyLoadError: 'Non è stato possibile caricare la cronologia delle ricerche. Riprova.', archivedSearch: 'Archiviata', activeSearch: 'Attiva',
-    greeting: 'Ehi {name}, ti va di incontrare qualcuno oggi?', placeholder: 'Descrivi chi potrebbe aiutarti', examples: ['Qualcuno che mi aiuti a preparare i colloqui in consulenza', 'Un professionista della finanza con esperienza in M&A', 'Alumni che lavorano nel marketing a Parigi'], resume: 'Riprendi la ricerca',
+    greeting: 'Ciao {name}, su cosa vorresti un aiuto oggi?', placeholder: 'Descrivi chi potrebbe aiutarti', examples: ['Qualcuno che mi aiuti a preparare i colloqui in consulenza', 'Un professionista della finanza con esperienza in M&A', 'Alumni che lavorano nel marketing a Parigi'], resume: 'Riprendi la ricerca',
     finding: 'Do un’occhiata', chooseLead: 'Ecco le persone adatte.', chooseBold: 'Scegline una e scrivo io il messaggio.',
     why: 'Perché è adatto', choose: 'Scegli', selected: 'Scelto', different: 'Mostra altre persone', browse: 'sfoglia la directory', notRight: 'Non è quello che cercavi?', or: 'oppure',
     to: 'A', intro: 'Ecco un messaggio proposto. Modifica tutto quello che vuoi, poi invialo quando ti sembra giusto.', aiNote: 'Ment è un assistente basato sull’IA e può sbagliare. Sei tu a scegliere chi contattare e cosa inviare.', draftNote: 'Scritto dall’IA. Rileggilo e rendilo tuo prima di inviarlo.', suggested: 'Messaggio proposto', send: 'Invia richiesta', regenerate: 'Rigenera',
@@ -34,7 +34,7 @@ const COPY = {
   },
   fr: {
     history: 'Historique', loadMore: 'Charger plus de recherches', retryHistory: 'Réessayer de charger l’historique', historyLoadError: 'Impossible de charger l’historique de vos recherches. Réessayez.', archivedSearch: 'Archivée', activeSearch: 'Active',
-    greeting: 'Salut {name}, on fait une rencontre aujourd’hui ?', placeholder: 'Décrivez qui pourrait vous aider', examples: ['Quelqu’un pour m’aider à préparer des entretiens en conseil', 'Un professionnel de la finance passé par le M&A', 'Des alumni qui travaillent en marketing à Paris'], resume: 'Reprendre la recherche',
+    greeting: 'Bonjour {name}, sur quoi aimeriez-vous être aidé aujourd’hui ?', placeholder: 'Décrivez qui pourrait vous aider', examples: ['Quelqu’un pour m’aider à préparer des entretiens en conseil', 'Un professionnel de la finance passé par le M&A', 'Des alumni qui travaillent en marketing à Paris'], resume: 'Reprendre la recherche',
     finding: 'Je regarde', chooseLead: 'Voici les personnes qui conviennent.', chooseBold: 'Choisissez-en une et j’écris le message.',
     why: 'Pourquoi ce profil', choose: 'Choisir', selected: 'Sélectionné', different: 'Voir d’autres personnes', browse: 'parcourir l’annuaire', notRight: 'Pas tout à fait ?', or: 'ou',
     to: 'À', intro: 'Voici un message proposé. Modifiez ce que vous voulez, puis envoyez-le lorsqu’il vous convient.', aiNote: 'Ment est un assistant fondé sur l’IA et peut se tromper. C’est vous qui choisissez qui contacter et quoi envoyer.', draftNote: 'Rédigé par l’IA. Relisez-le et adaptez-le avant de l’envoyer.', suggested: 'Message proposé', send: 'Envoyer la demande', regenerate: 'Régénérer',

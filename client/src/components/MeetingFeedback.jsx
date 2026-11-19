@@ -1,6 +1,5 @@
 import { errorMessage } from '../lib/errors.mjs';
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Check, Pencil } from 'lucide-react';
 import api from '../api/index.js';
 import { useT } from '../i18n/index.jsx';
@@ -17,19 +16,14 @@ export default function MeetingFeedback({ session, onSaved, compact = false }) {
   const [benefit, setBenefit] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  // Right after a meeting is marked complete is when its lessons are fresh:
-  // offer the check-in that turns them into skills.
-  const [offerCheckIn, setOfferCheckIn] = useState(false);
-  const navigate = useNavigate();
   const completed = session.viewer_completed || session.status === 'completed';
-  if (!completed && !canCompleteMeeting(session) && !offerCheckIn) return null;
+  if (!completed && !canCompleteMeeting(session)) return null;
 
   function edit() {
     setReflection((session.isMentor ? session.mentor_reflection : session.reflection) || '');
     setRating((session.isMentor ? session.mentor_rating : session.mentee_rating) ?? null);
     setBenefit(null);
     setError('');
-    setOfferCheckIn(false);
     setOpen(true);
   }
 
@@ -42,9 +36,8 @@ export default function MeetingFeedback({ session, onSaved, compact = false }) {
       await api.put(`/sessions/${session.id}`, meetingFeedback(session, reflection, rating));
       // The student's answer to "did it help?" feeds the school's impact figure; optional.
       if (!session.isMentor && benefit) await api.post(`/sessions/${session.id}/benefit`, { answer: benefit });
-      const firstCompletion = !completed;
       await onSaved();
-      if (firstCompletion) setOfferCheckIn(true); else setOpen(false);
+      setOpen(false);
     } catch (err) {
       setError(errorMessage(err, t, t('conversations.error')));
     } finally { setSaving(false); }
@@ -59,14 +52,6 @@ export default function MeetingFeedback({ session, onSaved, compact = false }) {
     </Button>
     <Dialog open={open} onOpenChange={value => { if (!saving) setOpen(value); }}>
       <DialogContent>
-        {offerCheckIn ? <>
-          <DialogTitle>{t('components.meeting.checkInPromptTitle')}</DialogTitle>
-          <DialogDescription>{t('components.meeting.checkInPromptBody')}</DialogDescription>
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>{t('components.meeting.checkInLater')}</Button>
-            <Button type="button" onClick={() => navigate('/profile?tab=reflections&checkin=1')}>{t('components.reflection.startCheckIn')}</Button>
-          </div>
-        </> : <>
         <DialogTitle>{t(completed ? 'components.meeting.yourReflectionPrivate' : 'components.session.markCompleted')}</DialogTitle>
         <DialogDescription>{t(session.isMentor ? 'components.meeting.reflectionPromptMentor' : 'components.meeting.reflectionPromptMentee')}</DialogDescription>
         <form onSubmit={save} className="space-y-4">
@@ -95,7 +80,6 @@ export default function MeetingFeedback({ session, onSaved, compact = false }) {
             <Button type="submit" disabled={saving}>{t(saving ? 'components.meeting.saving' : 'common.save')}</Button>
           </div>
         </form>
-        </>}
       </DialogContent>
     </Dialog>
   </>;

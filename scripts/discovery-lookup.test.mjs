@@ -110,22 +110,22 @@ test('a request outside the network stays a clean no-match with no question', as
   assert.equal(result.matches.length, 0);
 });
 
-test('a refused default model falls back to the configured one instead of failing', async () => {
+test('discovery never falls back to a configured 3B model', async () => {
   const fixture = discoveryFixture({ responses: [
     { decision: 'ready', search_request: 'Financial modelling', named_subject: 'Financial modelling' }, directMatch,
   ] });
-  const served = fixture.fetch.bind(fixture);
+  fixture.env.MISTRAL_MODEL = 'ministral-3b-latest';
   const tried = [];
   fixture.fetch = async (url, options) => {
     const { model } = JSON.parse(options.body);
     tried.push(model);
-    if (model === 'mistral-small-latest') return new Response('{"message":"quota"}', { status: 429 });
-    return served(url, options);
+    return new Response('{"message":"quota"}', { status: 429 });
   };
-  const result = await chat(fixture, 'help with Financial modelling');
-  assert.equal(result.matches.length, 1);
+  const response = await run(fixture, { action: 'chat', query: 'help with Financial modelling', lang: 'en' });
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).error, 'ai_rate_limited');
   assert.ok(tried.includes('mistral-small-latest'), 'the preferred model is tried first');
-  assert.ok(tried.includes('fixture-model'), 'then the configured model answers');
+  assert.ok(!tried.includes('fixture-model'), 'the configured 3B-class fallback is not called');
 });
 
 test('a vague request is asked a question even when the model invents a subject', async () => {
@@ -409,6 +409,107 @@ test('"what about IB in Europe" after results narrows them to European cities', 
   assert.deepEqual(offered(fixture, 1), [london.id], 'only European cities reach the matcher');
   assert.match(payload(fixture, 1).request, /^investment banking; /, 'it builds on the earlier search');
   assert.deepEqual(result.matches.map((m) => m.id), [london.id]);
+});
+
+// Whether a follow-up is about the people shown or a new subject is Mistral's
+// reading of the conversation, not a list of phrases.
+const marketerIn = (id, location) => ({ ...finance, id, name: `Marketer ${id}`, department: 'Marketing', job_title: 'Growth Marketer', skills: ['growth marketing'], location });
+const shownMarketing = (person) => [
+  { role: 'user', content: 'Alumni working in marketing in Paris' },
+  { role: 'assistant', kind: 'matches', framed: true, content: 'Here is someone.', search_request: 'marketing alumni', department: 'Marketing', location: '',
+    matches: [{ id: person.id, name: person.name }] },
+];
+
+test('Mistral reads "any close match in Europe?" as narrowing the search on screen', async () => {
+  const london = marketerIn('london', 'London'); const dubai = marketerIn('dubai', 'Dubai');
+  const fixture = withLocations(discoveryFixture({ candidates: [london, dubai], turns: shownMarketing(dubai), responses: [
+    clarify({ named_location: 'Europe', follow_up: 'narrow' }),
+    { outcome: 'matches', matches: [{ profile_id: london.id, confidence: 0.9, reasons: ['Marketing in London.'], matched_expertise: ['growth marketing'] }] },
+  ] }), ['London', 'Dubai']);
+  const result = await say(fixture, 'any close match in Europe? I am interested in European trends.', 'thread');
+  assert.equal(payload(fixture, 0).shown_search, 'marketing alumni', 'Mistral is told what was shown, without names');
+  assert.doesNotMatch(`${result.message} ${result.clarification} ${result.no_match_reason}`, /close match|trends/i);
+  assert.deepEqual(offered(fixture, 1), [london.id], 'only European cities reach the matcher');
+  assert.match(payload(fixture, 1).request, /^marketing alumni; /, 'it builds on the earlier search');
+});
+
+test('the follow-up model gets structured search state but no identities', async () => {
+  const paris = marketerIn('paris', 'Paris');
+  const turns = [
+    { role: 'user', content: 'marketing in Paris' },
+    { role: 'assistant', kind: 'matches', framed: true, content: 'Here is someone.', search_request: 'marketing alumni',
+      department: 'Marketing', location: 'Paris', company: '', exclude_locations: ['London'],
+      matches: [{ id: paris.id, name: paris.name, location: paris.location }] },
+  ];
+  const fixture = withLocations(discoveryFixture({ candidates: [paris], turns, responses: [
+    clarify({ named_location: 'Paris', follow_up: 'narrow' }),
+    { outcome: 'matches', matches: [{ profile_id: paris.id, confidence: 0.9, reasons: ['Marketing in Paris.'], matched_expertise: ['growth marketing'] }] },
+  ] }), ['Paris', 'London']);
+  await say(fixture, 'which of them is in Paris?', 'thread');
+  const sent = payload(fixture, 0);
+  assert.deepEqual(sent.shown_context, {
+    search_request: 'marketing alumni', department: 'Marketing', location: 'Paris', company: '',
+    exclude_locations: ['London'], result_count: 1,
+  });
+  assert.doesNotMatch(JSON.stringify(sent.shown_context), /paris person|\"id\"/i);
+});
+
+test('"anywhere is fine" removes the previous location but keeps the subject', async () => {
+  const paris = marketerIn('paris', 'Paris'); const london = marketerIn('london', 'London');
+  const turns = [
+    { role: 'user', content: 'marketing in Paris' },
+    { role: 'assistant', kind: 'matches', framed: true, content: 'Here is someone.', search_request: 'marketing alumni',
+      department: 'Marketing', location: 'Paris', matches: [{ id: paris.id, name: paris.name, location: paris.location }] },
+  ];
+  const fixture = withLocations(discoveryFixture({ candidates: [paris, london], turns, responses: [
+    clarify({ follow_up: 'narrow' }),
+    { outcome: 'matches', matches: [{ profile_id: london.id, confidence: 0.9, reasons: ['Growth marketing.'], matched_expertise: ['growth marketing'] }] },
+  ] }), ['Paris', 'London']);
+  const result = await say(fixture, 'anywhere is fine', 'thread');
+  assert.deepEqual(offered(fixture, 1), [paris.id, london.id], 'the old Paris filter is gone before matching');
+  assert.match(payload(fixture, 1).request, /^marketing alumni; /, 'the marketing search is retained');
+  assert.equal(result.understood.department, 'Marketing');
+  assert.equal(result.understood.location, '');
+});
+
+test('a pronoun follow-up changes location without losing the earlier subject', async () => {
+  const paris = marketerIn('paris', 'Paris'); const london = marketerIn('london', 'London');
+  const fixture = withLocations(discoveryFixture({ candidates: [paris, london], turns: shownMarketing(paris), responses: [
+    clarify({ named_location: 'London', follow_up: 'narrow' }),
+    { outcome: 'matches', matches: [{ profile_id: london.id, confidence: 0.9, reasons: ['Marketing in London.'], matched_expertise: ['growth marketing'] }] },
+  ] }), ['Paris', 'London']);
+  const result = await say(fixture, 'which of them is in London?', 'thread');
+  assert.deepEqual(offered(fixture, 1), [london.id]);
+  assert.match(payload(fixture, 1).request, /^marketing alumni; /);
+  assert.equal(result.understood.department, 'Marketing');
+  assert.equal(result.understood.location, 'London');
+});
+
+test('Mistral reading a follow-up as a new subject starts a new search', async () => {
+  const london = marketerIn('london', 'London');
+  const builder = { ...finance, id: 'build', name: 'Builder', department: 'Operations', job_title: 'Site Manager', skills: ['construction management'], location: 'London' };
+  const fixture = withLocations(discoveryFixture({ candidates: [london, builder], turns: shownMarketing(london), responses: [
+    clarify({ named_subject: 'construction', follow_up: 'new' }),
+    { outcome: 'matches', matches: [{ profile_id: builder.id, confidence: 0.9, reasons: ['Construction.'], matched_expertise: ['construction management'] }] },
+  ] }), ['London']);
+  await say(fixture, 'and someone who knows construction?', 'thread');
+  assert.doesNotMatch(payload(fixture, 1).request, /^marketing alumni; /, 'the old search is not carried over');
+});
+
+test('a phrase the code recognises keeps its rule, whatever Mistral reads', async () => {
+  const london = marketerIn('london', 'London'); const dubai = marketerIn('dubai', 'Dubai');
+  const fixture = withLocations(discoveryFixture({ candidates: [london, dubai], turns: shownMarketing(dubai), responses: [
+    clarify({ follow_up: 'narrow' }),
+    { outcome: 'matches', matches: [{ profile_id: london.id, confidence: 0.9, reasons: ['Marketing.'], matched_expertise: ['growth marketing'] }] },
+  ] }), ['London', 'Dubai']);
+  await say(fixture, 'none of these are relevant', 'thread');
+  assert.deepEqual(offered(fixture, 1), [london.id], 'pushback still leaves out the people already shown');
+});
+
+test('before any people are shown, Mistral is told nothing was shown', async () => {
+  const fixture = discoveryFixture({ candidates: [finance], responses: [clarify({ named_subject: 'finance' })] });
+  await say(fixture, 'someone in finance');
+  assert.equal(payload(fixture, 0).shown_search, null);
 });
 
 test('a region named without the model extracting it still filters', async () => {
@@ -1142,6 +1243,7 @@ test('a country left out removes the cities it covers', async () => {
   ] }), ['Paris', 'London']);
   const result = await (await run(fixture, { action: 'chat', thread_id: 'thread', query: 'pas en France', lang: 'fr' })).json();
   assert.deepEqual(result.matches.map((match) => match.location), ['London']);
+  assert.deepEqual(fixture.thread.turns.at(-1).exclude_locations, ['Paris'], 'the next follow-up gets the active exclusion as structured state');
 });
 
 test('a complaint that also names where to look searches there', async () => {

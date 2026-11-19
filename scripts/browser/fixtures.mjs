@@ -78,7 +78,14 @@ function fixtureApi(state, ApiError) {
       if (path.startsWith('/skills/suggest')) return [];
       if (/^\/(sessions|groups)\/\d+\/messages/.test(path)) {
         const [messagePath] = path.split('?');
-        const rows = state.messages[messagePath] || [];
+        const sessionId = Number(messagePath.split('/')[2]);
+        const selected = messagePath.startsWith('/sessions/') && state.sessions.find(session => session.id === sessionId);
+        const peerId = selected && (selected.mentor_id === state.user.id ? selected.mentee_id : selected.mentor_id);
+        const rows = selected ? state.sessions
+          .filter(session => (session.mentor_id === state.user.id ? session.mentee_id : session.mentor_id) === peerId)
+          .flatMap(session => (state.messages[`/sessions/${session.id}/messages`] || []).map(message => ({ ...message, session_id: session.id })))
+          .sort((a, b) => new Date(a.created_at) - new Date(b.created_at) || a.id - b.id)
+          : state.messages[messagePath] || [];
         return { messages: rows, hasMore: false };
       }
     }
@@ -104,6 +111,13 @@ function fixtureApi(state, ApiError) {
         const [, kind, id] = path.split('/');
         delete state.unread[kind === 'groups' ? 'groupMessages' : 'sessionMessages'][id];
         return {};
+      }
+      if (path.endsWith('/archive')) {
+        const session = state.sessions.find(item => item.id === Number(path.split('/')[2]));
+        const peerId = session.mentor_id === state.user.id ? session.mentee_id : session.mentor_id;
+        state.sessions.filter(item => (item.mentor_id === state.user.id ? item.mentee_id : item.mentor_id) === peerId)
+          .forEach(item => { item.conversation_archived = !!body.archived; });
+        return { id: session.id, archived: !!body.archived };
       }
       if (path.endsWith('/acknowledge')) { state.sessions.find(s => s.id === Number(path.split('/')[2])).mentee_acknowledged_at = new Date().toISOString(); return {}; }
       if (path === '/profile/ingest') {
@@ -151,7 +165,7 @@ function fixtureApi(state, ApiError) {
         if (body.thread_id && state.threadSession != null && state.threadSession !== row?.id) throw new ApiError('thread_already_linked', 400);
         if (!row) {
           const id = Math.max(2, ...state.sessions.map(session => session.id)) + 1;
-          row = { ...body, outbound_message: body.message, id, status: 'pending', mentor: state.peer, mentee: state.user, mentee_id: state.user.id, request_expires_at: new Date(Date.now() + 7 * 86400000).toISOString() };
+          row = { ...body, outbound_message: body.message, id, status: 'pending', mentor: state.peer, mentee: state.user, mentee_id: state.user.id, request_expires_at: new Date(Date.now() + 7 * 86400000).toISOString(), conversation_archived: false };
           state.sessions.push(row);
           state.messages[`/sessions/${id}/messages`] = [{ id: 1, sender_id: state.user.id, kind: 'request', body: body.message, created_at: new Date().toISOString() }];
         }
@@ -272,7 +286,7 @@ export const test = base.extend({
           { user_id: 'another-peer', role: 'member' },
         ] },
         groupProfiles: { [peer.id]: peer, 'another-peer': { id: 'another-peer', name: 'Another Member' } },
-        sessions: [1, 2].map(id => ({ id, status: 'scheduled', scheduled_at: '2026-01-01T12:00:00Z', title: `Meeting ${id}`, mentor_id: `peer-${id}`, mentee_id: user.id, mentor: { id: `peer-${id}`, name: `Peer ${id}` }, mentee: user })),
+        sessions: [1, 2].map(id => ({ id, status: 'scheduled', scheduled_at: '2026-01-01T12:00:00Z', title: `Meeting ${id}`, mentor_id: `peer-${id}`, mentee_id: user.id, mentor: { id: `peer-${id}`, name: `Peer ${id}` }, mentee: user, conversation_archived: false })),
       };
     }, { user, peer });
     let reactImport;

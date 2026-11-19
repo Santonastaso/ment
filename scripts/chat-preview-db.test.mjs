@@ -43,6 +43,7 @@ test('chat previews use the newest stored message without exposing unjoined grou
         (1,'Newest reply','message',now());
       insert into groups(organization_id, created_by, name, description) values
         ('${org}','${viewer}','Joined','Description'),('${org}','${peer}','Private','Hidden');
+      update groups set created_at = now() - interval '2 days';
       insert into group_members(group_id, user_id) values (1,'${viewer}');
       insert into group_messages(group_id, body, created_at) values
         (1,'Old group reply',now() - interval '1 day'),(1,'Newest group reply',now()),
@@ -55,6 +56,17 @@ test('chat previews use the newest stored message without exposing unjoined grou
     assert.equal(sessions[0].latest_message, 'Newest reply');
     assert.equal(groups.find(group => group.id === 1).latest_message, 'Newest group reply');
     assert.equal(groups.find(group => group.id === 2).latest_message, null);
+
+    await db.exec(`
+      alter table groups add column route_token text default 'test-token';
+      alter table group_members add column role text default 'member';
+    `);
+    await db.exec(await migration('20261117102019_group_conversation_activity.sql'));
+    const orderedGroups = (await db.query('select my_groups() value')).rows[0].value;
+    assert.equal(orderedGroups[0].id, 1);
+    assert.equal(orderedGroups[0].latest_message, 'Newest group reply');
+    assert.ok(Number.isFinite(Date.parse(orderedGroups[0].latest_message_at)));
+    assert.equal(orderedGroups.find(group => group.id === 2).latest_message_at, null);
 
     await db.exec(await migration('20261006111000_0076_repeat_completed_sessions.sql'));
     await db.exec('create trigger guard before insert or update on sessions for each row execute function pm_session_guard()');

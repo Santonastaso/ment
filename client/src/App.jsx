@@ -26,6 +26,7 @@ const AppLayout = lazy(() => import('./components/AppLayout.jsx'));
 const NotFound = lazy(() => import('./pages/NotFound.jsx'));
 
 const PUBLIC_META = {
+  '/': ['landing.hero.title', 'landing.hero.subtitle'],
   '/welcome': ['landing.hero.title', 'landing.hero.subtitle'],
   '/login': ['auth.login.title', 'auth.login.description'],
   '/request-access': ['auth.requestAccess.title', 'auth.requestAccess.description'],
@@ -58,7 +59,7 @@ function PageMetadata() {
       || (pathname.startsWith('/profile/') ? 'nav.myProfile' : null);
     const title = titleKey ? `${t(titleKey)} | Ment` : 'Ment';
     const description = routeMeta ? t(routeMeta[1]) : '';
-    const indexable = ['/welcome', '/request-access', '/terms', '/privacy'].includes(pathname);
+    const indexable = ['/', '/welcome', '/request-access', '/terms', '/privacy'].includes(pathname);
 
     document.title = title;
     document.documentElement.lang = lang;
@@ -154,7 +155,10 @@ function ProtectedRoute() {
   const location = useLocation();
   if (loading) return <LoadingScreen />;
   if (profileError && !user) return <ProfileLoadError />;
-  if (!user) return <Navigate to="/login" state={{ from: location }} replace />;
+  if (!user) {
+    if (location.pathname === '/') return page(<LandingPage />);
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
   const gate = authGatePath(user);
   if (gate) return <Navigate to={gate} state={{ returnTo: `${location.pathname}${location.search}${location.hash}` }} replace />;
   return page(<LegalReviewPrompt key={user.id} userId={user.id}><AppLayout /></LegalReviewPrompt>, false);
