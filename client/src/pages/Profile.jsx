@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import SkillTagInput from '../components/SkillTagInput.jsx';
@@ -697,23 +697,22 @@ export default function Profile() {
       </Surface>
 
       {isOwnProfile && (
-        <Surface className="profile-section">
-          <SurfaceHeader
-            className="sm:px-4"
-            title={t('profile.reflection.quickTitle')}
-            description={t('profile.reflection.quickDesc')}
-            action={
-              <div className="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" onClick={() => setTab('reflections')}>
-                  {t('profile.reflection.viewHistory')}
-                </Button>
-                  <Button ref={reflectionTriggerRef} size="sm" aria-haspopup="dialog" onClick={() => setReflectionOpen(true)}>
-                    {t('components.reflection.startCheckIn')}
-                  </Button>
-              </div>
-            }
-          />
-          <SurfaceBody className="pt-3 sm:px-4">
+        <details className="profile-section">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-1">
+            <span className="min-w-0">
+              <span className="block text-section font-semibold">{t('profile.reflection.quickTitle')}</span>
+              <span className="mt-1 block text-sm text-muted-foreground">{t('profile.reflection.quickDesc')}</span>
+            </span>
+            <span className="flex shrink-0 flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={(event) => { event.preventDefault(); setTab('reflections'); }}>
+                {t('profile.reflection.viewHistory')}
+              </Button>
+              <Button type="button" ref={reflectionTriggerRef} size="sm" aria-haspopup="dialog" onClick={(event) => { event.preventDefault(); setReflectionOpen(true); }}>
+                {t('components.reflection.startCheckIn')}
+              </Button>
+            </span>
+          </summary>
+          <div className="pt-3 sm:px-4">
             <ProfileReflection
               aiOff={!!profile.ai_opt_out}
               draft={reflectionDraft}
@@ -723,8 +722,8 @@ export default function Profile() {
               returnFocus={reflectionTriggerRef}
               onOpenChange={setReflectionOpen}
             />
-          </SurfaceBody>
-        </Surface>
+          </div>
+        </details>
       )}
       </div>
       </>

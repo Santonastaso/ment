@@ -1,4 +1,4 @@
-﻿import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { formatDayTime } from '../lib/utils.js';
 import api from '../api/index.js';
 import { useEffect, useRef } from 'react';
