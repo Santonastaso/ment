@@ -52,8 +52,9 @@
   "conversations.unreadCount": "{count} messaggi non letti",
   "conversations.state.reply": "Rispondi",
   "conversations.state.confirmTime": "Conferma orario",
-  "conversations.state.markComplete": "Segna completata",
+  "conversations.state.markComplete": "Rifletti sull'incontro",
   "conversations.state.awaitingReply": "In attesa",
   "conversations.newTime": "Nuovo orario",
   "conversations.calendarSyncWarning": "La sessione è cambiata, ma il calendario non è stato aggiornato. Controlla l'invito."
 }
+

@@ -11,7 +11,7 @@
   "components.ics.openEvent": "Apri nel calendario",
   "components.ics.ownerOnly": "Chi ha creato questo evento deve modificarne l’orario. Puoi comunque scaricare il file .ics.",
   "components.match.unknown": "Sconosciuto",
-  "components.session.markCompleted": "Segna come completata",
+  "components.session.markCompleted": "Rifletti sull'incontro",
   "components.session.close": "Chiudi",
   "components.popup.done": "Fatto",
   "components.sessionRequest.errorFocusQuestion": "Aggiungi qualche parola su ciò di cui vuoi parlare, o scegli un argomento.",
@@ -185,3 +185,4 @@
   "components.meeting.benefit.no": "Non proprio",
   "components.meeting.benefitHelp": "Facoltativo. Conta solo nei totali della scuola, mai mostrato con il tuo nome."
 }
+
