@@ -810,11 +810,11 @@ test('Profile skill filters share the navigation pill geometry', async ({ page }
   await page.goto('/profile');
   await page.getByTestId('profile-tab-skills').click();
   expect(await page.locator(':root').evaluate(element => getComputedStyle(element).getPropertyValue('--background').trim())).toBe('#f7f7fb');
-  const skillsType = await page.getByRole('heading', { name: 'What you can teach' }).evaluate(element => {
+  const skillsType = await page.getByRole('heading', { name: 'Your strengths' }).evaluate(element => {
     const style = getComputedStyle(element);
     return { family: style.fontFamily, size: style.fontSize, weight: style.fontWeight };
   });
-  const learnType = await page.getByRole('heading', { name: 'What you want to learn' }).evaluate(element => {
+  const learnType = await page.getByRole('heading', { name: 'Areas to develop' }).evaluate(element => {
     const style = getComputedStyle(element);
     return { family: style.fontFamily, size: style.fontSize, weight: style.fontWeight };
   });
@@ -1861,7 +1861,7 @@ test('choosing a skill suggestion saves it once, whether the save is fast, slow 
     await input.fill('lead');
     await page.getByRole('option', { name: /leadership/ }).click();
     // Leaving the field, as people do, must not submit anything more.
-    await page.getByRole('heading', { name: 'What you want to learn' }).click();
+    await page.getByRole('heading', { name: 'Areas to develop' }).click();
     if (fails) {
       await expect(page.getByRole('alert').first()).toBeVisible();
       // What was chosen stays in the box for the user to retry; the letters typed do not.
@@ -2400,3 +2400,4 @@ test('the search narrates what it is doing, and the student says why before a me
   // The draft box has square corners, so its first letter is never clipped.
   expect(await draft.evaluate(element => getComputedStyle(element).borderTopLeftRadius)).toBe('0px');
 });
+

@@ -7,6 +7,9 @@ const testUrl = `http://127.0.0.1:${testPort}`;
 export default defineConfig({
   testDir: './scripts/browser',
   timeout: 60_000,
+  // Keep a stalled fixture or browser process from holding the release gate
+  // indefinitely. Individual tests still get the shorter timeout above.
+  globalTimeout: 15 * 60_000,
   workers: 1,
   retries: 0,
   reporter: 'list',
