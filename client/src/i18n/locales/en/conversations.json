@@ -27,7 +27,6 @@
   "conversations.sendInvite": "Send calendar invite",
   "conversations.messagePlaceholder": "Message",
   "conversations.send": "Send message",
-  "conversations.personaQuestion": "What best describes you?",
   "conversations.loadOlder": "Load earlier messages",
   "conversations.error": "Could not update this conversation.",
   "conversations.status.pending": "Requested",

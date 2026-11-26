@@ -258,6 +258,16 @@ test('Home greeting stays static', async ({ page }) => {
   await expect(greeting.locator('span')).toHaveCount(0);
 });
 
+test('Home lets a member start a search without choosing their own role', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByText('What best describes you?')).toHaveCount(0);
+  const composer = page.getByRole('textbox', { name: 'Describe who could help' });
+  await composer.fill('finance');
+  await composer.press('Enter');
+  await expect(page.getByText('Which finance skill would you like help with?')).toBeVisible();
+  expect(await page.evaluate(() => window.fixture.calls.find((call) => call.path === '/discovery/matches')?.body)).toMatchObject({ query: 'finance' });
+});
+
 test('Home navigation resets an active discovery conversation', async ({ page }) => {
   await page.goto('/');
   const composer = page.getByRole('textbox', { name: 'Describe who could help' });

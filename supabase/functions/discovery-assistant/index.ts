@@ -26,6 +26,7 @@ const LOCATION_BUSY: Record<string, (place: string) => string> = {
 type Candidate = {
   id: string;
   name: string;
+  role?: 'student' | 'alumnus';
   job_title?: string | null;
   department?: string | null;
   program?: string | null;
@@ -104,6 +105,25 @@ const EMPTY_POOL_MESSAGES: Record<string, string> = {
   Italian: 'Nella rete attuale non c’è un professionista pertinente per questa richiesta.',
   French: 'Le réseau actuel ne contient aucun professionnel pertinent pour cette demande.',
 };
+
+const RECIPIENT_QUESTION: Record<string, string> = {
+  English: 'Would you prefer to speak with a student or an alumnus? Either is fine too.',
+  Italian: 'Preferisci parlare con uno studente o con un alumnus? Vanno bene anche entrambi.',
+  French: 'Préférerais-tu parler avec un étudiant ou un ancien élève ? Les deux conviennent aussi.',
+};
+
+function recipientRoleFrom(text: string): 'student' | 'alumnus' | '' {
+  if (/\b(either|both|anyone|entrambi|indifferente|les deux|peu importe)\b/i.test(text)) return '';
+  // A member may describe their own identity in the request. That is not a
+  // preference about whom to meet.
+  const request = text.replace(/\b(?:i(?:'m| am)|as|je suis|sono)\s+(?:an? |un[aeo]? )?(?:student[ie]?|[ée]tudiant(?:e)?|alumn(?:us|a|i))\b/gi, '');
+  const alumnus = /\b(alumn(?:us|a|i)|alumn[oa]|ancien(?:ne)?s? [ée]l[èe]ves?|dipl[oô]m[ée]s?)\b/i.test(request);
+  const student = /\b(students?|student[ie]|[ée]tudiant(?:e|s|es)?)\b/i.test(request);
+  if (alumnus && student) return '';
+  if (alumnus) return 'alumnus';
+  if (student) return 'student';
+  return '';
+}
 
 // The application writes the greeting and the sign-off; the model is told
 // not to, and writes them anyway ("Ciao Francesco, ciao Francesco"). Strip
@@ -687,6 +707,7 @@ function publicCandidate(candidate: Candidate, ranked?: RankedMatch, redactIdent
     : [];
   return {
     id: candidate.id,
+    role: candidate.role,
     name: redactIdentity ? 'Network member' : candidate.name,
     job_title: redactIdentity ? null : candidate.job_title,
     // Employer plus role identifies a person, so redacted candidates have none.
@@ -884,7 +905,8 @@ async function handle(req: Request): Promise<Response> {
   // relaxed: nobody based there is offered, even as a nearest match.
   let leaveOut: string[] = [];
   const language = localeName(body.lang);
-  const requesterRole = body.requester_role === 'alumnus' ? 'alumnus' : body.requester_role === 'student' ? 'student' : '';
+  let recipientRole = recipientRoleFrom(spoken);
+  let recipientAsked = false;
   if (!query || (action !== 'chat' && query.length < 3)) return jsonError('query_too_short');
 
   const { data: caller, error: callerError } = await ctx.sb.from('profiles')
@@ -902,6 +924,11 @@ async function handle(req: Request): Promise<Response> {
         .eq('id', body.thread_id).eq('user_id', ctx.user.id).maybeSingle();
       if (Array.isArray(data?.turns)) priorTurns = data.turns as Array<Record<string, unknown>>;
     }
+    const recipientQuestionIndex = priorTurns.findLastIndex((turn) => turn.role === 'assistant' && turn.stage === 'recipient');
+    recipientAsked = recipientQuestionIndex >= 0;
+    if (!recipientRole && recipientAsked) {
+      recipientRole = recipientRoleFrom(cleanText(priorTurns[recipientQuestionIndex + 1]?.content, 200));
+    }
     // Everyone already shown in this conversation, so a repeat is said aloud.
     for (const turn of priorTurns) {
       if (turn.role !== 'assistant' || turn.kind !== 'matches' || !Array.isArray(turn.matches)) continue;
@@ -911,7 +938,8 @@ async function handle(req: Request): Promise<Response> {
     // With results on screen and nothing else said, the exclusion refines
     // the search those results answered instead of starting a new one.
     let bareLeaveOut = false;
-    query = placePushback || spoken;
+    const previousRecipientQuestion = priorTurns.at(-1)?.stage === 'recipient' ? priorTurns.at(-1) : null;
+    query = previousRecipientQuestion ? `${cleanText(previousRecipientQuestion.search_request, 1000)}; ${spoken}` : placePushback || spoken;
     requestForMatch = query;
     for (const turn of priorTurns) {
       if (Array.isArray(turn.matches)) for (const person of turn.matches as Array<Record<string, unknown>>) knownNames.push(...nameAndFirst(person?.name));
@@ -991,7 +1019,7 @@ The language the user writes in is never a place: French words do not mean Franc
 Every term you return is checked against the coverage and anything not found there is discarded, so copy exactly and never invent one. The examples in these instructions illustrate shape only: never reuse their wording or their subject in anything you return.
 
 Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one concise question or empty string","search_request":"concise grounded request or empty string","no_match_reason":"one plain sentence, or empty string","named_subject":"as written, or empty string","matching_terms":["exact coverage term"],"nearest_terms":["exact coverage term"],"named_location":"as written, or empty string","ruled_out_places":["as written"],"exclude_locations":["exact coverage location"],"subject_label":"short phrase, or empty string","follow_up":"narrow"|"more"|"reject"|"new"|"","parts":{"role":"","seniority":"","field":"","department":"","company":"","skills":[],"exclude":[],"conflict":[]}}.`,
-        user: JSON.stringify({ conversation, coverage, answered: hasClarified, requester_role: requesterRole, lexical_hits: hits,
+        user: JSON.stringify({ conversation, coverage, answered: hasClarified, recipient_role: recipientRole, lexical_hits: hits,
           shown_search: shownSearch || null, shown_context: shownState }),
         temperature: 0.1,
         maxTokens: 800,
@@ -1224,6 +1252,7 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
 
       const clarifiedRequest = cleanText(result.value?.search_request, 1000);
       requestForMatch = clarifiedRequest || query;
+      if (previousRecipientQuestion) requestForMatch = cleanText(previousRecipientQuestion.search_request, 1000) || requestForMatch;
       // After a switch, the model's request is kept only when it is about the
       // new subject and carries nothing of the old one; otherwise the user's
       // own words are the request ("strategic consulting in construction"
@@ -1461,6 +1490,16 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
     ...row,
     linkedin_headline: !redactInterOrg || established.has(row.id) ? row.linkedin_headline : null,
   }));
+  if (action === 'chat' && candidates.length) {
+    // The retrieval RPC intentionally returns only matching facts. Read the
+    // current profile roles separately so the conversation can honour this
+    // preference without duplicating that security-definer function.
+    const { data: roles, error: roleError } = await ctx.sb.from('profiles')
+      .select('id,role').in('id', candidates.map((candidate) => candidate.id));
+    if (roleError) return jsonError('candidate_load_failed', 500);
+    const roleById = new Map((roles || []).map((person) => [person.id, person.role]));
+    candidates = candidates.map((candidate) => ({ ...candidate, role: roleById.get(candidate.id) }));
+  }
   if (action !== 'draft') progress({ stage: 'candidates', count: candidates.length });
 
   if (action === 'draft') {
@@ -1530,6 +1569,10 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
     if (out.has(namedLocationFilter.toLowerCase()) || (locationCities.length > 0 && locationCities.every((city) => out.has(city.toLowerCase())))) { namedLocationFilter = ''; locationCities = []; }
     refineFallback = refineFallback.filter((match) => elsewhere(match.location));
   }
+  if (recipientRole && candidates.some((candidate) => candidate.role)) {
+    candidates = candidates.filter((candidate) => candidate.role === recipientRole);
+    refineFallback = refineFallback.filter((match) => match.role === recipientRole);
+  }
   const networkCandidates = candidates;
 
   // Every part the user gave is a requirement: the subject (a department, or
@@ -1571,6 +1614,14 @@ Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one conci
   locationFilterApplied = narrowed.active.includes('place');
   departmentFilterApplied = Boolean(requiredDepartment) && narrowed.active.includes('subject');
   const relaxedParts = narrowed.relaxed.filter((key) => key !== 'subject');
+  if (action === 'chat' && !recipientRole && !recipientAsked && candidates.some((person) => person.role === 'student')
+    && candidates.some((person) => person.role === 'alumnus')) {
+    const question = RECIPIENT_QUESTION[language] || RECIPIENT_QUESTION.English;
+    const threadId = await persistTurns(ctx, body.thread_id, spoken, {
+      kind: 'clarification', stage: 'recipient', content: question, search_request: requestForMatch,
+    });
+    return answer({ matches: [], clarification: question, suggestions: [], thread_id: threadId });
+  }
   if (narrowed.relaxed.includes('company')) {
     nearestOnly = true;
     gapState = { kind: 'company', value: companyFilter, role: false };
