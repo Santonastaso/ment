@@ -22,6 +22,35 @@ test('website language governs clarification, matching and drafts', async () => 
   }
 });
 
+test('the assistant asks who to meet in the conversation, then filters the actual people', async () => {
+  const student = { ...finance, id: 'student-peer', name: 'Student Peer', role: 'student' };
+  const alumnus = { ...finance, id: 'alumnus-peer', name: 'Alumnus Peer', role: 'alumnus' };
+  const fixture = discoveryFixture({ candidates: [student, alumnus], responses: [
+    { decision: 'ready', search_request: 'Financial modelling' },
+    { decision: 'ready', search_request: 'Financial modelling' },
+    { outcome: 'matches', matches: [{ profile_id: student.id, confidence: 0.95,
+      reasons: ['Teaches financial modelling.'], matched_expertise: ['Financial modelling'] }] },
+  ] });
+  const question = await request(fixture, { action: 'chat', query: 'Financial modelling', lang: 'en' });
+  assert.match(question.clarification, /student or an alumnus/);
+  assert.deepEqual(question.suggestions, []);
+  const result = await request(fixture, { action: 'chat', thread_id: question.thread_id, query: 'A student', lang: 'en' });
+  assert.deepEqual(result.matches.map((person) => person.id), [student.id]);
+  assert.equal(fixture.calls.at(-1).offered.includes(alumnus.id), false);
+  assert.match(fixture.thread.turns[0].content, /Financial modelling/);
+  assert.equal(fixture.thread.turns.at(-2).content, 'A student');
+});
+
+test('the member describing themselves as a student does not silently filter out alumni', async () => {
+  const student = { ...finance, id: 'student-peer', role: 'student' };
+  const alumnus = { ...finance, id: 'alumnus-peer', role: 'alumnus' };
+  const fixture = discoveryFixture({ candidates: [student, alumnus], responses: [
+    { decision: 'ready', search_request: 'Financial modelling' },
+  ] });
+  const result = await request(fixture, { action: 'chat', query: 'I am a student seeking financial modelling advice', lang: 'en' });
+  assert.match(result.clarification, /student or an alumnus/);
+});
+
 test('topic changes reach the model as separate turns and the matcher uses its resolved goal', async () => {
   const turns = [{ role: 'user', content: 'Find a nurse' }, { role: 'assistant', kind: 'clarification', content: 'Which specialty?' }];
   const fixture = discoveryFixture({ turns, responses: [{ decision: 'ready', search_request: 'Financial modelling' }, directMatch] });

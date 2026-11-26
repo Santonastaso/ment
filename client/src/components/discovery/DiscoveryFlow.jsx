@@ -197,9 +197,6 @@ export default function DiscoveryFlow() {
   const intentCopy = homeCopy(lang);
   const [stage, setStage] = useState('ask');
   const [query, setQuery] = useState('');
-  const [requesterRole, setRequesterRole] = useState(() => {
-    try { return sessionStorage.getItem('ment.discovery.requesterRole') || ''; } catch { return ''; }
-  });
   const [submittedQuery, setSubmittedQuery] = useState('');
   const [turns, setTurns] = useState([]);
   const [matches, setMatches] = useState([]);
@@ -334,13 +331,13 @@ export default function DiscoveryFlow() {
   async function findMatches(nextQuery, activeThreadId = threadId) {
     const version = flowVersion.current;
     const message = nextQuery.trim();
-    if (!message || !requesterRole) return;
+    if (!message) return;
     setTurns(current => [...current, { role: 'user', content: message, at: new Date().toISOString() }]);
     setError(''); setStage('matching'); setMatchFeedback(null); setProgress([]); setProgressTick({ line: 0, filler: 0 }); progressSeed.current = Math.floor(Math.random() * 997);
     setSelected(null); setDraft('');
     try {
       const onProgress = event => { if (version === flowVersion.current) setProgress(current => [...current, event]); };
-      const [{ data }] = await Promise.all([api.post('/discovery/matches', { query: message, thread_id: activeThreadId, requester_role: requesterRole }, { onProgress }), pause(350)]);
+      const [{ data }] = await Promise.all([api.post('/discovery/matches', { query: message, thread_id: activeThreadId }, { onProgress }), pause(350)]);
       if (version !== flowVersion.current) return;
       setThreadId(data.thread_id || activeThreadId);
       refreshHistory().catch(() => {});
@@ -381,11 +378,6 @@ export default function DiscoveryFlow() {
     if (!nextQuery) return;
     setQuery('');
     findMatches(nextQuery);
-  }
-
-  function chooseRequesterRole(role) {
-    setRequesterRole(role);
-    try { sessionStorage.setItem('ment.discovery.requesterRole', role); } catch { /* storage is optional */ }
   }
 
   // Choosing someone first asks why them: a reason in the student's own words
@@ -585,12 +577,7 @@ export default function DiscoveryFlow() {
     : progressLines[Math.min(progressTick.line, progressLines.length - 1)];
 
   function composer() {
-    return <>{stage === 'ask' && <div className="mb-4 space-y-2" data-testid="discovery-persona-selector">
-      <p className="text-sm font-medium text-foreground">{t('conversations.personaQuestion')}</p>
-      <div className="flex flex-wrap gap-2" role="group" aria-label={t('conversations.personaQuestion')}>
-        {['student', 'alumnus'].map(role => <Button key={role} type="button" size="sm" variant={requesterRole === role ? 'default' : 'outline'} aria-pressed={requesterRole === role} onClick={() => chooseRequesterRole(role)}>{t(`profile.persona.${role}`)}</Button>)}
-      </div>
-    </div>}<form className="discovery-composer" onSubmit={submit}><textarea data-control-radius-exempt ref={composerInputRef} value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} maxLength={2000} rows={1} placeholder={copy.placeholder} aria-label={copy.placeholder} disabled={!requesterRole || stage === 'matching' || stage === 'drafting' || sending} /><Button size="icon" type="submit" className="send-spark" disabled={!requesterRole || !query.trim() || stage === 'matching' || stage === 'drafting' || sending} aria-label={t('conversations.send')}><ArrowUp /></Button></form>
+    return <><form className="discovery-composer" onSubmit={submit}><textarea data-control-radius-exempt ref={composerInputRef} value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} maxLength={2000} rows={1} placeholder={copy.placeholder} aria-label={copy.placeholder} disabled={stage === 'matching' || stage === 'drafting' || sending} /><Button size="icon" type="submit" className="send-spark" disabled={!query.trim() || stage === 'matching' || stage === 'drafting' || sending} aria-label={t('conversations.send')}><ArrowUp /></Button></form>
       {/* AI Act Art. 50: people are told they are talking to an AI. */}
       <p className="discovery-ai-note" data-testid="discovery-ai-note">{copy.aiNote}</p></>;
   }

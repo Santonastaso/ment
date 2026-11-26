@@ -94,7 +94,9 @@ export function discoveryFixture({ candidates = [finance], turns = [], responses
       from(table) {
         let mutation;
         const result = () => {
-          if (table === 'profiles') return { data: { id: 'viewer', name: 'Viewer Student', organization_id: 'organization' } };
+          if (table === 'profiles') return { data: mutation === 'roles'
+            ? candidates.map(({ id, role }) => ({ id, role }))
+            : { id: 'viewer', name: 'Viewer Student', organization_id: 'organization' } };
           if (table === 'organizations') return { data: { type: 'intra' } };
           if (table === 'sessions' || table === 'connections') return { data: [] };
           if (table === 'discovery_threads') {
@@ -104,7 +106,7 @@ export function discoveryFixture({ candidates = [finance], turns = [], responses
           throw new Error(`Unexpected table: ${table}`);
         };
         const query = {
-          select() { return this; }, or() { return this; }, in() { return this; },
+          select(fields) { if (table === 'profiles' && fields === 'id,role') mutation = 'roles'; return this; }, or() { return this; }, in() { return this; },
           eq(key, value) { context.queries.push({ table, key, value }); return this; },
           insert(value) { mutation = value; return this; }, update(value) { mutation = value; return this; },
           single: async () => result(), maybeSingle: async () => result(),
