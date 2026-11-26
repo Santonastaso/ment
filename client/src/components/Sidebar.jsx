@@ -69,10 +69,10 @@ export default function Sidebar({ collapsed = false, onNavigate, onToggle }) {
                   : 'text-[var(--sidebar-foreground)] hover:bg-[var(--sidebar-accent)]'
               )}
               aria-label={collapsed ? item.label : undefined}
-              title={collapsed ? item.label : undefined}
+              title={item.label}
             >
               <Icon className="size-5 shrink-0" strokeWidth={2.05} />
-              <span className={cn('sidebar-nav-label flex-1 whitespace-nowrap', collapsed && 'is-hidden')}>{item.label}</span>
+              <span className={cn('sidebar-nav-label min-w-0 flex-1 truncate', collapsed && 'is-hidden')}>{item.label}</span>
               {badgeCount > 0 && (
                 <span
                   data-testid={item.to === '/groups' ? 'nav-groups-requests-badge' : 'nav-messages-unread-badge'}

@@ -54,7 +54,10 @@ Deno.serve(async (req) => {
     .lte('next_attempt_at', new Date().toISOString())
     .order('created_at')
     .limit(50);
-  if (error) return json({ error: error.message }, 500);
+  if (error) {
+    console.error(JSON.stringify({ event: 'notification_queue_read_failed', code: error.code || 'unknown' }));
+    return json({ error: 'notification_queue_read_failed' }, 500);
+  }
 
   let sent = 0;
   let failed = 0;
@@ -86,7 +89,7 @@ Deno.serve(async (req) => {
       continue;
     }
     let session = null;
-    if (row.topic !== 'reflection_reminder') {
+    if (row.topic !== 'reflection_reminder' && row.topic !== 'group_join_request_received') {
       const sessionId = Number(payload.session_id);
       const { data } = await sb.from('sessions')
         .select('mentor_id, mentee_id, status, scheduled_at, route_token').eq('id', sessionId).maybeSingle();
@@ -103,6 +106,19 @@ Deno.serve(async (req) => {
             .select('last_read_at').eq('session_id', data.session_id).eq('user_id', row.user_id).maybeSingle();
           message = { ...data, last_read_at: read?.last_read_at || null };
         }
+      }
+    }
+    if (row.topic === 'group_join_request_received') {
+      const groupId = Number(payload.group_id);
+      const requesterId = String(payload.requester_id || '');
+      const { data: membership } = await sb.from('group_members')
+        .select('role').eq('group_id', groupId).eq('user_id', row.user_id)
+        .in('role', ['owner', 'admin']).maybeSingle();
+      const { data: request } = await sb.from('group_join_requests')
+        .select('status, expires_at').eq('group_id', groupId).eq('user_id', requesterId).maybeSingle();
+      if (!membership || !request || request.status !== 'pending' || new Date(request.expires_at).getTime() <= Date.now()) {
+        await fail('not_deliverable');
+        continue;
       }
     }
     const content = messageFor(row.topic, payload, appOrigin, session?.route_token);

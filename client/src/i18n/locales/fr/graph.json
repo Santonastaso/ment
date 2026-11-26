@@ -37,7 +37,7 @@
   "graph.details": "Détails du nœud",
   "graph.fit": "Adapter le graphe à l'écran",
   "graph.reset": "Réinitialiser les filtres et la vue",
-  "graph.search": "Rechercher une personne ou une compétence",
+  "graph.search": "Rechercher une compétence ou un programme",
   "graph.view.label": "Vue du graphe",
   "graph.stats.people": "Membres dans les groupes déclarables",
   "graph.stats.skills": "Compétences",

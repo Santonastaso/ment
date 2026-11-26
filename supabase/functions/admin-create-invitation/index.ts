@@ -69,7 +69,10 @@ Deno.serve(async (req) => {
     invited_by: ctx.user.id,
     expires_at: expiresAt,
   }).select('id,email,expires_at,created_at').single();
-  if (error) return jsonError(`invitation_create_failed: ${error.message}`, 500);
+  if (error) {
+    console.error(JSON.stringify({ event: 'invitation_create_failed', code: error.code || 'unknown' }));
+    return jsonError('invitation_create_failed', 500);
+  }
 
   return jsonOk({ ...data, invitation_url: `${appOrigin}/invite/${token}` }, 201);
 });

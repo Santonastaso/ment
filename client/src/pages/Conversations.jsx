@@ -1,7 +1,7 @@
 import { errorMessage } from '../lib/errors.mjs';
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { Archive, ArchiveRestore, Check, ChevronLeft, ChevronsLeft, ChevronsRight, CircleCheck, CircleX, Info, ListFilter, MessageCircle, MessageSquareText, Send, UserRound, UsersRound } from 'lucide-react';
+import { Archive, ArchiveRestore, Check, ChevronLeft, ChevronsLeft, ChevronsRight, CircleCheck, CircleX, Info, ListFilter, MessageCircle, MessageSquareText, Send, Trash2, UserRound, UsersRound } from 'lucide-react';
 import api from '../api/index.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useT } from '../i18n/index.jsx';
@@ -13,6 +13,7 @@ import { Skeleton } from '../components/ui/skeleton.jsx';
 import IcsDownloadButton from '../components/IcsDownloadButton.jsx';
 import MeetingFeedback from '../components/MeetingFeedback.jsx';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog.jsx';
+import { useConfirm } from '../components/ui/confirm.jsx';
 import { cn } from '@/lib/utils';
 import { supabase } from '../lib/supabase.js';
 import { CONVERSATION_FILTERS as FILTERS, conversationListItems, conversationState as rowState, isExpired, requestText, clearSentDraft, conversationThreads, peerConversationSessions, conversationUnreadCount, supportsPeerConversationHistory } from '../lib/conversations.mjs';
@@ -109,6 +110,7 @@ function sessionPreview(session, t) {
 export default function Conversations() {
   const { user, unreadCounts, refreshPendingAcceptances, refreshUnreadCounts } = useAuth();
   const { t, lang } = useT();
+  const confirm = useConfirm();
   const navigate = useNavigate();
   const { sessionToken, groupToken } = useParams();
   const copy = homeCopy(lang);
@@ -190,6 +192,7 @@ export default function Conversations() {
   const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [withdrawing, setWithdrawing] = useState(false);
   const [archiving, setArchiving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [scheduledAt, setScheduledAt] = useState('');
   const [savingSchedule, setSavingSchedule] = useState(false);
   const messagesRef = useRef(null);
@@ -542,6 +545,20 @@ export default function Conversations() {
     } finally { setArchiving(false); }
   }
 
+  async function deleteConversation() {
+    if (!selected || deleting) return;
+    if (!(await confirm(t('conversations.deleteConfirm')))) return;
+    setDeleting(true);
+    setError('');
+    try {
+      await api.delete(`/sessions/${selected.id}/delete`);
+      await loadSessions();
+      closeThread();
+    } catch (requestError) {
+      setError(errorMessage(requestError, t, t('conversations.error')));
+    } finally { setDeleting(false); }
+  }
+
   async function sendMessage(event) {
     event.preventDefault();
     const body = draft.trim();
@@ -681,7 +698,7 @@ export default function Conversations() {
             </button>
           );
         })}
-        {!visibleItems.length && filter !== 'all' && (
+        {(filter === 'archived' || (!visibleItems.length && filter !== 'all')) && (
           <p className="conversation-list-empty">{filter === 'archived' ? t('conversations.archiveHelp') : t('conversations.filter.empty')}</p>
         )}
         </>}
@@ -713,9 +730,19 @@ export default function Conversations() {
                 {peerHistoryAvailable && <Button type="button" variant="ghost" size="icon" disabled={archiving} onClick={toggleArchive} aria-label={t(selected.conversation_archived ? 'conversations.restore' : 'conversations.archive')} title={t(selected.conversation_archived ? 'conversations.restore' : 'conversations.archive')}>
                   {selected.conversation_archived ? <ArchiveRestore aria-hidden="true" /> : <Archive aria-hidden="true" />}
                 </Button>}
+                {peerHistoryAvailable && <Button type="button" variant="ghost" size="icon" disabled={deleting} onClick={deleteConversation} aria-label={t('conversations.delete')} title={t('conversations.delete')}>
+                  <Trash2 aria-hidden="true" />
+                </Button>}
                 <Button type="button" variant="ghost" size="icon" onClick={() => setOverviewOpen(true)} aria-label={t('conversations.requestDetails')} title={t('conversations.requestDetails')} aria-haspopup="dialog"><Info aria-hidden="true" /></Button>
               </div>
             </header>}
+
+            {selected && !selectedGroup && selected.needs_my_completion && (
+              <div className="conversation-completion-banner" data-testid="meeting-completion-banner">
+                <span>{t('conversations.state.markComplete')}</span>
+                <MeetingFeedback compact session={selected} onSaved={loadSessions} />
+              </div>
+            )}
 
             <div className="conversation-messages" ref={messagesRef}>
               {showThreadSkeleton ? <div className="conversation-messages-skeleton" role="status" aria-label={t('common.loading')}>
@@ -752,7 +779,7 @@ export default function Conversations() {
                     {itemSession.scheduled_at && <IcsDownloadButton sessionId={itemSession.id} session={itemSession} meetingUrl={itemSession.meeting_url} label={t('conversations.sendInvite')} />}
                     <Button type="button" variant="ghost" size="sm" onClick={() => { setOverviewOpen(true); setScheduleOpen(true); }}>{t(itemSession.scheduled_at ? 'conversations.reschedule' : 'conversations.schedule')}</Button>
                   </>}
-                  {(itemSession.status === 'scheduled' || itemSession.status === 'completed') && <MeetingFeedback key={`prominent-${itemSession.id}`} session={itemSession} onSaved={loadSessions} />}
+                  {(itemSession.status === 'scheduled' || itemSession.status === 'completed') && !itemSession.needs_my_completion && <MeetingFeedback key={`prominent-${itemSession.id}`} session={itemSession} onSaved={loadSessions} />}
                 </div>}
                 {isCurrentRequest && (['cancelled', 'declined', 'completed'].includes(itemSession.status) || isExpired(itemSession)) && itemSession.isMentee && <div className="conversation-request-actions"><Button type="button" size="sm" onClick={() => setNewRequestOpen(true)}>{t('conversations.newRequest')}</Button></div>}
               </article> : event ? <div className="conversation-event"><EventIcon aria-hidden="true" /><strong>{event.title}</strong><time dateTime={message.created_at}>{formatChatClock(message.created_at)}</time></div>

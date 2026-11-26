@@ -280,6 +280,7 @@ Deno.serve(async (req) => {
     }
     return jsonError('unsupported_action', 400);
   } catch (error) {
-    return jsonError(error instanceof Error ? error.message : 'calendar_request_failed', 502);
+    console.error(JSON.stringify({ event: 'calendar_request_failed', error: error instanceof Error ? error.name : 'unknown' }));
+    return jsonError('calendar_request_failed', 502);
   }
 });

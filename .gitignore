@@ -42,6 +42,7 @@ Thumbs.db
 /tmp/test-*.js
 test-results/
 playwright-report/
+.playwright-browsers/
 .privacy-acceptance/
 privacy-acceptance-report.json
 

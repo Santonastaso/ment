@@ -34,12 +34,6 @@ const PUBLIC_META = {
   '/privacy': ['legal.privacy.title', 'legal.privacy.intro'],
 };
 
-const APP_TITLES = {
-  '/': 'nav.home', '/explorer': 'nav.explorer', '/conversations': 'nav.messages', '/c/': 'nav.messages', '/g/': 'nav.messages',
-  '/groups': 'nav.groups', '/profile': 'nav.myProfile', '/admin': 'nav.admin',
-  '/admin/ops': 'nav.platformOps', '/admin/graph': 'nav.knowledgeGraph',
-};
-
 function updateMeta(selector, attribute, value) {
   let element = document.head.querySelector(selector);
   if (!element) {
@@ -55,9 +49,10 @@ function PageMetadata() {
 
   useEffect(() => {
     const routeMeta = PUBLIC_META[pathname];
-    const titleKey = routeMeta?.[0] || APP_TITLES[pathname] || (pathname.startsWith('/c/') || pathname.startsWith('/g/') ? 'nav.messages' : null)
-      || (pathname.startsWith('/profile/') ? 'nav.myProfile' : null);
-    const title = titleKey ? `${t(titleKey)} | Ment` : 'Ment';
+    // Keep the browser identity stable across routes. Route names still belong
+    // in the page itself; the product title should remain recognizable in tabs
+    // and mobile app switchers.
+    const title = 'ment · Ask & Learn';
     const description = routeMeta ? t(routeMeta[1]) : '';
     const indexable = ['/', '/welcome', '/request-access', '/terms', '/privacy'].includes(pathname);
 

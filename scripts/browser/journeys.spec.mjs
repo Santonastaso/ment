@@ -240,12 +240,12 @@ test('repeated sessions stay in one restorable conversation', async ({ page }) =
   await expect(page.getByText('Earlier session', { exact: true })).toBeVisible();
   await expect(page.locator('.conversation-message').getByText('Current session', { exact: true })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Archive conversation' }).click();
+  await page.getByRole('button', { name: 'Remove from inbox' }).click();
   await expect(page).toHaveURL(/filter=archived/);
   await expect(page.locator('.conversation-list-item').filter({ hasText: 'Peer 1' })).toBeVisible();
   await page.locator('.conversation-list-item').filter({ hasText: 'Peer 1' }).click();
-  await page.getByRole('button', { name: 'Restore conversation' }).click();
-  await expect(page.getByRole('button', { name: 'Archive conversation' })).toBeVisible();
+  await page.getByRole('button', { name: 'Return to inbox' }).click();
+  await expect(page.getByRole('button', { name: 'Remove from inbox' })).toBeVisible();
 });
 
 test('Home greeting stays static', async ({ page }) => {
@@ -706,6 +706,9 @@ test('a proposed time is checked again before sending a request', async ({ page 
   await dialog.getByRole('textbox').fill('How can I improve my project planning?');
   await dialog.getByRole('button', { name: 'Next' }).click();
   await dialog.getByRole('button', { name: 'Suggest a time', exact: true }).click();
+  await expect(dialog.getByRole('button', { name: 'Tomorrow' })).toHaveCount(0);
+  await expect(dialog.getByRole('button', { name: 'In 3 days' })).toHaveCount(0);
+  await expect(dialog.getByRole('button', { name: 'Next week' })).toHaveCount(0);
   const dateField = dialog.getByRole('textbox', { name: 'Date' });
   const timeField = dialog.getByRole('combobox', { name: 'Time' });
   expect(await dateField.evaluate(element => getComputedStyle(element).textAlign)).toBe('center');
@@ -784,6 +787,7 @@ test('Quick reflection opens a card without shifting the profile and preserves d
 
 test('Profile tabs support keyboard navigation and history', async ({ page }) => {
   await page.goto('/profile');
+  await expect(page).toHaveTitle('ment · Ask & Learn');
   const overview = page.getByRole('tab', { name: 'Overview', exact: true });
   await expect(overview).toHaveAttribute('aria-selected', 'true');
   await page.screenshot({ path: test.info().outputPath('profile-connected-desktop.png'), animations: 'disabled' });
@@ -2051,7 +2055,11 @@ test('members are told the chat is an AI, and can download their own data', asyn
   await page.goto('/profile?tab=availability');
   const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('export-my-data').click()]);
   expect(download.suggestedFilename()).toMatch(/^ment-data-\d{4}-\d{2}-\d{2}\.csv$/);
-  const lines = (await (await download.createReadStream()).toArray().then(parts => Buffer.concat(parts).toString('utf8'))).split('\r\n');
+  expect(await download.failure()).toBeNull();
+  const stream = await download.createReadStream();
+  const chunks = [];
+  for await (const chunk of stream) chunks.push(chunk);
+  const lines = Buffer.concat(chunks).toString('utf8').split('\r\n');
   expect(lines.slice(0, 3)).toEqual(['\uFEFFSection,Item,Field,Value', 'export,,format,ment-export-1', 'profile,,id,viewer']);
 });
 

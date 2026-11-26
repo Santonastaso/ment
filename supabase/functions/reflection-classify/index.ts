@@ -45,7 +45,7 @@ Deno.serve(async (req) => {
   if (error) {
     return error.code === 'PGRST116'
       ? jsonError('not_found', 404)
-      : jsonError(`read_failed: ${error.message}`, 500);
+      : jsonError('reflection_read_failed', 500);
   }
   if (!log) return jsonError('not_found', 404);
 
