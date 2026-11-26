@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { errorMessage } from '../lib/errors.mjs';
 import api from '../api/index.js';
 import { useT } from '../i18n/index.jsx';
@@ -34,7 +34,6 @@ export default function AdminOps() {
   const [ownerStats, setOwnerStats] = useState(null);
   const [ownerLoading, setOwnerLoading] = useState(false);
   const [orgNameDraft, setOrgNameDraft] = useState('');
-  const [orgTypeDraft, setOrgTypeDraft] = useState('intra');
   const [creatingOrg, setCreatingOrg] = useState(false);
   const [accessRequests, setAccessRequests] = useState([]);
   const [accessRequestTotal, setAccessRequestTotal] = useState(0);
@@ -72,9 +71,8 @@ export default function AdminOps() {
     setCreatingOrg(true);
     setNotice(null);
     try {
-      const res = await api.post('/admin/organizations', { name, type: orgTypeDraft });
+      const res = await api.post('/admin/organizations', { name, type: 'intra' });
       setOrgNameDraft('');
-      setOrgTypeDraft('intra');
       loadOwnerStats();
       setNotice({ variant: 'default', title: t('admin.notice.orgCreatedTitle'), message: t('admin.notice.orgCreatedMsg', { name: res.data.organizationName }) });
     } catch (e) {
@@ -172,18 +170,6 @@ export default function AdminOps() {
                 onChange={e => setOrgNameDraft(e.target.value)}
                 placeholder={t('admin.orgs.placeholder')}
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="organization-type">{t('admin.orgs.typeLabel')}</Label>
-              <select
-                id="organization-type"
-                value={orgTypeDraft}
-                onChange={e => setOrgTypeDraft(e.target.value)}
-                className="input text-sm h-10"
-              >
-                <option value="intra">{t('admin.privacy.modeIntra')}</option>
-                <option value="inter">{t('admin.privacy.modeInter')}</option>
-              </select>
             </div>
             <Button type="submit" disabled={creatingOrg || !orgNameDraft.trim()}>
               {creatingOrg ? t('admin.orgs.creating') : t('admin.orgs.create')}

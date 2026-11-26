@@ -884,6 +884,7 @@ async function handle(req: Request): Promise<Response> {
   // relaxed: nobody based there is offered, even as a nearest match.
   let leaveOut: string[] = [];
   const language = localeName(body.lang);
+  const requesterRole = body.requester_role === 'alumnus' ? 'alumnus' : body.requester_role === 'student' ? 'student' : '';
   if (!query || (action !== 'chat' && query.length < 3)) return jsonError('query_too_short');
 
   const { data: caller, error: callerError } = await ctx.sb.from('profiles')
@@ -990,7 +991,7 @@ The language the user writes in is never a place: French words do not mean Franc
 Every term you return is checked against the coverage and anything not found there is discarded, so copy exactly and never invent one. The examples in these instructions illustrate shape only: never reuse their wording or their subject in anything you return.
 
 Return JSON only: {"decision":"clarify"|"ready"|"no_match","question":"one concise question or empty string","search_request":"concise grounded request or empty string","no_match_reason":"one plain sentence, or empty string","named_subject":"as written, or empty string","matching_terms":["exact coverage term"],"nearest_terms":["exact coverage term"],"named_location":"as written, or empty string","ruled_out_places":["as written"],"exclude_locations":["exact coverage location"],"subject_label":"short phrase, or empty string","follow_up":"narrow"|"more"|"reject"|"new"|"","parts":{"role":"","seniority":"","field":"","department":"","company":"","skills":[],"exclude":[],"conflict":[]}}.`,
-        user: JSON.stringify({ conversation, coverage, answered: hasClarified, lexical_hits: hits,
+        user: JSON.stringify({ conversation, coverage, answered: hasClarified, requester_role: requesterRole, lexical_hits: hits,
           shown_search: shownSearch || null, shown_context: shownState }),
         temperature: 0.1,
         maxTokens: 800,

@@ -27,6 +27,7 @@
   "conversations.sendInvite": "Envoyer l'invitation calendrier",
   "conversations.messagePlaceholder": "Message",
   "conversations.send": "Envoyer le message",
+  "conversations.personaQuestion": "Qu’est-ce qui vous décrit le mieux ?",
   "conversations.loadOlder": "Charger les messages précédents",
   "conversations.error": "Impossible de mettre à jour cette conversation.",
   "conversations.status.pending": "Demandée",
