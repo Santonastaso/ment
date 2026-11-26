@@ -52,8 +52,9 @@
   "conversations.unreadCount": "{count} messages non lus",
   "conversations.state.reply": "Répondre",
   "conversations.state.confirmTime": "Confirmer l’horaire",
-  "conversations.state.markComplete": "Marquer terminée",
+  "conversations.state.markComplete": "Réfléchir à la rencontre",
   "conversations.state.awaitingReply": "En attente",
   "conversations.newTime": "Nouvel horaire",
   "conversations.calendarSyncWarning": "La session a changé, mais le calendrier n'a pas pu être mis à jour. Vérifiez l'invitation."
 }
+

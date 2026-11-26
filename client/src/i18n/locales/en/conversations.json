@@ -52,8 +52,9 @@
   "conversations.unreadCount": "{count} unread messages",
   "conversations.state.reply": "Reply",
   "conversations.state.confirmTime": "Confirm time",
-  "conversations.state.markComplete": "Mark complete",
+  "conversations.state.markComplete": "Reflect on meeting",
   "conversations.state.awaitingReply": "Waiting",
   "conversations.newTime": "New time",
   "conversations.calendarSyncWarning": "The session changed, but the calendar could not update. Please check the invite."
 }
+

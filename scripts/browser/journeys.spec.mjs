@@ -1145,7 +1145,7 @@ test('onboarding to discovery, request, acceptance, chat and meeting', async ({ 
   await expect(page.getByRole('heading', { name: 'Groups', exact: true })).toBeVisible();
   await page.locator('nav').getByRole('link', { name: /^Messages/ }).click();
   await page.getByRole('button', { name: /Peer Mentor/ }).click();
-  await page.getByRole('button', { name: 'Mark as completed' }).click();
+  await page.getByRole('button', { name: 'Reflect on meeting', exact: true }).click();
   const dialog = page.getByRole('dialog');
   await dialog.getByRole('textbox').fill('Useful conversation');
   await dialog.getByRole('radio').nth(3).click();

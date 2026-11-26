@@ -12,7 +12,7 @@
   "components.ics.ownerOnly": "The person who created this calendar event must update its time. You can still download the .ics file.",
   "components.match.unknown": "Unknown",
 
-  "components.session.markCompleted": "Mark as completed",
+  "components.session.markCompleted": "Reflect on meeting",
   "components.session.close": "Close",
   "components.popup.done": "Done",
 
@@ -201,3 +201,4 @@
   "components.meeting.benefit.no": "Not really",
   "components.meeting.benefitHelp": "Optional. Only counted in school-wide totals, never shown with your name."
 }
+
