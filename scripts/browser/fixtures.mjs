@@ -274,6 +274,10 @@ export const test = base.extend({
     page.on('pageerror', error => errors.push(error.message));
     await page.addInitScript(({ user, peer }) => {
       localStorage.setItem('ment.lang', 'en');
+      // Existing journeys assume the standard student search context. Keep
+      // that context explicit in the fixture; the product still asks a real
+      // member to choose Student or Alumnus on a fresh session.
+      sessionStorage.setItem('ment.discovery.requesterRole', 'student');
       window.fixture = {
         user: JSON.parse(sessionStorage.getItem('ment.fixture.auth') || 'null') || user,
         persistAuth: sessionStorage.getItem('ment.fixture.persistAuth') === '1',
