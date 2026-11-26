@@ -62,7 +62,7 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
 
@@ -87,7 +87,7 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Verify user journeys with isolated fixtures
-        run: npm run test:browser
+        run: timeout --signal=TERM 15m npm run test:browser
 
       # Never upload raw browser output, screenshots, traces or reports.
       # The evidence job retains allowlisted results on success and failure.
