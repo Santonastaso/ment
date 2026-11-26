@@ -100,6 +100,7 @@ export default function CvImport({ profile, onApplied }) {
     <DialogContent className={review ? 'sm:max-w-3xl' : 'sm:max-w-md'} showCloseButton={!busy}>
       <DialogHeader><DialogTitle>{review ? t('profile.cv.reviewTitle') : t('profile.cv.open')}</DialogTitle><DialogDescription>{review ? t('onboarding.import.reviewNotice') : t('onboarding.import.desc')}</DialogDescription></DialogHeader>
       {!review && <>
+      <p className="-mt-2 text-xs text-muted-foreground">{t('profile.cv.retentionNotice')}</p>
       <label className="flex items-start gap-2 text-sm text-muted-foreground">
         <input type="checkbox" className="mt-0.5" checked={consent} onChange={event => setConsent(event.target.checked)} />
         <span>{t('onboarding.import.consent')}</span>

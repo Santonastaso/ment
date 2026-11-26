@@ -125,7 +125,6 @@ const FAMILIES = {
   'admin.users.role.*': 'student alumnus admin',
   'components.ics.*.*': 'add|google add|microsoft connect|google connect|microsoft',
   'components.monthYear.month*': '01 02 03 04 05 06 07 08 09 10 11 12',
-  'components.sessionRequest.day*': '1 3 7',
   'conversations.status.*': 'pending scheduled completed declined cancelled expired',
   'graph.filter.*': 'persona cohort skill',
   'graph.kind.*': 'skill person',

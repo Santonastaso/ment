@@ -236,8 +236,12 @@ export default function Profile() {
       const link = Object.assign(document.createElement('a'), { href: url, download: `ment-data-${new Date().toISOString().slice(0, 10)}.csv` });
       document.body.appendChild(link);
       link.click();
-      link.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 0);
+      // Give the browser time to claim both the anchor and the blob. Removing
+      // either immediately can cancel the download in Chromium and mobile WebKit.
+      window.setTimeout(() => {
+        link.remove();
+        URL.revokeObjectURL(url);
+      }, 1000);
     } catch {
       showToast(t('profile.data.error'));
     } finally {

@@ -61,6 +61,17 @@ test('message notification contains no member-written content and expires once r
   assert.equal(isDeliverable(notification, session, now, { ...message, sender_id: mentor }), false);
 });
 
+test('group join notifications contain only a generic review link', () => {
+  const payload = { group_id: 7, requester_id: 'requester', group_name: 'Finance Association' };
+  const notification = row('group_join_request_received', mentor, payload);
+  const content = messageFor('group_join_request_received', payload, 'https://ment-labs.com');
+  assert.equal(content.subject, 'A new request to join your MENT group');
+  assert.match(content.text, /Finance Association/);
+  assert.match(content.text, /https:\/\/ment-labs\.com\/groups/);
+  assert.equal(isDeliverable(notification, null, now), true);
+  assert.equal(isDeliverable(notification, null, now, undefined), true);
+});
+
 test('reserved and configured test domains never reach the email provider', () => {
   assert.equal(isDeliverableEmail('member@essec.edu', ['ment.io']), true);
   assert.equal(isDeliverableEmail('demo@ment.invalid'), false);

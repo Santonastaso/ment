@@ -26,6 +26,11 @@ export function messageFor(topic, payload, origin, routeToken) {
     ["Take two minutes to note what went well this week and what you'd like to learn next. Your reflections are private to you."],
     'Write a reflection', `${origin}/profile`, origin,
   );
+  if (topic === 'group_join_request_received') return email(
+    'A new request to join your MENT group',
+    [`Someone has asked to join ${String(payload.group_name || 'your group')}. Review the request in MENT when you can.`],
+    'Review the request', `${origin}/groups`, origin,
+  );
   if (!Number.isSafeInteger(sessionId) || sessionId <= 0) return null;
   if (topic === 'session_request_received') return email(
     'Someone would like your advice on MENT',
@@ -84,6 +89,9 @@ export function isDeliverable(
   const createdAt = new Date(row.created_at).getTime();
   if (!Number.isFinite(createdAt) || createdAt > now || now - createdAt > maxAge * 86400000) return false;
   if (row.topic === 'reflection_reminder') return true;
+  if (row.topic === 'group_join_request_received') {
+    return session === null && Boolean(payload.group_id) && Boolean(payload.requester_id);
+  }
   if (!session) return false;
   if (row.topic === 'session_request_received') {
     return session.status === 'pending' && session.mentor_id === row.user_id;

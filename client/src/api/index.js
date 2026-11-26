@@ -1443,6 +1443,13 @@ async function put(url, body = {}) {
 async function del(url) {
   const viewer = await getViewer();
 
+  if (/^\/sessions\/\d+\/delete$/.test(url)) {
+    const id = Number(url.split('/')[2]);
+    const { error } = await supabase.rpc('delete_peer_conversation', { p_session_id: id });
+    if (error) throw new ApiError(error.message, 404);
+    return ok({ id, deleted: true });
+  }
+
   if (/^\/discovery\/threads\/[0-9a-f-]+$/i.test(url)) {
     const id = url.split('/')[3];
     const { error } = await supabase.from('discovery_threads').delete()

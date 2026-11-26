@@ -43,13 +43,6 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
   const minDateTime = new Date(minDate.getTime() - minDate.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
   const suggestedDate = new Date(Date.now() + 90 * 60 * 1000);
   const suggestedDateTime = new Date(suggestedDate.getTime() - suggestedDate.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-  function pickDay(days) {
-    const date = new Date();
-    date.setDate(date.getDate() + days);
-    date.setHours(14, 0, 0, 0);
-    setScheduledAt(new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16));
-  }
-
   function hasInvalidTime() {
     return scheduledAt && (!Number.isFinite(new Date(scheduledAt).getTime()) || new Date(scheduledAt).getTime() < Date.now() + 60 * 60 * 1000);
   }
@@ -105,12 +98,6 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
   }, [mentor, teachSkills]);
   // A topic is enough to start a conversation; not everyone has one precise question.
   const focus = question.trim() || (selectedTopics.length ? t('components.sessionRequest.generalInterest', { topics: selectedTopics.join(', ') }) : '');
-  const sameDay = days => {
-    const date = new Date();
-    date.setDate(date.getDate() + days);
-    return scheduledAt.slice(0, 10) === new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-  };
-
   const stepTitle = [
     t('components.sessionRequest.step1Label'),
     t('components.sessionRequest.step2Label'),
@@ -276,10 +263,6 @@ export default function SessionRequestModal({ mentor, onClose, onSuccess, initia
                 <Button type="button" variant={scheduledAt ? 'default' : 'outline'} className="h-auto min-h-11 whitespace-normal px-3" aria-pressed={!!scheduledAt} onClick={() => setScheduledAt(suggestedDateTime)}>{t('components.sessionRequest.pickTime')}</Button>
               </div>
               {scheduledAt && <div className="flex flex-wrap items-end gap-3">
-                <div className="flex w-full flex-wrap gap-2 pb-1">
-                  {[1, 3, 7].map(days => <Button key={days} type="button" size="sm" variant={sameDay(days) ? 'default' : 'outline'} aria-pressed={sameDay(days)} onClick={() => pickDay(days)}>{t(`components.sessionRequest.day${days}`)}</Button>)}
-                  <p className="w-full text-xs text-muted-foreground">{t('components.sessionRequest.quickDayHint')}</p>
-                </div>
                 <label className="label block w-40">{t('components.sessionRequest.date')}
                   <input type="date" className="input mt-1 text-center" min={minDateTime.slice(0, 10)} value={scheduledAt.slice(0, 10)} onChange={e => setScheduledAt(`${e.target.value}T${scheduledAt.slice(11, 16)}`)} />
                 </label>

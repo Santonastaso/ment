@@ -821,6 +821,8 @@ a.person-row-name:hover { color: var(--primary-text); text-decoration: underline
 .conversation-header-person strong, .conversation-header-person span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .conversation-header-actions { display: flex; align-items: center; gap: 6px; }
 .conversation-header-actions button, .conversation-header-actions summary { background: var(--background); }
+.conversation-completion-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 12px 24px 0; border: 1px solid var(--border-subtle); border-radius: var(--control-radius); background: var(--status-attention-bg); color: var(--status-attention-fg); padding: 10px 12px 10px 14px; font-size: var(--type-caption); font-weight: 600; }
+.conversation-completion-banner .conversation-icon-action { color: var(--status-attention-fg); }
 .conversation-back { display: none; border: 0; background: transparent; }
 .conversation-icon-action { color: var(--muted-foreground); }
 .conversation-icon-action:hover { color: var(--foreground); }
@@ -899,6 +901,7 @@ a.person-row-name:hover { color: var(--primary-text); text-decoration: underline
   .conversation-back { display: grid; place-items: center; }
   .conversation-header { grid-template-columns: 24px 32px minmax(0, 1fr) auto; gap: 8px; margin: 12px 16px 0; padding: 12px; }
   .conversation-header-actions { gap: 3px; }
+  .conversation-completion-banner { margin: 10px 16px 0; }
   .conversation-messages { padding-inline: 16px; }
   .conversation-composer { width: calc(100% - 32px); }
   .conversations-shell.is-list-collapsed { grid-template-columns: 1fr; }
