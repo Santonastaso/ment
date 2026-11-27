@@ -29,9 +29,19 @@ function hasServiceRole(req: Request) {
   }
 }
 
+// The database scheduler cannot hold a service-role JWT. It instead presents a
+// high-entropy token kept in Supabase Vault; this check is executed with this
+// function's own service-role client, so that token never becomes browser data.
+async function hasWorkerToken(req: Request) {
+  const token = req.headers.get('x-notification-worker-token');
+  if (!token || token.length > 256) return false;
+  const { data, error } = await sb.rpc('notification_worker_token_matches', { p_token: token });
+  return !error && data === true;
+}
+
 Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
-  if (!hasServiceRole(req)) return json({ error: 'service_role_required' }, 403);
+  if (!hasServiceRole(req) && !(await hasWorkerToken(req))) return json({ error: 'worker_auth_required' }, 403);
   if (!resendKey) return json({ error: 'RESEND_API_KEY_not_configured' }, 503);
   if (!from || !appOrigin || !/^https:\/\/[^/]+$/i.test(appOrigin)) {
     return json({ error: 'notification_sender_not_configured' }, 503);

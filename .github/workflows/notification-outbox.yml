@@ -1,13 +1,10 @@
 name: notification-outbox
 
 on:
-  schedule:
-    - cron: '*/15 * * * *'
   workflow_dispatch:
 
 jobs:
   send:
-    if: github.event_name == 'workflow_dispatch' || vars.NOTIFICATIONS_ENABLED == 'true'
     environment: production
     runs-on: ubuntu-latest
     concurrency:

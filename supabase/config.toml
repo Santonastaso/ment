@@ -29,7 +29,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.send-notification-outbox]
-verify_jwt = true
+verify_jwt = false
 
 [functions.discovery-assistant]
 verify_jwt = true
